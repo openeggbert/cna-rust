@@ -1,5 +1,8 @@
 # CNA Rust
 
+> **Status: In progress - ZATÍM NEFUNKČNÍ**
+
+
 This workspace exposes [CNA](https://github.com/openeggbert/cna) through raw
 `cna-sys` declarations and a safe `cna` crate with an XNA-compatible module
 tree.
