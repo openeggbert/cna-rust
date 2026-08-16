@@ -1,6 +1,6 @@
 # CNA Rust
 
-> **Status: In progress - ZATÍM NEFUNKČNÍ**
+> **Status: In progress - NOT YET FUNCTIONAL**
 
 
 This workspace exposes [CNA](https://github.com/openeggbert/cna) through raw
