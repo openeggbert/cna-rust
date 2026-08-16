@@ -7,7 +7,7 @@ version = "0.0.0"
 edition = "2021"
 rust-version = "1.74"
 license = "Ms-PL"
-repository = "https://github.com/openeggbert/cna-sys"
+repository = "https://github.com/openeggbert/cna-rust"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
