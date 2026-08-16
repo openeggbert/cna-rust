@@ -1,32 +1,33 @@
 # CNA Rust
 
-This workspace exposes [CNA](https://github.com/openeggbert/cna) through a raw
-`cna-sys` crate and a safe `cna` crate whose public module tree mirrors CNA and
-XNA 4.0 namespaces.
+This workspace exposes [CNA](https://github.com/openeggbert/cna) through raw
+`cna-sys` declarations and a safe `cna` crate with an XNA-compatible module
+tree.
 
 ```text
 Rust game
    ↓
-cna::Microsoft::Xna::Framework compatibility modules
+cna::Microsoft::Xna::Framework::{Graphics, Input, Content}
    ↓
-cna::CNA::Framework modules
+cna-sys
    ↓
-cna-sys → stable CNA C ABI → CNA C++
+CNA stable C ABI
+   ↓
+CNA C++ Microsoft::Xna::Framework implementation
 ```
 
 ## Status
 
-**Early scaffold.** The corrected module hierarchy and initial safe values are
-present. `cna-sys` intentionally contains no guessed ABI declarations while the
-canonical CNA C API does not exist.
+**Early scaffold.** The compatibility modules and first safe value types exist.
+`cna-sys` contains no guessed declarations while the canonical C ABI is absent.
 
 ```rust
 use cna::Microsoft::Xna::Framework::{Color, Game, GameTime, Vector2};
 ```
 
-The capitalized modules are intentional compatibility modules. Private
-lowercase implementation modules may follow Rust conventions internally, but
-the public hierarchy preserves the CNA/XNA namespace identity.
+Binding-specific `Result`, error, and runner utilities live at
+the `cna` crate root. There is deliberately no `cna::CNA::Framework` module.
+Future `CNA` modules must mirror concrete native `CNA::...` extensions.
 
 See [architecture](docs/architecture.md) and [plan](plan.md).
 

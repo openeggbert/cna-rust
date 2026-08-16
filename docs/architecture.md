@@ -1,22 +1,21 @@
 # Architecture
 
 ```text
-cna::Microsoft::Xna::Framework::{Graphics, Input, Content}
+cna::Microsoft::Xna::Framework compatibility modules
                               ↓
-cna::CNA::Framework::{Graphics, Input, Content}
+cna crate-private bridge and crate-root binding utilities
                               ↓
-cna::CNA::Interop
+cna-sys raw declarations
                               ↓
-cna-sys
+CNA stable C ABI
                               ↓
-CNA stable C ABI → CNA C++ core
+CNA C++: Microsoft::Xna::Framework
 ```
 
-`cna-sys` contains only exact raw declarations derived from canonical CNA C
-headers. The safe `cna` crate owns all Rust safety policy and exposes the
-capitalized compatibility module trees.
+`cna-sys` will contain exact raw declarations derived from canonical CNA C
+headers. The safe crate owns Rust errors, RAII, borrowing, callback context,
+thread-safety decisions, and shutdown.
 
-Native resource wrappers will use RAII and `Drop`; borrowed objects carry
-lifetimes; errors become `Result`; `Send` and `Sync` are granted only where the
-ABI permits them. C++ exceptions and Sharp Runtime ownership/layout details
-never cross the C ABI.
+There is no public `CNA::Framework` module because no corresponding namespace
+exists in CNA C++. A public `CNA` module is valid only for specific extensions
+that mirror real native `CNA::...` declarations.

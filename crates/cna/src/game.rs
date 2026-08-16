@@ -13,12 +13,6 @@ pub struct GameTime {
     pub running_slowly: bool,
 }
 
-/// Borrowed access to CNA services during a lifecycle callback.
-#[derive(Debug, Default)]
-pub struct GameContext {
-    _private: (),
-}
-
 /// Receives lifecycle callbacks from CNA's native game loop.
 pub trait Game {
     /// Initializes game-owned state.
@@ -26,7 +20,7 @@ pub trait Game {
     /// # Errors
     ///
     /// Returns an error when initialization cannot complete.
-    fn initialize(&mut self, _context: &mut GameContext) -> Result<()> {
+    fn initialize(&mut self) -> Result<()> {
         Ok(())
     }
 
@@ -35,7 +29,7 @@ pub trait Game {
     /// # Errors
     ///
     /// Returns an error when content cannot be loaded.
-    fn load_content(&mut self, _context: &mut GameContext) -> Result<()> {
+    fn load_content(&mut self) -> Result<()> {
         Ok(())
     }
 
@@ -44,7 +38,7 @@ pub trait Game {
     /// # Errors
     ///
     /// Returns an error when the update cannot complete.
-    fn update(&mut self, _context: &mut GameContext, _time: &GameTime) -> Result<()> {
+    fn update(&mut self, _time: &GameTime) -> Result<()> {
         Ok(())
     }
 
@@ -53,7 +47,7 @@ pub trait Game {
     /// # Errors
     ///
     /// Returns an error when the frame cannot be drawn.
-    fn draw(&mut self, _context: &mut GameContext, _time: &GameTime) -> Result<()> {
+    fn draw(&mut self, _time: &GameTime) -> Result<()> {
         Ok(())
     }
 
@@ -62,7 +56,7 @@ pub trait Game {
     /// # Errors
     ///
     /// Returns an error when cleanup cannot complete.
-    fn unload_content(&mut self, _context: &mut GameContext) -> Result<()> {
+    fn unload_content(&mut self) -> Result<()> {
         Ok(())
     }
 }
