@@ -1,6 +1,6 @@
 [package]
 name = "cna"
-description = "Safe, idiomatic Rust frontend for the native CNA game framework"
+description = "Safe CNA and Microsoft.Xna.Framework-compatible Rust frontend"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

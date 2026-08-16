@@ -1,32 +1,22 @@
 # Architecture
 
 ```text
-Rust game
-   ↓
-cna (safe, idiomatic API; Result and RAII)
-   ↓
-cna-sys (raw generated/audited C declarations)
-   ↓
-CNA stable C ABI
-   ↓
-CNA C++ core → Sharp Runtime, subsystems, renderers
+cna::Microsoft::Xna::Framework::{Graphics, Input, Content}
+                              ↓
+cna::CNA::Framework::{Graphics, Input, Content}
+                              ↓
+cna::CNA::Interop
+                              ↓
+cna-sys
+                              ↓
+CNA stable C ABI → CNA C++ core
 ```
 
-This repository is named `cna-sys`, but hosts both layers as one Cargo
-workspace so raw declarations and safe wrappers are reviewed and versioned
-together. Applications should depend on `cna`; direct `cna-sys` use is reserved
-for low-level integration work.
+`cna-sys` contains only exact raw declarations derived from canonical CNA C
+headers. The safe `cna` crate owns all Rust safety policy and exposes the
+capitalized compatibility module trees.
 
-The safe crate keeps value math in Rust, maps native errors to `Result`, and
-will own native resources with RAII and `Drop`. Borrowed resources carry Rust
-lifetimes and cannot be released. Raw handles never appear in safe public APIs.
-High-frequency draw commands and buffers cross in batches; input crosses as
-snapshots.
-
-The raw crate remains intentionally empty until the canonical C headers exist.
-It will use exact fixed-width layouts, explicit ABI/struct versioning, UTF-8,
-opaque generation-checked handles, and callback context pointers. Generated
-output must be checked and accompanied by ABI layout/link smoke tests.
-
-Sharp Runtime is below the C ABI. Rust ownership models CNA handles only and
-must never depend on Sharp Runtime's objects, exceptions, or layouts.
+Native resource wrappers will use RAII and `Drop`; borrowed objects carry
+lifetimes; errors become `Result`; `Send` and `Sync` are granted only where the
+ABI permits them. C++ exceptions and Sharp Runtime ownership/layout details
+never cross the C ABI.

@@ -1,7 +1,5 @@
-//! Safe Rust frontend for the native CNA game framework.
-//!
-//! This is an early scaffold. Local values are usable now; native execution
-//! will be implemented after CNA publishes its stable C ABI.
+//! CNA and Microsoft.Xna.Framework-compatible Rust namespaces over CNA's
+//! stable C ABI.
 
 #![forbid(unsafe_code)]
 
@@ -9,12 +7,54 @@ mod error;
 mod game;
 mod value;
 
-pub use error::{CnaError, Result};
-pub use game::{run, Game, GameContext, GameTime};
-pub use value::{Color, Vector2};
+/// CNA-native API hierarchy.
+#[allow(non_snake_case)]
+pub mod CNA {
+    /// CNA.Framework public values and lifecycle types.
+    pub mod Framework {
+        pub use crate::error::{CnaError, Result};
+        pub use crate::game::{run, Game, GameContext, GameTime};
+        pub use crate::value::{Color, Vector2};
 
-/// Returns whether the raw crate contains canonical CNA ABI declarations.
-#[must_use]
-pub const fn native_bindings_available() -> bool {
-    cna_sys::BINDINGS_AVAILABLE
+        /// CNA.Framework.Graphics native resource wrappers.
+        pub mod Graphics {}
+
+        /// CNA.Framework.Input snapshots and enumerations.
+        pub mod Input {}
+
+        /// CNA.Framework.Content loading APIs.
+        pub mod Content {}
+    }
+
+    /// Low-level ABI status. Application code should use `CNA::Framework`.
+    pub mod Interop {
+        /// Returns whether canonical CNA ABI declarations are available.
+        #[must_use]
+        pub const fn bindings_available() -> bool {
+            cna_sys::BINDINGS_AVAILABLE
+        }
+    }
+}
+
+/// XNA 4.0-compatible API hierarchy backed by CNA.
+#[allow(non_snake_case)]
+pub mod Microsoft {
+    /// Microsoft.Xna namespace.
+    pub mod Xna {
+        /// Microsoft.Xna.Framework compatibility facade.
+        pub mod Framework {
+            pub use crate::CNA::Framework::{
+                run, CnaError, Color, Game, GameContext, GameTime, Result, Vector2,
+            };
+
+            /// Microsoft.Xna.Framework.Graphics compatibility types.
+            pub mod Graphics {}
+
+            /// Microsoft.Xna.Framework.Input compatibility types.
+            pub mod Input {}
+
+            /// Microsoft.Xna.Framework.Content compatibility types.
+            pub mod Content {}
+        }
+    }
 }

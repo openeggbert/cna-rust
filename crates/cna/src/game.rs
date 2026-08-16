@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::{CnaError, Result};
+use crate::error::{CnaError, Result};
 
 /// Timing information supplied to one update or draw callback.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
