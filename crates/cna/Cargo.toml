@@ -1,0 +1,17 @@
+[package]
+name = "cna"
+description = "Safe, idiomatic Rust frontend for the native CNA game framework"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+cna-sys = { path = "../cna-sys", version = "0.0.0" }
+
+[lib]
+path = "src/lib.rs"
+
+[lints]
+workspace = true

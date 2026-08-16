@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = ["crates/cna", "crates/cna-sys"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.74"
+license = "Ms-PL"
+repository = "https://github.com/openeggbert/cna-sys"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+all = "warn"
+pedantic = "warn"
