@@ -14,49 +14,34 @@ pub struct GameTime {
 }
 
 /// Receives lifecycle callbacks from CNA's native game loop.
+#[allow(non_snake_case)]
 pub trait Game {
     /// Initializes game-owned state.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when initialization cannot complete.
-    fn initialize(&mut self) -> Result<()> {
+    fn Initialize(&mut self) -> Result<()> {
         Ok(())
     }
 
     /// Loads game content.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when content cannot be loaded.
-    fn load_content(&mut self) -> Result<()> {
+    fn LoadContent(&mut self) -> Result<()> {
         Ok(())
     }
 
     /// Advances game state.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the update cannot complete.
-    fn update(&mut self, _time: &GameTime) -> Result<()> {
+    fn Update(&mut self, _time: &GameTime) -> Result<()> {
         Ok(())
     }
 
     /// Draws one frame.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the frame cannot be drawn.
-    fn draw(&mut self, _time: &GameTime) -> Result<()> {
+    fn Draw(&mut self, _time: &GameTime) -> Result<()> {
         Ok(())
     }
 
     /// Releases game-owned content during shutdown.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when cleanup cannot complete.
-    fn unload_content(&mut self) -> Result<()> {
+    fn UnloadContent(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    fn Exit(&mut self) -> Result<()> {
         Ok(())
     }
 }

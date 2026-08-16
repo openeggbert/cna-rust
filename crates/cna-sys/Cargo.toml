@@ -1,5 +1,5 @@
 [package]
-name = "cna-sys"
+name = "cna-rust-sys"
 description = "Raw declarations for CNA's stable C ABI"
 version.workspace = true
 edition.workspace = true

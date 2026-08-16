@@ -1,5 +1,5 @@
 [package]
-name = "cna"
+name = "cna-rust"
 description = "Safe CNA and Microsoft.Xna.Framework-compatible Rust frontend"
 version.workspace = true
 edition.workspace = true
