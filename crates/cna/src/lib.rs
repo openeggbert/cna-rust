@@ -1,103 +1,82 @@
-//! Microsoft.Xna.Framework-compatible Rust API over CNA's stable C ABI.
+//! Safe Rust projection of Microsoft XNA Framework 4.0 over CNA's stable C ABI.
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_op_in_unsafe_fn)]
 
 mod error;
 mod game;
+mod graphics;
+mod input;
+mod native;
 mod value;
 
 pub use error::{CnaError, Result};
-pub use game::run;
+pub use game::{run, run_for_frames};
 
-/// XNA 4.0-compatible API hierarchy backed by CNA.
+/// XNA 4.0 compatibility hierarchy. Casing intentionally follows XNA.
 #[allow(non_snake_case)]
 pub mod Microsoft {
-    /// Microsoft.Xna namespace.
     pub mod Xna {
-        /// Microsoft.Xna.Framework compatibility facade.
         pub mod Framework {
-            pub use crate::game::{Game, GameTime};
-            pub use crate::value::{Color, Vector2};
+            pub use crate::game::{Game, GameContext, GameTime, TimeSpan};
+            pub use crate::value::{
+                BoundingBox, BoundingSphere, Color, MathHelper, Matrix, Plane, Point, Quaternion,
+                Ray, Rectangle, Vector2, Vector3, Vector4,
+            };
 
-            /// Microsoft.Xna.Framework.Graphics compatibility types.
+            #[allow(non_snake_case, clippy::module_name_repetitions)]
             pub mod Graphics {
-                use super::super::super::value::{Color, Matrix, Vector2};
-                pub struct Viewport {
-                    pub X: i32,
-                    pub Y: i32,
-                    pub Width: i32,
-                    pub Height: i32,
-                }
-                pub struct GraphicsDevice {
-                    pub Viewport: Viewport,
-                }
-                impl GraphicsDevice {
-                    pub fn Clear(&self, _color: Color) {}
-                }
-                pub struct GraphicsDeviceManager {
-                    pub GraphicsDevice: GraphicsDevice,
-                }
-                impl GraphicsDeviceManager {
-                    pub fn new(_game: &impl crate::game::Game) -> Self {
-                        Self {
-                            GraphicsDevice: GraphicsDevice {
-                                Viewport: Viewport { X: 0, Y: 0, Width: 1280, Height: 720 }
-                            }
-                        }
-                    }
-                }
-                pub struct SpriteBatch {}
-                impl SpriteBatch {
-                    pub fn new(_device: &GraphicsDevice) -> Self { Self {} }
-                    pub fn Begin(&self) {}
-                    pub fn End(&self) {}
-                    pub fn Draw(&self, _texture: &Texture2D, _position: Vector2, _color: Color) {}
-                    pub fn DrawRect(&self, _texture: &Texture2D, _rect: [f32; 4], _color: Color) {}
-                }
-                pub struct Texture2D {
-                    pub Width: i32,
-                    pub Height: i32,
-                }
-                pub struct BasicEffect {
-                    pub World: Matrix,
-                    pub View: Matrix,
-                    pub Projection: Matrix,
-                    pub TextureEnabled: bool,
-                    pub Texture: Option<Texture2D>,
-                }
-                impl BasicEffect {
-                    pub fn new(_device: &GraphicsDevice) -> Self {
-                        Self {
-                            World: Matrix::CreateIdentity(),
-                            View: Matrix::CreateIdentity(),
-                            Projection: Matrix::CreateIdentity(),
-                            TextureEnabled: false,
-                            Texture: None,
-                        }
-                    }
-                    pub fn Apply(&self) {}
-                }
+                pub use crate::graphics::{
+                    GraphicsDevice, GraphicsResource, SpriteBatch, Texture, Texture2D, Viewport,
+                };
             }
 
-            /// Microsoft.Xna.Framework.Input compatibility types.
+            #[allow(non_snake_case)]
             pub mod Input {
-                pub enum Keys { Escape }
-                pub struct KeyboardState {}
-                impl KeyboardState {
-                    pub fn IsKeyDown(&self, _key: Keys) -> bool { false }
-                }
-                pub struct Keyboard {}
-                impl Keyboard {
-                    pub fn GetState() -> KeyboardState { KeyboardState {} }
-                }
+                pub use crate::input::{Keyboard, KeyboardState, Keys};
             }
 
-            /// Microsoft.Xna.Framework.Content compatibility types.
-            pub mod Content {
-                pub struct ContentManager {}
-                impl ContentManager {
-                    pub fn Load<T>(&self, _name: &str) -> Result<T, ()> { Err(()) }
-                }
+            /// Reserved strict namespace for the not-yet-implemented XNB facade.
+            #[allow(non_snake_case)]
+            pub mod Content {}
+        }
+    }
+}
+
+/// CNA-specific functionality kept outside the strict XNA projection.
+pub mod extensions {
+    pub mod graphics {
+        use crate::error::Result;
+        use crate::graphics::GraphicsDevice;
+
+        /// Renderer facts queried from CNA rather than inferred from a name.
+        #[derive(Clone, Debug, Eq, PartialEq)]
+        pub struct RendererInfo {
+            pub name: String,
+            pub supports_3d: bool,
+            pub supports_depth_stencil: bool,
+            pub max_texture_dimension: u32,
+        }
+
+        /// CNA renderer diagnostics for a strict XNA `GraphicsDevice`.
+        pub trait RendererInfoExt {
+            /// Queries CNA's active native renderer.
+            ///
+            /// # Errors
+            ///
+            /// Returns the exact error reported by CNA.
+            fn renderer_info(&self) -> Result<RendererInfo>;
+        }
+
+        impl RendererInfoExt for GraphicsDevice<'_> {
+            fn renderer_info(&self) -> Result<RendererInfo> {
+                let (name, supports_3d, supports_depth_stencil, max_texture_dimension) =
+                    self.renderer_info()?;
+                Ok(RendererInfo {
+                    name,
+                    supports_3d,
+                    supports_depth_stencil,
+                    max_texture_dimension,
+                })
             }
         }
     }

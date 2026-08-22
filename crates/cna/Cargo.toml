@@ -6,11 +6,13 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "../../README.md"
 
 [dependencies]
-cna-sys = { path = "../cna-sys", version = "0.0.0" }
+cna-sys = { package = "cna-rust-sys", path = "../cna-sys", version = "0.0.0" }
 
 [lib]
+name = "cna"
 path = "src/lib.rs"
 
 [lints]

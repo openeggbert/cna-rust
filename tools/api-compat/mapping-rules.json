@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "modulePrefix": "cna::",
+  "methodCasing": "preserve",
+  "propertyGetter": "Foo",
+  "propertySetter": "SetFoo",
+  "primaryConstructor": "new",
+  "additionalConstructor": "from_<snake_case_parameter_names>; append _as_<types> only when names collide",
+  "overloadSuffix": "With<PascalCaseParameterNames>; append As<ParameterTypes> only when names collide",
+  "operatorProjection": "Rust operator traits; no synthetic inherent member",
+  "interfaceProjection": "trait",
+  "classProjection": "struct-with-contract-traits",
+  "gameProjection": "Game-trait-plus-GameContext",
+  "timeSpan": "cna::Microsoft::Xna::Framework::TimeSpan",
+  "refOut": "&mut T unless an explicit multi-output result rule applies",
+  "nullable": "Option<T>",
+  "disposal": "Dispose plus idempotent Drop",
+  "syntheticTypes": [
+    {
+      "name": "Microsoft.Xna.Framework.GameContext",
+      "kind": "struct",
+      "members": ["Exit", "GraphicsDevice"]
+    },
+    {
+      "name": "Microsoft.Xna.Framework.TimeSpan",
+      "kind": "struct",
+      "members": [
+        "FromMilliseconds", "FromSeconds", "MaxValue", "MinValue", "Ticks",
+        "TicksPerDay", "TicksPerHour", "TicksPerMillisecond", "TicksPerMinute",
+        "TicksPerSecond", "TotalMilliseconds", "TotalSeconds", "Zero", "from_ticks"
+      ]
+    }
+  ],
+  "typeKindOverrides": {
+    "Microsoft.Xna.Framework.Game": "trait",
+    "Microsoft.Xna.Framework.Graphics.GraphicsResource": "trait",
+    "Microsoft.Xna.Framework.Graphics.Texture": "trait"
+  },
+  "genericTypeRenames": {
+    "Microsoft.Xna.Framework.Content.ContentTypeReader`1": "Microsoft.Xna.Framework.Content.ContentTypeReaderOfT",
+    "Microsoft.Xna.Framework.Graphics.PackedVector.IPackedVector`1": "Microsoft.Xna.Framework.Graphics.PackedVector.IPackedVectorOfT"
+  },
+  "allowlist": []
+}

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "abiVersion": 1792,
+  "symbols": {
+    "cna_get_abi_version": 0,
+    "cna_error_get_last_message_size": 1,
+    "cna_error_copy_last_message": 3,
+    "cna_game_create": 2,
+    "cna_game_set_frame_hooks_ext": 2,
+    "cna_game_run_one_frame": 1,
+    "cna_game_run": 1,
+    "cna_game_request_exit": 1,
+    "cna_game_destroy": 1,
+    "cna_game_get_graphics_device": 2,
+    "cna_graphics_device_get_viewport": 2,
+    "cna_graphics_device_clear_rgba": 5,
+    "cna_graphics_device_supports_capability": 3,
+    "cna_graphics_device_get_renderer_info": 2,
+    "cna_graphics_device_get_renderer_name_size": 2,
+    "cna_graphics_device_copy_renderer_name": 4,
+    "cna_texture2d_create_from_encoded_memory": 5,
+    "cna_texture2d_get_info": 2,
+    "cna_texture2d_destroy": 1,
+    "cna_sprite_batch_create": 2,
+    "cna_sprite_batch_begin": 2,
+    "cna_sprite_batch_submit_many": 3,
+    "cna_sprite_batch_end": 1,
+    "cna_sprite_batch_destroy": 1,
+    "cna_keyboard_get_state": 2,
+    "cna_keyboard_state_is_key_down": 3
+  }
+}
