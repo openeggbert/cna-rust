@@ -30,7 +30,8 @@
     "System.Char": "char",
     "System.String": "String",
     "System.Void": "()",
-    "System.IntPtr": "WindowHandle"
+    "System.IntPtr": "WindowHandle",
+    "System.Type": "TypeId"
   },
   "systemInterfaceTraits": {
     "System.IComparable`1": "PartialOrd",
@@ -40,7 +41,12 @@
     "System.Collections.Generic.IEnumerator`1": "Iterator"
   },
   "interfaceProjectionOverrides": {
-    "Microsoft.Xna.Framework.CurveKeyCollection::System.Collections.Generic.ICollection`1": "IntoIterator"
+    "Microsoft.Xna.Framework.CurveKeyCollection::System.Collections.Generic.ICollection`1": "IntoIterator",
+    "Microsoft.Xna.Framework.Graphics.DisplayModeCollection::System.Collections.Generic.IEnumerable`1": "IntoIterator",
+    "Microsoft.Xna.Framework.GameServiceContainer::System.IServiceProvider": "ServiceProvider"
+  },
+  "baseProjectionOverrides": {
+    "Microsoft.Xna.Framework.DrawableGameComponent": "GameComponentBase"
   },
   "ignoredClrInterfaces": [
     "System.IComparable",
@@ -54,6 +60,28 @@
     "Microsoft.Xna.Framework.Game::Draw",
     "Microsoft.Xna.Framework.Game::UnloadContent",
     "Microsoft.Xna.Framework.Game::OnExiting",
+    "Microsoft.Xna.Framework.Game::Run",
+    "Microsoft.Xna.Framework.Game::RunOneFrame",
+    "Microsoft.Xna.Framework.Game::Tick",
+    "Microsoft.Xna.Framework.Game::SuppressDraw",
+    "Microsoft.Xna.Framework.Game::Exit",
+    "Microsoft.Xna.Framework.Game::ResetElapsedTime",
+    "Microsoft.Xna.Framework.Game::SetInactiveSleepTime",
+    "Microsoft.Xna.Framework.Game::SetIsMouseVisible",
+    "Microsoft.Xna.Framework.Game::SetTargetElapsedTime",
+    "Microsoft.Xna.Framework.Game::SetIsFixedTimeStep",
+    "Microsoft.Xna.Framework.Game::GraphicsDevice",
+    "Microsoft.Xna.Framework.DrawableGameComponent::GraphicsDevice",
+    "Microsoft.Xna.Framework.GameServiceContainer::AddService",
+    "Microsoft.Xna.Framework.GameWindow::SetTitle",
+    "Microsoft.Xna.Framework.GameWindow::SetAllowUserResizing",
+    "Microsoft.Xna.Framework.GameWindow::BeginScreenDeviceChange",
+    "Microsoft.Xna.Framework.GameWindow::EndScreenDeviceChange",
+    "Microsoft.Xna.Framework.GameWindow::EndScreenDeviceChangeWithScreenDeviceName",
+    "Microsoft.Xna.Framework.TitleContainer::OpenStream",
+    "Microsoft.Xna.Framework.Graphics.SamplerStateCollection::*",
+    "Microsoft.Xna.Framework.Graphics.TextureCollection::*",
+    "Microsoft.Xna.Framework.Graphics.GraphicsAdapter::*",
     "Microsoft.Xna.Framework.Graphics.GraphicsDevice::*",
     "Microsoft.Xna.Framework.Graphics.GraphicsResource::Dispose",
     "Microsoft.Xna.Framework.Graphics.SpriteBatch::*",
@@ -69,7 +97,8 @@
     "Microsoft.Xna.Framework.Input.GamePad::*"
   ],
   "fallibleExclusions": [
-    "Microsoft.Xna.Framework.Graphics.GraphicsDevice::ToString"
+    "Microsoft.Xna.Framework.Graphics.GraphicsDevice::ToString",
+    "Microsoft.Xna.Framework.Graphics.GraphicsDevice::Finalize"
   ],
   "mutableReceiverMembers": [
     "*::Dispose",
@@ -81,32 +110,114 @@
     "Microsoft.Xna.Framework.Game::BeginRun",
     "Microsoft.Xna.Framework.Game::EndRun",
     "Microsoft.Xna.Framework.Game::BeginDraw",
-    "Microsoft.Xna.Framework.Game::EndDraw"
+    "Microsoft.Xna.Framework.Game::EndDraw",
+    "Microsoft.Xna.Framework.Game::Run",
+    "Microsoft.Xna.Framework.Game::RunOneFrame"
   ],
+  "sharedReceiverMembers": [
+    "Microsoft.Xna.Framework.GameWindow::AllowUserResizing",
+    "Microsoft.Xna.Framework.Graphics.PresentationParameters::*",
+    "Microsoft.Xna.Framework.Graphics.SamplerStateCollection::*",
+    "Microsoft.Xna.Framework.Graphics.TextureCollection::*"
+  ],
+  "parameterTypeOverrides": {
+    "Microsoft.Xna.Framework.GameComponentCollection::InsertItem::item": "Arc<dyn IGameComponent>",
+    "Microsoft.Xna.Framework.GameComponentCollection::SetItem::item": "Arc<dyn IGameComponent>",
+    "Microsoft.Xna.Framework.GameComponentCollectionEventArgs::.ctor::gameComponent": "Arc<dyn IGameComponent>",
+    "Microsoft.Xna.Framework.GameServiceContainer::AddService::provider": "Arc<dyn Any+Send+Sync>",
+    "Microsoft.Xna.Framework.Graphics.GraphicsDevice::BlendState::value": "Arc<Graphics::BlendState>",
+    "Microsoft.Xna.Framework.Graphics.GraphicsDevice::DepthStencilState::value": "Arc<Graphics::DepthStencilState>",
+    "Microsoft.Xna.Framework.Graphics.GraphicsDevice::RasterizerState::value": "Arc<Graphics::RasterizerState>",
+    "Microsoft.Xna.Framework.Graphics.SamplerStateCollection::Item::value": "Arc<Graphics::SamplerState>",
+    "Microsoft.Xna.Framework.Graphics.TextureCollection::Item::value": "Option<Arc<dyn Graphics::Texture>>"
+  },
+  "returnTypeOverrides": {
+    "Microsoft.Xna.Framework.GameComponent::Game": "Option<Arc<GameState>>",
+    "Microsoft.Xna.Framework.DrawableGameComponent::GraphicsDevice": "Graphics::GraphicsDevice",
+    "Microsoft.Xna.Framework.GameComponentCollectionEventArgs::GameComponent": "Arc<dyn IGameComponent>",
+    "Microsoft.Xna.Framework.GameServiceContainer::GetService": "Option<Arc<dyn Any+Send+Sync>>",
+    "Microsoft.Xna.Framework.TitleContainer::OpenStream": "Box<dyn Read>",
+    "Microsoft.Xna.Framework.Graphics.ResourceCreatedEventArgs::Resource": "Arc<dyn Any+Send+Sync>",
+    "Microsoft.Xna.Framework.Graphics.ResourceDestroyedEventArgs::Tag": "Option<Arc<dyn Any+Send+Sync>>",
+    "Microsoft.Xna.Framework.Graphics.GraphicsDevice::BlendState": "Arc<Graphics::BlendState>",
+    "Microsoft.Xna.Framework.Graphics.GraphicsDevice::DepthStencilState": "Arc<Graphics::DepthStencilState>",
+    "Microsoft.Xna.Framework.Graphics.GraphicsDevice::RasterizerState": "Arc<Graphics::RasterizerState>",
+    "Microsoft.Xna.Framework.Graphics.SamplerStateCollection::Item": "Arc<Graphics::SamplerState>",
+    "Microsoft.Xna.Framework.Graphics.TextureCollection::Item": "Option<Arc<dyn Graphics::Texture>>",
+    "Microsoft.Xna.Framework.Graphics.GraphicsAdapter::Adapters": "&[Self]",
+    "Microsoft.Xna.Framework.Graphics.DisplayModeCollection::Item": "Vec<Graphics::DisplayMode>"
+  },
   "contextInjectedMembers": {
+    "Microsoft.Xna.Framework.Graphics.GraphicsAdapter::UseReferenceDevice": [
+      {
+        "name": "graphicsDevice",
+        "type": "&Graphics::GraphicsDevice"
+      }
+    ],
+    "Microsoft.Xna.Framework.Graphics.GraphicsAdapter::UseNullDevice": [
+      {
+        "name": "graphicsDevice",
+        "type": "&Graphics::GraphicsDevice"
+      }
+    ],
+    "Microsoft.Xna.Framework.Graphics.GraphicsAdapter::DefaultAdapter": [
+      {
+        "name": "graphicsDevice",
+        "type": "&Graphics::GraphicsDevice"
+      }
+    ],
+    "Microsoft.Xna.Framework.Graphics.GraphicsAdapter::Adapters": [
+      {
+        "name": "graphicsDevice",
+        "type": "&Graphics::GraphicsDevice"
+      }
+    ],
     "Microsoft.Xna.Framework.Input.Keyboard::GetState": [
-      {"name": "game", "type": "&GameContext"}
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
     ],
     "Microsoft.Xna.Framework.Input.Mouse::*": [
-      {"name": "game", "type": "&GameContext"}
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
     ],
     "Microsoft.Xna.Framework.Input.GamePad::*": [
-      {"name": "game", "type": "&GameContext"}
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
     ]
   },
   "genericConstraintProjection": {
-    "struct": ["Copy"],
+    "struct": [
+      "Copy"
+    ],
     "class": [],
     "new": []
   },
-  "streamProjection": {"genericName": "R", "bound": "Read", "type": "&mut R"},
-  "outputStreamProjection": {"genericName": "W", "bound": "Write", "type": "&mut W"},
+  "streamProjection": {
+    "genericName": "R",
+    "bound": "Read",
+    "type": "&mut R"
+  },
+  "outputStreamProjection": {
+    "genericName": "W",
+    "bound": "Write",
+    "type": "&mut W"
+  },
   "outputStreamMembers": [
     "Microsoft.Xna.Framework.Graphics.Texture2D::SaveAsJpeg",
     "Microsoft.Xna.Framework.Graphics.Texture2D::SaveAsPng"
   ],
-  "collectionProjections": {"System.Collections.Generic.IEnumerable`1": "&[T]"},
-  "ownedCollectionProjections": {"System.Collections.Generic.IEnumerator`1": "IntoIter<T>"},
+  "collectionProjections": {
+    "System.Collections.Generic.IEnumerable`1": "&[T]"
+  },
+  "ownedCollectionProjections": {
+    "System.Collections.Generic.IEnumerator`1": "IntoIter<T>"
+  },
   "ownedClassPropertyResults": [
     "Microsoft.Xna.Framework.CurveKeyCollection::Item"
   ],
@@ -116,34 +227,130 @@
   "retainedObjectProperties": {
     "Microsoft.Xna.Framework.Graphics.GraphicsResource::Tag": "Option<Arc<dyn Any+Send+Sync>>"
   },
-  "eventProjection": {"addReturn": "u64", "removeParameter": "u64"},
+  "eventProjection": {
+    "receiver": "&Self",
+    "addReturn": "u64",
+    "removeParameter": "u64"
+  },
   "syntheticTypes": [
     {
       "name": "Microsoft.Xna.Framework.GameContext",
       "kind": "struct",
       "members": [
-        {"name": "Exit", "kind": "method", "receiver": "&Self", "parameters": [], "returnType": "Result<()>"},
-        {"name": "GraphicsDevice", "kind": "method", "receiver": "&Self", "parameters": [], "returnType": "Result<Graphics::GraphicsDevice>"}
+        {
+          "name": "Exit",
+          "kind": "method",
+          "receiver": "&Self",
+          "parameters": [],
+          "returnType": "Result<()>"
+        },
+        {
+          "name": "GraphicsDevice",
+          "kind": "method",
+          "receiver": "&Self",
+          "parameters": [],
+          "returnType": "Result<Graphics::GraphicsDevice>"
+        }
       ]
     },
     {
       "name": "Microsoft.Xna.Framework.TimeSpan",
       "kind": "struct",
       "members": [
-        {"name": "FromMilliseconds", "kind": "method", "parameters": [{"name": "milliseconds", "type": "f64"}], "returnType": "Self"},
-        {"name": "FromSeconds", "kind": "method", "parameters": [{"name": "seconds", "type": "f64"}], "returnType": "Self"},
-        {"name": "MaxValue", "kind": "assoc_const", "type": "Self"},
-        {"name": "MinValue", "kind": "assoc_const", "type": "Self"},
-        {"name": "Ticks", "kind": "method", "receiver": "&Self", "parameters": [], "returnType": "i64"},
-        {"name": "TicksPerDay", "kind": "assoc_const", "type": "i64"},
-        {"name": "TicksPerHour", "kind": "assoc_const", "type": "i64"},
-        {"name": "TicksPerMillisecond", "kind": "assoc_const", "type": "i64"},
-        {"name": "TicksPerMinute", "kind": "assoc_const", "type": "i64"},
-        {"name": "TicksPerSecond", "kind": "assoc_const", "type": "i64"},
-        {"name": "TotalMilliseconds", "kind": "method", "receiver": "&Self", "parameters": [], "returnType": "f64"},
-        {"name": "TotalSeconds", "kind": "method", "receiver": "&Self", "parameters": [], "returnType": "f64"},
-        {"name": "Zero", "kind": "assoc_const", "type": "Self"},
-        {"name": "from_ticks", "kind": "method", "parameters": [{"name": "ticks", "type": "i64"}], "returnType": "Self"}
+        {
+          "name": "FromMilliseconds",
+          "kind": "method",
+          "parameters": [
+            {
+              "name": "milliseconds",
+              "type": "f64"
+            }
+          ],
+          "returnType": "Self"
+        },
+        {
+          "name": "FromSeconds",
+          "kind": "method",
+          "parameters": [
+            {
+              "name": "seconds",
+              "type": "f64"
+            }
+          ],
+          "returnType": "Self"
+        },
+        {
+          "name": "MaxValue",
+          "kind": "assoc_const",
+          "type": "Self"
+        },
+        {
+          "name": "MinValue",
+          "kind": "assoc_const",
+          "type": "Self"
+        },
+        {
+          "name": "Ticks",
+          "kind": "method",
+          "receiver": "&Self",
+          "parameters": [],
+          "returnType": "i64"
+        },
+        {
+          "name": "TicksPerDay",
+          "kind": "assoc_const",
+          "type": "i64"
+        },
+        {
+          "name": "TicksPerHour",
+          "kind": "assoc_const",
+          "type": "i64"
+        },
+        {
+          "name": "TicksPerMillisecond",
+          "kind": "assoc_const",
+          "type": "i64"
+        },
+        {
+          "name": "TicksPerMinute",
+          "kind": "assoc_const",
+          "type": "i64"
+        },
+        {
+          "name": "TicksPerSecond",
+          "kind": "assoc_const",
+          "type": "i64"
+        },
+        {
+          "name": "TotalMilliseconds",
+          "kind": "method",
+          "receiver": "&Self",
+          "parameters": [],
+          "returnType": "f64"
+        },
+        {
+          "name": "TotalSeconds",
+          "kind": "method",
+          "receiver": "&Self",
+          "parameters": [],
+          "returnType": "f64"
+        },
+        {
+          "name": "Zero",
+          "kind": "assoc_const",
+          "type": "Self"
+        },
+        {
+          "name": "from_ticks",
+          "kind": "method",
+          "parameters": [
+            {
+              "name": "ticks",
+              "type": "i64"
+            }
+          ],
+          "returnType": "Self"
+        }
       ]
     }
   ],

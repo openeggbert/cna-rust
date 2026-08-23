@@ -6,13 +6,17 @@
 
 #![allow(non_snake_case)]
 
+use std::any::{Any, TypeId};
 use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::Arc;
 
 use cna::Microsoft::Xna::Framework::Graphics::PackedVector::{
     Alpha8, Bgra5551, Byte4, HalfSingle, NormalizedByte2, Short2,
 };
 use cna::Microsoft::Xna::Framework::Graphics::{
-    Blend, BlendState, CompareFunction, CullMode, DepthStencilState, RasterizerState, SamplerState,
+    Blend, BlendState, CompareFunction, CullMode, DepthFormat, DepthStencilState, PresentInterval,
+    PresentationParameters, RasterizerState, RenderTargetUsage, SamplerState, SurfaceFormat,
     TextureAddressMode, TextureFilter, Viewport,
 };
 use cna::Microsoft::Xna::Framework::Input::Touch::{
@@ -24,9 +28,25 @@ use cna::Microsoft::Xna::Framework::Input::{
 };
 use cna::Microsoft::Xna::Framework::{
     BoundingBox, BoundingFrustum, BoundingSphere, Color, Curve, CurveContinuity, CurveKey,
-    CurveLoopType, CurveTangent, MathHelper, Matrix, Plane, Point, Quaternion, Ray, Rectangle,
-    Vector2, Vector3, Vector4,
+    CurveLoopType, CurveTangent, DisplayOrientation, DrawableGameComponent, Game, GameComponent,
+    GameComponentCollection, GameComponentCollectionEventArgs, GameServiceContainer,
+    IGameComponent, MathHelper, Matrix, Plane, Point, Quaternion, Ray, Rectangle, Vector2, Vector3,
+    Vector4,
 };
+use cna::{GameComponentCollectionExt, GameState, GameStateAccess};
+
+#[derive(Default)]
+struct CorpusGame {
+    state: Arc<GameState>,
+}
+
+impl GameStateAccess for CorpusGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for CorpusGame {}
 
 fn bits(value: f32) -> u32 {
     value.to_bits()
@@ -965,6 +985,184 @@ fn pinned_xna_math_observations() {
         ),
         (4, TextureAddressMode::Clamp, TextureFilter::Point)
     );
+    let presentation = PresentationParameters::new();
+    observe!(
+        (
+            presentation.BackBufferWidth(),
+            presentation.BackBufferHeight(),
+            presentation.BackBufferFormat(),
+            presentation.DepthStencilFormat(),
+            presentation.MultiSampleCount(),
+            presentation.DisplayOrientation(),
+            presentation.PresentationInterval(),
+            presentation.RenderTargetUsage(),
+            presentation.IsFullScreen(),
+            presentation.Bounds(),
+        ),
+        (
+            0,
+            0,
+            SurfaceFormat::Color,
+            DepthFormat::None,
+            0,
+            DisplayOrientation::Default,
+            PresentInterval::Default,
+            RenderTargetUsage::DiscardContents,
+            true,
+            Rectangle::new(0, 0, 0, 0),
+        )
+    );
+    let cloned_presentation = presentation.Clone();
+    cloned_presentation.SetBackBufferWidth(640);
+    cloned_presentation.SetIsFullScreen(false);
+    observe!(
+        (
+            presentation.BackBufferWidth(),
+            presentation.IsFullScreen(),
+            cloned_presentation.BackBufferWidth(),
+            cloned_presentation.IsFullScreen(),
+        ),
+        (0, true, 640, false)
+    );
 
-    assert_eq!(observations, 105);
+    // Game/component/service expectations are pinned from the XNA 4 Game IL:
+    // defaults, change-only notifications, retained service identity and
+    // collection duplicate/removal behavior are managed framework semantics.
+    let mut game = CorpusGame::default();
+    observe!(
+        (
+            game.IsActive(),
+            game.IsFixedTimeStep(),
+            game.IsMouseVisible(),
+            game.TargetElapsedTime().Ticks(),
+            game.InactiveSleepTime().Ticks(),
+        ),
+        (true, true, false, 166_667, 200_000)
+    );
+    observe!(
+        game.SetTargetElapsedTime(cna::Microsoft::Xna::Framework::TimeSpan::Zero)
+            .is_err(),
+        true
+    );
+    observe!(
+        game.SetInactiveSleepTime(cna::Microsoft::Xna::Framework::TimeSpan::from_ticks(-1))
+            .is_err(),
+        true
+    );
+    observe!(
+        DisplayOrientation::LandscapeLeft | DisplayOrientation::Portrait,
+        DisplayOrientation::LandscapeLeft | DisplayOrientation::Portrait
+    );
+
+    let services = GameServiceContainer::new();
+    observe!(services.GetService(TypeId::of::<String>()).is_none(), true);
+    let provider: Arc<dyn Any + Send + Sync> = Arc::new(String::from("service"));
+    services
+        .AddService(TypeId::of::<String>(), Arc::clone(&provider))
+        .expect("first service registration");
+    observe!(
+        Arc::ptr_eq(
+            &provider,
+            &services
+                .GetService(TypeId::of::<String>())
+                .expect("retained service")
+        ),
+        true
+    );
+    observe!(
+        services
+            .AddService(TypeId::of::<String>(), Arc::new(String::new()))
+            .is_err(),
+        true
+    );
+    services.RemoveService(TypeId::of::<String>());
+    observe!(services.GetService(TypeId::of::<String>()).is_none(), true);
+
+    let mut component = GameComponent::new(&game);
+    observe!(
+        (
+            component.Enabled(),
+            component.UpdateOrder(),
+            Arc::ptr_eq(&component.Game().expect("parent game"), game.game_state())
+        ),
+        (true, 0, true)
+    );
+    let enabled_events = Arc::new(AtomicUsize::new(0));
+    let enabled_count = Arc::clone(&enabled_events);
+    let enabled_registration = Arc::new(AtomicU64::new(0));
+    let registration_for_handler = Arc::clone(&enabled_registration);
+    let registration = component.AddEnabledChangedHandler(Box::new(move |sender: &dyn Any, _| {
+        enabled_count.fetch_add(1, Ordering::SeqCst);
+        let component = sender
+            .downcast_ref::<GameComponent>()
+            .expect("GameComponent event sender");
+        assert!(
+            component.RemoveEnabledChangedHandler(registration_for_handler.load(Ordering::SeqCst))
+        );
+    }));
+    enabled_registration.store(registration, Ordering::SeqCst);
+    component.SetEnabled(false);
+    component.SetEnabled(true);
+    component.SetEnabled(true);
+    observe!(enabled_events.load(Ordering::SeqCst), 1);
+    let order_events = Arc::new(AtomicUsize::new(0));
+    let order_count = Arc::clone(&order_events);
+    component.AddUpdateOrderChangedHandler(Box::new(move |_: &dyn Any, _| {
+        order_count.fetch_add(1, Ordering::SeqCst);
+    }));
+    component.SetUpdateOrder(0);
+    component.SetUpdateOrder(7);
+    observe!(order_events.load(Ordering::SeqCst), 1);
+
+    let mut drawable = DrawableGameComponent::new(&game);
+    observe!((drawable.Visible(), drawable.DrawOrder()), (true, 0));
+    let drawable_events = Arc::new(AtomicUsize::new(0));
+    let visible_count = Arc::clone(&drawable_events);
+    drawable.AddVisibleChangedHandler(Box::new(move |_: &dyn Any, _| {
+        visible_count.fetch_add(1, Ordering::SeqCst);
+    }));
+    let draw_order_count = Arc::clone(&drawable_events);
+    drawable.AddDrawOrderChangedHandler(Box::new(move |_: &dyn Any, _| {
+        draw_order_count.fetch_add(1, Ordering::SeqCst);
+    }));
+    drawable.SetVisible(false);
+    drawable.SetVisible(false);
+    drawable.SetDrawOrder(3);
+    drawable.SetDrawOrder(3);
+    observe!(drawable_events.load(Ordering::SeqCst), 2);
+
+    let collection = GameComponentCollection::new();
+    let collection_events = Arc::new(AtomicUsize::new(0));
+    let stored: Arc<dyn IGameComponent> = Arc::new(GameComponent::new(&game));
+    let expected = Arc::clone(&stored);
+    let added_count = Arc::clone(&collection_events);
+    collection.AddComponentAddedHandler(Box::new(
+        move |_: &dyn Any, args: GameComponentCollectionEventArgs| {
+            assert!(Arc::ptr_eq(&args.GameComponent(), &expected));
+            added_count.fetch_add(1, Ordering::SeqCst);
+        },
+    ));
+    collection.Add(Arc::clone(&stored));
+    observe!(
+        (collection.Count(), collection_events.load(Ordering::SeqCst)),
+        (1, 1)
+    );
+    observe!(
+        catch_unwind(AssertUnwindSafe(|| collection.Add(Arc::clone(&stored)))).is_err(),
+        true
+    );
+    let removed_count = Arc::clone(&collection_events);
+    collection.AddComponentRemovedHandler(Box::new(move |_: &dyn Any, _| {
+        removed_count.fetch_add(10, Ordering::SeqCst);
+    }));
+    observe!(
+        (
+            collection.Remove(&stored),
+            collection.Count(),
+            collection_events.load(Ordering::SeqCst)
+        ),
+        (true, 0, 11)
+    );
+
+    assert_eq!(observations, 123);
 }

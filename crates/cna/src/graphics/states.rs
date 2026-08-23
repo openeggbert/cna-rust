@@ -32,6 +32,88 @@ const fn native_blend_function(value: BlendFunction) -> sys::CNA_BlendFunction {
     }
 }
 
+fn blend_from_native(value: u32) -> Option<Blend> {
+    Some(match value {
+        0 => Blend::One,
+        1 => Blend::Zero,
+        2 => Blend::SourceColor,
+        3 => Blend::InverseSourceColor,
+        4 => Blend::SourceAlpha,
+        5 => Blend::InverseSourceAlpha,
+        6 => Blend::DestinationColor,
+        7 => Blend::InverseDestinationColor,
+        8 => Blend::DestinationAlpha,
+        9 => Blend::InverseDestinationAlpha,
+        10 => Blend::BlendFactor,
+        11 => Blend::InverseBlendFactor,
+        12 => Blend::SourceAlphaSaturation,
+        _ => return None,
+    })
+}
+
+fn blend_function_from_native(value: u32) -> Option<BlendFunction> {
+    Some(match value {
+        0 => BlendFunction::Add,
+        1 => BlendFunction::Subtract,
+        2 => BlendFunction::ReverseSubtract,
+        sys::CNA_BLEND_FUNCTION_MIN => BlendFunction::Min,
+        sys::CNA_BLEND_FUNCTION_MAX => BlendFunction::Max,
+        _ => return None,
+    })
+}
+
+fn compare_from_native(value: u32) -> Option<CompareFunction> {
+    Some(match value {
+        0 => CompareFunction::Always,
+        1 => CompareFunction::Never,
+        2 => CompareFunction::Less,
+        3 => CompareFunction::LessEqual,
+        4 => CompareFunction::Equal,
+        5 => CompareFunction::GreaterEqual,
+        6 => CompareFunction::Greater,
+        7 => CompareFunction::NotEqual,
+        _ => return None,
+    })
+}
+
+fn stencil_from_native(value: u32) -> Option<StencilOperation> {
+    Some(match value {
+        0 => StencilOperation::Keep,
+        1 => StencilOperation::Zero,
+        2 => StencilOperation::Replace,
+        3 => StencilOperation::Increment,
+        4 => StencilOperation::Decrement,
+        5 => StencilOperation::IncrementSaturation,
+        6 => StencilOperation::DecrementSaturation,
+        7 => StencilOperation::Invert,
+        _ => return None,
+    })
+}
+
+fn texture_address_from_native(value: u32) -> Option<TextureAddressMode> {
+    Some(match value {
+        0 => TextureAddressMode::Wrap,
+        1 => TextureAddressMode::Clamp,
+        2 => TextureAddressMode::Mirror,
+        _ => return None,
+    })
+}
+
+fn texture_filter_from_native(value: u32) -> Option<TextureFilter> {
+    Some(match value {
+        0 => TextureFilter::Linear,
+        1 => TextureFilter::Point,
+        2 => TextureFilter::Anisotropic,
+        3 => TextureFilter::LinearMipPoint,
+        4 => TextureFilter::PointMipLinear,
+        5 => TextureFilter::MinLinearMagPointMipLinear,
+        6 => TextureFilter::MinLinearMagPointMipPoint,
+        7 => TextureFilter::MinPointMagLinearMipLinear,
+        8 => TextureFilter::MinPointMagLinearMipPoint,
+        _ => return None,
+    })
+}
+
 /// Shared managed state for XNA graphics-state resources.
 ///
 /// XNA permits constructing these resources before a device exists and attaches
@@ -94,7 +176,9 @@ impl StateResource {
             return;
         }
         if disposing {
-            let _ = self.disposing.emit(sender);
+            let _ = self
+                .disposing
+                .emit(sender, crate::extensions::events::EventArgs);
         }
     }
 
@@ -159,11 +243,11 @@ macro_rules! graphics_state_resource {
                 self.resource.set_tag(value);
             }
 
-            fn AddDisposingHandler(&mut self, handler: Box<dyn EventHandler>) -> u64 {
+            fn AddDisposingHandler(&self, handler: Box<dyn EventHandler>) -> u64 {
                 self.resource.disposing.add(handler)
             }
 
-            fn RemoveDisposingHandler(&mut self, registration: u64) -> bool {
+            fn RemoveDisposingHandler(&self, registration: u64) -> bool {
                 self.resource.disposing.remove(registration)
             }
 
@@ -260,6 +344,31 @@ impl BlendState {
     #[must_use]
     pub const fn new() -> Self {
         Self::preset(false, "", Blend::One, Blend::One, Blend::Zero, Blend::Zero)
+    }
+
+    pub(super) fn from_native(value: sys::CNA_BlendState, device: &GraphicsDevice) -> Option<Self> {
+        let result = Self {
+            resource: StateResource::new(false, ""),
+            alpha_blend_function: blend_function_from_native(value.alpha_blend_function)?,
+            alpha_destination_blend: blend_from_native(value.alpha_destination_blend)?,
+            alpha_source_blend: blend_from_native(value.alpha_source_blend)?,
+            color_blend_function: blend_function_from_native(value.color_blend_function)?,
+            color_destination_blend: blend_from_native(value.color_destination_blend)?,
+            color_source_blend: blend_from_native(value.color_source_blend)?,
+            color_write_channels: ColorWriteChannels::from_bits(value.color_write_channels),
+            color_write_channels1: ColorWriteChannels::from_bits(value.color_write_channels1),
+            color_write_channels2: ColorWriteChannels::from_bits(value.color_write_channels2),
+            color_write_channels3: ColorWriteChannels::from_bits(value.color_write_channels3),
+            blend_factor: Color::from_r_and_g_and_b_and_a_as_int32_and_int32_and_int32_and_int32(
+                i32::from(value.blend_factor.r),
+                i32::from(value.blend_factor.g),
+                i32::from(value.blend_factor.b),
+                i32::from(value.blend_factor.a),
+            ),
+            multi_sample_mask: value.multi_sample_mask,
+        };
+        result.resource.bind(device).ok()?;
+        Some(result)
     }
 
     pub fn AlphaBlendFunction(&self) -> BlendFunction {
@@ -441,6 +550,41 @@ impl DepthStencilState {
     #[must_use]
     pub const fn new() -> Self {
         Self::preset(false, "", true, true)
+    }
+
+    pub(super) fn from_native(
+        value: sys::CNA_DepthStencilState,
+        device: &GraphicsDevice,
+    ) -> Option<Self> {
+        let result = Self {
+            resource: StateResource::new(false, ""),
+            depth_buffer_enable: value.depth_buffer_enable != sys::CNA_FALSE,
+            depth_buffer_write_enable: value.depth_buffer_write_enable != sys::CNA_FALSE,
+            depth_buffer_function: compare_from_native(value.depth_buffer_function)?,
+            stencil_enable: value.stencil_enable != sys::CNA_FALSE,
+            stencil_function: compare_from_native(value.stencil_function)?,
+            stencil_mask: value.stencil_mask,
+            stencil_write_mask: value.stencil_write_mask,
+            reference_stencil: value.reference_stencil,
+            stencil_fail: stencil_from_native(value.stencil_fail)?,
+            stencil_depth_buffer_fail: stencil_from_native(value.stencil_depth_buffer_fail)?,
+            stencil_pass: stencil_from_native(value.stencil_pass)?,
+            two_sided_stencil_mode: value.two_sided_stencil_mode != sys::CNA_FALSE,
+            counter_clockwise_stencil_function: compare_from_native(
+                value.counter_clockwise_stencil_function,
+            )?,
+            counter_clockwise_stencil_fail: stencil_from_native(
+                value.counter_clockwise_stencil_fail,
+            )?,
+            counter_clockwise_stencil_depth_buffer_fail: stencil_from_native(
+                value.counter_clockwise_stencil_depth_buffer_fail,
+            )?,
+            counter_clockwise_stencil_pass: stencil_from_native(
+                value.counter_clockwise_stencil_pass,
+            )?,
+        };
+        result.resource.bind(device).ok()?;
+        Some(result)
     }
 
     pub fn DepthBufferEnable(&self) -> bool {
@@ -637,6 +781,32 @@ impl RasterizerState {
         Self::preset(false, "", CullMode::CullCounterClockwiseFace)
     }
 
+    pub(super) fn from_native(
+        value: sys::CNA_RasterizerState,
+        device: &GraphicsDevice,
+    ) -> Option<Self> {
+        let result = Self {
+            resource: StateResource::new(false, ""),
+            cull_mode: match value.cull_mode {
+                0 => CullMode::None,
+                1 => CullMode::CullClockwiseFace,
+                2 => CullMode::CullCounterClockwiseFace,
+                _ => return None,
+            },
+            fill_mode: match value.fill_mode {
+                0 => FillMode::Solid,
+                1 => FillMode::WireFrame,
+                _ => return None,
+            },
+            depth_bias: value.depth_bias,
+            slope_scale_depth_bias: value.slope_scale_depth_bias,
+            multi_sample_anti_alias: value.multi_sample_anti_alias != sys::CNA_FALSE,
+            scissor_test_enable: value.scissor_test_enable != sys::CNA_FALSE,
+        };
+        result.resource.bind(device).ok()?;
+        Some(result)
+    }
+
     pub fn CullMode(&self) -> CullMode {
         self.cull_mode
     }
@@ -779,6 +949,24 @@ impl SamplerState {
     #[must_use]
     pub const fn new() -> Self {
         Self::preset(false, "", TextureFilter::Linear, TextureAddressMode::Wrap)
+    }
+
+    pub(super) fn from_native(
+        value: sys::CNA_SamplerState,
+        device: &GraphicsDevice,
+    ) -> Option<Self> {
+        let result = Self {
+            resource: StateResource::new(false, ""),
+            address_u: texture_address_from_native(value.address_u)?,
+            address_v: texture_address_from_native(value.address_v)?,
+            address_w: texture_address_from_native(value.address_w)?,
+            filter: texture_filter_from_native(value.filter)?,
+            max_anisotropy: value.max_anisotropy,
+            max_mip_level: value.max_mip_level,
+            mip_map_level_of_detail_bias: value.mip_map_level_of_detail_bias,
+        };
+        result.resource.bind(device).ok()?;
+        Some(result)
     }
 
     pub fn Filter(&self) -> TextureFilter {

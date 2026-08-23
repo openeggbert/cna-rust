@@ -422,6 +422,10 @@ def clr_value_type(
     if base == "System.IO.Stream":
         return rules["streamProjection"]["genericName"]
     if base.startswith("System.EventHandler"):
+        if arguments:
+            payload = clr_value_type(arguments[0], rules, current, reference_types, method_generics)
+            if payload != "EventArgs":
+                return "Box<dyn EventHandler<" + payload + ">>"
         return "Box<dyn EventHandler>"
     if base.startswith("System."):
         name = base.rsplit(".", 1)[-1]
@@ -446,12 +450,19 @@ def clr_parameter_type(
     reference_types: dict[str, dict],
     method_generics: list[dict],
 ) -> str:
+    override = rules.get("parameterTypeOverrides", {}).get(
+        current["name"] + "::" + member["name"] + "::" + (parameter.get("name") or "value")
+    )
+    if override:
+        return override
     value = parameter["type"]
     by_reference = value.endswith("&")
     if by_reference:
         value = value[:-1]
     if value == "System.Object":
         return "&dyn Any"
+    if value == "System.Exception":
+        return "&dyn Error"
     base, arguments = split_generic_arguments(value)
     collection = rules.get("collectionProjections", {}).get(base)
     if collection and len(arguments) == 1:
@@ -478,7 +489,13 @@ def clr_parameter_type(
         return ("&mut [" if mutable else "&[") + element + "]"
     else:
         mapped = clr_value_type(value, rules, current, reference_types, method_generics)
-        contract = reference_types.get(split_generic_arguments(value)[0])
+        contract_name = split_generic_arguments(value)[0]
+        contract = reference_types.get(contract_name)
+        projected_kind = rules.get("typeKindOverrides", {}).get(
+            contract_name, contract.get("kind") if contract else None
+        )
+        if projected_kind in {"interface", "trait", "delegate"}:
+            mapped = "dyn " + mapped
         borrowed = bool(contract and contract["kind"] in {"class", "interface", "delegate"}) or value == "System.Object"
     if by_reference:
         # A CLR `ref` parameter is an alias through which the callee may write;
@@ -522,6 +539,9 @@ def is_fallible(type_name: str, member_name: str, rules: dict) -> bool:
 
 
 def mutable_receiver(contract_type: dict, member: dict, rules: dict) -> bool:
+    if any(rule_matches(pattern, contract_type["name"], member["name"])
+           for pattern in rules.get("sharedReceiverMembers", [])):
+        return False
     if member.get("mapping") == "property-setter":
         return True
     if contract_type["name"] == "Microsoft.Xna.Framework.Game" and member["name"] in {
@@ -541,13 +561,28 @@ def projected_return_type(
     reference_types: dict[str, dict],
     method_generics: list[dict],
     property_borrow: bool = False,
+    projected_name: str | None = None,
 ) -> str:
+    projected_member_name = projected_name or member["name"]
+    fallible = is_fallible(contract_type["name"], projected_member_name, rules)
+    if projected_member_name != member["name"]:
+        fallible = fallible or is_fallible(
+            contract_type["name"], member["name"], rules
+        )
+    override = rules.get("returnTypeOverrides", {}).get(
+        contract_type["name"] + "::" + projected_member_name
+    )
+    if override:
+        mapped = override
+        if fallible:
+            mapped = "Result<" + mapped + ">"
+        return mapped
     mapped = clr_value_type(value or "System.Void", rules, contract_type, reference_types, method_generics)
     if property_borrow and value:
         referenced = reference_types.get(split_generic_arguments(value)[0])
         if referenced and referenced["kind"] in {"class", "interface", "delegate"}:
             mapped = "&" + mapped
-    if is_fallible(contract_type["name"], member["name"], rules):
+    if fallible:
         mapped = "Result<" + mapped + ">"
     return mapped
 
@@ -604,7 +639,8 @@ def callable_descriptor(
                 returned = "Result<Self>"
         else:
             returned = projected_return_type(
-                member.get("returnType"), contract_type, member, rules, reference_types, generics
+                member.get("returnType"), contract_type, member, rules, reference_types, generics,
+                projected_name=projected_name
             )
         signature = {"parameters": parameters, "returnType": returned, "generics": generics, "refOut": ref_out}
     signature.update({
@@ -688,12 +724,14 @@ def mapped_members(contract_type: dict, rules: dict, reference_types: dict[str, 
                         contract_type, getter, name, rules, reference_types, "property-getter"
                     )
                     descriptor["returnType"] = projected_return_type(
-                        member["type"], contract_type, getter, rules, reference_types, [], property_borrow=True
+                        member["type"], contract_type, getter, rules, reference_types, [],
+                        property_borrow=True, projected_name=name
                     )
                     if any(rule_matches(pattern, contract_type["name"], name)
                            for pattern in rules.get("ownedClassPropertyResults", [])):
                         descriptor["returnType"] = projected_return_type(
-                            member["type"], contract_type, getter, rules, reference_types, []
+                            member["type"], contract_type, getter, rules, reference_types, [],
+                            projected_name=name
                         )
                     if any(rule_matches(pattern, contract_type["name"], name)
                            for pattern in rules.get("optionalClassPropertyResults", [])):
@@ -718,7 +756,11 @@ def mapped_members(contract_type: dict, rules: dict, reference_types: dict[str, 
                     descriptor["parameters"][-1]["type"] = retained_object_type
                 result[setter_name] = descriptor
         elif kind == "event":
-            receiver = [] if member.get("static") else [{"name": "self", "type": "&mut Self"}]
+            # Event registries use interior mutability. This keeps subscription
+            # available through shared identities such as `Game.Components`
+            # and matches CLR reference-object mutation without requiring an
+            # exclusive borrow of the object wrapper.
+            receiver = [] if member.get("static") else [{"name": "self", "type": "&Self"}]
             handler = clr_value_type(member["type"], rules, contract_type, reference_types, [])
             add_name = "Add" + member["name"] + "Handler"
             remove_name = "Remove" + member["name"] + "Handler"
@@ -1028,8 +1070,10 @@ def compare_relations(
 
     base = wanted.get("baseType")
     if base and base.startswith("Microsoft.Xna.Framework."):
-        base_path = "cna::" + rules["genericTypeRenames"].get(base, base).replace(".", "::").replace("`1", "").replace("`2", "")
-        required = relative_rust_path(base_path)
+        required = rules.get("baseProjectionOverrides", {}).get(wanted.get("clrName", ""))
+        if required is None:
+            base_path = "cna::" + rules["genericTypeRenames"].get(base, base).replace(".", "::").replace("`1", "").replace("`2", "")
+            required = relative_rust_path(base_path)
         if required not in traits:
             findings.append(finding(
                 "BASE_PROJECTION_MISMATCH", type_name, expected=required, actual=sorted(traits)

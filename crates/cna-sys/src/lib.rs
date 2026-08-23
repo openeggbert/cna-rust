@@ -30,6 +30,37 @@ pub const CNA_RESULT_BUFFER_TOO_SMALL: CNA_Result = 14;
 pub const CNA_FALSE: CNA_Bool = 0;
 pub const CNA_TRUE: CNA_Bool = 1;
 pub const CNA_INVALID_HANDLE: CNA_Handle = 0;
+pub const CNA_DISPLAY_ORIENTATION_DEFAULT: CNA_DisplayOrientation = 0;
+pub const CNA_DISPLAY_ORIENTATION_LANDSCAPE_LEFT: CNA_DisplayOrientation = 1;
+pub const CNA_DISPLAY_ORIENTATION_LANDSCAPE_RIGHT: CNA_DisplayOrientation = 2;
+pub const CNA_DISPLAY_ORIENTATION_PORTRAIT: CNA_DisplayOrientation = 4;
+pub const CNA_GAME_EVENT_ACTIVATED: CNA_GameEvent = 0;
+pub const CNA_GAME_EVENT_DEACTIVATED: CNA_GameEvent = 1;
+pub const CNA_GAME_EVENT_DISPOSED: CNA_GameEvent = 2;
+pub const CNA_GAME_EVENT_EXITING: CNA_GameEvent = 3;
+pub const CNA_GAME_WINDOW_EVENT_CLIENT_SIZE_CHANGED: CNA_GameWindowEvent = 0;
+pub const CNA_GAME_WINDOW_EVENT_ORIENTATION_CHANGED: CNA_GameWindowEvent = 1;
+pub const CNA_GAME_WINDOW_EVENT_SCREEN_DEVICE_NAME_CHANGED: CNA_GameWindowEvent = 2;
+pub const CNA_GRAPHICS_DEVICE_STATUS_NORMAL: CNA_GraphicsDeviceStatus = 0;
+pub const CNA_GRAPHICS_DEVICE_STATUS_LOST: CNA_GraphicsDeviceStatus = 1;
+pub const CNA_GRAPHICS_DEVICE_STATUS_NOT_RESET: CNA_GraphicsDeviceStatus = 2;
+pub const CNA_GRAPHICS_PROFILE_REACH: CNA_GraphicsProfile = 0;
+pub const CNA_GRAPHICS_PROFILE_HI_DEF: CNA_GraphicsProfile = 1;
+pub const CNA_PRESENT_INTERVAL_DEFAULT: CNA_PresentInterval = 0;
+pub const CNA_PRESENT_INTERVAL_ONE: CNA_PresentInterval = 1;
+pub const CNA_PRESENT_INTERVAL_TWO: CNA_PresentInterval = 2;
+pub const CNA_PRESENT_INTERVAL_IMMEDIATE: CNA_PresentInterval = 3;
+pub const CNA_DEPTH_FORMAT_NONE: CNA_DepthFormat = 0;
+pub const CNA_DEPTH_FORMAT_DEPTH16: CNA_DepthFormat = 1;
+pub const CNA_DEPTH_FORMAT_DEPTH24: CNA_DepthFormat = 2;
+pub const CNA_DEPTH_FORMAT_DEPTH24_STENCIL8: CNA_DepthFormat = 3;
+pub const CNA_RENDER_TARGET_USAGE_DISCARD_CONTENTS: CNA_RenderTargetUsage = 0;
+pub const CNA_RENDER_TARGET_USAGE_PRESERVE_CONTENTS: CNA_RenderTargetUsage = 1;
+pub const CNA_RENDER_TARGET_USAGE_PLATFORM_CONTENTS: CNA_RenderTargetUsage = 2;
+pub const CNA_SHADER_STAGE_PIXEL: CNA_ShaderStage = 0;
+pub const CNA_SHADER_STAGE_VERTEX: CNA_ShaderStage = 1;
+pub const CNA_MAX_SAMPLERS: u32 = 16;
+pub const CNA_TEXTURE_COLLECTION_MAX_TEXTURES: u32 = 16;
 pub const CNA_GRAPHICS_CAPABILITY_THREE_D: CNA_GraphicsCapability = 0;
 pub const CNA_GRAPHICS_CAPABILITY_DEPTH_STENCIL_BUFFER: CNA_GraphicsCapability = 1;
 pub const CNA_SPRITE_SORT_MODE_DEFERRED: CNA_SpriteSortMode = 0;
@@ -160,7 +191,18 @@ pub const CNA_GAMEPAD_BUTTON_ALL: CNA_GamePadButtonFlags = 0x7fff_ffff;
 
 pub type CNA_Result = u32;
 pub type CNA_Bool = u8;
+pub type CNA_DisplayOrientation = u32;
+pub type CNA_GameEvent = u32;
+pub type CNA_GameWindowEvent = u32;
+pub type CNA_GraphicsDeviceStatus = u32;
+pub type CNA_GraphicsProfile = u32;
+pub type CNA_PresentInterval = u32;
+pub type CNA_DepthFormat = u32;
+pub type CNA_RenderTargetUsage = u32;
+pub type CNA_ShaderStage = u32;
+pub type CNA_NativeHandleValue = u64;
 pub type CNA_Handle = u64;
+pub type CNA_GameEventRegistrationHandle = CNA_Handle;
 pub type CNA_ErrorCategory = u32;
 pub type CNA_GraphicsCapability = u32;
 pub type CNA_GraphicsCapabilityFlags = u64;
@@ -223,6 +265,75 @@ pub struct CNA_Rectangle {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_DisplayMode {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub width: i32,
+    pub height: i32,
+    pub aspect_ratio: f32,
+    pub format: CNA_SurfaceFormat,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_PresentationParameters {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub back_buffer_format: CNA_SurfaceFormat,
+    pub back_buffer_width: i32,
+    pub back_buffer_height: i32,
+    pub depth_stencil_format: CNA_DepthFormat,
+    pub multi_sample_count: i32,
+    pub presentation_interval: CNA_PresentInterval,
+    pub display_orientation: CNA_DisplayOrientation,
+    pub render_target_usage: CNA_RenderTargetUsage,
+    pub is_full_screen: CNA_Bool,
+    pub headless_ext: CNA_Bool,
+    pub reserved: [u8; 2],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_TextureSlotInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub bound: CNA_Bool,
+    pub reserved: [u8; 7],
+    pub texture: CNA_Handle,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_GraphicsAdapterInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub adapter_index: u32,
+    pub is_default_adapter: CNA_Bool,
+    pub is_wide_screen: CNA_Bool,
+    pub use_null_device: CNA_Bool,
+    pub use_reference_device: CNA_Bool,
+    pub vendor_id: i32,
+    pub device_id: i32,
+    pub revision: i32,
+    pub subsystem_id: i32,
+    pub description_byte_length: u64,
+    pub device_name_byte_length: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_GraphicsFormatSelection {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub exact_match: CNA_Bool,
+    pub reserved: [u8; 3],
+    pub format: CNA_SurfaceFormat,
+    pub depth_format: CNA_DepthFormat,
+    pub multi_sample_count: i32,
+}
+
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct CNA_ErrorInfo {
     pub struct_size: u32,
@@ -257,6 +368,7 @@ pub type CNA_GameLifecycleCallback = Option<
         *mut CNA_CallbackError,
     ) -> CNA_Result,
 >;
+pub type CNA_GameEventCallback = Option<unsafe extern "C" fn(*mut c_void)>;
 
 pub type CNA_GameBeginDrawCallback = Option<
     unsafe extern "C" fn(
@@ -569,9 +681,138 @@ pub type cna_game_set_frame_hooks_ext_fn =
 pub type cna_game_run_one_frame_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
 pub type cna_game_run_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
 pub type cna_game_request_exit_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_game_get_is_active_fn = unsafe extern "C" fn(CNA_Handle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_game_get_is_mouse_visible_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_game_set_is_mouse_visible_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_Bool) -> CNA_Result;
+pub type cna_game_get_is_fixed_time_step_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_game_set_is_fixed_time_step_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_Bool) -> CNA_Result;
+pub type cna_game_get_target_elapsed_time_ticks_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut i64) -> CNA_Result;
+pub type cna_game_set_target_elapsed_time_ticks_fn =
+    unsafe extern "C" fn(CNA_Handle, i64) -> CNA_Result;
+pub type cna_game_get_inactive_sleep_time_ticks_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut i64) -> CNA_Result;
+pub type cna_game_set_inactive_sleep_time_ticks_fn =
+    unsafe extern "C" fn(CNA_Handle, i64) -> CNA_Result;
+pub type cna_game_reset_elapsed_time_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_game_suppress_draw_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_game_tick_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_game_set_window_title_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_StringView) -> CNA_Result;
+pub type cna_game_subscribe_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    CNA_GameEvent,
+    CNA_GameEventCallback,
+    *mut c_void,
+    *mut CNA_GameEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_game_window_subscribe_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    CNA_GameWindowEvent,
+    CNA_GameEventCallback,
+    *mut c_void,
+    *mut CNA_GameEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_game_unsubscribe_fn =
+    unsafe extern "C" fn(CNA_GameEventRegistrationHandle) -> CNA_Result;
 pub type cna_game_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_game_window_get_allow_user_resizing_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_game_window_set_allow_user_resizing_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_Bool) -> CNA_Result;
+pub type cna_game_window_get_client_bounds_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Rectangle) -> CNA_Result;
+pub type cna_game_window_get_current_orientation_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_DisplayOrientation) -> CNA_Result;
+pub type cna_game_window_get_native_handle_ext_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut u64) -> CNA_Result;
+pub type cna_game_window_get_screen_device_name_size_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut u64) -> CNA_Result;
+pub type cna_game_window_copy_screen_device_name_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_game_window_get_title_size_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut u64) -> CNA_Result;
+pub type cna_game_window_copy_title_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_game_window_begin_screen_device_change_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_Bool) -> CNA_Result;
+pub type cna_game_window_end_screen_device_change_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_StringView, i32, i32) -> CNA_Result;
 pub type cna_game_get_graphics_device_fn =
     unsafe extern "C" fn(CNA_Handle, *mut CNA_Handle) -> CNA_Result;
+pub type cna_graphics_device_get_status_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_GraphicsDeviceStatus) -> CNA_Result;
+pub type cna_graphics_device_get_graphics_profile_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_GraphicsProfile) -> CNA_Result;
+pub type cna_graphics_device_get_presentation_parameters_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_PresentationParameters) -> CNA_Result;
+pub type cna_graphics_device_get_display_mode_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_DisplayMode) -> CNA_Result;
+pub type cna_graphics_device_get_blend_state_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_BlendState) -> CNA_Result;
+pub type cna_graphics_device_get_depth_stencil_state_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_DepthStencilState) -> CNA_Result;
+pub type cna_graphics_device_get_rasterizer_state_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_RasterizerState) -> CNA_Result;
+pub type cna_graphics_device_get_sampler_state_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_ShaderStage, u32, *mut CNA_SamplerState) -> CNA_Result;
+pub type cna_graphics_device_set_sampler_state_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_ShaderStage, u32, *const CNA_SamplerState) -> CNA_Result;
+pub type cna_graphics_device_get_texture_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_ShaderStage, u32, *mut CNA_TextureSlotInfo) -> CNA_Result;
+pub type cna_graphics_device_set_texture_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_ShaderStage, u32, CNA_Handle) -> CNA_Result;
+pub type cna_graphics_device_get_adapter_index_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut u32) -> CNA_Result;
+pub type cna_graphics_adapter_get_count_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut u64) -> CNA_Result;
+pub type cna_graphics_adapter_get_info_fn =
+    unsafe extern "C" fn(CNA_Handle, u32, *mut CNA_GraphicsAdapterInfo) -> CNA_Result;
+pub type cna_graphics_adapter_copy_description_fn =
+    unsafe extern "C" fn(CNA_Handle, u32, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_graphics_adapter_copy_device_name_fn =
+    unsafe extern "C" fn(CNA_Handle, u32, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_graphics_adapter_get_current_display_mode_fn =
+    unsafe extern "C" fn(CNA_Handle, u32, *mut CNA_DisplayMode) -> CNA_Result;
+pub type cna_graphics_adapter_get_display_mode_count_fn =
+    unsafe extern "C" fn(CNA_Handle, u32, CNA_Bool, CNA_SurfaceFormat, *mut u64) -> CNA_Result;
+pub type cna_graphics_adapter_copy_display_modes_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    u32,
+    CNA_Bool,
+    CNA_SurfaceFormat,
+    *mut CNA_DisplayMode,
+    u64,
+    *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_adapter_set_device_preferences_fn =
+    unsafe extern "C" fn(CNA_Handle, u32, CNA_Bool, CNA_Bool) -> CNA_Result;
+pub type cna_graphics_adapter_is_profile_supported_fn =
+    unsafe extern "C" fn(CNA_Handle, u32, CNA_GraphicsProfile, *mut CNA_Bool) -> CNA_Result;
+pub type cna_graphics_adapter_query_render_target_format_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    u32,
+    CNA_GraphicsProfile,
+    CNA_SurfaceFormat,
+    CNA_DepthFormat,
+    i32,
+    *mut CNA_GraphicsFormatSelection,
+) -> CNA_Result;
+pub type cna_graphics_adapter_query_backbuffer_format_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    u32,
+    CNA_GraphicsProfile,
+    CNA_SurfaceFormat,
+    CNA_DepthFormat,
+    i32,
+    *mut CNA_GraphicsFormatSelection,
+) -> CNA_Result;
+pub type cna_graphics_adapter_get_native_monitor_handle_fn =
+    unsafe extern "C" fn(CNA_Handle, u32, *mut CNA_NativeHandleValue) -> CNA_Result;
 pub type cna_graphics_device_get_viewport_fn =
     unsafe extern "C" fn(CNA_Handle, *mut CNA_Viewport) -> CNA_Result;
 pub type cna_graphics_device_set_viewport_fn =
@@ -691,6 +932,7 @@ mod layout_tests {
     use core::mem::{align_of, size_of};
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn reviewed_abi_070_layouts_match_lp64_and_llp64() {
         assert_eq!(
             (size_of::<CNA_StringView>(), align_of::<CNA_StringView>()),

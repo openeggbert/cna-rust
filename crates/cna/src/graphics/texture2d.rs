@@ -17,7 +17,7 @@ use crate::extensions::events::EventHandler;
 use crate::value::Rectangle;
 
 use super::resource::{ResourceKind, ResourceState};
-use super::{GraphicsDevice, GraphicsResource, SurfaceFormat, Texture};
+use super::{GraphicsDevice, GraphicsResource, SurfaceFormat, Texture, TextureRuntime};
 
 /// Owned native XNA `Texture2D` resource.
 pub struct Texture2D {
@@ -474,6 +474,32 @@ impl Texture for Texture2D {
     }
 }
 
+impl TextureRuntime for Texture2D {
+    fn bind_texture_slot(
+        &self,
+        device: &GraphicsDevice,
+        vertex_stage: bool,
+        index: u32,
+    ) -> Result<()> {
+        if !self.state.device().is_same_device(device) {
+            return Err(CnaError::InvalidInput(
+                "texture belongs to a different graphics device",
+            ));
+        }
+        let texture = self.state.require_handle()?;
+        device.state.native().set_texture_slot(
+            device.handle()?,
+            if vertex_stage {
+                sys::CNA_SHADER_STAGE_VERTEX
+            } else {
+                sys::CNA_SHADER_STAGE_PIXEL
+            },
+            index,
+            texture,
+        )
+    }
+}
+
 impl GraphicsResource for Texture2D {
     fn GraphicsDevice(&self) -> Option<&GraphicsDevice> {
         Some(self.state.device())
@@ -499,11 +525,11 @@ impl GraphicsResource for Texture2D {
         self.state.set_tag(value);
     }
 
-    fn AddDisposingHandler(&mut self, handler: Box<dyn EventHandler>) -> u64 {
+    fn AddDisposingHandler(&self, handler: Box<dyn EventHandler>) -> u64 {
         self.state.add_disposing_handler(handler)
     }
 
-    fn RemoveDisposingHandler(&mut self, registration: u64) -> bool {
+    fn RemoveDisposingHandler(&self, registration: u64) -> bool {
         self.state.remove_disposing_handler(registration)
     }
 

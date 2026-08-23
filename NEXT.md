@@ -1,61 +1,59 @@
 # Session evidence and next work
 
-## 2026-08-23 — lifecycle/graphics foundation run
+## 2026-08-23 — Game/Graphics persistent-object run
 
-### Result
-
-This run cleared all five pre-existing structural mismatches and completed the
-durable device/resource foundation before broad API expansion. Curves, every
-remaining packed-vector type, graphics resources, texture base behavior,
-`Texture2D`, and the managed graphics-state group now have zero local strict
-diagnostics. `SpriteBatch` is reduced to dependencies on real `Effect` and
-`SpriteFont` families; those types were not replaced with shells.
+### Strict result
 
 ```text
-reference XNA types               257 -> 257
+reference XNA types                257 -> 257
 reference members                2964 -> 2964
-expected mapped Rust types        259 -> 259
-actual strict Rust types           51 -> 91
+expected mapped Rust types         259 -> 259
+actual strict Rust types            91 -> 117
 
-total diagnostics                 364 -> 263
-missing types                     208 -> 168
-missing members                   151 -> 95
-parameter/signature mismatches      3 -> 0
-disposal mismatches                 2 -> 0
+total diagnostics                  263 -> 178
+missing types                      168 -> 142
+missing members                     95 -> 36
+
+constructor / overload / property   2 / 18 / 30 -> 1 / 17 / 4
+event mapping mismatches                      20 -> 0
 ```
 
-All base/trait/interface, return, generic/bound, ref/out, enum/value, flags,
-delegate, unexpected surface, unsafe/internal/raw-handle, allowlist, and
-unmeasured counts remain zero. Current overlapping missing-category counts are:
+Parameter/signature, return, base/trait/interface, generic/bound, ref/out,
+enum/value, flags, delegate, disposal, unexpected surface, type-kind,
+internal/raw-handle/public-unsafe leaks, allowlist, and unmeasured-category
+counts all remain zero. Normal strict mode exits 1 only for the 178 genuine
+remaining gaps; leak-only exits 0.
 
 ```text
-constructor / overload / property       2 / 18 / 30
-event / parameter / disposal           20 / 0 / 0
+Game                 36 -> 2
+GraphicsDevice       51 -> 26
+SpriteBatch           8 -> 8
 ```
 
-The six requested scoreboards are exact:
+All 26 new component/service/window/presentation/display/collection dependency
+types have zero local diagnostics. `Game` waits only for its real content
+manager. `GraphicsDevice` waits for buffers/draw/reset/render-target and
+back-buffer transfer routes. `SpriteBatch` remains unchanged because its two
+`Effect` and six `SpriteFont` dependencies were not replaced with placeholders.
 
-```text
-Game                 42 -> 36
-GraphicsDevice       72 -> 51
-GraphicsResource     11 -> 0
-Texture               1 -> 0
-Texture2D            14 -> 0
-SpriteBatch          16 -> 8
-```
+Fresh missing-type families are Graphics 63, Media 24, Audio 19, Design 13,
+Content 12, Framework/core 4, Input 3, Storage 3, and GamerServices 1.
 
-Normal strict mode exits 1 for the remaining 263 real gaps. Report-only records
-the same scoreboard and leak-only exits 0 with no findings.
+### Game object model and lifecycle
 
-### Behavior and lifecycle
+The implementation now has real per-game component, service, launch-parameter,
+window, lifecycle-state, and event objects. Components initialize before the
+run and immediately when added after initialization. Update/draw snapshots are
+stable for equal order, order changes affect subsequent snapshots, and removal
+during a snapshot does not invalidate iteration. Enabled/visible/order events
+support ordered subscription, removal, and self-removal; handler panic is
+contained.
 
-The neutral XNA-derived corpus grew from 82 to 105 named observations (106
-assertions including the count gate). New groups are curve (10), packed vector
-(7), and graphics-state defaults (6). It found and fixed half conversion,
-tie-even quantization, curve loop/tangent, and CNA `BlendFunction.Min/Max`
-translation errors. Final corpus failures are zero.
+`GameServiceContainer` uses per-instance type tokens and returns the same
+shared provider identity. Duplicate add, missing get/remove, and invalid
+providers are deterministic. No global service registry exists.
 
-The real CNA one-frame lifecycle order is:
+The measured native one-frame shutdown order is:
 
 ```text
 Initialize
@@ -65,105 +63,113 @@ Update
 BeginDraw
 Draw
 EndDraw
-Exiting
+Exiting event / OnExiting
 EndRun
 UnloadContent
-Dispose
+Device Disposing
+Game Dispose
+Game Disposed event
 ```
 
-`BeginDraw=false` was also measured: two begin attempts produced exactly one
-`Draw` and one `EndDraw`. User `UnloadContent` occurs exactly once. Before CNA
-destroy, the host privately releases registered native children in reverse
-order because ABI 0.7 rejects a live-child parent destroy. That internal pass
-does not invoke `UnloadContent` or public resource events. At CNA shutdown,
-resources are already disposed, then CNA sends `Exiting`, `EndRun`, and the one
-user `UnloadContent`; Rust sends `Dispose` after the destroy attempt.
+User `UnloadContent` occurs exactly once. The host first performs an internal
+reverse-order release of registered native children because ABI 0.7 rejects
+parent destruction with live children. That internal operation emits neither
+user `UnloadContent` nor public resource events. CNA destroy then emits the
+user shutdown callbacks; shared device invalidation and public game disposal
+follow. A discovered early-invalidation regression was fixed so the CNA
+`UnloadContent` callback still has a valid callback-scoped device borrow.
 
-### Device and resource ownership
+`Activated`, `Deactivated`, and the three window events are subscribed through
+real CNA routes and safely detached before destruction. HEADLESS does not
+fabricate platform transitions. Repeated arbitrary `Game.RunOneFrame`/`Tick`
+is still a precise host/ABI blocker: CNA retains a creation-time callback
+context, so a borrowed game cannot safely outlive one host session or be
+rebound by the current ABI.
 
-`GraphicsDevice` now wraps a stable `Arc<DeviceState>`. Repeated
-`GameContext.GraphicsDevice` access and every child association share that
-identity. Only the private CNA device handle is borrowed at callback entry and
-cleared at callback exit. Resources share identity/validity, not native device
-ownership; the game is the sole native owner.
+### Graphics identity and lifecycle
 
-The host invalidates the shared device after parent destruction, including a
-reported failure. Device and child access after shutdown fail safely; child
-`Dispose` after shutdown is idempotent. Tests cover multiple resources on one
-device, same-device draws through distinct wrappers, invalidation, live-child
-shutdown, and disposal after parent shutdown.
+One host-owned `Arc<DeviceState>` is the durable logical `GraphicsDevice`.
+Resources and persistent properties share that identity but never own the
+native device. The CNA handle remains callback-scoped. Shutdown invalidates the
+shared state deterministically; access after parent shutdown fails safely and
+resource `Dispose` remains idempotent.
 
-`GraphicsResource.Disposing` covers registration order, removal, self-removal,
-single emission, event-visible state, double dispose, `Drop`, and contained
-handler panic. The internal parent cleanup deliberately emits no user event.
+Repeated access preserves logical identity for `Game.GraphicsDevice`,
+`PresentationParameters`, `Adapter`, textures, samplers, vertex textures,
+vertex samplers, and graphics-state properties. Presentation refresh mutates
+the shared object in place; `Clone` is independent. Texture/sampler collections
+validate bounds and device association. A CNA-reported texture handle without
+a tracked safe wrapper returns explicit unsupported behavior instead of
+creating a second native owner.
 
-### Native ABI and fault evidence
+Resource-created/destroyed events remain safely non-emitting because CNA's raw
+handle callbacks cannot reconstruct stable safe wrapper/tag identity. Lost and
+reset events likewise require a real backend transition; HEADLESS state is not
+treated as such. `GraphicsAdapter.MonitorHandle` is explicitly unsupported
+where CNA cannot expose a safe opaque identity.
+
+### Behavior, ABI, and safety evidence
 
 ```text
-reviewed ABI functions                 34 -> 53
-full prototype functions checked           53
-prototype type positions                  188
-all C/Rust ABI measurements           135 -> 313
-layout types / callbacks / constants   14 / 2 / 98
-prototype/probe mismatches                     0
-missing header/library symbols                 0
-ABI tested                               0x00000700
+XNA-derived observations          105 -> 123
+assertions including count        106 -> 124
+failures                                    0
+
+reviewed ABI functions             53 -> 104
+prototype type positions          188 -> 388
+total C/Rust measurements         313 -> 419
+layouts / callbacks / constants   19 / 3 / 129
+mismatches                                  0
+
+native game lifetime cycles       143 -> 146
+native child handles               93 -> 103
+native crashes                              0
+observed double-free/UAF                    0
 ```
 
-Full compiler-derived prototypes now cover return types, parameter count,
-width/signedness, pointer depth/constness, callback and structure pointer types,
-and bool/enum/flag representation for every reviewed route.
+New corpus groups cover component/service behavior and authoritative XNA
+`PresentationParameters` defaults/clone semantics. Native stress additionally
+covers stable property identities, multiple resources sharing a device,
+texture/sampler slots, disposed parents, component ordering/mutation,
+device/game events, callback/event-handler panic plus recreation, double
+dispose/drop, live-child cleanup, and injected create/info/reported-destroy
+failures.
 
-The isolated suite passes 143 successful game lifetimes and constructs 93
-native child handles. It covers double `Dispose`, `Dispose` plus `Drop`, active
-batch disposal, live children at shutdown, partial texture rollback, a
-contained callback panic plus recreation, injected game-create failure,
-texture-information failure plus recreation, and a reported game-destroy
-failure plus recreation. Native crashes and observed double-free/use-after-free
-events are zero. No sanitizer was actually executed; `tools/native-stress/`
-provides an opt-in runner for a separately ASan/UBSan-instrumented exact
-ABI-0.7 CNA library.
+All 104 reviewed functions have compiler-derived return/parameter prototypes,
+including pointer depth, constness where representable, scalar width and
+signedness, callback/struct pointer types, and bool/enum/flag representation.
+ABI tested is exactly `0x00000700`.
 
-### Canonical CNA and template
+No sanitizer was executed. An exact ABI-0.7 sanitized CNA artifact could not be
+produced while canonical CNA HEAD still fails at
+`CnaCApiCoreExt.cpp:250` with renderer identity `49 == 50`. Canonical revision
+is `1bb2145d99ed572dd4eb15009c34e2e5f410fcf0`; it was not modified.
 
-Canonical read-only CNA HEAD is
-`1bb2145d99ed572dd4eb15009c34e2e5f410fcf0`. A clean unmodified HEADLESS C API
-configure succeeds, but the build still stops at:
+### Template and quality gates
 
-```text
-modules/c-api/src/CnaCApiCoreExt.cpp:250
-renderer identity assertion: 49 == 50
-```
+Linux x86-64 experimental CNA HEADLESS template tests and fresh 60/600-frame
+runs pass. The canary retains real PNG, `Texture2D`, texture `SpriteBatch`,
+keyboard/mouse/gamepad, clean shutdown, and now verifies per-game service
+identity. A fresh generated consumer vendors both binding crates, contains no
+developer/sibling path, builds/tests, and completes 60 frames.
 
-The CNA checkout was not modified. The loader remains exact ABI 0.7 and does
-not accept ABI 0.8. Native evidence uses the experimental ABI-0.7 HEADLESS
-artifact and remains labelled accordingly.
-
-The Linux x86-64 template builds/tests and freshly completes 60 and 600
-HEADLESS frames. It now demonstrates a real state-bearing
-`SpriteBatch.Begin(Deferred, AlphaBlend)` route. A fresh generated consumer
-vendors both binding crates, contains no developer/sibling path, builds/tests,
-and completes 60 frames.
-
-### Quality gates
-
-Rust 1.74 format, check, workspace all-feature tests, docs, and Clippy all exit
-zero. The Clippy audit reduced library warnings from 432 to 368 and the native
-stress test warnings from 16 to two by fixing unchecked conversions, redundant
-locks/closures, precedence, and temporary stock-state borrows. Remaining
-warnings are chiefly exact XNA naming, exact float equality, intentional packed
-numeric conversion, large differential/stress functions, and mapped overload
-argument counts; they are not globally silenced.
+Rust 1.74 format, check, workspace all-feature tests, docs, and Clippy exit
+zero. New genuine Clippy findings (unchecked enum/index conversions, trait
+object identity comparison, needless closure/borrow, and fallible cache setup)
+were fixed. Narrow compatibility allowances remain for exact XNA naming,
+mapped high-arity overloads, exact numerical behavior, and the native stress
+driver.
 
 ### Next coherent slice
 
-1. Implement components/services/window with their real events and ordering.
-2. Finish the remaining `Game` state/events/run controls on that object model.
-3. Establish stable state-collection, presentation-parameter, and adapter
-   identities before buffers/render targets.
-4. Add real `Effect`, then the two remaining `SpriteBatch.Begin` overloads;
-   add real `SpriteFont`, then the six draw-string overloads.
-5. Run the optional sanitizer path once an exact instrumented ABI-0.7 CNA
-   artifact can be produced without hiding the canonical HEAD blocker.
-6. Defer XNB/content, models, audio/XACT, and media/storage until those lifetime
-   dependencies are complete.
+1. Implement real Content/XNB ownership sufficient for `Game.Content`.
+2. Solve repeated `RunOneFrame`/`Tick` with an owned/rebindable callback
+   context or a reviewed CNA ABI addition.
+3. Add vertex declarations and buffers with safe bound-buffer destruction,
+   then drawing, render targets, reset, and back-buffer transfer.
+4. Implement real `Effect` ownership/reflection/execution before the two
+   effect-bearing `SpriteBatch.Begin` overloads.
+5. Implement genuine `SpriteFont` state, measurement, and atlas rendering
+   before the six draw-string overloads.
+6. Execute optional ASan/UBSan only against an exact ABI-0.7 instrumented CNA
+   artifact; do not infer leak freedom from crash absence.

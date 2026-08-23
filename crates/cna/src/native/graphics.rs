@@ -1,5 +1,7 @@
 //! Native graphics-device and owned-resource calls.
 
+#![allow(clippy::similar_names)]
+
 use cna_sys as sys;
 
 use crate::error::{CnaError, Result};
@@ -25,6 +27,115 @@ impl Native {
         self.check(unsafe {
             (self.graphics_device_clear_rgba)(device, rgba[0], rgba[1], rgba[2], rgba[3])
         })
+    }
+
+    pub(crate) fn graphics_device_status(
+        &self,
+        device: sys::CNA_Handle,
+        status: &mut sys::CNA_GraphicsDeviceStatus,
+    ) -> Result<()> {
+        // SAFETY: the device is callback-scoped and output is initialized/live.
+        self.check(unsafe { (self.graphics_device_get_status)(device, status) })
+    }
+
+    pub(crate) fn graphics_profile(
+        &self,
+        device: sys::CNA_Handle,
+        profile: &mut sys::CNA_GraphicsProfile,
+    ) -> Result<()> {
+        // SAFETY: the device is callback-scoped and output is initialized/live.
+        self.check(unsafe { (self.graphics_device_get_graphics_profile)(device, profile) })
+    }
+
+    pub(crate) fn presentation_parameters(
+        &self,
+        device: sys::CNA_Handle,
+        parameters: &mut sys::CNA_PresentationParameters,
+    ) -> Result<()> {
+        // SAFETY: the caller supplies a complete versioned writable output.
+        self.check(unsafe {
+            (self.graphics_device_get_presentation_parameters)(device, parameters)
+        })
+    }
+
+    pub(crate) fn display_mode(
+        &self,
+        device: sys::CNA_Handle,
+        mode: &mut sys::CNA_DisplayMode,
+    ) -> Result<()> {
+        // SAFETY: the caller supplies a complete versioned writable output.
+        self.check(unsafe { (self.graphics_device_get_display_mode)(device, mode) })
+    }
+
+    pub(crate) fn blend_state(
+        &self,
+        device: sys::CNA_Handle,
+        state: &mut sys::CNA_BlendState,
+    ) -> Result<()> {
+        // SAFETY: the caller supplies a complete versioned writable output.
+        self.check(unsafe { (self.graphics_device_get_blend_state)(device, state) })
+    }
+
+    pub(crate) fn depth_stencil_state(
+        &self,
+        device: sys::CNA_Handle,
+        state: &mut sys::CNA_DepthStencilState,
+    ) -> Result<()> {
+        // SAFETY: the caller supplies a complete versioned writable output.
+        self.check(unsafe { (self.graphics_device_get_depth_stencil_state)(device, state) })
+    }
+
+    pub(crate) fn rasterizer_state(
+        &self,
+        device: sys::CNA_Handle,
+        state: &mut sys::CNA_RasterizerState,
+    ) -> Result<()> {
+        // SAFETY: the caller supplies a complete versioned writable output.
+        self.check(unsafe { (self.graphics_device_get_rasterizer_state)(device, state) })
+    }
+
+    pub(crate) fn sampler_state(
+        &self,
+        device: sys::CNA_Handle,
+        stage: sys::CNA_ShaderStage,
+        slot: u32,
+        state: &mut sys::CNA_SamplerState,
+    ) -> Result<()> {
+        // SAFETY: stage/slot are validated by the collection and output is live.
+        self.check(unsafe { (self.graphics_device_get_sampler_state)(device, stage, slot, state) })
+    }
+
+    pub(crate) fn set_sampler_state(
+        &self,
+        device: sys::CNA_Handle,
+        stage: sys::CNA_ShaderStage,
+        slot: u32,
+        state: &sys::CNA_SamplerState,
+    ) -> Result<()> {
+        // SAFETY: the complete descriptor is copied synchronously.
+        self.check(unsafe { (self.graphics_device_set_sampler_state)(device, stage, slot, state) })
+    }
+
+    pub(crate) fn texture_slot(
+        &self,
+        device: sys::CNA_Handle,
+        stage: sys::CNA_ShaderStage,
+        slot: u32,
+        info: &mut sys::CNA_TextureSlotInfo,
+    ) -> Result<()> {
+        // SAFETY: stage/slot are validated by the collection and output is live.
+        self.check(unsafe { (self.graphics_device_get_texture)(device, stage, slot, info) })
+    }
+
+    pub(crate) fn set_texture_slot(
+        &self,
+        device: sys::CNA_Handle,
+        stage: sys::CNA_ShaderStage,
+        slot: u32,
+        texture: sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: the collection and concrete texture wrapper validate both handles.
+        self.check(unsafe { (self.graphics_device_set_texture)(device, stage, slot, texture) })
     }
 
     pub(crate) fn graphics_viewport(

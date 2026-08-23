@@ -69,6 +69,37 @@ xna_enum!(FillMode {
     WireFrame = 1,
 });
 
+xna_enum!(DepthFormat {
+    None = 0,
+    Depth16 = 1,
+    Depth24 = 2,
+    Depth24Stencil8 = 3,
+});
+
+xna_enum!(GraphicsDeviceStatus {
+    Normal = 0,
+    Lost = 1,
+    NotReset = 2,
+});
+
+xna_enum!(GraphicsProfile {
+    Reach = 0,
+    HiDef = 1,
+});
+
+xna_enum!(PresentInterval {
+    Default = 0,
+    One = 1,
+    Two = 2,
+    Immediate = 3,
+});
+
+xna_enum!(RenderTargetUsage {
+    DiscardContents = 0,
+    PreserveContents = 1,
+    PlatformContents = 2,
+});
+
 xna_enum!(TextureAddressMode {
     Wrap = 0,
     Clamp = 1,
@@ -101,7 +132,11 @@ impl ColorWriteChannels {
     pub const All: Self = Self(15);
 
     pub(super) const fn bits(self) -> u32 {
-        self.0 as u32
+        u32::from_ne_bytes(self.0.to_ne_bytes())
+    }
+
+    pub(super) const fn from_bits(value: u32) -> Self {
+        Self(i32::from_ne_bytes(value.to_ne_bytes()))
     }
 }
 
@@ -156,7 +191,7 @@ impl BitAnd for ClearOptions {
     }
 }
 
-/// Exact XNA 4.0 SpriteBatch ordering modes.
+/// Exact XNA 4.0 `SpriteBatch` ordering modes.
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum SpriteSortMode {
@@ -179,7 +214,7 @@ impl SpriteEffects {
     pub const FlipVertically: Self = Self(2);
 
     pub(super) const fn bits(self) -> u32 {
-        self.0 as u32
+        u32::from_ne_bytes(self.0.to_ne_bytes())
     }
 }
 

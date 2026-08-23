@@ -95,6 +95,10 @@ class VerifierMappingTests(unittest.TestCase):
             ["&Graphics::GraphicsDevice", "&mut R", "i32", "i32", "bool"],
         )
         self.assertIn("FromStreamWithGraphicsDeviceAndStream", members)
+        self.assertEqual(
+            members["FromStreamWithGraphicsDeviceAndStream"]["returnType"],
+            "Result<Self>",
+        )
 
     def test_texture2d_save_stream_projects_as_write(self):
         texture = {
@@ -248,6 +252,116 @@ class VerifierMappingTests(unittest.TestCase):
             resource, RULES, {resource["name"]: resource, device["name"]: device}
         )
         self.assertEqual(members["GraphicsDevice"]["returnType"], "Option<&Graphics::GraphicsDevice>")
+
+    def test_device_retained_state_property_preserves_shared_identity(self):
+        state = {
+            "name": "Microsoft.Xna.Framework.Graphics.BlendState", "kind": "class",
+        }
+        device = {
+            "name": "Microsoft.Xna.Framework.Graphics.GraphicsDevice", "kind": "class",
+            "genericParameters": [], "members": [
+                {"kind": "property", "name": "BlendState", "static": False,
+                 "type": state["name"], "get": True, "set": True, "parameters": []},
+            ],
+        }
+        members = VERIFY.mapped_members(
+            device, RULES, {device["name"]: device, state["name"]: state}
+        )
+        self.assertEqual(
+            members["BlendState"]["returnType"],
+            "Result<Arc<Graphics::BlendState>>",
+        )
+        self.assertEqual(
+            members["SetBlendState"]["parameters"][-1]["type"],
+            "Arc<Graphics::BlendState>",
+        )
+
+    def test_generic_event_uses_payload_and_shared_receiver(self):
+        event_args = {
+            "name": "Microsoft.Xna.Framework.GameComponentCollectionEventArgs",
+            "kind": "class",
+        }
+        collection = {
+            "name": "Microsoft.Xna.Framework.GameComponentCollection", "kind": "class",
+            "genericParameters": [], "members": [
+                {"kind": "event", "name": "ComponentAdded", "static": False,
+                 "type": "System.EventHandler`1[Microsoft.Xna.Framework.GameComponentCollectionEventArgs]"},
+            ],
+        }
+        members = VERIFY.mapped_members(
+            collection, RULES, {collection["name"]: collection, event_args["name"]: event_args}
+        )
+        self.assertEqual(members["AddComponentAddedHandler"]["parameters"], [
+            {"name": "self", "type": "&Self"},
+            {"name": "handler", "type": "Box<dyn EventHandler<GameComponentCollectionEventArgs>>"},
+        ])
+        self.assertEqual(members["RemoveComponentAddedHandler"]["parameters"], [
+            {"name": "self", "type": "&Self"},
+            {"name": "registration", "type": "u64"},
+        ])
+
+    def test_interface_parameter_projects_as_trait_object(self):
+        component = {
+            "name": "Microsoft.Xna.Framework.IGameComponent", "kind": "interface",
+        }
+        collection = {
+            "name": "Microsoft.Xna.Framework.GameComponentCollection", "kind": "class",
+            "genericParameters": [], "members": [
+                {"kind": "method", "name": "RemoveItem", "static": False,
+                 "returnType": "System.Void", "genericParameters": [], "parameters": [
+                     {"name": "item", "type": component["name"]},
+                 ]},
+            ],
+        }
+        members = VERIFY.mapped_members(
+            collection, RULES, {collection["name"]: collection, component["name"]: component}
+        )
+        self.assertEqual(members["RemoveItem"]["parameters"][-1]["type"], "&dyn IGameComponent")
+
+    def test_retained_component_parameter_override_is_owned_arc(self):
+        component = {
+            "name": "Microsoft.Xna.Framework.IGameComponent", "kind": "interface",
+        }
+        collection = {
+            "name": "Microsoft.Xna.Framework.GameComponentCollection", "kind": "class",
+            "genericParameters": [], "members": [
+                {"kind": "method", "name": "InsertItem", "static": False,
+                 "returnType": "System.Void", "genericParameters": [], "parameters": [
+                     {"name": "index", "type": "System.Int32"},
+                     {"name": "item", "type": component["name"]},
+                 ]},
+            ],
+        }
+        members = VERIFY.mapped_members(
+            collection, RULES, {collection["name"]: collection, component["name"]: component}
+        )
+        self.assertEqual(members["InsertItem"]["parameters"][-1]["type"], "Arc<dyn IGameComponent>")
+
+    def test_projected_property_setter_name_drives_fallibility(self):
+        game = {
+            "name": "Microsoft.Xna.Framework.Game", "kind": "class",
+            "genericParameters": [], "members": [
+                {"kind": "property", "name": "IsMouseVisible", "static": False,
+                 "type": "System.Boolean", "get": True, "set": True, "parameters": []},
+            ],
+        }
+        members = VERIFY.mapped_members(game, RULES, {game["name"]: game})
+        self.assertEqual(members["IsMouseVisible"]["returnType"], "bool")
+        self.assertEqual(members["SetIsMouseVisible"]["returnType"], "Result<()>")
+
+    def test_drawable_base_uses_explicit_composition_trait(self):
+        name = "cna::Microsoft::Xna::Framework::DrawableGameComponent"
+        expected = {name: {
+            "kind": "struct", "clrKind": "class",
+            "clrName": "Microsoft.Xna.Framework.DrawableGameComponent",
+            "members": {}, "flags": False, "underlyingType": None,
+            "baseType": "Microsoft.Xna.Framework.GameComponent",
+            "interfaces": [], "allInterfaces": [], "genericParameters": [],
+            "operatorTraits": set(),
+        }}
+        actual = {name: self._empty_actual("struct", {}, traits=("GameComponentBase",))}
+        self.assertFalse(any(item["code"] == "BASE_PROJECTION_MISMATCH"
+                             for item in VERIFY.compare(expected, actual, RULES)))
 
     def test_comparison_emits_every_structural_category(self):
         type_name = "cna::Microsoft::Xna::Framework::Derived"

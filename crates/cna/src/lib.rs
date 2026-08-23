@@ -11,14 +11,23 @@ mod packed;
 mod value;
 
 pub use error::{CnaError, Result};
-pub use game::{run, run_for_frames};
+pub use game::{
+    run, run_for_frames, GameComponentBase, GameComponentCollectionExt, GameComponentRuntime,
+    GameState, GameStateAccess, LaunchParametersExt, ServiceProvider,
+};
+pub use graphics::TextureRuntime;
 
 /// XNA 4.0 compatibility hierarchy. Casing intentionally follows XNA.
 #[allow(non_snake_case)]
 pub mod Microsoft {
     pub mod Xna {
         pub mod Framework {
-            pub use crate::game::{Game, GameContext, GameTime, TimeSpan};
+            pub use crate::game::{
+                DisplayOrientation, DrawableGameComponent, FrameworkDispatcher, Game,
+                GameComponent, GameComponentCollection, GameComponentCollectionEventArgs,
+                GameContext, GameServiceContainer, GameTime, GameWindow, IDrawable, IGameComponent,
+                IUpdateable, LaunchParameters, TimeSpan, TitleContainer,
+            };
             pub use crate::input::PlayerIndex;
             pub use crate::value::{
                 BoundingBox, BoundingFrustum, BoundingSphere, Color, ContainmentType, Curve,
@@ -31,10 +40,14 @@ pub mod Microsoft {
             pub mod Graphics {
                 pub use crate::graphics::{
                     Blend, BlendFunction, BlendState, ClearOptions, ColorWriteChannels,
-                    CompareFunction, CullMode, DepthStencilState, FillMode, GraphicsDevice,
-                    GraphicsResource, RasterizerState, SamplerState, SpriteBatch, SpriteEffects,
-                    SpriteSortMode, StencilOperation, SurfaceFormat, Texture, Texture2D,
-                    TextureAddressMode, TextureFilter, Viewport,
+                    CompareFunction, CullMode, DepthFormat, DepthStencilState, DisplayMode,
+                    DisplayModeCollection, FillMode, GraphicsAdapter, GraphicsDevice,
+                    GraphicsDeviceStatus, GraphicsProfile, GraphicsResource, PresentInterval,
+                    PresentationParameters, RasterizerState, RenderTargetUsage,
+                    ResourceCreatedEventArgs, ResourceDestroyedEventArgs, SamplerState,
+                    SamplerStateCollection, SpriteBatch, SpriteEffects, SpriteSortMode,
+                    StencilOperation, SurfaceFormat, Texture, Texture2D, TextureAddressMode,
+                    TextureCollection, TextureFilter, Viewport,
                 };
 
                 #[allow(non_snake_case)]
@@ -83,15 +96,15 @@ pub mod extensions {
         pub struct EventArgs;
 
         /// Type-erased XNA event callback.
-        pub trait EventHandler: Send {
-            fn invoke(&mut self, sender: &dyn Any, args: EventArgs);
+        pub trait EventHandler<T = EventArgs>: Send {
+            fn invoke(&mut self, sender: &dyn Any, args: T);
         }
 
-        impl<F> EventHandler for F
+        impl<F, T> EventHandler<T> for F
         where
-            F: FnMut(&dyn Any, EventArgs) + Send,
+            F: FnMut(&dyn Any, T) + Send,
         {
-            fn invoke(&mut self, sender: &dyn Any, args: EventArgs) {
+            fn invoke(&mut self, sender: &dyn Any, args: T) {
                 self(sender, args);
             }
         }

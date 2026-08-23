@@ -73,6 +73,13 @@ constant `Type::Foo`. It preserves XNA casing even though ordinary Rust uses
 upper snake case. A non-const static property maps to `Foo()`. There are no
 method-shaped aliases for const properties.
 
+When a CLR static graphics property requires the process-global current device
+but the safe Rust projection intentionally has no global native runtime, the
+mapping injects `graphicsDevice: &GraphicsDevice` as an explicit context
+parameter. This applies to `GraphicsAdapter` static adapter/preference
+properties and is encoded in `mapping-rules.json`. It does not authorize an
+untracked handle or implicit global device.
+
 A read-only instance property `Foo` maps to `Foo(&self)`. A read/write property
 maps to `Foo(&self)` and `SetFoo(&mut self, value)`. A natural borrowed result is
 returned as `&T` or `&mut T`; a resource is not cloned to imitate a property.
@@ -126,8 +133,10 @@ they never destroy a parent-owned handle.
 ## Game
 
 XNA `Game` is projected as a user-implemented `Game` lifecycle trait composed
-with a callback-scoped `GameContext`. The context provides access to the
-host-owned state whose lifetime CNA controls. This avoids pretending that a
+through `GameStateAccess` with one `Arc<GameState>` and a callback-scoped
+`GameContext`. The state provides durable per-instance components, services,
+launch parameters, window, timing flags, and events; the context exposes the
+host-owned portion while CNA invokes callbacks. This avoids pretending that a
 stateless callback trait is the CLR base class. `GraphicsDevice` is a durable,
 safe shared identity rather than a callback lifetime: only its private native
 borrow is callback-scoped, and safe operations fail once the host invalidates
@@ -136,11 +145,27 @@ the identity.
 Lifecycle virtuals retain XNA names (`Initialize`, `LoadContent`, `BeginRun`,
 `Update`, `BeginDraw`, `Draw`, `EndDraw`, `OnExiting`, `EndRun`,
 `UnloadContent`, and `Dispose`). `BeginDraw` returns `bool`; CNA skips the draw
-callback when it is false. Properties, public events, components, services,
-window state, and the remaining run/exit behavior remain required work in the
-strict contract. Crate-root `run` is the Rust host entry point; it is explicitly
-outside the strict hierarchy. `GameContext` is a mapped support type with
-machine-declared `GraphicsDevice` and `Exit` members.
+callback when it is false. Public properties/events and run controls are trait
+methods delegating to the composed state. Crate-root `run` is an additional
+host entry point and remains explicitly outside the strict hierarchy.
+`GameContext` is a mapped support type with machine-declared
+`GraphicsDevice` and `Exit` members.
+
+CLR component interface references map to shared
+`Arc<dyn IGameComponent + Send + Sync>` identities. The component collection
+uses stable registration order as the tie-breaker for equal update/draw order
+and takes a shared snapshot for each traversal, so collection mutation cannot
+invalidate a live Rust borrow. A component added after game initialization is
+initialized immediately. `GameServiceContainer` maps CLR runtime type tokens
+to Rust `TypeId` and providers to shared typed `Arc` identities; services are
+owned by one game and are never global.
+
+`Game.RunOneFrame` is a strict trait member, while the current native host can
+safely execute it only as one complete owned session. CNA ABI 0.7 retains its
+creation-time callback context and exposes no rebinding route, so arbitrary
+repeated ticks cannot safely retain a borrowed Rust game. The implementation
+must fail explicitly rather than manufacture a `'static` reference. This is a
+runtime capability limitation, not a removal or renaming of the mapped member.
 
 User `UnloadContent` and host resource teardown are distinct. The host may
 dispose registered native children before asking CNA to destroy the game, but
@@ -191,12 +216,16 @@ reported as `ContentManager` support.
 
 An event `Foo` maps to `AddFooHandler` and `RemoveFooHandler`. The returned
 registration token identifies removal when token semantics are necessary for
-safe teardown. Handlers are typed callbacks; panic is caught before it can
-unwind into native code and is converted to a callback error. Handler order and
-self-removal follow the registration snapshot taken for that event emission. A
-closure must be `Send`/`Sync` only when CNA can invoke it from the corresponding
-threads. Delegate signatures follow the same parameter, null, and ref/out
-mappings as methods.
+safe teardown. Instance subscription methods take `&self`: the event registry
+uses interior mutability so events remain usable through stable shared class
+identities such as `Game.Components`. A generic CLR event payload maps to
+`EventHandler<TEventArgs>` instead of erasing the argument type. Handlers are
+typed callbacks; panic is caught before it can unwind into native code and is
+converted to a callback error. Handler order and self-removal follow the
+registration snapshot taken for that event emission. A closure must be
+`Send`/`Sync` only when CNA can invoke it from the corresponding threads.
+Delegate signatures follow the same parameter, null, and ref/out mappings as
+methods.
 
 ## Disposal, ownership, and unsafe code
 
@@ -235,6 +264,14 @@ base `GraphicsResource.GraphicsDevice` result is `Option<&GraphicsDevice>`.
 Their first real application binds them to one durable device identity.
 Const-representable XNA stock-state properties are associated constants; their
 descriptors are immutable and use the same first-bind rule.
+
+Persistent reference-valued device properties use stable shared identity.
+Repeated access to `PresentationParameters`, adapter, texture/sampler
+collections, and graphics-state objects returns the same logical object.
+Native refresh updates that retained object in place; explicit `Clone` of
+`PresentationParameters` creates an independent managed value. A device
+collection may return a tracked safe resource wrapper, but it must never create
+an unrelated owner merely because CNA reports the same raw handle.
 
 ## TimeSpan and errors
 

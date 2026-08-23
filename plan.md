@@ -8,151 +8,160 @@ MSRV: Rust 1.74
 
 ## Governing constraints
 
-- Preserve authoritative XNA identifiers and casing under
+- Preserve authoritative XNA identifiers and casing below
   `cna::Microsoft::Xna::Framework`.
-- Keep filesystem modules private and the compatibility allowlist empty.
-- Treat every measured zero as a permanent gate; do not reclassify real gaps.
-- Complete coherent behavior/ownership families before broad shallow types.
+- Keep implementation modules private, the compatibility allowlist empty, and
+  every structural zero as a permanent regression gate.
+- Complete dependency/ownership families with real behavior before adding
+  broad unrelated types.
 - Expose only safe facades over reviewed, exact ABI-0.7 CNA routes.
 
-The generated `typeScoreboard` remains the detailed work queue. This plan
-records measured truth and dependency order rather than duplicating metadata.
+The generated `typeScoreboard` is the authoritative work queue. This file
+records the final measured state and dependency order; it does not maintain a
+second hand-written contract inventory.
 
 ## Current strict API measurement
 
-| Measurement | Requested-run baseline | Current |
+| Measurement | Run baseline | Current |
 |---|---:|---:|
 | XNA reference types | 257 | 257 |
 | XNA reference members | 2,964 | 2,964 |
 | expected mapped Rust types | 259 | 259 |
-| actual strict Rust types | 51 | 91 |
-| total diagnostics | 364 | 263 |
-| missing types | 208 | 168 |
-| missing members | 151 | 95 |
-| parameter/signature mismatches | 3 | 0 |
-| disposal mismatches | 2 | 0 |
-| unexpected types/members | 0 / 0 | 0 / 0 |
-| type-kind mismatches | 0 | 0 |
-| internal/raw-handle/public-unsafe leaks | 0 / 0 / 0 | 0 / 0 / 0 |
-| allowlist entries | 0 | 0 |
-| unmeasured categories | 0 | 0 |
+| actual strict Rust types | 91 | 117 |
+| total diagnostics | 263 | 178 |
+| missing types | 168 | 142 |
+| missing members | 95 | 36 |
+| constructor mapping mismatches | 2 | 1 |
+| overload mapping mismatches | 18 | 17 |
+| property mapping mismatches | 30 | 4 |
+| event mapping mismatches | 20 | 0 |
 
-All other structural mismatches remain zero: base, trait, interface, return,
-generic, generic-bound, ref/out, enum/value, flags, and delegate. Current
-overlapping missing-category counts are two constructors, 18 overloads, 30
-properties, and 20 events.
+Parameter/signature, return, base projection, trait, interface, generic,
+generic-bound, ref/out, enum/value, flags, delegate, disposal, unexpected type,
+unexpected member, type-kind, internal-type leak, raw-handle leak, public
+unsafe, allowlist, and unmeasured-category counts are all zero.
 
-### Six-type core scoreboard
+The 142 missing types are grouped from the fresh generated report as:
 
-| Strict type | Before | Current |
+```text
+Graphics          63
+Media             24
+Audio             19
+Design            13
+Content           12
+Framework/core     4
+Input               3
+Storage             3
+GamerServices       1
+```
+
+## Current three-type scoreboard
+
+| Strict type | Run baseline | Current |
 |---|---:|---:|
-| `Game` | 42 | 36 |
-| `GraphicsDevice` | 72 | 51 |
-| `GraphicsResource` | 11 | 0 |
-| `Texture` | 1 | 0 |
-| `Texture2D` | 14 | 0 |
-| `SpriteBatch` | 16 | 8 |
+| `Game` | 36 | 2 |
+| `GraphicsDevice` | 51 | 26 |
+| `SpriteBatch` | 8 | 8 |
 
-`SpriteBatch` waits only for two effect-bearing begin overloads and six
-`SpriteFont` draw-string overloads. `Game` and `GraphicsDevice` remain the
-nonzero lifecycle/graphics foundation types; their missing component/window,
-event, presentation, collection, buffer, and draw dependencies are not hidden.
+`Game` now waits only for `Content` and `SetContent`, which require the real
+`ContentManager`. `GraphicsDevice` waits for its primary constructor plus
+buffer binding/data, render targets, reset/back-buffer transfer, and drawing
+routes. `SpriteBatch` deliberately still waits for two real `Effect`-bearing
+`Begin` overloads and six real `SpriteFont` draw-string overloads.
+
+Every new dependency type introduced in this run has zero local diagnostics:
+
+- Game/core: `DisplayOrientation`, `IGameComponent`, `IUpdateable`,
+  `IDrawable`, `GameComponent`, `DrawableGameComponent`,
+  `GameComponentCollection`, `GameComponentCollectionEventArgs`,
+  `GameServiceContainer`, `LaunchParameters`, `GameWindow`,
+  `FrameworkDispatcher`, and `TitleContainer`.
+- Graphics: `DepthFormat`, `DisplayMode`, `DisplayModeCollection`,
+  `GraphicsAdapter`, `GraphicsDeviceStatus`, `GraphicsProfile`,
+  `PresentInterval`, `PresentationParameters`, `RenderTargetUsage`,
+  `ResourceCreatedEventArgs`, `ResourceDestroyedEventArgs`,
+  `SamplerStateCollection`, and `TextureCollection`.
 
 ## Completed in this run
 
-- [x] Fixed all three generated signature and both disposal mismatches, with
-  verifier regression tests and no mapping relaxation.
-- [x] Completed `Curve`, `CurveKey`, `CurveKeyCollection`, loop/continuity and
-  tangent behavior with exact declarations and XNA-derived observations.
-- [x] Completed all 17 selected-profile packed-vector formats, typed/untyped
-  contracts, exact packing behavior, and differential tests.
-- [x] Replaced callback-lifetime `GraphicsDevice` identity with a durable
-  shared state whose native handle borrow remains callback-scoped.
-- [x] Added resource registration, deterministic pre-parent child release,
-  same-device validation, shared invalidation, and post-shutdown safety tests.
-- [x] Completed `GraphicsResource`, its normative `Disposing` event, and the
-  `Texture`/`Texture2D` base relationships at zero local diagnostics.
-- [x] Completed all mapped `Texture2D` constructors, stream overloads,
-  metadata, transfers, encoders, validation, rollback, and lifetime behavior.
-- [x] Implemented every texture `SpriteBatch.Draw` overload and both
-  non-effect state-bearing `Begin` routes with invalid-state tests.
-- [x] Completed the managed blend/depth/rasterizer/sampler state families and
-  exact enums/flags, stock defaults, resource semantics, and real CNA apply
-  routes.
-- [x] Deepened `GraphicsDevice` with viewport/scissor, blend factor,
-  multisample mask, reference stencil, state setters, and no-argument present.
-- [x] Added real `BeginRun`, `BeginDraw`, `EndDraw`, and `EndRun` frame hooks.
-- [x] Separated one user `UnloadContent` from internal pre-destroy child
-  cleanup and measured the callback order explicitly.
-- [x] Expanded every reviewed function from symbol/arity checks to compiler-
-  derived full C prototype comparison.
-- [x] Added isolated test-bridge faults for create, texture information and
-  reported destroy failure, plus an opt-in ASan/UBSan runner.
+- [x] Regenerated the strict work queue and dependency-family inventory.
+- [x] Added the complete selected-profile component/service/window declaration
+  family with stable component ordering, mutation snapshots, change events,
+  initialization timing, per-game typed services, window managed state, and
+  real CNA lifecycle/window subscriptions where the backend exposes them.
+- [x] Completed all currently representable `Game` lifecycle/state/event/run
+  members except its content-manager property pair.
+- [x] Preserved exactly one user `UnloadContent` and corrected shutdown order:
+  internal child release precedes CNA destroy; CNA emits `Exiting`, `EndRun`,
+  and the sole `UnloadContent`; device invalidation and public disposal follow.
+- [x] Extended the durable `Arc<DeviceState>` graph with stable shared
+  `PresentationParameters`, adapter, texture/sampler collection, and graphics
+  state identities. Repeated access aliases the same logical state.
+- [x] Added real CNA query/apply routes for presentation/display/window/device
+  state and safe real event subscriptions. Unsupported HEADLESS transitions
+  are never fabricated.
+- [x] Kept `Effect` and `SpriteFont` pending instead of adding signature-only
+  placeholders, so `SpriteBatch` remains behaviorally honest.
+- [x] Expanded full C-prototype verification to every newly reviewed ABI route.
 
-## Behavior and native evidence
+## Behavior, ABI, safety, and template evidence
 
-| Measurement | Baseline | Current |
+| Measurement | Run baseline | Current |
 |---|---:|---:|
-| named XNA-derived observations | 82 | 105 |
-| corpus assertions including count | 83 | 106 |
-| reviewed ABI functions | 34 | 53 |
-| C/Rust ABI measurements | 135 | 313 |
-| prototype functions/type positions | unmeasured | 53 / 188 |
+| named XNA-derived observations | 105 | 123 |
+| corpus assertions including count | 106 | 124 |
+| reviewed ABI functions | 53 | 104 |
+| prototype type positions | 188 | 388 |
+| total C/Rust ABI measurements | 313 | 419 |
 | prototype/layout/callback/constant mismatches | 0 | 0 |
-| successful native game lifetimes | 127 | 143 |
-| native child handles constructed | not separately recorded | 93 |
+| native game lifetime cycles exercised | 143 | 146 |
+| native child handles constructed | 93 | 103 |
 | native crashes observed | 0 | 0 |
 
-New managed groups are curve (10 observations), packed vectors (7), and
-graphics-state defaults (6). The implementation work found and fixed XNA
-behavior differences in half conversion, tie-to-even packing, curve loop/
-tangent semantics, and the private XNA-to-CNA `BlendFunction.Min/Max`
-translation. The corpus now passes with zero failures.
+New behavior groups cover component/service semantics and
+`PresentationParameters` defaults/clone independence. The corpus passes all
+123 observations and 124 assertions. Native stress covers component ordering
+and mutation, lifecycle and event-handler panic containment, stable device and
+collection identity, resource association, disposed-parent behavior, child
+cleanup, fault injection, repeated disposal, and recreation.
 
-The native suite covers 100 minimal lifetimes, 25 double-dispose/drop resource
-games, ten transfer/event games, lifecycle/device identity, a suppressed draw,
-callback panic plus recreation, create failure, texture-info rollback plus
-recreation, and reported destroy failure plus recreation. No sanitizer was
-actually executed, so the run does not claim leak freedom from crash absence.
+Linux x86-64 experimental ABI-0.7 HEADLESS template tests and fresh 60/600
+frame runs pass. A fresh generated consumer vendors both crates, contains no
+developer path, builds/tests, and completes 60 frames. It exercises real PNG,
+`Texture2D`, texture `SpriteBatch`, input, per-game service identity, and clean
+shutdown.
 
-## Runtime and template evidence
-
-- [x] Linux x86-64 experimental CNA ABI-0.7 HEADLESS template tests pass.
-- [x] Fresh template runs complete 60 and 600 successful draw frames.
-- [x] The canary uses real PNG decoding, `Texture2D`, state-bearing
-  `SpriteBatch`, clear, keyboard/mouse/gamepad, and deterministic shutdown.
-- [x] A fresh generated consumer vendors both crates, has no developer or
-  sibling paths, builds/tests, and completes 60 HEADLESS frames.
-
-Canonical CNA HEAD `1bb2145d99ed572dd4eb15009c34e2e5f410fcf0` still fails an
-unmodified C API build at `CnaCApiCoreExt.cpp:250`; the renderer identity
-assertion reduces to `49 == 50`. The Rust loader remains pinned to exactly ABI
-0.7. Runtime evidence therefore remains experimental and does not imply an ABI
-0.8 migration.
+Canonical read-only CNA HEAD
+`1bb2145d99ed572dd4eb15009c34e2e5f410fcf0` still fails an unmodified C API
+build at `modules/c-api/src/CnaCApiCoreExt.cpp:250`; the renderer identity
+assertion is `49 == 50`. The Rust loader remains exact ABI 0.7. No exact
+ABI-0.7 ASan/UBSan CNA artifact could be produced, so sanitizers remain
+unmeasured and absence of a native crash is not reported as leak freedom.
 
 ## Next dependency-ordered work
 
-1. Implement the authoritative component/service/window group: `IGameComponent`,
-   `IUpdateable`, `IDrawable`, component base types/collection/events,
-   `GameServiceContainer`, `LaunchParameters`, and `GameWindow`.
-2. Complete remaining `Game` properties, events, run-one-frame/tick/reset/
-   suppress/exit semantics over that object model.
-3. Resolve stable wrapper identity for device state collections,
-   `PresentationParameters`, and adapter/profile/status before adding buffers.
-4. Complete graphics device events and the buffer/vertex declaration group,
-   then render targets and drawing routes using reviewed CNA prototypes.
-5. Implement `Effect` coherently, then clear the two remaining state-bearing
-   `SpriteBatch.Begin` overloads; implement real `SpriteFont` before the six
-   draw-string overloads.
-6. Produce and run an exact ABI-0.7 ASan/UBSan CNA artifact when the upstream
-   build blocker permits it; keep sanitizer tooling optional for Rust 1.74.
-7. Begin models and XNB/content only after the lifetime/identity graph above is
-   complete. PNG decoding is never content-pipeline support.
+1. Implement the real content foundation needed by `Game.Content` and
+   `Game.SetContent`; PNG decoding remains separate from XNB.
+2. Resolve repeated `Game.RunOneFrame`/`Tick` hosting without leaving CNA's
+   retained callback context pointing at a borrowed Rust game. The present
+   one-session host is safe but does not claim arbitrary repeated XNA ticks.
+3. Add vertex declarations and vertex/index buffers with safe binding lifetime
+   rules, then complete device draw routes and data transfers.
+4. Add render targets and reset/back-buffer behavior only through real backend
+   routes or explicit unsupported errors.
+5. Implement the full `Effect` ownership/reflection/execution family before
+   clearing the two effect-bearing `SpriteBatch.Begin` overloads.
+6. Implement real `SpriteFont` state/measurement/rendering before clearing the
+   six draw-string overloads.
+7. Run optional ASan/UBSan verification when an exact instrumented ABI-0.7 CNA
+   library can be built without changing canonical semantics.
+8. Defer models, broad content/XNB, audio/XACT, media, and storage until these
+   ownership dependencies are complete.
 
 ## Definition of complete compatibility
 
-The selected profile is complete only when all mapped types/members and every
-structural category reach zero, all public-surface safety gates remain zero,
-behavior is XNA-derived, native prototypes/layouts are compiler-verified,
-ownership plus sanitizer evidence passes, canonical CNA builds unmodified, and
+The selected profile is complete only when all mapped types and members and
+every structural category reach zero; all public-surface safety gates remain
+zero; behavior is XNA-derived; native prototypes/layouts are compiler-verified;
+ownership and sanitizer evidence pass; canonical CNA builds unmodified; and
 every claimed platform has fresh runtime evidence.

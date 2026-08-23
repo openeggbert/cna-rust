@@ -28,24 +28,28 @@ pub(super) struct ResourceState {
     active: Mutex<bool>,
     name: Mutex<String>,
     tag: Mutex<Option<Arc<dyn Any + Send + Sync>>>,
-    disposing: EventHandlers,
+    disposing: EventHandlers<EventArgs>,
 }
 
-type SharedHandler = Arc<Mutex<Box<dyn EventHandler>>>;
+type SharedHandler<T> = Arc<Mutex<Box<dyn EventHandler<T>>>>;
 
-#[derive(Default)]
-pub(super) struct EventHandlers {
-    state: Mutex<EventHandlerState>,
+pub(crate) struct EventHandlers<T = EventArgs> {
+    state: Mutex<EventHandlerState<T>>,
 }
 
-#[derive(Default)]
-struct EventHandlerState {
+struct EventHandlerState<T> {
     next_registration: u64,
-    entries: Vec<(u64, SharedHandler)>,
+    entries: Vec<(u64, SharedHandler<T>)>,
 }
 
-impl EventHandlers {
-    pub(super) const fn new() -> Self {
+impl<T> Default for EventHandlers<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T> EventHandlers<T> {
+    pub(crate) const fn new() -> Self {
         Self {
             state: Mutex::new(EventHandlerState {
                 next_registration: 0,
@@ -54,7 +58,7 @@ impl EventHandlers {
         }
     }
 
-    pub(super) fn add(&self, handler: Box<dyn EventHandler>) -> u64 {
+    pub(crate) fn add(&self, handler: Box<dyn EventHandler<T>>) -> u64 {
         let mut state = self
             .state
             .lock()
@@ -67,7 +71,7 @@ impl EventHandlers {
         registration
     }
 
-    pub(super) fn remove(&self, registration: u64) -> bool {
+    pub(crate) fn remove(&self, registration: u64) -> bool {
         let mut state = self
             .state
             .lock()
@@ -77,7 +81,10 @@ impl EventHandlers {
         length != state.entries.len()
     }
 
-    pub(super) fn emit(&self, sender: &dyn Any) -> bool {
+    pub(crate) fn emit(&self, sender: &dyn Any, args: T) -> bool
+    where
+        T: Clone,
+    {
         let handlers = self
             .state
             .lock()
@@ -92,7 +99,7 @@ impl EventHandlers {
                 handler
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .invoke(sender, EventArgs);
+                    .invoke(sender, args.clone());
             }));
             panicked |= result.is_err();
         }
@@ -191,7 +198,7 @@ impl ResourceState {
         if self.handle().is_none() {
             return Ok(());
         }
-        let handler_panicked = disposing && self.disposing.emit(sender);
+        let handler_panicked = disposing && self.disposing.emit(sender, EventArgs);
         let result = self.dispose_native();
         if handler_panicked {
             Err(CnaError::Callback(
@@ -239,8 +246,8 @@ pub trait GraphicsResource {
     fn SetName(&mut self, value: &str);
     fn Tag(&self) -> Option<Arc<dyn Any + Send + Sync>>;
     fn SetTag(&mut self, value: Option<Arc<dyn Any + Send + Sync>>);
-    fn AddDisposingHandler(&mut self, handler: Box<dyn EventHandler>) -> u64;
-    fn RemoveDisposingHandler(&mut self, registration: u64) -> bool;
+    fn AddDisposingHandler(&self, handler: Box<dyn EventHandler>) -> u64;
+    fn RemoveDisposingHandler(&self, registration: u64) -> bool;
     fn Dispose(&mut self, value: bool) -> Result<()>;
     fn DisposeWithNoArguments(&mut self) -> Result<()> {
         self.Dispose(true)
@@ -263,7 +270,7 @@ pub trait GraphicsResource {
 }
 
 /// XNA base relationship projected as a Rust trait.
-pub trait Texture: GraphicsResource {
+pub trait Texture: GraphicsResource + super::TextureRuntime {
     fn Format(&self) -> crate::Microsoft::Xna::Framework::Graphics::SurfaceFormat;
     fn LevelCount(&self) -> i32;
 }
@@ -302,12 +309,12 @@ mod tests {
         }));
         self_registration.store(second, Ordering::Relaxed);
 
-        assert!(!events.emit(&()));
+        assert!(!events.emit(&(), EventArgs));
         assert_eq!(*order.lock().expect("order"), [1, 2]);
         assert_eq!(calls.load(Ordering::Relaxed), 1);
         assert!(events.remove(first));
         assert!(!events.remove(first));
-        assert!(!events.emit(&()));
+        assert!(!events.emit(&(), EventArgs));
         assert_eq!(calls.load(Ordering::Relaxed), 1);
     }
 }

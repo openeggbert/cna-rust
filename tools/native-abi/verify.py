@@ -270,8 +270,9 @@ def abi_probes(cna_root: Path, manifest: dict) -> tuple[dict[str, int], dict[str
                 f"_p{position}: {parameter}"
                 for position, parameter in enumerate(value["rustParameters"])
             )
+            body = "()" if value["rustReturn"] == "()" else "CNA_RESULT_SUCCESS"
             rust_lines.append(
-                f"unsafe extern \"C\" fn callback_{index}({parameters}) -> {value['rustReturn']} {{ CNA_RESULT_SUCCESS }}"
+                f"unsafe extern \"C\" fn callback_{index}({parameters}) -> {value['rustReturn']} {{ {body} }}"
             )
         rust_lines.append("fn main() {")
         for type_name, fields in manifest.get("layouts", {}).items():

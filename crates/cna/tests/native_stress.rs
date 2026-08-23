@@ -1,24 +1,50 @@
 //! Crash-isolated ownership and callback stress for an explicitly supplied CNA library.
 
+#![allow(clippy::too_many_lines)]
+
 use std::io::Cursor;
 use std::process::Command;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, Weak};
 
 use cna::Microsoft::Xna::Framework::Graphics::{
-    BlendState, DepthStencilState, GraphicsDevice, GraphicsResource, RasterizerState, SamplerState,
-    SpriteBatch, SpriteSortMode, Texture, Texture2D,
+    BlendState, DepthStencilState, GraphicsAdapter, GraphicsDevice, GraphicsDeviceStatus,
+    GraphicsProfile, GraphicsResource, RasterizerState, SamplerState, SpriteBatch, SpriteSortMode,
+    Texture, Texture2D,
 };
-use cna::Microsoft::Xna::Framework::{Color, Game, GameContext, GameTime, Rectangle, Vector2};
-use cna::{run_for_frames, CnaError, Result};
+use cna::Microsoft::Xna::Framework::{
+    Color, Game, GameContext, GameTime, IDrawable, IGameComponent, IUpdateable, Rectangle, Vector2,
+};
+use cna::{
+    run_for_frames, CnaError, GameComponentCollectionExt, GameComponentRuntime, GameState,
+    GameStateAccess, Result,
+};
 
 const CHILD_CASE: &str = "CNA_RUST_NATIVE_STRESS_CHILD";
 
-struct EmptyGame;
+#[derive(Default)]
+struct EmptyGame {
+    state: Arc<GameState>,
+}
+
+impl GameStateAccess for EmptyGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
 
 impl Game for EmptyGame {}
 
-struct PanicGame;
+#[derive(Default)]
+struct PanicGame {
+    state: Arc<GameState>,
+}
+
+impl GameStateAccess for PanicGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
 
 impl Game for PanicGame {
     fn Update(&mut self, game: &mut GameContext<'_>, time: &GameTime) -> Result<()> {
@@ -27,10 +53,38 @@ impl Game for PanicGame {
     }
 }
 
+#[derive(Default)]
+struct PanicEventGame {
+    state: Arc<GameState>,
+}
+
+impl GameStateAccess for PanicEventGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for PanicEventGame {
+    fn Initialize(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let _ = game;
+        self.AddExitingHandler(Box::new(|_: &dyn std::any::Any, _| {
+            panic!("intentional lifecycle-event panic");
+        }));
+        Ok(())
+    }
+}
+
 struct SuppressFirstDrawGame {
+    state: Arc<GameState>,
     begin_draws: Arc<AtomicUsize>,
     draws: Arc<AtomicUsize>,
     end_draws: Arc<AtomicUsize>,
+}
+
+impl GameStateAccess for SuppressFirstDrawGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
 }
 
 impl Game for SuppressFirstDrawGame {
@@ -49,6 +103,212 @@ impl Game for SuppressFirstDrawGame {
     }
 }
 
+struct RecordingComponent {
+    name: &'static str,
+    game: Weak<GameState>,
+    log: Arc<Mutex<Vec<String>>>,
+    update_order: i32,
+    draw_order: i32,
+    remove_during_update: Mutex<Option<Weak<dyn IGameComponent>>>,
+}
+
+impl RecordingComponent {
+    fn record(&self, suffix: &str) {
+        self.log
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(format!("{}.{}", self.name, suffix));
+    }
+}
+
+impl GameComponentRuntime for RecordingComponent {
+    fn AsUpdateable(&self) -> Option<&dyn IUpdateable> {
+        Some(self)
+    }
+
+    fn AsDrawable(&self) -> Option<&dyn IDrawable> {
+        Some(self)
+    }
+}
+
+impl IGameComponent for RecordingComponent {
+    fn Initialize(&self) {
+        self.record("Initialize");
+    }
+}
+
+impl IUpdateable for RecordingComponent {
+    fn Enabled(&self) -> bool {
+        true
+    }
+
+    fn UpdateOrder(&self) -> i32 {
+        self.update_order
+    }
+
+    fn AddEnabledChangedHandler(
+        &self,
+        handler: Box<dyn cna::extensions::events::EventHandler>,
+    ) -> u64 {
+        drop(handler);
+        0
+    }
+
+    fn RemoveEnabledChangedHandler(&self, registration: u64) -> bool {
+        let _ = registration;
+        false
+    }
+
+    fn AddUpdateOrderChangedHandler(
+        &self,
+        handler: Box<dyn cna::extensions::events::EventHandler>,
+    ) -> u64 {
+        drop(handler);
+        0
+    }
+
+    fn RemoveUpdateOrderChangedHandler(&self, registration: u64) -> bool {
+        let _ = registration;
+        false
+    }
+
+    fn Update(&self, game_time: &GameTime) {
+        let _ = game_time;
+        self.record("Update");
+        let target = self
+            .remove_during_update
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take()
+            .and_then(|target| target.upgrade());
+        if let (Some(game), Some(target)) = (self.game.upgrade(), target) {
+            assert!(game.Components().Remove(&target));
+        }
+    }
+}
+
+impl IDrawable for RecordingComponent {
+    fn Visible(&self) -> bool {
+        true
+    }
+
+    fn DrawOrder(&self) -> i32 {
+        self.draw_order
+    }
+
+    fn AddVisibleChangedHandler(
+        &self,
+        handler: Box<dyn cna::extensions::events::EventHandler>,
+    ) -> u64 {
+        drop(handler);
+        0
+    }
+
+    fn RemoveVisibleChangedHandler(&self, registration: u64) -> bool {
+        let _ = registration;
+        false
+    }
+
+    fn AddDrawOrderChangedHandler(
+        &self,
+        handler: Box<dyn cna::extensions::events::EventHandler>,
+    ) -> u64 {
+        drop(handler);
+        0
+    }
+
+    fn RemoveDrawOrderChangedHandler(&self, registration: u64) -> bool {
+        let _ = registration;
+        false
+    }
+
+    fn Draw(&self, game_time: &GameTime) {
+        let _ = game_time;
+        self.record("Draw");
+    }
+}
+
+struct ComponentOrderGame {
+    state: Arc<GameState>,
+    log: Arc<Mutex<Vec<String>>>,
+    add_after_initialize: AtomicBool,
+}
+
+impl GameStateAccess for ComponentOrderGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for ComponentOrderGame {
+    fn Initialize(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let _ = game;
+        self.log
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push("Game.Initialize".to_owned());
+        Ok(())
+    }
+
+    fn Update(&mut self, game: &mut GameContext<'_>, time: &GameTime) -> Result<()> {
+        let _ = (game, time);
+        self.log
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push("Game.Update".to_owned());
+        if !self.add_after_initialize.swap(true, Ordering::AcqRel) {
+            let component: Arc<dyn IGameComponent> = Arc::new(RecordingComponent {
+                name: "D",
+                game: Arc::downgrade(&self.state),
+                log: Arc::clone(&self.log),
+                update_order: 0,
+                draw_order: 0,
+                remove_during_update: Mutex::new(None),
+            });
+            self.state.Components().Add(component);
+        }
+        Ok(())
+    }
+
+    fn Draw(&mut self, game: &mut GameContext<'_>, time: &GameTime) -> Result<()> {
+        let _ = (game, time);
+        self.log
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push("Game.Draw".to_owned());
+        Ok(())
+    }
+}
+
+fn component_order_game(log: &Arc<Mutex<Vec<String>>>) -> ComponentOrderGame {
+    let state = Arc::new(GameState::new());
+    let component = |name, update_order, draw_order| {
+        Arc::new(RecordingComponent {
+            name,
+            game: Arc::downgrade(&state),
+            log: Arc::clone(log),
+            update_order,
+            draw_order,
+            remove_during_update: Mutex::new(None),
+        })
+    };
+    let a = component("A", 0, 0);
+    let b: Arc<dyn IGameComponent> = component("B", 0, 0);
+    let c: Arc<dyn IGameComponent> = component("C", -1, -1);
+    *a.remove_during_update
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(Arc::downgrade(&b));
+    let a: Arc<dyn IGameComponent> = a;
+    state.Components().Add(a);
+    state.Components().Add(Arc::clone(&b));
+    state.Components().Add(c);
+    ComponentOrderGame {
+        state,
+        log: Arc::clone(log),
+        add_after_initialize: AtomicBool::new(false),
+    }
+}
+
 #[derive(Default)]
 struct LifecycleEvidence {
     events: Vec<&'static str>,
@@ -56,10 +316,17 @@ struct LifecycleEvidence {
 }
 
 struct LifecycleEvidenceGame {
+    state: Arc<GameState>,
     evidence: Arc<Mutex<LifecycleEvidence>>,
     device: Arc<Mutex<Option<GraphicsDevice>>>,
     texture: Arc<Mutex<Option<Texture2D>>>,
     batch: Arc<Mutex<Option<SpriteBatch>>>,
+}
+
+impl GameStateAccess for LifecycleEvidenceGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
 }
 
 impl LifecycleEvidenceGame {
@@ -92,10 +359,47 @@ impl Game for LifecycleEvidenceGame {
 
     fn Initialize(&mut self, game: &mut GameContext<'_>) -> Result<()> {
         self.event("Initialize");
+        let exiting_evidence = Arc::clone(&self.evidence);
+        self.AddExitingHandler(Box::new(move |sender: &dyn std::any::Any, _| {
+            let state = sender
+                .downcast_ref::<GameState>()
+                .expect("GameState event sender");
+            assert!(!state
+                .GraphicsDevice()
+                .expect("device during Exiting")
+                .IsDisposed()
+                .expect("device state during Exiting"));
+            exiting_evidence
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .events
+                .push("Exiting");
+        }));
+        let disposed_evidence = Arc::clone(&self.evidence);
+        self.AddDisposedHandler(Box::new(move |_: &dyn std::any::Any, _| {
+            disposed_evidence
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .events
+                .push("DisposedEvent");
+        }));
+        let device = game.GraphicsDevice()?;
+        let disposing_evidence = Arc::clone(&self.evidence);
+        device.AddDisposingHandler(Box::new(move |sender: &dyn std::any::Any, _| {
+            let device = sender
+                .downcast_ref::<GraphicsDevice>()
+                .expect("GraphicsDevice event sender");
+            assert!(device.IsDisposed().expect("disposed event state"));
+            disposing_evidence
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .events
+                .push("DeviceDisposing");
+        }));
         *self
             .device
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(game.GraphicsDevice()?);
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(device);
         Ok(())
     }
 
@@ -103,6 +407,54 @@ impl Game for LifecycleEvidenceGame {
         self.event("LoadContent");
         let first_device = game.GraphicsDevice()?;
         let second_device = game.GraphicsDevice()?;
+        assert!(std::ptr::eq(
+            first_device.PresentationParameters()?,
+            second_device.PresentationParameters()?
+        ));
+        assert!(std::ptr::eq(
+            first_device.Adapter()?,
+            second_device.Adapter()?
+        ));
+        assert!(std::ptr::eq(
+            first_device.SamplerStates()?,
+            second_device.SamplerStates()?
+        ));
+        assert!(std::ptr::eq(
+            first_device.VertexSamplerStates()?,
+            second_device.VertexSamplerStates()?
+        ));
+        assert!(std::ptr::eq(
+            first_device.Textures()?,
+            second_device.Textures()?
+        ));
+        assert!(std::ptr::eq(
+            first_device.VertexTextures()?,
+            second_device.VertexTextures()?
+        ));
+        assert_eq!(
+            first_device.GraphicsDeviceStatus()?,
+            GraphicsDeviceStatus::Normal
+        );
+        assert!(matches!(
+            first_device.GraphicsProfile()?,
+            GraphicsProfile::Reach | GraphicsProfile::HiDef
+        ));
+        assert!(std::ptr::eq(
+            first_device.Adapter()?,
+            GraphicsAdapter::DefaultAdapter(&first_device)?
+        ));
+        assert_eq!(
+            GraphicsAdapter::Adapters(&first_device)?.as_ptr(),
+            GraphicsAdapter::Adapters(&second_device)?.as_ptr()
+        );
+        assert!(std::ptr::eq(
+            first_device.Adapter()?.CurrentDisplayMode()?,
+            second_device.Adapter()?.CurrentDisplayMode()?
+        ));
+        assert!(std::ptr::eq(
+            first_device.Adapter()?.SupportedDisplayModes()?,
+            second_device.Adapter()?.SupportedDisplayModes()?
+        ));
         let mut encoded = Cursor::new(ONE_PIXEL_RGBA_PNG);
         *self
             .texture
@@ -147,12 +499,6 @@ impl Game for LifecycleEvidenceGame {
         batch.End()
     }
 
-    fn OnExiting(&mut self, game: &mut GameContext<'_>) -> Result<()> {
-        self.event("Exiting");
-        assert!(!game.GraphicsDevice()?.IsDisposed()?);
-        Ok(())
-    }
-
     fn UnloadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
         let _ = game;
         self.event("UnloadContent");
@@ -179,13 +525,21 @@ impl Game for LifecycleEvidenceGame {
 
     fn Dispose(&mut self) {
         self.event("Dispose");
+        self.DisposeWithDisposing(true);
     }
 }
 
 #[derive(Default)]
 struct ResourceGame {
+    state: Arc<GameState>,
     texture: Option<Texture2D>,
     batch: Option<SpriteBatch>,
+}
+
+impl GameStateAccess for ResourceGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
 }
 
 impl Game for ResourceGame {
@@ -226,7 +580,16 @@ impl Game for ResourceGame {
     }
 }
 
-struct TextureTransferGame;
+#[derive(Default)]
+struct TextureTransferGame {
+    state: Arc<GameState>,
+}
+
+impl GameStateAccess for TextureTransferGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
 
 impl Game for TextureTransferGame {
     fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
@@ -356,9 +719,48 @@ impl Game for TextureTransferGame {
         assert!(depth.GraphicsDevice().is_some());
         assert!(rasterizer.GraphicsDevice().is_some());
         batch.End()?;
-        device.SetBlendState(&blend)?;
-        device.SetDepthStencilState(&depth)?;
-        device.SetRasterizerState(&rasterizer)?;
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            blend.SetMultiSampleMask(0);
+        }))
+        .is_err());
+        let blend = Arc::new(blend);
+        let depth = Arc::new(depth);
+        let rasterizer = Arc::new(rasterizer);
+        device.SetBlendState(Arc::clone(&blend))?;
+        device.SetDepthStencilState(Arc::clone(&depth))?;
+        device.SetRasterizerState(Arc::clone(&rasterizer))?;
+        assert!(Arc::ptr_eq(&blend, &device.BlendState()?));
+        assert!(Arc::ptr_eq(&depth, &device.DepthStencilState()?));
+        assert!(Arc::ptr_eq(&rasterizer, &device.RasterizerState()?));
+        let sampler = Arc::new(SamplerState::LinearClamp);
+        let sampler_states = device.SamplerStates()?;
+        sampler_states.SetItem(0, Arc::clone(&sampler))?;
+        assert!(Arc::ptr_eq(&sampler, &sampler_states.Item(0)?));
+        assert!(matches!(
+            sampler_states.Item(-1),
+            Err(CnaError::InvalidInput(_))
+        ));
+        let bound_texture: Arc<dyn Texture> = Arc::new(Texture2D::new(&device, 1, 1)?);
+        device
+            .Textures()?
+            .SetItem(0, Some(Arc::clone(&bound_texture)))?;
+        assert!(Arc::ptr_eq(
+            &bound_texture,
+            &device.Textures()?.Item(0)?.expect("bound texture")
+        ));
+        let associated_device = bound_texture
+            .GraphicsDevice()
+            .expect("texture retains device association");
+        assert!(std::ptr::eq(
+            associated_device.PresentationParameters()?,
+            device.PresentationParameters()?
+        ));
+        device.Textures()?.SetItem(0, None)?;
+        assert!(device.Textures()?.Item(0)?.is_none());
+        assert!(matches!(
+            device.Textures()?.Item(16),
+            Err(CnaError::InvalidInput(_))
+        ));
         device.SetBlendFactor(Color::Red)?;
         assert_eq!(device.BlendFactor()?, Color::Red);
         device.SetMultiSampleMask(0x1234_5678)?;
@@ -370,10 +772,6 @@ impl Game for TextureTransferGame {
         device.SetScissorRectangle(Rectangle::new(0, 0, 1, 1))?;
         assert_eq!(device.ScissorRectangle()?, Rectangle::new(0, 0, 1, 1));
         device.PresentWithNoArguments()?;
-        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            blend.SetMultiSampleMask(0);
-        }))
-        .is_err());
         assert!(matches!(batch.End(), Err(CnaError::InvalidInput(_))));
         assert!(matches!(
             batch.Draw(&texture, Vector2::Zero, Color::White),
@@ -430,7 +828,16 @@ impl Game for TextureTransferGame {
     }
 }
 
-struct FaultTextureInfoGame;
+#[derive(Default)]
+struct FaultTextureInfoGame {
+    state: Arc<GameState>,
+}
+
+impl GameStateAccess for FaultTextureInfoGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
 
 impl Game for FaultTextureInfoGame {
     fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
@@ -455,7 +862,9 @@ fn native_stress_isolated() {
         "resources-25",
         "texture-transfers-10",
         "lifecycle-order-and-identity",
+        "component-order-and-mutation",
         "callback-panic",
+        "callback-event-panic",
         "fault-game-create",
         "fault-texture-info",
         "fault-game-destroy",
@@ -476,7 +885,7 @@ fn run_child_case(case: &str) {
     match case {
         "lifecycle-100" => {
             for _ in 0..100 {
-                run_for_frames(EmptyGame, 1).expect("create/run/destroy cycle");
+                run_for_frames(EmptyGame::default(), 1).expect("create/run/destroy cycle");
             }
         }
         "resources-25" => {
@@ -487,7 +896,7 @@ fn run_child_case(case: &str) {
         }
         "texture-transfers-10" => {
             for _ in 0..10 {
-                run_for_frames(TextureTransferGame, 1)
+                run_for_frames(TextureTransferGame::default(), 1)
                     .expect("Texture2D transfer/validation/event cycle");
             }
         }
@@ -498,6 +907,7 @@ fn run_child_case(case: &str) {
             let batch = Arc::new(Mutex::new(None));
             run_for_frames(
                 LifecycleEvidenceGame {
+                    state: Arc::new(GameState::new()),
                     evidence: Arc::clone(&evidence),
                     device: Arc::clone(&device),
                     texture: Arc::clone(&texture),
@@ -523,7 +933,9 @@ fn run_child_case(case: &str) {
                     "Exiting",
                     "EndRun",
                     "UnloadContent",
-                    "Dispose"
+                    "DeviceDisposing",
+                    "Dispose",
+                    "DisposedEvent"
                 ]
             );
             assert!(evidence.unload_resources_disposed);
@@ -536,6 +948,15 @@ fn run_child_case(case: &str) {
                 .expect("retained device")
                 .IsDisposed()
                 .expect("device state"));
+            assert!(matches!(
+                device
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .as_ref()
+                    .expect("retained device")
+                    .SamplerStates(),
+                Err(CnaError::InvalidInput("graphics device is disposed"))
+            ));
             let mut texture = texture
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -562,6 +983,7 @@ fn run_child_case(case: &str) {
             let end_draws = Arc::new(AtomicUsize::new(0));
             run_for_frames(
                 SuppressFirstDrawGame {
+                    state: Arc::new(GameState::new()),
                     begin_draws: Arc::clone(&begin_draws),
                     draws: Arc::clone(&draws),
                     end_draws: Arc::clone(&end_draws),
@@ -573,17 +995,52 @@ fn run_child_case(case: &str) {
             assert_eq!(draws.load(Ordering::SeqCst), 1);
             assert_eq!(end_draws.load(Ordering::SeqCst), 1);
         }
+        "component-order-and-mutation" => {
+            let log = Arc::new(Mutex::new(Vec::new()));
+            run_for_frames(component_order_game(&log), 1)
+                .expect("component initialization/order/mutation game");
+            assert_eq!(
+                *log.lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner),
+                [
+                    "Game.Initialize",
+                    "A.Initialize",
+                    "B.Initialize",
+                    "C.Initialize",
+                    "Game.Update",
+                    "D.Initialize",
+                    "C.Update",
+                    "A.Update",
+                    // XNA snapshots the update list before iteration, so B
+                    // still updates once after A removes it from Components.
+                    "B.Update",
+                    "D.Update",
+                    "Game.Draw",
+                    "C.Draw",
+                    "A.Draw",
+                    "D.Draw",
+                ]
+            );
+        }
         "callback-panic" => {
             assert!(matches!(
-                run_for_frames(PanicGame, 1),
+                run_for_frames(PanicGame::default(), 1),
                 Err(CnaError::Callback(_))
             ));
-            run_for_frames(EmptyGame, 1).expect("game recreation after contained panic");
+            run_for_frames(EmptyGame::default(), 1).expect("game recreation after contained panic");
+        }
+        "callback-event-panic" => {
+            assert!(matches!(
+                run_for_frames(PanicEventGame::default(), 1),
+                Err(CnaError::Callback(_))
+            ));
+            run_for_frames(EmptyGame::default(), 1)
+                .expect("game recreation after contained event-handler panic");
         }
         "fault-game-create" => {
             std::env::set_var("CNA_RUST_TEST_FAULT", "game-create");
             assert!(matches!(
-                run_for_frames(EmptyGame, 1),
+                run_for_frames(EmptyGame::default(), 1),
                 Err(CnaError::Native {
                     code: cna_sys::CNA_RESULT_INTERNAL,
                     ..
@@ -594,26 +1051,26 @@ fn run_child_case(case: &str) {
         "fault-texture-info" => {
             std::env::set_var("CNA_RUST_TEST_FAULT", "texture-info");
             assert!(matches!(
-                run_for_frames(FaultTextureInfoGame, 1),
+                run_for_frames(FaultTextureInfoGame::default(), 1),
                 Err(CnaError::Native {
                     code: cna_sys::CNA_RESULT_INTERNAL,
                     ..
                 })
             ));
             std::env::remove_var("CNA_RUST_TEST_FAULT");
-            run_for_frames(EmptyGame, 1).expect("recreate after texture rollback");
+            run_for_frames(EmptyGame::default(), 1).expect("recreate after texture rollback");
         }
         "fault-game-destroy" => {
             std::env::set_var("CNA_RUST_TEST_FAULT", "game-destroy");
             assert!(matches!(
-                run_for_frames(EmptyGame, 1),
+                run_for_frames(EmptyGame::default(), 1),
                 Err(CnaError::Native {
                     code: cna_sys::CNA_RESULT_INTERNAL,
                     ..
                 })
             ));
             std::env::remove_var("CNA_RUST_TEST_FAULT");
-            run_for_frames(EmptyGame, 1).expect("recreate after destroy failure report");
+            run_for_frames(EmptyGame::default(), 1).expect("recreate after destroy failure report");
         }
         _ => panic!("unknown native stress child case"),
     }

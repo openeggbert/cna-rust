@@ -419,11 +419,11 @@ impl GraphicsResource for SpriteBatch {
         self.state.set_tag(value);
     }
 
-    fn AddDisposingHandler(&mut self, handler: Box<dyn EventHandler>) -> u64 {
+    fn AddDisposingHandler(&self, handler: Box<dyn EventHandler>) -> u64 {
         self.state.add_disposing_handler(handler)
     }
 
-    fn RemoveDisposingHandler(&mut self, registration: u64) -> bool {
+    fn RemoveDisposingHandler(&self, registration: u64) -> bool {
         self.state.remove_disposing_handler(registration)
     }
 

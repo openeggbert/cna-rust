@@ -46,9 +46,10 @@ hierarchy and deliberate CNA extensions.
   zero. Clippy still reports audited compatibility warnings; they are not
   globally hidden.
 - XNA 4.0 Windows runtime inventory remains 257 CLR types and 2,964 members;
-  259 Rust types are expected and 91 strict types now exist.
-- Strict diagnostics are 263: 168 missing types and 95 missing members.
-  Parameter/signature and disposal mismatches are now zero. Type kind,
+  259 Rust types are expected and 117 strict types now exist.
+- Strict diagnostics are 178: 142 missing types and 36 missing members.
+  `Game`, `GraphicsDevice`, and `SpriteBatch` have respectively 2, 26, and 8
+  local diagnostics. Parameter/signature and disposal mismatches are zero. Type kind,
   base/trait/interface, return, generic/bound, ref/out, enum/value, flags, and
   delegate mismatches remain zero.
 - Unexpected types/members, internal leaks, raw-handle leaks, public unsafe
@@ -56,19 +57,24 @@ hierarchy and deliberate CNA extensions.
 - Curves and all remaining packed vectors are real. `GraphicsResource`,
   `Texture`, and `Texture2D` have zero local diagnostics. Managed graphics
   states are complete and `SpriteBatch` implements all texture draw overloads.
-- The XNA-derived corpus passes 105 named observations and 106 assertions.
-- The reviewed ABI slice is 53 functions. Full compiler-derived prototypes are
-  checked for all 53, and all 313 independent C/Rust prototype/layout/callback/
+- Components, per-game typed services, launch parameters, `GameWindow`,
+  display/presentation types, adapter/device status, and stable device
+  texture/sampler collections are real and have zero local diagnostics.
+- The XNA-derived corpus passes 123 named observations and 124 assertions.
+- The reviewed ABI slice is 104 functions. Full compiler-derived prototypes are
+  checked for all 104, and all 419 independent C/Rust prototype/layout/callback/
   constant measurements match.
 - Linux x86-64 HEADLESS validation freshly passes 60 and 600 template frames,
-  143 isolated successful native game lifetimes, and a generated vendored
-  consumer build/test plus 60 frames.
+  146 isolated native game lifetime cycles (including injected failures), and
+  a generated vendored consumer build/test plus 60 frames.
 
 `GraphicsDevice` now has durable shared identity while its private CNA handle
 remains callback-scoped. Resources retain device association without owning
 the native device, share deterministic invalidation, and are released before
 parent destruction. User `UnloadContent` remains exactly once and is separate
-from internal pre-destroy child cleanup.
+from internal pre-destroy child cleanup. Persistent presentation, adapter,
+texture/sampler collection, and graphics-state access preserves shared logical
+identity instead of constructing unrelated wrappers.
 
 Canonical CNA HEAD `1bb2145d99ed572dd4eb15009c34e2e5f410fcf0` still fails an
 unmodified C API build at `CnaCApiCoreExt.cpp:250`: the renderer identity

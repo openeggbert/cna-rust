@@ -7,6 +7,8 @@ use cna::Microsoft::Xna::Framework::Input::{Keyboard, KeyboardState, Keys};
 use cna::Microsoft::Xna::Framework::{
     Color, Game, GameContext, GameTime, Matrix, TimeSpan, Vector2, Vector3,
 };
+use cna::{GameState, GameStateAccess};
+use std::sync::Arc;
 
 fn accepts_game<T: Game>() {}
 fn accepts_resource<T: GraphicsResource>() {}
@@ -28,7 +30,16 @@ fn projected_resource_relationships(
     texture.DisposeWithNoArguments()
 }
 
-struct ProbeGame;
+#[derive(Default)]
+struct ProbeGame {
+    state: Arc<GameState>,
+}
+
+impl GameStateAccess for ProbeGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
 
 impl Game for ProbeGame {}
 

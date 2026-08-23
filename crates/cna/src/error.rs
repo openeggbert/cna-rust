@@ -27,6 +27,8 @@ pub enum CnaError {
     UnsupportedPlatform,
     /// CNA's selected ABI does not expose the requested runtime route.
     UnsupportedRuntime(&'static str),
+    /// A mapped XNA file/stream operation failed.
+    Io(String),
 }
 
 impl fmt::Display for CnaError {
@@ -46,6 +48,7 @@ impl fmt::Display for CnaError {
             Self::InvalidInput(message) | Self::UnsupportedRuntime(message) => {
                 formatter.write_str(message)
             }
+            Self::Io(message) => formatter.write_str(message),
             Self::UnsupportedPlatform => formatter.write_str("CNA dynamic loading is not implemented on this platform"),
         }
     }
