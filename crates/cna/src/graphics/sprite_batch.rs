@@ -13,12 +13,12 @@ use cna_sys as sys;
 
 use crate::error::{CnaError, Result};
 use crate::extensions::events::EventHandler;
-use crate::value::{Color, Rectangle, Vector2};
+use crate::value::{Color, Matrix, Rectangle, Vector2};
 
 use super::resource::{ResourceKind, ResourceState};
 use super::{
-    BlendState, DepthStencilState, GraphicsDevice, GraphicsResource, RasterizerState, SamplerState,
-    SpriteEffects, SpriteSortMode, Texture2D,
+    BlendState, DepthStencilState, Effect, GraphicsDevice, GraphicsResource, RasterizerState,
+    SamplerState, SpriteEffects, SpriteFont, SpriteSortMode, Texture2D,
 };
 
 /// Owned `SpriteBatch` associated with one durable graphics-device identity.
@@ -119,6 +119,96 @@ impl SpriteBatch {
             &sampler,
             &depth_stencil,
             &rasterizer,
+        )?;
+        self.state.set_active(true);
+        Ok(())
+    }
+
+    pub fn BeginWithSortModeAndBlendStateAndSamplerStateAndDepthStencilStateAndRasterizerStateAndEffect(
+        &mut self,
+        sortMode: SpriteSortMode,
+        blendState: &BlendState,
+        samplerState: &SamplerState,
+        depthStencilState: &DepthStencilState,
+        rasterizerState: &RasterizerState,
+        effect: Option<&Effect>,
+    ) -> Result<()> {
+        self.begin_with_effect(
+            sortMode,
+            blendState,
+            samplerState,
+            depthStencilState,
+            rasterizerState,
+            effect,
+            None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn BeginWithSortModeAndBlendStateAndSamplerStateAndDepthStencilStateAndRasterizerStateAndEffectAndTransformMatrix(
+        &mut self,
+        sortMode: SpriteSortMode,
+        blendState: &BlendState,
+        samplerState: &SamplerState,
+        depthStencilState: &DepthStencilState,
+        rasterizerState: &RasterizerState,
+        effect: Option<&Effect>,
+        transformMatrix: Matrix,
+    ) -> Result<()> {
+        self.begin_with_effect(
+            sortMode,
+            blendState,
+            samplerState,
+            depthStencilState,
+            rasterizerState,
+            effect,
+            Some(transformMatrix),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn begin_with_effect(
+        &mut self,
+        sort_mode: SpriteSortMode,
+        blend_state: &BlendState,
+        sampler_state: &SamplerState,
+        depth_stencil_state: &DepthStencilState,
+        rasterizer_state: &RasterizerState,
+        effect: Option<&Effect>,
+        transform: Option<Matrix>,
+    ) -> Result<()> {
+        if self.state.is_active() {
+            return Err(CnaError::InvalidInput("SpriteBatch.Begin was called twice"));
+        }
+        let device = self.state.device();
+        blend_state.bind(device)?;
+        sampler_state.bind(device)?;
+        depth_stencil_state.bind(device)?;
+        rasterizer_state.bind(device)?;
+        let effect_handle = if let Some(effect) = effect {
+            if !effect.is_same_device(device) {
+                return Err(CnaError::InvalidInput(
+                    "SpriteBatch Effect belongs to a different graphics device",
+                ));
+            }
+            effect.handle()?
+        } else {
+            sys::CNA_INVALID_HANDLE
+        };
+        let blend = blend_state.native();
+        let sampler = sampler_state.native();
+        let depth_stencil = depth_stencil_state.native();
+        let rasterizer = rasterizer_state.native();
+        let transform = transform.map(super::effect::native_matrix);
+        device.state.native().begin_sprite_batch_with_effect(
+            self.state.require_handle()?,
+            sort_mode as u32,
+            &blend,
+            &sampler,
+            &depth_stencil,
+            &rasterizer,
+            effect_handle,
+            transform.as_ref(),
         )?;
         self.state.set_active(true);
         Ok(())
@@ -369,6 +459,202 @@ impl SpriteBatch {
             .state
             .native()
             .submit_sprite(self.state.require_handle()?, &command)
+    }
+
+    pub fn DrawString(
+        &mut self,
+        spriteFont: &SpriteFont,
+        text: &str,
+        position: Vector2,
+        color: Color,
+    ) -> Result<()> {
+        self.submit_string(
+            spriteFont,
+            text,
+            position,
+            color,
+            0.0,
+            Vector2::Zero,
+            Vector2::One,
+            SpriteEffects::None,
+            0.0,
+        )
+    }
+
+    pub fn DrawStringWithSpriteFontAndTextAndPositionAndColor(
+        &mut self,
+        spriteFont: &SpriteFont,
+        text: &str,
+        position: Vector2,
+        color: Color,
+    ) -> Result<()> {
+        self.DrawString(spriteFont, text, position, color)
+    }
+
+    pub fn DrawStringWithSpriteFontAndTextAndPositionAndColorAndRotationAndOriginAndScaleAndEffectsAndLayerDepthAsSpriteFontAndStringAndVector2AndColorAndSingleAndVector2AndSingleAndSpriteEffectsAndSingle(
+        &mut self,
+        spriteFont: &SpriteFont,
+        text: &str,
+        position: Vector2,
+        color: Color,
+        rotation: f32,
+        origin: Vector2,
+        scale: f32,
+        effects: SpriteEffects,
+        layerDepth: f32,
+    ) -> Result<()> {
+        self.submit_string(
+            spriteFont,
+            text,
+            position,
+            color,
+            rotation,
+            origin,
+            Vector2::new(scale),
+            effects,
+            layerDepth,
+        )
+    }
+
+    pub fn DrawStringWithSpriteFontAndTextAndPositionAndColorAndRotationAndOriginAndScaleAndEffectsAndLayerDepthAsSpriteFontAndStringAndVector2AndColorAndSingleAndVector2AndVector2AndSpriteEffectsAndSingle(
+        &mut self,
+        spriteFont: &SpriteFont,
+        text: &str,
+        position: Vector2,
+        color: Color,
+        rotation: f32,
+        origin: Vector2,
+        scale: Vector2,
+        effects: SpriteEffects,
+        layerDepth: f32,
+    ) -> Result<()> {
+        self.submit_string(
+            spriteFont, text, position, color, rotation, origin, scale, effects, layerDepth,
+        )
+    }
+
+    pub fn DrawStringWithSpriteFontAndTextAndPositionAndColorAndRotationAndOriginAndScaleAndEffectsAndLayerDepthAsSpriteFontAndStringBuilderAndVector2AndColorAndSingleAndVector2AndSingleAndSpriteEffectsAndSingle(
+        &mut self,
+        spriteFont: &SpriteFont,
+        text: &str,
+        position: Vector2,
+        color: Color,
+        rotation: f32,
+        origin: Vector2,
+        scale: f32,
+        effects: SpriteEffects,
+        layerDepth: f32,
+    ) -> Result<()> {
+        self.DrawStringWithSpriteFontAndTextAndPositionAndColorAndRotationAndOriginAndScaleAndEffectsAndLayerDepthAsSpriteFontAndStringAndVector2AndColorAndSingleAndVector2AndSingleAndSpriteEffectsAndSingle(
+            spriteFont,
+            text,
+            position,
+            color,
+            rotation,
+            origin,
+            scale,
+            effects,
+            layerDepth,
+        )
+    }
+
+    pub fn DrawStringWithSpriteFontAndTextAndPositionAndColorAndRotationAndOriginAndScaleAndEffectsAndLayerDepthAsSpriteFontAndStringBuilderAndVector2AndColorAndSingleAndVector2AndVector2AndSpriteEffectsAndSingle(
+        &mut self,
+        spriteFont: &SpriteFont,
+        text: &str,
+        position: Vector2,
+        color: Color,
+        rotation: f32,
+        origin: Vector2,
+        scale: Vector2,
+        effects: SpriteEffects,
+        layerDepth: f32,
+    ) -> Result<()> {
+        self.DrawStringWithSpriteFontAndTextAndPositionAndColorAndRotationAndOriginAndScaleAndEffectsAndLayerDepthAsSpriteFontAndStringAndVector2AndColorAndSingleAndVector2AndVector2AndSpriteEffectsAndSingle(
+            spriteFont,
+            text,
+            position,
+            color,
+            rotation,
+            origin,
+            scale,
+            effects,
+            layerDepth,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn submit_string(
+        &mut self,
+        sprite_font: &SpriteFont,
+        text: &str,
+        position: Vector2,
+        color: Color,
+        rotation: f32,
+        origin: Vector2,
+        scale: Vector2,
+        effects: SpriteEffects,
+        layer_depth: f32,
+    ) -> Result<()> {
+        if !self.state.is_active() {
+            return Err(CnaError::InvalidInput(
+                "SpriteBatch.DrawString requires an active Begin/End interval",
+            ));
+        }
+        if !sprite_font.is_same_device(self.state.device()) {
+            return Err(CnaError::InvalidInput(
+                "SpriteBatch and SpriteFont belong to different graphics devices",
+            ));
+        }
+        if !position.X.is_finite()
+            || !position.Y.is_finite()
+            || !rotation.is_finite()
+            || !origin.X.is_finite()
+            || !origin.Y.is_finite()
+            || !scale.X.is_finite()
+            || !scale.Y.is_finite()
+            || !layer_depth.is_finite()
+        {
+            return Err(CnaError::InvalidInput(
+                "SpriteBatch.DrawString transform values must be finite",
+            ));
+        }
+        let command = sys::CNA_SpriteTextCommand {
+            struct_size: size_of::<sys::CNA_SpriteTextCommand>() as u32,
+            struct_version: 1,
+            sprite_font: sprite_font.handle()?,
+            text: sys::CNA_StringView {
+                data: text.as_ptr().cast(),
+                byte_length: u64::try_from(text.len())
+                    .map_err(|_| CnaError::InvalidInput("SpriteBatch text is too large"))?,
+            },
+            position: sys::CNA_Vector2 {
+                x: position.X,
+                y: position.Y,
+            },
+            color: sys::CNA_Color {
+                r: color.R(),
+                g: color.G(),
+                b: color.B(),
+                a: color.A(),
+            },
+            rotation,
+            origin: sys::CNA_Vector2 {
+                x: origin.X,
+                y: origin.Y,
+            },
+            scale: sys::CNA_Vector2 {
+                x: scale.X,
+                y: scale.Y,
+            },
+            effects: effects.bits(),
+            layer_depth,
+        };
+        self.state
+            .device()
+            .state
+            .native()
+            .draw_sprite_string(self.state.require_handle()?, &command)
     }
 
     pub fn End(&mut self) -> Result<()> {

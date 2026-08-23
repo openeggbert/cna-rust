@@ -100,6 +100,58 @@ xna_enum!(RenderTargetUsage {
     PlatformContents = 2,
 });
 
+xna_enum!(CubeMapFace {
+    PositiveX = 0,
+    NegativeX = 1,
+    PositiveY = 2,
+    NegativeY = 3,
+    PositiveZ = 4,
+    NegativeZ = 5,
+});
+
+xna_enum!(IndexElementSize {
+    SixteenBits = 0,
+    ThirtyTwoBits = 1,
+});
+
+xna_enum!(PrimitiveType {
+    TriangleList = 0,
+    TriangleStrip = 1,
+    LineList = 2,
+    LineStrip = 3,
+});
+
+xna_enum!(VertexElementFormat {
+    Single = 0,
+    Vector2 = 1,
+    Vector3 = 2,
+    Vector4 = 3,
+    Color = 4,
+    Byte4 = 5,
+    Short2 = 6,
+    Short4 = 7,
+    NormalizedShort2 = 8,
+    NormalizedShort4 = 9,
+    HalfVector2 = 10,
+    HalfVector4 = 11,
+});
+
+xna_enum!(VertexElementUsage {
+    Position = 0,
+    Color = 1,
+    TextureCoordinate = 2,
+    Normal = 3,
+    Binormal = 4,
+    Tangent = 5,
+    BlendIndices = 6,
+    BlendWeight = 7,
+    Depth = 8,
+    Fog = 9,
+    PointSize = 10,
+    Sample = 11,
+    TessellateFactor = 12,
+});
+
 xna_enum!(TextureAddressMode {
     Wrap = 0,
     Clamp = 1,
@@ -170,6 +222,55 @@ impl ClearOptions {
     pub const DepthBuffer: Self = Self(2);
     pub const Stencil: Self = Self(4);
 }
+
+macro_rules! open_graphics_flags {
+    ($name:ident { $($constant:ident = $value:expr),+ $(,)? }) => {
+        #[repr(transparent)]
+        #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+        pub struct $name(i32);
+
+        impl $name {
+            $(pub const $constant: Self = Self($value);)+
+
+            pub(super) const fn bits(self) -> u32 {
+                u32::from_ne_bytes(self.0.to_ne_bytes())
+            }
+        }
+
+        impl BitOr for $name {
+            type Output = Self;
+
+            fn bitor(self, rhs: Self) -> Self::Output {
+                Self(self.0 | rhs.0)
+            }
+        }
+
+        impl BitOrAssign for $name {
+            fn bitor_assign(&mut self, rhs: Self) {
+                self.0 |= rhs.0;
+            }
+        }
+
+        impl BitAnd for $name {
+            type Output = Self;
+
+            fn bitand(self, rhs: Self) -> Self::Output {
+                Self(self.0 & rhs.0)
+            }
+        }
+    };
+}
+
+open_graphics_flags!(BufferUsage {
+    None = 0,
+    WriteOnly = 1,
+});
+
+open_graphics_flags!(SetDataOptions {
+    None = 0,
+    Discard = 1,
+    NoOverwrite = 2,
+});
 
 impl BitOr for ClearOptions {
     type Output = Self;
@@ -268,7 +369,7 @@ pub enum SurfaceFormat {
 }
 
 impl SurfaceFormat {
-    pub(super) fn from_native(value: u32) -> Option<Self> {
+    pub(crate) fn from_native(value: u32) -> Option<Self> {
         Some(match value {
             0 => Self::Color,
             1 => Self::Bgr565,

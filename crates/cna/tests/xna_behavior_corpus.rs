@@ -11,13 +11,20 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 
+use cna::Microsoft::Xna::Framework::Content::{
+    ContentLoadException, ContentSerializerAttribute, ContentSerializerCollectionItemNameAttribute,
+    ContentSerializerRuntimeTypeAttribute, ContentSerializerTypeVersionAttribute,
+};
 use cna::Microsoft::Xna::Framework::Graphics::PackedVector::{
     Alpha8, Bgra5551, Byte4, HalfSingle, NormalizedByte2, Short2,
 };
 use cna::Microsoft::Xna::Framework::Graphics::{
-    Blend, BlendState, CompareFunction, CullMode, DepthFormat, DepthStencilState, PresentInterval,
-    PresentationParameters, RasterizerState, RenderTargetUsage, SamplerState, SurfaceFormat,
-    TextureAddressMode, TextureFilter, Viewport,
+    Blend, BlendState, BufferUsage, CompareFunction, CullMode, DepthFormat, DepthStencilState,
+    IndexElementSize, PresentInterval, PresentationParameters, PrimitiveType, RasterizerState,
+    RenderTargetUsage, SamplerState, SetDataOptions, SurfaceFormat, TextureAddressMode,
+    TextureFilter, VertexDeclaration, VertexElement, VertexElementFormat, VertexElementUsage,
+    VertexPositionColor, VertexPositionColorTexture, VertexPositionNormalTexture,
+    VertexPositionTexture, Viewport,
 };
 use cna::Microsoft::Xna::Framework::Input::Touch::{
     TouchCollection, TouchLocation, TouchLocationState,
@@ -1164,5 +1171,152 @@ fn pinned_xna_math_observations() {
         (true, 0, 11)
     );
 
-    assert_eq!(observations, 123);
+    // Content metadata defaults and the per-Game manager identity are pinned
+    // to the selected XNA runtime contract. XNB framing/failure paths live in
+    // the dedicated managed-reader corpus.
+    let content = game.Content();
+    observe!(Arc::ptr_eq(&content, &game.Content()), true);
+    observe!(content.RootDirectory(), String::new());
+    content
+        .SetRootDirectory("Content")
+        .expect("set empty manager root");
+    observe!(content.RootDirectory(), "Content".to_owned());
+
+    let mut serializer = ContentSerializerAttribute::new();
+    observe!(
+        (
+            serializer.ElementName(),
+            serializer.FlattenContent(),
+            serializer.Optional(),
+            serializer.AllowNull(),
+            serializer.SharedResource(),
+            serializer.CollectionItemName(),
+            serializer.HasCollectionItemName(),
+        ),
+        (
+            String::new(),
+            false,
+            false,
+            true,
+            false,
+            "Item".to_owned(),
+            false,
+        )
+    );
+    serializer.SetElementName("Root");
+    serializer.SetFlattenContent(true);
+    serializer.SetOptional(true);
+    serializer.SetAllowNull(false);
+    serializer.SetSharedResource(true);
+    serializer.SetCollectionItemName("Entry");
+    observe!(
+        (
+            serializer.ElementName(),
+            serializer.FlattenContent(),
+            serializer.Optional(),
+            serializer.AllowNull(),
+            serializer.SharedResource(),
+            serializer.CollectionItemName(),
+            serializer.HasCollectionItemName(),
+        ),
+        (
+            "Root".to_owned(),
+            true,
+            true,
+            false,
+            true,
+            "Entry".to_owned(),
+            true,
+        )
+    );
+    observe!(serializer.Clone(), serializer);
+    observe!(
+        ContentSerializerCollectionItemNameAttribute::new("Glyph").CollectionItemName(),
+        "Glyph".to_owned()
+    );
+    observe!(
+        ContentSerializerRuntimeTypeAttribute::new("Example.Type").RuntimeType(),
+        "Example.Type".to_owned()
+    );
+    observe!(
+        ContentSerializerTypeVersionAttribute::new(17).TypeVersion(),
+        17
+    );
+    observe!(
+        ContentLoadException::from_message("asset failed").to_string(),
+        "asset failed".to_owned()
+    );
+
+    // Vertex layout/value identities and validation are managed XNA behavior;
+    // native transfer and binding execution is covered by native_stress.
+    observe!(
+        (
+            BufferUsage::None | BufferUsage::WriteOnly,
+            SetDataOptions::Discard | SetDataOptions::NoOverwrite,
+        ),
+        (
+            BufferUsage::WriteOnly,
+            SetDataOptions::Discard | SetDataOptions::NoOverwrite,
+        )
+    );
+    observe!(
+        (
+            IndexElementSize::SixteenBits as i32,
+            IndexElementSize::ThirtyTwoBits as i32,
+            PrimitiveType::TriangleList as i32,
+            PrimitiveType::LineStrip as i32,
+        ),
+        (0, 1, 0, 3)
+    );
+    let element = VertexElement::new(12, VertexElementFormat::Color, VertexElementUsage::Color, 0);
+    observe!(
+        (
+            element.Offset(),
+            element.VertexElementFormat(),
+            element.VertexElementUsage(),
+            element.UsageIndex(),
+        ),
+        (12, VertexElementFormat::Color, VertexElementUsage::Color, 0,)
+    );
+    let declaration = VertexDeclaration::new(&[
+        VertexElement::new(
+            0,
+            VertexElementFormat::Vector3,
+            VertexElementUsage::Position,
+            0,
+        ),
+        element,
+    ])
+    .expect("inferred vertex declaration");
+    observe!(
+        (declaration.VertexStride(), declaration.GetVertexElements()),
+        (
+            16,
+            vec![
+                VertexElement::new(
+                    0,
+                    VertexElementFormat::Vector3,
+                    VertexElementUsage::Position,
+                    0,
+                ),
+                element,
+            ]
+        )
+    );
+    observe!(VertexDeclaration::new(&[]).is_err(), true);
+    observe!(
+        VertexDeclaration::from_vertex_stride_and_elements(12, &[element]).is_err(),
+        true
+    );
+    observe!(
+        (
+            VertexPositionColor::VertexDeclaration().VertexStride(),
+            VertexPositionColorTexture::VertexDeclaration().VertexStride(),
+            VertexPositionNormalTexture::VertexDeclaration().VertexStride(),
+            VertexPositionTexture::VertexDeclaration().VertexStride(),
+        ),
+        (16, 24, 32, 20)
+    );
+
+    assert_eq!(observations, 140);
 }

@@ -615,6 +615,12 @@ def callable_descriptor(
         signature = lifecycle
     else:
         generics = projected_generic_parameters(contract_type, member, rules)
+        generic_overrides = rules.get("genericBoundOverrides", {}).get(
+            contract_type["name"] + "::" + projected_name, {}
+        )
+        for generic in generics:
+            if generic["name"] in generic_overrides:
+                generic["bounds"] = sorted(generic_overrides[generic["name"]])
         parameters = []
         if member["kind"] != "constructor" and not member.get("static"):
             parameters.append({
@@ -633,6 +639,13 @@ def callable_descriptor(
             })
             if parameter.get("ref") or parameter["type"].endswith("&"):
                 ref_out.append(position)
+        projected_parameter_overrides = rules.get("projectedParameterTypeOverrides", {})
+        for parameter in parameters:
+            override = projected_parameter_overrides.get(
+                contract_type["name"] + "::" + projected_name + "::" + parameter["name"]
+            )
+            if override:
+                parameter["type"] = override
         if member["kind"] == "constructor":
             returned = "Self"
             if is_fallible(contract_type["name"], ".ctor", rules):
@@ -697,11 +710,21 @@ def mapped_members(contract_type: dict, rules: dict, reference_types: dict[str, 
                 }
             else:
                 mapped = clr_value_type(member["type"], rules, contract_type, reference_types, [])
-                result[member["name"]] = {
-                    "name": member["name"],
-                    "kind": "assoc_const" if member.get("static") else "field",
-                    "origin": "field", "type": mapped, "overload": 0,
-                }
+                static_getter = rules.get("staticFieldGetterOverrides", {}).get(
+                    contract_type["name"] + "::" + member["name"]
+                )
+                if member.get("static") and static_getter:
+                    result[member["name"]] = {
+                        "name": member["name"], "kind": "function", "origin": "field",
+                        "parameters": [], "returnType": static_getter,
+                        "generics": [], "refOut": [], "overload": 0,
+                    }
+                else:
+                    result[member["name"]] = {
+                        "name": member["name"],
+                        "kind": "assoc_const" if member.get("static") else "field",
+                        "origin": "field", "type": mapped, "overload": 0,
+                    }
         elif kind == "property":
             name = member["name"]
             retained_object_type = rules.get("retainedObjectProperties", {}).get(
@@ -824,9 +847,13 @@ def expected_contract(reference: dict, rules: dict) -> dict[str, dict]:
             "allInterfaces": contract_type.get("interfaces", []),
             "genericParameters": [
                 {"name": value["name"], "bounds": sorted(
-                    bound
-                    for special in value.get("specialConstraints", [])
-                    for bound in rules["genericConstraintProjection"].get(special, [])
+                    rules.get("typeGenericBoundOverrides", {})
+                    .get(contract_type["name"], {})
+                    .get(value["name"], [
+                        bound
+                        for special in value.get("specialConstraints", [])
+                        for bound in rules["genericConstraintProjection"].get(special, [])
+                    ])
                 )}
                 for value in contract_type.get("genericParameters", [])
             ],
@@ -1062,6 +1089,11 @@ def compare_relations(
     traits = present["traits"]
     if wanted["clrKind"] == "struct":
         for required in {"Copy", "Clone", "PartialEq"}:
+            if (
+                required == "Copy"
+                and wanted.get("clrName") in rules.get("nonCopyStructProjections", [])
+            ):
+                continue
             if required not in traits:
                 findings.append(finding("TRAIT_MISMATCH", type_name, expected=required, actual=sorted(traits)))
     for required in wanted.get("operatorTraits", set()):

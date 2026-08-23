@@ -108,7 +108,35 @@ pub(crate) struct Native {
     pub(super) graphics_device_set_rasterizer_state:
         sys::cna_graphics_device_set_rasterizer_state_fn,
     pub(super) graphics_device_present: sys::cna_graphics_device_present_fn,
+    pub(super) graphics_device_reset: sys::cna_graphics_device_reset_fn,
+    pub(super) graphics_device_reset_with_parameters:
+        sys::cna_graphics_device_reset_with_parameters_fn,
+    pub(super) graphics_device_get_backbuffer_data_window:
+        sys::cna_graphics_device_get_backbuffer_data_window_fn,
     pub(super) graphics_device_clear_rgba: sys::cna_graphics_device_clear_rgba_fn,
+    pub(super) graphics_device_set_vertex_buffer: sys::cna_graphics_device_set_vertex_buffer_fn,
+    pub(super) graphics_device_set_vertex_buffer_offset:
+        sys::cna_graphics_device_set_vertex_buffer_offset_fn,
+    pub(super) graphics_device_set_vertex_buffers: sys::cna_graphics_device_set_vertex_buffers_fn,
+    pub(super) graphics_device_get_vertex_buffer_count:
+        sys::cna_graphics_device_get_vertex_buffer_count_fn,
+    pub(super) graphics_device_copy_vertex_buffers: sys::cna_graphics_device_copy_vertex_buffers_fn,
+    pub(super) graphics_device_get_vertex_buffer: sys::cna_graphics_device_get_vertex_buffer_fn,
+    pub(super) graphics_device_set_index_buffer: sys::cna_graphics_device_set_index_buffer_fn,
+    pub(super) graphics_device_get_index_buffer: sys::cna_graphics_device_get_index_buffer_fn,
+    pub(super) graphics_device_draw_primitives: sys::cna_graphics_device_draw_primitives_fn,
+    pub(super) graphics_device_draw_indexed_primitives:
+        sys::cna_graphics_device_draw_indexed_primitives_fn,
+    pub(super) graphics_device_draw_instanced_primitives:
+        sys::cna_graphics_device_draw_instanced_primitives_fn,
+    pub(super) graphics_device_draw_user_primitives:
+        sys::cna_graphics_device_draw_user_primitives_fn,
+    pub(super) graphics_device_draw_user_indexed_primitives:
+        sys::cna_graphics_device_draw_user_indexed_primitives_fn,
+    pub(super) graphics_device_set_render_targets: sys::cna_graphics_device_set_render_targets_fn,
+    pub(super) graphics_device_get_render_target_count:
+        sys::cna_graphics_device_get_render_target_count_fn,
+    pub(super) graphics_device_copy_render_targets: sys::cna_graphics_device_copy_render_targets_fn,
     pub(super) graphics_device_get_renderer_info: sys::cna_graphics_device_get_renderer_info_fn,
     pub(super) graphics_device_get_renderer_name_size:
         sys::cna_graphics_device_get_renderer_name_size_fn,
@@ -122,12 +150,141 @@ pub(crate) struct Native {
     pub(super) texture2d_get_encoded_byte_count: sys::cna_texture2d_get_encoded_byte_count_fn,
     pub(super) texture2d_copy_encoded: sys::cna_texture2d_copy_encoded_fn,
     pub(super) texture2d_destroy: sys::cna_texture2d_destroy_fn,
+    pub(super) texturecube_create: sys::cna_texturecube_create_fn,
+    pub(super) texturecube_destroy: sys::cna_texturecube_destroy_fn,
+    pub(super) texturecube_get_info: sys::cna_texturecube_get_info_fn,
+    pub(super) texturecube_set_data: sys::cna_texturecube_set_data_fn,
+    pub(super) texturecube_get_data: sys::cna_texturecube_get_data_fn,
+    pub(super) render_target2d_create: sys::cna_render_target2d_create_fn,
+    pub(super) render_target_cube_create: sys::cna_render_target_cube_create_fn,
+    pub(super) render_target_get_info: sys::cna_render_target_get_info_fn,
+    pub(super) render_target_destroy: sys::cna_render_target_destroy_fn,
+    pub(super) vertex_declaration_create_with_stride:
+        sys::cna_vertex_declaration_create_with_stride_fn,
+    pub(super) vertex_declaration_destroy: sys::cna_vertex_declaration_destroy_fn,
+    pub(super) vertex_buffer_binding_init: sys::cna_vertex_buffer_binding_init_fn,
+    pub(super) vertex_buffer_create: sys::cna_vertex_buffer_create_fn,
+    pub(super) vertex_buffer_destroy: sys::cna_vertex_buffer_destroy_fn,
+    pub(super) vertex_buffer_get_info: sys::cna_vertex_buffer_get_info_fn,
+    pub(super) vertex_buffer_set_data: sys::cna_vertex_buffer_set_data_fn,
+    pub(super) vertex_buffer_set_data_raw: sys::cna_vertex_buffer_set_data_raw_fn,
+    pub(super) vertex_buffer_set_data_raw_at: sys::cna_vertex_buffer_set_data_raw_at_fn,
+    pub(super) vertex_buffer_get_data_raw: sys::cna_vertex_buffer_get_data_raw_fn,
+    pub(super) index_buffer_create: sys::cna_index_buffer_create_fn,
+    pub(super) index_buffer_destroy: sys::cna_index_buffer_destroy_fn,
+    pub(super) index_buffer_get_info: sys::cna_index_buffer_get_info_fn,
+    pub(super) index_buffer_set_data: sys::cna_index_buffer_set_data_fn,
+    pub(super) index_buffer_set_data_at: sys::cna_index_buffer_set_data_at_fn,
+    pub(super) index_buffer_get_data: sys::cna_index_buffer_get_data_fn,
     pub(super) sprite_batch_create: sys::cna_sprite_batch_create_fn,
     pub(super) sprite_batch_begin: sys::cna_sprite_batch_begin_fn,
     pub(super) sprite_batch_begin_with_states: sys::cna_sprite_batch_begin_with_states_fn,
+    pub(super) sprite_batch_begin_with_effect: sys::cna_sprite_batch_begin_with_effect_fn,
     pub(super) sprite_batch_submit_many: sys::cna_sprite_batch_submit_many_fn,
     pub(super) sprite_batch_end: sys::cna_sprite_batch_end_fn,
     pub(super) sprite_batch_destroy: sys::cna_sprite_batch_destroy_fn,
+    pub(super) sprite_batch_draw_string: sys::cna_sprite_batch_draw_string_fn,
+    pub(super) sprite_font_create: sys::cna_sprite_font_create_fn,
+    pub(super) sprite_font_get_info: sys::cna_sprite_font_get_info_fn,
+    pub(super) sprite_font_copy_characters: sys::cna_sprite_font_copy_characters_fn,
+    pub(super) sprite_font_copy_glyphs: sys::cna_sprite_font_copy_glyphs_fn,
+    pub(super) sprite_font_set_default_character: sys::cna_sprite_font_set_default_character_fn,
+    pub(super) sprite_font_set_line_spacing: sys::cna_sprite_font_set_line_spacing_fn,
+    pub(super) sprite_font_set_spacing: sys::cna_sprite_font_set_spacing_fn,
+    pub(super) sprite_font_measure_utf8: sys::cna_sprite_font_measure_utf8_fn,
+    pub(super) sprite_font_destroy: sys::cna_sprite_font_destroy_fn,
+    pub(super) effect_create_empty: sys::cna_effect_create_empty_fn,
+    pub(super) effect_create_compiled: sys::cna_effect_create_compiled_fn,
+    pub(super) effect_material_create: sys::cna_effect_material_create_fn,
+    pub(super) effect_destroy: sys::cna_effect_destroy_fn,
+    pub(super) effect_clone: sys::cna_effect_clone_fn,
+    pub(super) effect_dispose: sys::cna_effect_dispose_fn,
+    pub(super) effect_apply: sys::cna_effect_apply_fn,
+    pub(super) effect_get_parameters: sys::cna_effect_get_parameters_fn,
+    pub(super) effect_get_techniques: sys::cna_effect_get_techniques_fn,
+    pub(super) effect_get_current_technique: sys::cna_effect_get_current_technique_fn,
+    pub(super) effect_set_current_technique: sys::cna_effect_set_current_technique_fn,
+    pub(super) effect_annotation_create: sys::cna_effect_annotation_create_fn,
+    pub(super) effect_annotation_destroy: sys::cna_effect_annotation_destroy_fn,
+    pub(super) effect_annotation_get_info: sys::cna_effect_annotation_get_info_fn,
+    pub(super) effect_annotation_get_name_byte_count:
+        sys::cna_effect_annotation_get_name_byte_count_fn,
+    pub(super) effect_annotation_copy_name: sys::cna_effect_annotation_copy_name_fn,
+    pub(super) effect_annotation_get_semantic_byte_count:
+        sys::cna_effect_annotation_get_semantic_byte_count_fn,
+    pub(super) effect_annotation_copy_semantic: sys::cna_effect_annotation_copy_semantic_fn,
+    pub(super) effect_annotation_get_value_boolean: sys::cna_effect_annotation_get_value_boolean_fn,
+    pub(super) effect_annotation_get_value_int32: sys::cna_effect_annotation_get_value_int32_fn,
+    pub(super) effect_annotation_get_value_single: sys::cna_effect_annotation_get_value_single_fn,
+    pub(super) effect_annotation_get_value_string_byte_count:
+        sys::cna_effect_annotation_get_value_string_byte_count_fn,
+    pub(super) effect_annotation_copy_value_string: sys::cna_effect_annotation_copy_value_string_fn,
+    pub(super) effect_annotation_get_value_vector2: sys::cna_effect_annotation_get_value_vector2_fn,
+    pub(super) effect_annotation_get_value_vector3: sys::cna_effect_annotation_get_value_vector3_fn,
+    pub(super) effect_annotation_get_value_vector4: sys::cna_effect_annotation_get_value_vector4_fn,
+    pub(super) effect_annotation_get_value_matrix: sys::cna_effect_annotation_get_value_matrix_fn,
+    pub(super) effect_annotation_collection_destroy:
+        sys::cna_effect_annotation_collection_destroy_fn,
+    pub(super) effect_annotation_collection_add: sys::cna_effect_annotation_collection_add_fn,
+    pub(super) effect_annotation_collection_get_count:
+        sys::cna_effect_annotation_collection_get_count_fn,
+    pub(super) effect_annotation_collection_get_at: sys::cna_effect_annotation_collection_get_at_fn,
+    pub(super) effect_annotation_collection_find: sys::cna_effect_annotation_collection_find_fn,
+    pub(super) effect_parameter_destroy: sys::cna_effect_parameter_destroy_fn,
+    pub(super) effect_parameter_get_info: sys::cna_effect_parameter_get_info_fn,
+    pub(super) effect_parameter_get_name_byte_count:
+        sys::cna_effect_parameter_get_name_byte_count_fn,
+    pub(super) effect_parameter_copy_name: sys::cna_effect_parameter_copy_name_fn,
+    pub(super) effect_parameter_get_semantic_byte_count:
+        sys::cna_effect_parameter_get_semantic_byte_count_fn,
+    pub(super) effect_parameter_copy_semantic: sys::cna_effect_parameter_copy_semantic_fn,
+    pub(super) effect_parameter_get_elements: sys::cna_effect_parameter_get_elements_fn,
+    pub(super) effect_parameter_get_structure_members:
+        sys::cna_effect_parameter_get_structure_members_fn,
+    pub(super) effect_parameter_get_annotations: sys::cna_effect_parameter_get_annotations_fn,
+    pub(super) effect_parameter_get_value: sys::cna_effect_parameter_get_value_fn,
+    pub(super) effect_parameter_get_values: sys::cna_effect_parameter_get_values_fn,
+    pub(super) effect_parameter_set_value: sys::cna_effect_parameter_set_value_fn,
+    pub(super) effect_parameter_set_values: sys::cna_effect_parameter_set_values_fn,
+    pub(super) effect_parameter_get_value_string_byte_count:
+        sys::cna_effect_parameter_get_value_string_byte_count_fn,
+    pub(super) effect_parameter_copy_value_string: sys::cna_effect_parameter_copy_value_string_fn,
+    pub(super) effect_parameter_set_value_string: sys::cna_effect_parameter_set_value_string_fn,
+    pub(super) effect_parameter_get_value_texture: sys::cna_effect_parameter_get_value_texture_fn,
+    pub(super) effect_parameter_set_value_texture: sys::cna_effect_parameter_set_value_texture_fn,
+    pub(super) effect_parameter_collection_destroy: sys::cna_effect_parameter_collection_destroy_fn,
+    pub(super) effect_parameter_collection_add_create:
+        sys::cna_effect_parameter_collection_add_create_fn,
+    pub(super) effect_parameter_collection_get_count:
+        sys::cna_effect_parameter_collection_get_count_fn,
+    pub(super) effect_parameter_collection_get_at: sys::cna_effect_parameter_collection_get_at_fn,
+    pub(super) effect_parameter_collection_find_name:
+        sys::cna_effect_parameter_collection_find_name_fn,
+    pub(super) effect_parameter_collection_find_semantic:
+        sys::cna_effect_parameter_collection_find_semantic_fn,
+    pub(super) effect_pass_destroy: sys::cna_effect_pass_destroy_fn,
+    pub(super) effect_pass_get_name_byte_count: sys::cna_effect_pass_get_name_byte_count_fn,
+    pub(super) effect_pass_copy_name: sys::cna_effect_pass_copy_name_fn,
+    pub(super) effect_pass_get_annotations: sys::cna_effect_pass_get_annotations_fn,
+    pub(super) effect_pass_apply: sys::cna_effect_pass_apply_fn,
+    pub(super) effect_pass_collection_destroy: sys::cna_effect_pass_collection_destroy_fn,
+    pub(super) effect_pass_collection_add_create: sys::cna_effect_pass_collection_add_create_fn,
+    pub(super) effect_pass_collection_get_count: sys::cna_effect_pass_collection_get_count_fn,
+    pub(super) effect_pass_collection_get_at: sys::cna_effect_pass_collection_get_at_fn,
+    pub(super) effect_pass_collection_find: sys::cna_effect_pass_collection_find_fn,
+    pub(super) effect_technique_destroy: sys::cna_effect_technique_destroy_fn,
+    pub(super) effect_technique_get_name_byte_count:
+        sys::cna_effect_technique_get_name_byte_count_fn,
+    pub(super) effect_technique_copy_name: sys::cna_effect_technique_copy_name_fn,
+    pub(super) effect_technique_get_passes: sys::cna_effect_technique_get_passes_fn,
+    pub(super) effect_technique_get_annotations: sys::cna_effect_technique_get_annotations_fn,
+    pub(super) effect_technique_collection_destroy: sys::cna_effect_technique_collection_destroy_fn,
+    pub(super) effect_technique_collection_add_named:
+        sys::cna_effect_technique_collection_add_named_fn,
+    pub(super) effect_technique_collection_get_count:
+        sys::cna_effect_technique_collection_get_count_fn,
+    pub(super) effect_technique_collection_get_at: sys::cna_effect_technique_collection_get_at_fn,
+    pub(super) effect_technique_collection_find: sys::cna_effect_technique_collection_find_fn,
     pub(super) keyboard_get_state: sys::cna_keyboard_get_state_fn,
     pub(super) mouse_get_state: sys::cna_mouse_get_state_fn,
     pub(super) mouse_get_window_handle: sys::cna_mouse_get_window_handle_fn,
@@ -454,9 +611,85 @@ impl Native {
                 "cna_graphics_device_present",
                 sys::cna_graphics_device_present_fn
             ),
+            graphics_device_reset: symbol!(
+                "cna_graphics_device_reset",
+                sys::cna_graphics_device_reset_fn
+            ),
+            graphics_device_reset_with_parameters: symbol!(
+                "cna_graphics_device_reset_with_parameters",
+                sys::cna_graphics_device_reset_with_parameters_fn
+            ),
+            graphics_device_get_backbuffer_data_window: symbol!(
+                "cna_graphics_device_get_backbuffer_data_window",
+                sys::cna_graphics_device_get_backbuffer_data_window_fn
+            ),
             graphics_device_clear_rgba: symbol!(
                 "cna_graphics_device_clear_rgba",
                 sys::cna_graphics_device_clear_rgba_fn
+            ),
+            graphics_device_set_vertex_buffer: symbol!(
+                "cna_graphics_device_set_vertex_buffer",
+                sys::cna_graphics_device_set_vertex_buffer_fn
+            ),
+            graphics_device_set_vertex_buffer_offset: symbol!(
+                "cna_graphics_device_set_vertex_buffer_offset",
+                sys::cna_graphics_device_set_vertex_buffer_offset_fn
+            ),
+            graphics_device_set_vertex_buffers: symbol!(
+                "cna_graphics_device_set_vertex_buffers",
+                sys::cna_graphics_device_set_vertex_buffers_fn
+            ),
+            graphics_device_get_vertex_buffer_count: symbol!(
+                "cna_graphics_device_get_vertex_buffer_count",
+                sys::cna_graphics_device_get_vertex_buffer_count_fn
+            ),
+            graphics_device_copy_vertex_buffers: symbol!(
+                "cna_graphics_device_copy_vertex_buffers",
+                sys::cna_graphics_device_copy_vertex_buffers_fn
+            ),
+            graphics_device_get_vertex_buffer: symbol!(
+                "cna_graphics_device_get_vertex_buffer",
+                sys::cna_graphics_device_get_vertex_buffer_fn
+            ),
+            graphics_device_set_index_buffer: symbol!(
+                "cna_graphics_device_set_index_buffer",
+                sys::cna_graphics_device_set_index_buffer_fn
+            ),
+            graphics_device_get_index_buffer: symbol!(
+                "cna_graphics_device_get_index_buffer",
+                sys::cna_graphics_device_get_index_buffer_fn
+            ),
+            graphics_device_draw_primitives: symbol!(
+                "cna_graphics_device_draw_primitives",
+                sys::cna_graphics_device_draw_primitives_fn
+            ),
+            graphics_device_draw_indexed_primitives: symbol!(
+                "cna_graphics_device_draw_indexed_primitives",
+                sys::cna_graphics_device_draw_indexed_primitives_fn
+            ),
+            graphics_device_draw_instanced_primitives: symbol!(
+                "cna_graphics_device_draw_instanced_primitives",
+                sys::cna_graphics_device_draw_instanced_primitives_fn
+            ),
+            graphics_device_draw_user_primitives: symbol!(
+                "cna_graphics_device_draw_user_primitives",
+                sys::cna_graphics_device_draw_user_primitives_fn
+            ),
+            graphics_device_draw_user_indexed_primitives: symbol!(
+                "cna_graphics_device_draw_user_indexed_primitives",
+                sys::cna_graphics_device_draw_user_indexed_primitives_fn
+            ),
+            graphics_device_set_render_targets: symbol!(
+                "cna_graphics_device_set_render_targets",
+                sys::cna_graphics_device_set_render_targets_fn
+            ),
+            graphics_device_get_render_target_count: symbol!(
+                "cna_graphics_device_get_render_target_count",
+                sys::cna_graphics_device_get_render_target_count_fn
+            ),
+            graphics_device_copy_render_targets: symbol!(
+                "cna_graphics_device_copy_render_targets",
+                sys::cna_graphics_device_copy_render_targets_fn
             ),
             graphics_device_get_renderer_info: symbol!(
                 "cna_graphics_device_get_renderer_info",
@@ -487,6 +720,103 @@ impl Native {
                 sys::cna_texture2d_copy_encoded_fn
             ),
             texture2d_destroy: symbol!("cna_texture2d_destroy", sys::cna_texture2d_destroy_fn),
+            texturecube_create: symbol!("cna_texturecube_create", sys::cna_texturecube_create_fn),
+            texturecube_destroy: symbol!(
+                "cna_texturecube_destroy",
+                sys::cna_texturecube_destroy_fn
+            ),
+            texturecube_get_info: symbol!(
+                "cna_texturecube_get_info",
+                sys::cna_texturecube_get_info_fn
+            ),
+            texturecube_set_data: symbol!(
+                "cna_texturecube_set_data",
+                sys::cna_texturecube_set_data_fn
+            ),
+            texturecube_get_data: symbol!(
+                "cna_texturecube_get_data",
+                sys::cna_texturecube_get_data_fn
+            ),
+            render_target2d_create: symbol!(
+                "cna_render_target2d_create",
+                sys::cna_render_target2d_create_fn
+            ),
+            render_target_cube_create: symbol!(
+                "cna_render_target_cube_create",
+                sys::cna_render_target_cube_create_fn
+            ),
+            render_target_get_info: symbol!(
+                "cna_render_target_get_info",
+                sys::cna_render_target_get_info_fn
+            ),
+            render_target_destroy: symbol!(
+                "cna_render_target_destroy",
+                sys::cna_render_target_destroy_fn
+            ),
+            vertex_declaration_create_with_stride: symbol!(
+                "cna_vertex_declaration_create_with_stride",
+                sys::cna_vertex_declaration_create_with_stride_fn
+            ),
+            vertex_declaration_destroy: symbol!(
+                "cna_vertex_declaration_destroy",
+                sys::cna_vertex_declaration_destroy_fn
+            ),
+            vertex_buffer_binding_init: symbol!(
+                "cna_vertex_buffer_binding_init",
+                sys::cna_vertex_buffer_binding_init_fn
+            ),
+            vertex_buffer_create: symbol!(
+                "cna_vertex_buffer_create",
+                sys::cna_vertex_buffer_create_fn
+            ),
+            vertex_buffer_destroy: symbol!(
+                "cna_vertex_buffer_destroy",
+                sys::cna_vertex_buffer_destroy_fn
+            ),
+            vertex_buffer_get_info: symbol!(
+                "cna_vertex_buffer_get_info",
+                sys::cna_vertex_buffer_get_info_fn
+            ),
+            vertex_buffer_set_data: symbol!(
+                "cna_vertex_buffer_set_data",
+                sys::cna_vertex_buffer_set_data_fn
+            ),
+            vertex_buffer_set_data_raw: symbol!(
+                "cna_vertex_buffer_set_data_raw",
+                sys::cna_vertex_buffer_set_data_raw_fn
+            ),
+            vertex_buffer_set_data_raw_at: symbol!(
+                "cna_vertex_buffer_set_data_raw_at",
+                sys::cna_vertex_buffer_set_data_raw_at_fn
+            ),
+            vertex_buffer_get_data_raw: symbol!(
+                "cna_vertex_buffer_get_data_raw",
+                sys::cna_vertex_buffer_get_data_raw_fn
+            ),
+            index_buffer_create: symbol!(
+                "cna_index_buffer_create",
+                sys::cna_index_buffer_create_fn
+            ),
+            index_buffer_destroy: symbol!(
+                "cna_index_buffer_destroy",
+                sys::cna_index_buffer_destroy_fn
+            ),
+            index_buffer_get_info: symbol!(
+                "cna_index_buffer_get_info",
+                sys::cna_index_buffer_get_info_fn
+            ),
+            index_buffer_set_data: symbol!(
+                "cna_index_buffer_set_data",
+                sys::cna_index_buffer_set_data_fn
+            ),
+            index_buffer_set_data_at: symbol!(
+                "cna_index_buffer_set_data_at",
+                sys::cna_index_buffer_set_data_at_fn
+            ),
+            index_buffer_get_data: symbol!(
+                "cna_index_buffer_get_data",
+                sys::cna_index_buffer_get_data_fn
+            ),
             sprite_batch_create: symbol!(
                 "cna_sprite_batch_create",
                 sys::cna_sprite_batch_create_fn
@@ -496,6 +826,10 @@ impl Native {
                 "cna_sprite_batch_begin_with_states",
                 sys::cna_sprite_batch_begin_with_states_fn
             ),
+            sprite_batch_begin_with_effect: symbol!(
+                "cna_sprite_batch_begin_with_effect",
+                sys::cna_sprite_batch_begin_with_effect_fn
+            ),
             sprite_batch_submit_many: symbol!(
                 "cna_sprite_batch_submit_many",
                 sys::cna_sprite_batch_submit_many_fn
@@ -504,6 +838,332 @@ impl Native {
             sprite_batch_destroy: symbol!(
                 "cna_sprite_batch_destroy",
                 sys::cna_sprite_batch_destroy_fn
+            ),
+            sprite_batch_draw_string: symbol!(
+                "cna_sprite_batch_draw_string",
+                sys::cna_sprite_batch_draw_string_fn
+            ),
+            sprite_font_create: symbol!("cna_sprite_font_create", sys::cna_sprite_font_create_fn),
+            sprite_font_get_info: symbol!(
+                "cna_sprite_font_get_info",
+                sys::cna_sprite_font_get_info_fn
+            ),
+            sprite_font_copy_characters: symbol!(
+                "cna_sprite_font_copy_characters",
+                sys::cna_sprite_font_copy_characters_fn
+            ),
+            sprite_font_copy_glyphs: symbol!(
+                "cna_sprite_font_copy_glyphs",
+                sys::cna_sprite_font_copy_glyphs_fn
+            ),
+            sprite_font_set_default_character: symbol!(
+                "cna_sprite_font_set_default_character",
+                sys::cna_sprite_font_set_default_character_fn
+            ),
+            sprite_font_set_line_spacing: symbol!(
+                "cna_sprite_font_set_line_spacing",
+                sys::cna_sprite_font_set_line_spacing_fn
+            ),
+            sprite_font_set_spacing: symbol!(
+                "cna_sprite_font_set_spacing",
+                sys::cna_sprite_font_set_spacing_fn
+            ),
+            sprite_font_measure_utf8: symbol!(
+                "cna_sprite_font_measure_utf8",
+                sys::cna_sprite_font_measure_utf8_fn
+            ),
+            sprite_font_destroy: symbol!(
+                "cna_sprite_font_destroy",
+                sys::cna_sprite_font_destroy_fn
+            ),
+            effect_create_empty: symbol!(
+                "cna_effect_create_empty",
+                sys::cna_effect_create_empty_fn
+            ),
+            effect_create_compiled: symbol!(
+                "cna_effect_create_compiled",
+                sys::cna_effect_create_compiled_fn
+            ),
+            effect_material_create: symbol!(
+                "cna_effect_material_create",
+                sys::cna_effect_material_create_fn
+            ),
+            effect_destroy: symbol!("cna_effect_destroy", sys::cna_effect_destroy_fn),
+            effect_clone: symbol!("cna_effect_clone", sys::cna_effect_clone_fn),
+            effect_dispose: symbol!("cna_effect_dispose", sys::cna_effect_dispose_fn),
+            effect_apply: symbol!("cna_effect_apply", sys::cna_effect_apply_fn),
+            effect_get_parameters: symbol!(
+                "cna_effect_get_parameters",
+                sys::cna_effect_get_parameters_fn
+            ),
+            effect_get_techniques: symbol!(
+                "cna_effect_get_techniques",
+                sys::cna_effect_get_techniques_fn
+            ),
+            effect_get_current_technique: symbol!(
+                "cna_effect_get_current_technique",
+                sys::cna_effect_get_current_technique_fn
+            ),
+            effect_set_current_technique: symbol!(
+                "cna_effect_set_current_technique",
+                sys::cna_effect_set_current_technique_fn
+            ),
+            effect_annotation_create: symbol!(
+                "cna_effect_annotation_create",
+                sys::cna_effect_annotation_create_fn
+            ),
+            effect_annotation_destroy: symbol!(
+                "cna_effect_annotation_destroy",
+                sys::cna_effect_annotation_destroy_fn
+            ),
+            effect_annotation_get_info: symbol!(
+                "cna_effect_annotation_get_info",
+                sys::cna_effect_annotation_get_info_fn
+            ),
+            effect_annotation_get_name_byte_count: symbol!(
+                "cna_effect_annotation_get_name_byte_count",
+                sys::cna_effect_annotation_get_name_byte_count_fn
+            ),
+            effect_annotation_copy_name: symbol!(
+                "cna_effect_annotation_copy_name",
+                sys::cna_effect_annotation_copy_name_fn
+            ),
+            effect_annotation_get_semantic_byte_count: symbol!(
+                "cna_effect_annotation_get_semantic_byte_count",
+                sys::cna_effect_annotation_get_semantic_byte_count_fn
+            ),
+            effect_annotation_copy_semantic: symbol!(
+                "cna_effect_annotation_copy_semantic",
+                sys::cna_effect_annotation_copy_semantic_fn
+            ),
+            effect_annotation_get_value_boolean: symbol!(
+                "cna_effect_annotation_get_value_boolean",
+                sys::cna_effect_annotation_get_value_boolean_fn
+            ),
+            effect_annotation_get_value_int32: symbol!(
+                "cna_effect_annotation_get_value_int32",
+                sys::cna_effect_annotation_get_value_int32_fn
+            ),
+            effect_annotation_get_value_single: symbol!(
+                "cna_effect_annotation_get_value_single",
+                sys::cna_effect_annotation_get_value_single_fn
+            ),
+            effect_annotation_get_value_string_byte_count: symbol!(
+                "cna_effect_annotation_get_value_string_byte_count",
+                sys::cna_effect_annotation_get_value_string_byte_count_fn
+            ),
+            effect_annotation_copy_value_string: symbol!(
+                "cna_effect_annotation_copy_value_string",
+                sys::cna_effect_annotation_copy_value_string_fn
+            ),
+            effect_annotation_get_value_vector2: symbol!(
+                "cna_effect_annotation_get_value_vector2",
+                sys::cna_effect_annotation_get_value_vector2_fn
+            ),
+            effect_annotation_get_value_vector3: symbol!(
+                "cna_effect_annotation_get_value_vector3",
+                sys::cna_effect_annotation_get_value_vector3_fn
+            ),
+            effect_annotation_get_value_vector4: symbol!(
+                "cna_effect_annotation_get_value_vector4",
+                sys::cna_effect_annotation_get_value_vector4_fn
+            ),
+            effect_annotation_get_value_matrix: symbol!(
+                "cna_effect_annotation_get_value_matrix",
+                sys::cna_effect_annotation_get_value_matrix_fn
+            ),
+            effect_annotation_collection_destroy: symbol!(
+                "cna_effect_annotation_collection_destroy",
+                sys::cna_effect_annotation_collection_destroy_fn
+            ),
+            effect_annotation_collection_add: symbol!(
+                "cna_effect_annotation_collection_add",
+                sys::cna_effect_annotation_collection_add_fn
+            ),
+            effect_annotation_collection_get_count: symbol!(
+                "cna_effect_annotation_collection_get_count",
+                sys::cna_effect_annotation_collection_get_count_fn
+            ),
+            effect_annotation_collection_get_at: symbol!(
+                "cna_effect_annotation_collection_get_at",
+                sys::cna_effect_annotation_collection_get_at_fn
+            ),
+            effect_annotation_collection_find: symbol!(
+                "cna_effect_annotation_collection_find",
+                sys::cna_effect_annotation_collection_find_fn
+            ),
+            effect_parameter_destroy: symbol!(
+                "cna_effect_parameter_destroy",
+                sys::cna_effect_parameter_destroy_fn
+            ),
+            effect_parameter_get_info: symbol!(
+                "cna_effect_parameter_get_info",
+                sys::cna_effect_parameter_get_info_fn
+            ),
+            effect_parameter_get_name_byte_count: symbol!(
+                "cna_effect_parameter_get_name_byte_count",
+                sys::cna_effect_parameter_get_name_byte_count_fn
+            ),
+            effect_parameter_copy_name: symbol!(
+                "cna_effect_parameter_copy_name",
+                sys::cna_effect_parameter_copy_name_fn
+            ),
+            effect_parameter_get_semantic_byte_count: symbol!(
+                "cna_effect_parameter_get_semantic_byte_count",
+                sys::cna_effect_parameter_get_semantic_byte_count_fn
+            ),
+            effect_parameter_copy_semantic: symbol!(
+                "cna_effect_parameter_copy_semantic",
+                sys::cna_effect_parameter_copy_semantic_fn
+            ),
+            effect_parameter_get_elements: symbol!(
+                "cna_effect_parameter_get_elements",
+                sys::cna_effect_parameter_get_elements_fn
+            ),
+            effect_parameter_get_structure_members: symbol!(
+                "cna_effect_parameter_get_structure_members",
+                sys::cna_effect_parameter_get_structure_members_fn
+            ),
+            effect_parameter_get_annotations: symbol!(
+                "cna_effect_parameter_get_annotations",
+                sys::cna_effect_parameter_get_annotations_fn
+            ),
+            effect_parameter_get_value: symbol!(
+                "cna_effect_parameter_get_value",
+                sys::cna_effect_parameter_get_value_fn
+            ),
+            effect_parameter_get_values: symbol!(
+                "cna_effect_parameter_get_values",
+                sys::cna_effect_parameter_get_values_fn
+            ),
+            effect_parameter_set_value: symbol!(
+                "cna_effect_parameter_set_value",
+                sys::cna_effect_parameter_set_value_fn
+            ),
+            effect_parameter_set_values: symbol!(
+                "cna_effect_parameter_set_values",
+                sys::cna_effect_parameter_set_values_fn
+            ),
+            effect_parameter_get_value_string_byte_count: symbol!(
+                "cna_effect_parameter_get_value_string_byte_count",
+                sys::cna_effect_parameter_get_value_string_byte_count_fn
+            ),
+            effect_parameter_copy_value_string: symbol!(
+                "cna_effect_parameter_copy_value_string",
+                sys::cna_effect_parameter_copy_value_string_fn
+            ),
+            effect_parameter_set_value_string: symbol!(
+                "cna_effect_parameter_set_value_string",
+                sys::cna_effect_parameter_set_value_string_fn
+            ),
+            effect_parameter_get_value_texture: symbol!(
+                "cna_effect_parameter_get_value_texture",
+                sys::cna_effect_parameter_get_value_texture_fn
+            ),
+            effect_parameter_set_value_texture: symbol!(
+                "cna_effect_parameter_set_value_texture",
+                sys::cna_effect_parameter_set_value_texture_fn
+            ),
+            effect_parameter_collection_destroy: symbol!(
+                "cna_effect_parameter_collection_destroy",
+                sys::cna_effect_parameter_collection_destroy_fn
+            ),
+            effect_parameter_collection_add_create: symbol!(
+                "cna_effect_parameter_collection_add_create",
+                sys::cna_effect_parameter_collection_add_create_fn
+            ),
+            effect_parameter_collection_get_count: symbol!(
+                "cna_effect_parameter_collection_get_count",
+                sys::cna_effect_parameter_collection_get_count_fn
+            ),
+            effect_parameter_collection_get_at: symbol!(
+                "cna_effect_parameter_collection_get_at",
+                sys::cna_effect_parameter_collection_get_at_fn
+            ),
+            effect_parameter_collection_find_name: symbol!(
+                "cna_effect_parameter_collection_find_name",
+                sys::cna_effect_parameter_collection_find_name_fn
+            ),
+            effect_parameter_collection_find_semantic: symbol!(
+                "cna_effect_parameter_collection_find_semantic",
+                sys::cna_effect_parameter_collection_find_semantic_fn
+            ),
+            effect_pass_destroy: symbol!(
+                "cna_effect_pass_destroy",
+                sys::cna_effect_pass_destroy_fn
+            ),
+            effect_pass_get_name_byte_count: symbol!(
+                "cna_effect_pass_get_name_byte_count",
+                sys::cna_effect_pass_get_name_byte_count_fn
+            ),
+            effect_pass_copy_name: symbol!(
+                "cna_effect_pass_copy_name",
+                sys::cna_effect_pass_copy_name_fn
+            ),
+            effect_pass_get_annotations: symbol!(
+                "cna_effect_pass_get_annotations",
+                sys::cna_effect_pass_get_annotations_fn
+            ),
+            effect_pass_apply: symbol!("cna_effect_pass_apply", sys::cna_effect_pass_apply_fn),
+            effect_pass_collection_destroy: symbol!(
+                "cna_effect_pass_collection_destroy",
+                sys::cna_effect_pass_collection_destroy_fn
+            ),
+            effect_pass_collection_add_create: symbol!(
+                "cna_effect_pass_collection_add_create",
+                sys::cna_effect_pass_collection_add_create_fn
+            ),
+            effect_pass_collection_get_count: symbol!(
+                "cna_effect_pass_collection_get_count",
+                sys::cna_effect_pass_collection_get_count_fn
+            ),
+            effect_pass_collection_get_at: symbol!(
+                "cna_effect_pass_collection_get_at",
+                sys::cna_effect_pass_collection_get_at_fn
+            ),
+            effect_pass_collection_find: symbol!(
+                "cna_effect_pass_collection_find",
+                sys::cna_effect_pass_collection_find_fn
+            ),
+            effect_technique_destroy: symbol!(
+                "cna_effect_technique_destroy",
+                sys::cna_effect_technique_destroy_fn
+            ),
+            effect_technique_get_name_byte_count: symbol!(
+                "cna_effect_technique_get_name_byte_count",
+                sys::cna_effect_technique_get_name_byte_count_fn
+            ),
+            effect_technique_copy_name: symbol!(
+                "cna_effect_technique_copy_name",
+                sys::cna_effect_technique_copy_name_fn
+            ),
+            effect_technique_get_passes: symbol!(
+                "cna_effect_technique_get_passes",
+                sys::cna_effect_technique_get_passes_fn
+            ),
+            effect_technique_get_annotations: symbol!(
+                "cna_effect_technique_get_annotations",
+                sys::cna_effect_technique_get_annotations_fn
+            ),
+            effect_technique_collection_destroy: symbol!(
+                "cna_effect_technique_collection_destroy",
+                sys::cna_effect_technique_collection_destroy_fn
+            ),
+            effect_technique_collection_add_named: symbol!(
+                "cna_effect_technique_collection_add_named",
+                sys::cna_effect_technique_collection_add_named_fn
+            ),
+            effect_technique_collection_get_count: symbol!(
+                "cna_effect_technique_collection_get_count",
+                sys::cna_effect_technique_collection_get_count_fn
+            ),
+            effect_technique_collection_get_at: symbol!(
+                "cna_effect_technique_collection_get_at",
+                sys::cna_effect_technique_collection_get_at_fn
+            ),
+            effect_technique_collection_find: symbol!(
+                "cna_effect_technique_collection_find",
+                sys::cna_effect_technique_collection_find_fn
             ),
             keyboard_get_state: symbol!("cna_keyboard_get_state", sys::cna_keyboard_get_state_fn),
             mouse_get_state: symbol!("cna_mouse_get_state", sys::cna_mouse_get_state_fn),

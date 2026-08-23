@@ -212,6 +212,82 @@ retains `Load` on its primary projected overload. Raw encoded-image loading via
 `Texture2D::FromStream` is distinct from XNB content loading and is never
 reported as `ContentManager` support.
 
+`ContentManager.Load<T>` returns `Arc<T>` because XNA caches and returns one
+observable reference identity for an asset/type pair. The manager's erased
+storage is private; callers and custom readers remain typed. A cache hit with a
+different requested `T` is an error, not a second interpretation of the same
+payload. `ContentLoadable` supplies the typed target and optional disposable
+identity; `ContentDisposable` is the Rust ownership hook used by `Unload` and
+does not introduce a dynamic public XNA loading surface.
+
+The CLR `ContentTypeReader<T>` collision maps to `ContentTypeReaderOfT<T>` under
+the generic/non-generic collision rule. Registered readers are activated from
+the XNB reader table, use their declared reader version, receive an optional
+existing instance, and return the exact typed `Arc<T>`. Shared resources use
+typed fixups after the root object is read. External references recursively use
+the same manager/cache pipeline. Reader-created disposable resources are
+recorded as they are created so a later reader failure can release a partial
+object graph.
+
+XNB framing and the reader system are managed Rust. Native CNA is entered only
+when a built-in reader must construct a graphics resource. An uncompressed
+`Texture2D` XNB therefore follows `ContentManager -> ContentReader ->
+Texture2DReader -> Texture2D` while an encoded PNG follows `FromStream`; these
+routes are intentionally never conflated.
+
+## Vertex and index data
+
+XNA `IVertexType` maps exactly to a safe trait whose
+`VertexDeclaration(&self)` returns a retained declaration reference. Built-in
+vertex structs also expose their XNA static `VertexDeclaration()` property and
+return one stable declaration identity. The structs use explicit C-compatible
+layout where native transfer observes layout; size, alignment, offsets, and
+stride are verified independently.
+
+Generic buffer and `DrawUser*` element types map to typed Rust slices. The
+crate-root `VertexData` and `IndexData` bounds are Rust safety adaptations
+outside the strict namespace. `VertexData` explicitly encodes/decodes fields
+and provides a declaration, so arbitrary Rust padding is never reinterpreted as
+initialized bytes. `IndexData` admits only the exact 16- and 32-bit integer
+families. The strict API is not weakened to `&[u8]`; validated byte buffers
+exist only inside the bridge.
+
+`VertexBufferBinding` retains shared buffer identity. Device binding state
+therefore remains observable and protects the underlying CNA raw binding: a
+bound buffer cannot be destroyed until it is unbound. `Discard` and
+`NoOverwrite` retain their distinct enum identities and are forwarded exactly;
+an unsupported native option must fail rather than degrade to `None`.
+
+## Effects, fonts, and collection indexers
+
+`Effect` is an owned `GraphicsResource`. Its annotation, parameter, pass,
+technique, and collection objects are parent-owned views: they retain the
+parent's durable state, never destroy the Effect, and fail safely after parent
+disposal. Repeated lookup of the same native child handle returns one cached
+logical identity. Assigning `CurrentTechnique` validates parent and device
+identity.
+
+Effect parameter overloads remain typed families for booleans, integers,
+floats, vectors, quaternion, matrices, arrays, strings, and textures. They do
+not collapse into `Any`, JSON, or an untyped public byte value. Texture
+parameters retain a safe tracked wrapper so CNA's raw handle does not create a
+second owner. `EffectPass.Apply` and Effect-bearing `SpriteBatch.Begin` methods
+must execute real CNA routes; a renderer capability failure remains an error.
+
+CLR collection indexers overloaded by integer and string cannot share one Rust
+method name. The strict collection retains the metadata-selected string
+`Item`, while the deterministic integer operation is exposed as `item_at`
+through a collection-specific trait in `cna::extensions::graphics`. The
+extension changes only Rust call syntax; it does not invent another strict XNA
+member or alter the collection's parent-owned identity.
+
+`SpriteFont` has no public XNA constructor and is produced by its normal XNB
+reader. The font retains its atlas as part of one content-owned object graph;
+SpriteBatch borrows it and never owns it. CLR `StringBuilder` draw/measure
+inputs map to `&str` in this profile because Rust has no separate mutable
+builder reference type at the call boundary and the operation only observes
+text. Scalar and vector scale overloads remain mechanically distinct.
+
 ## Events and delegates
 
 An event `Foo` maps to `AddFooHandler` and `RemoveFooHandler`. The returned
@@ -272,6 +348,13 @@ Native refresh updates that retained object in place; explicit `Clone` of
 `PresentationParameters` creates an independent managed value. A device
 collection may return a tracked safe resource wrapper, but it must never create
 an unrelated owner merely because CNA reports the same raw handle.
+
+Render-target bindings use the same retained-resource rule as buffer bindings.
+The device stores stable logical bindings only after native `SetRenderTargets`
+succeeds, rejects duplicate/wrong-device/disposed/incompatible targets first,
+and clears bindings before child destruction. HEADLESS or another backend may
+reject the operation; the safe projection preserves that error and never
+fabricates a render target or pixel result.
 
 ## TimeSpan and errors
 

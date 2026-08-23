@@ -21,6 +21,8 @@ use super::{GraphicsDevice, SamplerState, Texture};
 /// texture validate its device association and perform one reviewed binding
 /// operation on behalf of a `TextureCollection`.
 pub trait TextureRuntime: Any + Send + Sync {
+    fn as_any(&self) -> &dyn Any;
+
     fn bind_texture_slot(
         &self,
         device: &GraphicsDevice,
@@ -137,6 +139,13 @@ impl SamplerStateCollection {
         state.ensure_alive()?;
         Ok(state)
     }
+
+    pub(super) fn clear_cache(&self) {
+        self.cached
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .fill(None);
+    }
 }
 
 /// Stable device-owned texture collection with safe logical-object caching.
@@ -232,6 +241,13 @@ impl TextureCollection {
             .ok_or(CnaError::InvalidInput("graphics device is disposed"))?;
         state.ensure_alive()?;
         Ok(state)
+    }
+
+    pub(super) fn clear_cache(&self) {
+        self.cached
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .fill(None);
     }
 }
 

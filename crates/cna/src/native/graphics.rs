@@ -260,6 +260,265 @@ impl Native {
         self.check(unsafe { (self.graphics_device_present)(device) })
     }
 
+    pub(crate) fn reset_graphics_device(&self, device: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: the device is callback-scoped and CNA completes reset synchronously.
+        self.check(unsafe { (self.graphics_device_reset)(device) })
+    }
+
+    pub(crate) fn reset_graphics_device_with_parameters(
+        &self,
+        device: sys::CNA_Handle,
+        parameters: &sys::CNA_PresentationParameters,
+        adapter_index: Option<u32>,
+    ) -> Result<()> {
+        let adapter = adapter_index
+            .as_ref()
+            .map_or(core::ptr::null(), |value| value as *const u32);
+        // SAFETY: CNA copies the complete descriptor and optional scalar synchronously.
+        self.check(unsafe {
+            (self.graphics_device_reset_with_parameters)(device, parameters, adapter)
+        })
+    }
+
+    pub(crate) fn get_backbuffer_data_window(
+        &self,
+        device: sys::CNA_Handle,
+        readback: &sys::CNA_BackBufferReadback,
+        destination: &mut [sys::CNA_Color],
+    ) -> Result<()> {
+        let capacity = u64::try_from(destination.len())
+            .map_err(|_| CnaError::InvalidInput("back-buffer destination is too large"))?;
+        let pointer = if destination.is_empty() {
+            core::ptr::null_mut()
+        } else {
+            destination.as_mut_ptr()
+        };
+        // SAFETY: descriptor and writable POD destination remain live for this synchronous call.
+        self.check(unsafe {
+            (self.graphics_device_get_backbuffer_data_window)(device, readback, pointer, capacity)
+        })
+    }
+
+    pub(crate) fn set_graphics_vertex_buffer(
+        &self,
+        device: sys::CNA_Handle,
+        buffer: sys::CNA_Handle,
+        offset: i32,
+    ) -> Result<()> {
+        // SAFETY: both handles and the nonnegative offset are validated by the wrappers.
+        self.check(unsafe {
+            if offset == 0 {
+                (self.graphics_device_set_vertex_buffer)(device, buffer)
+            } else {
+                (self.graphics_device_set_vertex_buffer_offset)(device, buffer, offset)
+            }
+        })
+    }
+
+    pub(crate) fn set_graphics_vertex_buffers(
+        &self,
+        device: sys::CNA_Handle,
+        bindings: &[sys::CNA_VertexBufferBinding],
+    ) -> Result<()> {
+        let count = u64::try_from(bindings.len())
+            .map_err(|_| CnaError::InvalidInput("vertex binding array is too large"))?;
+        let pointer = if bindings.is_empty() {
+            core::ptr::null()
+        } else {
+            bindings.as_ptr()
+        };
+        // SAFETY: the complete POD slice is copied synchronously.
+        self.check(unsafe { (self.graphics_device_set_vertex_buffers)(device, pointer, count) })
+    }
+
+    pub(crate) fn graphics_vertex_buffer_count(
+        &self,
+        device: sys::CNA_Handle,
+        count: &mut u64,
+    ) -> Result<()> {
+        // SAFETY: the callback-scoped handle and scalar output remain live.
+        self.check(unsafe { (self.graphics_device_get_vertex_buffer_count)(device, count) })
+    }
+
+    pub(crate) fn copy_graphics_vertex_buffers(
+        &self,
+        device: sys::CNA_Handle,
+        destination: &mut [sys::CNA_VertexBufferBinding],
+        count: &mut u64,
+    ) -> Result<()> {
+        let capacity = u64::try_from(destination.len())
+            .map_err(|_| CnaError::InvalidInput("vertex binding array is too large"))?;
+        let pointer = if destination.is_empty() {
+            core::ptr::null_mut()
+        } else {
+            destination.as_mut_ptr()
+        };
+        // SAFETY: destination describes capacity writable POD elements; CNA writes atomically.
+        self.check(unsafe {
+            (self.graphics_device_copy_vertex_buffers)(device, pointer, capacity, count)
+        })
+    }
+
+    pub(crate) fn graphics_vertex_buffer(
+        &self,
+        device: sys::CNA_Handle,
+        buffer: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: the callback-scoped handle and scalar output remain live.
+        self.check(unsafe { (self.graphics_device_get_vertex_buffer)(device, buffer) })
+    }
+
+    pub(crate) fn set_graphics_index_buffer(
+        &self,
+        device: sys::CNA_Handle,
+        buffer: sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: wrappers validate the borrowed device and owned buffer identities.
+        self.check(unsafe { (self.graphics_device_set_index_buffer)(device, buffer) })
+    }
+
+    pub(crate) fn graphics_index_buffer(
+        &self,
+        device: sys::CNA_Handle,
+        buffer: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: the callback-scoped handle and scalar output remain live.
+        self.check(unsafe { (self.graphics_device_get_index_buffer)(device, buffer) })
+    }
+
+    pub(crate) fn draw_primitives(
+        &self,
+        device: sys::CNA_Handle,
+        primitive_type: sys::CNA_PrimitiveType,
+        start_vertex: i32,
+        primitive_count: i32,
+    ) -> Result<()> {
+        // SAFETY: Rust validates topology/count/range and the device is callback-scoped.
+        self.check(unsafe {
+            (self.graphics_device_draw_primitives)(
+                device,
+                primitive_type,
+                start_vertex,
+                primitive_count,
+            )
+        })
+    }
+
+    pub(crate) fn draw_indexed_primitives(
+        &self,
+        device: sys::CNA_Handle,
+        primitive_type: sys::CNA_PrimitiveType,
+        base_vertex: i32,
+        min_vertex_index: i32,
+        num_vertices: i32,
+        start_index: i32,
+        primitive_count: i32,
+    ) -> Result<()> {
+        // SAFETY: Rust validates bound resources and every scalar range first.
+        self.check(unsafe {
+            (self.graphics_device_draw_indexed_primitives)(
+                device,
+                primitive_type,
+                base_vertex,
+                min_vertex_index,
+                num_vertices,
+                start_index,
+                primitive_count,
+            )
+        })
+    }
+
+    pub(crate) fn draw_instanced_primitives(
+        &self,
+        device: sys::CNA_Handle,
+        primitive_type: sys::CNA_PrimitiveType,
+        base_vertex: i32,
+        min_vertex_index: i32,
+        num_vertices: i32,
+        start_index: i32,
+        primitive_count: i32,
+        instance_count: i32,
+    ) -> Result<()> {
+        // SAFETY: Rust validates bound resources and every scalar range first.
+        self.check(unsafe {
+            (self.graphics_device_draw_instanced_primitives)(
+                device,
+                primitive_type,
+                base_vertex,
+                min_vertex_index,
+                num_vertices,
+                start_index,
+                primitive_count,
+                instance_count,
+            )
+        })
+    }
+
+    pub(crate) fn draw_user_primitives(
+        &self,
+        device: sys::CNA_Handle,
+        primitives: &sys::CNA_UserPrimitives,
+    ) -> Result<()> {
+        // SAFETY: Rust owns the descriptor, declaration and source bytes for the whole call.
+        self.check(unsafe { (self.graphics_device_draw_user_primitives)(device, primitives) })
+    }
+
+    pub(crate) fn draw_user_indexed_primitives(
+        &self,
+        device: sys::CNA_Handle,
+        primitives: &sys::CNA_UserPrimitives,
+        indices: &sys::CNA_UserIndices,
+    ) -> Result<()> {
+        // SAFETY: Rust owns both descriptors and source arrays for the synchronous call.
+        self.check(unsafe {
+            (self.graphics_device_draw_user_indexed_primitives)(device, primitives, indices)
+        })
+    }
+
+    pub(crate) fn set_render_targets(
+        &self,
+        device: sys::CNA_Handle,
+        bindings: &[sys::CNA_RenderTargetBinding],
+    ) -> Result<()> {
+        let count = u64::try_from(bindings.len())
+            .map_err(|_| CnaError::InvalidInput("render-target binding array is too large"))?;
+        let pointer = if bindings.is_empty() {
+            core::ptr::null()
+        } else {
+            bindings.as_ptr()
+        };
+        // SAFETY: CNA synchronously validates and copies the complete POD binding array.
+        self.check(unsafe { (self.graphics_device_set_render_targets)(device, pointer, count) })
+    }
+
+    pub(crate) fn render_target_count(
+        &self,
+        device: sys::CNA_Handle,
+        count: &mut u64,
+    ) -> Result<()> {
+        // SAFETY: the callback-scoped handle and scalar output remain live.
+        self.check(unsafe { (self.graphics_device_get_render_target_count)(device, count) })
+    }
+
+    pub(crate) fn copy_render_targets(
+        &self,
+        device: sys::CNA_Handle,
+        destination: &mut [sys::CNA_RenderTargetBinding],
+        count: &mut u64,
+    ) -> Result<()> {
+        let capacity = u64::try_from(destination.len())
+            .map_err(|_| CnaError::InvalidInput("render-target binding array is too large"))?;
+        let pointer = if destination.is_empty() {
+            core::ptr::null_mut()
+        } else {
+            destination.as_mut_ptr()
+        };
+        // SAFETY: destination describes capacity writable POD elements; CNA writes atomically.
+        self.check(unsafe {
+            (self.graphics_device_copy_render_targets)(device, pointer, capacity, count)
+        })
+    }
+
     pub(crate) fn renderer_info(
         &self,
         device: sys::CNA_Handle,
@@ -325,6 +584,101 @@ impl Native {
     ) -> Result<()> {
         // SAFETY: the callback-scoped device and versioned input/output remain live.
         self.check(unsafe { (self.texture2d_create)(device, info, texture) })
+    }
+
+    pub(crate) fn create_texture_cube(
+        &self,
+        device: sys::CNA_Handle,
+        info: &sys::CNA_TextureCubeCreateInfo,
+        handle: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: CNA copies the descriptor and writes one owned handle synchronously.
+        self.check(unsafe { (self.texturecube_create)(device, info, handle) })
+    }
+
+    pub(crate) fn destroy_texture_cube(&self, handle: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: ResourceState guarantees single destruction of an owned cube texture handle.
+        self.check(unsafe { (self.texturecube_destroy)(handle) })
+    }
+
+    pub(crate) fn texture_cube_info(
+        &self,
+        handle: sys::CNA_Handle,
+        info: &mut sys::CNA_TextureCubeInfo,
+    ) -> Result<()> {
+        // SAFETY: caller initializes the complete versioned writable descriptor.
+        self.check(unsafe { (self.texturecube_get_info)(handle, info) })
+    }
+
+    pub(crate) fn set_texture_cube_data(
+        &self,
+        handle: sys::CNA_Handle,
+        transfer: &sys::CNA_TextureCubeTransfer,
+        data: &[sys::CNA_Color],
+    ) -> Result<()> {
+        let capacity = u64::try_from(data.len())
+            .map_err(|_| CnaError::InvalidInput("cube texture source is too large"))?;
+        let pointer = if data.is_empty() {
+            core::ptr::null()
+        } else {
+            data.as_ptr()
+        };
+        // SAFETY: CNA reads the complete Color slice synchronously and retains no pointer.
+        self.check(unsafe { (self.texturecube_set_data)(handle, transfer, pointer, capacity) })
+    }
+
+    pub(crate) fn get_texture_cube_data(
+        &self,
+        handle: sys::CNA_Handle,
+        transfer: &sys::CNA_TextureCubeTransfer,
+        data: &mut [sys::CNA_Color],
+        required: &mut u64,
+    ) -> Result<()> {
+        let capacity = u64::try_from(data.len())
+            .map_err(|_| CnaError::InvalidInput("cube texture destination is too large"))?;
+        let pointer = if data.is_empty() {
+            core::ptr::null_mut()
+        } else {
+            data.as_mut_ptr()
+        };
+        // SAFETY: CNA writes the caller-owned POD slice atomically and reports the exact count.
+        self.check(unsafe {
+            (self.texturecube_get_data)(handle, transfer, pointer, capacity, required)
+        })
+    }
+
+    pub(crate) fn create_render_target2d(
+        &self,
+        device: sys::CNA_Handle,
+        info: &sys::CNA_RenderTarget2DCreateInfo,
+        handle: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: CNA copies the descriptor and writes one owned handle synchronously.
+        self.check(unsafe { (self.render_target2d_create)(device, info, handle) })
+    }
+
+    pub(crate) fn create_render_target_cube(
+        &self,
+        device: sys::CNA_Handle,
+        info: &sys::CNA_RenderTargetCubeCreateInfo,
+        handle: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: CNA copies the descriptor and writes one owned handle synchronously.
+        self.check(unsafe { (self.render_target_cube_create)(device, info, handle) })
+    }
+
+    pub(crate) fn render_target_info(
+        &self,
+        handle: sys::CNA_Handle,
+        info: &mut sys::CNA_RenderTargetInfo,
+    ) -> Result<()> {
+        // SAFETY: caller initializes the complete versioned writable descriptor.
+        self.check(unsafe { (self.render_target_get_info)(handle, info) })
+    }
+
+    pub(crate) fn destroy_render_target(&self, handle: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: ResourceState guarantees single destruction of an unbound owned target handle.
+        self.check(unsafe { (self.render_target_destroy)(handle) })
     }
 
     pub(crate) fn texture_info(
@@ -423,6 +777,221 @@ impl Native {
         self.check(unsafe { (self.texture2d_destroy)(texture) })
     }
 
+    pub(crate) fn create_vertex_declaration(
+        &self,
+        stride: i32,
+        elements: &[sys::CNA_VertexElement],
+        declaration: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        let count = u64::try_from(elements.len())
+            .map_err(|_| CnaError::InvalidInput("vertex declaration is too large"))?;
+        let pointer = if elements.is_empty() {
+            core::ptr::null()
+        } else {
+            elements.as_ptr()
+        };
+        // SAFETY: the validated POD slice is copied synchronously and the output is live.
+        self.check(unsafe {
+            (self.vertex_declaration_create_with_stride)(stride, pointer, count, declaration)
+        })
+    }
+
+    pub(crate) fn destroy_vertex_declaration(&self, declaration: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: the caller transfers exactly-once ownership of a live handle.
+        self.check(unsafe { (self.vertex_declaration_destroy)(declaration) })
+    }
+
+    pub(crate) fn initialize_vertex_buffer_binding(
+        &self,
+        buffer: sys::CNA_Handle,
+        vertex_offset: i32,
+        instance_frequency: i32,
+        binding: &mut sys::CNA_VertexBufferBinding,
+    ) -> Result<()> {
+        // SAFETY: scalar inputs were validated by CNA and the output is live.
+        self.check(unsafe {
+            (self.vertex_buffer_binding_init)(buffer, vertex_offset, instance_frequency, binding)
+        })
+    }
+
+    pub(crate) fn create_vertex_buffer(
+        &self,
+        device: sys::CNA_Handle,
+        info: &sys::CNA_VertexBufferCreateInfo,
+        buffer: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: the callback-scoped device and versioned input/output remain live.
+        self.check(unsafe { (self.vertex_buffer_create)(device, info, buffer) })
+    }
+
+    pub(crate) fn vertex_buffer_info(
+        &self,
+        buffer: sys::CNA_Handle,
+        info: &mut sys::CNA_VertexBufferInfo,
+    ) -> Result<()> {
+        // SAFETY: the owned handle and initialized versioned output remain live.
+        self.check(unsafe { (self.vertex_buffer_get_info)(buffer, info) })
+    }
+
+    /// The caller must prove that `T` has the exact CNA layout selected by `transfer.vertex_type`.
+    pub(crate) unsafe fn set_typed_vertex_data<T: Copy>(
+        &self,
+        buffer: sys::CNA_Handle,
+        transfer: &sys::CNA_VertexBufferTransfer,
+        data: &[T],
+    ) -> Result<()> {
+        let capacity = u64::try_from(data.len())
+            .map_err(|_| CnaError::InvalidInput("vertex data array is too large"))?;
+        let pointer = if data.is_empty() {
+            core::ptr::null()
+        } else {
+            data.as_ptr().cast()
+        };
+        // SAFETY: the caller establishes the documented T/vertex_type layout identity.
+        self.check(unsafe { (self.vertex_buffer_set_data)(buffer, transfer, pointer, capacity) })
+    }
+
+    pub(crate) fn set_raw_vertex_data(
+        &self,
+        buffer: sys::CNA_Handle,
+        offset_in_bytes: Option<u64>,
+        data: &[u8],
+        vertex_count: u64,
+        vertex_stride: u32,
+    ) -> Result<()> {
+        let byte_count = u64::try_from(data.len())
+            .map_err(|_| CnaError::InvalidInput("vertex data array is too large"))?;
+        let pointer = if data.is_empty() {
+            core::ptr::null()
+        } else {
+            data.as_ptr().cast()
+        };
+        // SAFETY: the byte slice describes exactly byte_count readable bytes and is copied.
+        let result = unsafe {
+            match offset_in_bytes {
+                Some(offset) => (self.vertex_buffer_set_data_raw_at)(
+                    buffer,
+                    offset,
+                    pointer,
+                    byte_count,
+                    vertex_count,
+                    vertex_stride,
+                ),
+                None => (self.vertex_buffer_set_data_raw)(
+                    buffer,
+                    pointer,
+                    byte_count,
+                    vertex_count,
+                    vertex_stride,
+                ),
+            }
+        };
+        self.check(result)
+    }
+
+    pub(crate) fn get_raw_vertex_data(
+        &self,
+        buffer: sys::CNA_Handle,
+        offset_in_bytes: u64,
+        destination: &mut [u8],
+        vertex_count: u64,
+        vertex_stride: u32,
+    ) -> Result<()> {
+        let byte_count = u64::try_from(destination.len())
+            .map_err(|_| CnaError::InvalidInput("vertex data array is too large"))?;
+        let pointer = if destination.is_empty() {
+            core::ptr::null_mut()
+        } else {
+            destination.as_mut_ptr().cast()
+        };
+        // SAFETY: the slice describes exactly byte_count writable bytes; CNA writes atomically.
+        self.check(unsafe {
+            (self.vertex_buffer_get_data_raw)(
+                buffer,
+                offset_in_bytes,
+                pointer,
+                byte_count,
+                vertex_count,
+                vertex_stride,
+            )
+        })
+    }
+
+    pub(crate) fn destroy_vertex_buffer(&self, buffer: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: the caller transfers exactly-once ownership of a live handle.
+        self.check(unsafe { (self.vertex_buffer_destroy)(buffer) })
+    }
+
+    pub(crate) fn create_index_buffer(
+        &self,
+        device: sys::CNA_Handle,
+        info: &sys::CNA_IndexBufferCreateInfo,
+        buffer: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: the callback-scoped device and versioned input/output remain live.
+        self.check(unsafe { (self.index_buffer_create)(device, info, buffer) })
+    }
+
+    pub(crate) fn index_buffer_info(
+        &self,
+        buffer: sys::CNA_Handle,
+        info: &mut sys::CNA_IndexBufferInfo,
+    ) -> Result<()> {
+        // SAFETY: the owned handle and initialized versioned output remain live.
+        self.check(unsafe { (self.index_buffer_get_info)(buffer, info) })
+    }
+
+    pub(crate) fn set_index_data<T: Copy>(
+        &self,
+        buffer: sys::CNA_Handle,
+        offset_in_bytes: Option<u64>,
+        transfer: &sys::CNA_IndexBufferTransfer,
+        data: &[T],
+    ) -> Result<()> {
+        let capacity = u64::try_from(data.len())
+            .map_err(|_| CnaError::InvalidInput("index data array is too large"))?;
+        let pointer = if data.is_empty() {
+            core::ptr::null()
+        } else {
+            data.as_ptr().cast()
+        };
+        // SAFETY: callers pass only u16 or u32 slices matching index_element_size.
+        let result = unsafe {
+            match offset_in_bytes {
+                Some(offset) => {
+                    (self.index_buffer_set_data_at)(buffer, offset, transfer, pointer, capacity)
+                }
+                None => (self.index_buffer_set_data)(buffer, transfer, pointer, capacity),
+            }
+        };
+        self.check(result)
+    }
+
+    pub(crate) fn get_index_data<T: Copy>(
+        &self,
+        buffer: sys::CNA_Handle,
+        transfer: &sys::CNA_IndexBufferTransfer,
+        destination: &mut [T],
+        required: &mut u64,
+    ) -> Result<()> {
+        let capacity = u64::try_from(destination.len())
+            .map_err(|_| CnaError::InvalidInput("index data array is too large"))?;
+        let pointer = if destination.is_empty() {
+            core::ptr::null_mut()
+        } else {
+            destination.as_mut_ptr().cast()
+        };
+        // SAFETY: callers pass only u16 or u32 slices matching index_element_size.
+        self.check(unsafe {
+            (self.index_buffer_get_data)(buffer, transfer, pointer, capacity, required)
+        })
+    }
+
+    pub(crate) fn destroy_index_buffer(&self, buffer: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: the caller transfers exactly-once ownership of a live handle.
+        self.check(unsafe { (self.index_buffer_destroy)(buffer) })
+    }
+
     pub(crate) fn create_sprite_batch(
         &self,
         device: sys::CNA_Handle,
@@ -474,6 +1043,16 @@ impl Native {
         self.check(unsafe { (self.sprite_batch_submit_many)(batch, command, 1) })
     }
 
+    pub(crate) fn draw_sprite_string(
+        &self,
+        batch: sys::CNA_Handle,
+        command: &sys::CNA_SpriteTextCommand,
+    ) -> Result<()> {
+        // SAFETY: the command is complete version-one POD and its UTF-8 view
+        // remains live for the synchronous native call.
+        self.check(unsafe { (self.sprite_batch_draw_string)(batch, command) })
+    }
+
     pub(crate) fn end_sprite_batch(&self, batch: sys::CNA_Handle) -> Result<()> {
         // SAFETY: the wrapper enforces an active begin/end interval.
         self.check(unsafe { (self.sprite_batch_end)(batch) })
@@ -482,5 +1061,678 @@ impl Native {
     pub(crate) fn destroy_sprite_batch(&self, batch: sys::CNA_Handle) -> Result<()> {
         // SAFETY: the caller transfers exactly-once ownership of a live handle.
         self.check(unsafe { (self.sprite_batch_destroy)(batch) })
+    }
+
+    pub(crate) fn create_sprite_font(
+        &self,
+        info: &sys::CNA_SpriteFontCreateInfo,
+        font: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: the versioned descriptor and complete glyph slice referenced
+        // by it remain live for this synchronous copying call.
+        self.check(unsafe { (self.sprite_font_create)(info, font) })
+    }
+
+    pub(crate) fn sprite_font_info(
+        &self,
+        font: sys::CNA_Handle,
+        info: &mut sys::CNA_SpriteFontInfo,
+    ) -> Result<()> {
+        // SAFETY: the owned handle is live and the output is initialized.
+        self.check(unsafe { (self.sprite_font_get_info)(font, info) })
+    }
+
+    pub(crate) fn copy_sprite_font_characters(
+        &self,
+        font: sys::CNA_Handle,
+        destination: &mut [sys::CNA_Char16],
+        count: &mut u64,
+    ) -> Result<()> {
+        let capacity = u64::try_from(destination.len())
+            .map_err(|_| CnaError::InvalidInput("SpriteFont character table is too large"))?;
+        let pointer = if destination.is_empty() {
+            core::ptr::null_mut()
+        } else {
+            destination.as_mut_ptr()
+        };
+        // SAFETY: the output points to exactly `capacity` writable elements.
+        self.check(unsafe { (self.sprite_font_copy_characters)(font, pointer, capacity, count) })
+    }
+
+    pub(crate) fn copy_sprite_font_glyphs(
+        &self,
+        font: sys::CNA_Handle,
+        destination: &mut [sys::CNA_SpriteFontGlyph],
+        count: &mut u64,
+    ) -> Result<()> {
+        let capacity = u64::try_from(destination.len())
+            .map_err(|_| CnaError::InvalidInput("SpriteFont glyph table is too large"))?;
+        let pointer = if destination.is_empty() {
+            core::ptr::null_mut()
+        } else {
+            destination.as_mut_ptr()
+        };
+        // SAFETY: the output points to exactly `capacity` writable elements.
+        self.check(unsafe { (self.sprite_font_copy_glyphs)(font, pointer, capacity, count) })
+    }
+
+    pub(crate) fn set_sprite_font_default_character(
+        &self,
+        font: sys::CNA_Handle,
+        value: Option<sys::CNA_Char16>,
+    ) -> Result<()> {
+        let (has_value, value) = value.map_or((sys::CNA_FALSE, 0), |value| (sys::CNA_TRUE, value));
+        // SAFETY: the owned handle is live and the scalar values are valid.
+        self.check(unsafe { (self.sprite_font_set_default_character)(font, has_value, value) })
+    }
+
+    pub(crate) fn set_sprite_font_line_spacing(
+        &self,
+        font: sys::CNA_Handle,
+        value: i32,
+    ) -> Result<()> {
+        // SAFETY: the owned handle is live and the scalar is copied.
+        self.check(unsafe { (self.sprite_font_set_line_spacing)(font, value) })
+    }
+
+    pub(crate) fn set_sprite_font_spacing(&self, font: sys::CNA_Handle, value: f32) -> Result<()> {
+        // SAFETY: the owned handle is live and Rust validates finiteness.
+        self.check(unsafe { (self.sprite_font_set_spacing)(font, value) })
+    }
+
+    pub(crate) fn measure_sprite_font(
+        &self,
+        font: sys::CNA_Handle,
+        text: sys::CNA_StringView,
+        size: &mut sys::CNA_Vector2,
+    ) -> Result<()> {
+        // SAFETY: the UTF-8 view remains live for the synchronous call and the
+        // output points to one writable vector.
+        self.check(unsafe { (self.sprite_font_measure_utf8)(font, text, size) })
+    }
+
+    pub(crate) fn destroy_sprite_font(&self, font: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: the caller transfers exactly-once ownership of a live handle.
+        self.check(unsafe { (self.sprite_font_destroy)(font) })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn begin_sprite_batch_with_effect(
+        &self,
+        batch: sys::CNA_Handle,
+        sort_mode: sys::CNA_SpriteSortMode,
+        blend: &sys::CNA_BlendState,
+        sampler: &sys::CNA_SamplerState,
+        depth_stencil: &sys::CNA_DepthStencilState,
+        rasterizer: &sys::CNA_RasterizerState,
+        effect: sys::CNA_Handle,
+        transform: Option<&sys::CNA_Matrix>,
+    ) -> Result<()> {
+        // SAFETY: descriptors and optional matrix remain live for this
+        // synchronous call; Rust validates all resource/device identities.
+        self.check(unsafe {
+            (self.sprite_batch_begin_with_effect)(
+                batch,
+                sort_mode,
+                blend,
+                sampler,
+                depth_stencil,
+                rasterizer,
+                effect,
+                transform.map_or(core::ptr::null(), |value| value as *const sys::CNA_Matrix),
+            )
+        })
+    }
+
+    pub(crate) fn create_empty_effect(
+        &self,
+        device: sys::CNA_Handle,
+        effect: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: the device is live during the callback and output is valid.
+        self.check(unsafe { (self.effect_create_empty)(device, effect) })
+    }
+
+    pub(crate) fn create_compiled_effect(
+        &self,
+        device: sys::CNA_Handle,
+        code: &[u8],
+        effect: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        let count = u64::try_from(code.len())
+            .map_err(|_| CnaError::InvalidInput("effect bytecode is too large"))?;
+        // SAFETY: the nonempty byte slice and output remain live for the call.
+        self.check(unsafe { (self.effect_create_compiled)(device, code.as_ptr(), count, effect) })
+    }
+
+    pub(crate) fn create_effect_material(
+        &self,
+        source: sys::CNA_Handle,
+        effect: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: source is a live owned effect and output is valid.
+        self.check(unsafe { (self.effect_material_create)(source, effect) })
+    }
+
+    pub(crate) fn clone_effect(
+        &self,
+        source: sys::CNA_Handle,
+        effect: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: source is live and output receives independent ownership.
+        self.check(unsafe { (self.effect_clone)(source, effect) })
+    }
+
+    pub(crate) fn dispose_effect_contents(&self, effect: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: handle ownership is retained; this only releases contents.
+        self.check(unsafe { (self.effect_dispose)(effect) })
+    }
+
+    pub(crate) fn destroy_effect(&self, effect: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: caller transfers exactly-once effect-handle ownership.
+        self.check(unsafe { (self.effect_destroy)(effect) })
+    }
+
+    pub(crate) fn apply_effect(&self, effect: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: handle and owning device are live.
+        self.check(unsafe { (self.effect_apply)(effect) })
+    }
+
+    pub(crate) fn effect_parameters(
+        &self,
+        effect: sys::CNA_Handle,
+        collection: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: handle is live and output receives an owned collection view.
+        self.check(unsafe { (self.effect_get_parameters)(effect, collection) })
+    }
+
+    pub(crate) fn effect_techniques(
+        &self,
+        effect: sys::CNA_Handle,
+        collection: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: handle is live and output receives an owned collection view.
+        self.check(unsafe { (self.effect_get_techniques)(effect, collection) })
+    }
+
+    pub(crate) fn current_effect_technique(
+        &self,
+        effect: sys::CNA_Handle,
+        technique: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: handle is live and output receives an owned technique view.
+        self.check(unsafe { (self.effect_get_current_technique)(effect, technique) })
+    }
+
+    pub(crate) fn set_current_effect_technique(
+        &self,
+        effect: sys::CNA_Handle,
+        technique: sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: both handles were validated as live and parent-compatible.
+        self.check(unsafe { (self.effect_set_current_technique)(effect, technique) })
+    }
+
+    fn copy_effect_text(
+        &self,
+        handle: sys::CNA_Handle,
+        count_fn: unsafe extern "C" fn(sys::CNA_Handle, *mut u64) -> sys::CNA_Result,
+        copy_fn: unsafe extern "C" fn(
+            sys::CNA_Handle,
+            *mut core::ffi::c_char,
+            u64,
+            *mut u64,
+        ) -> sys::CNA_Result,
+    ) -> Result<String> {
+        let mut count = 0;
+        // SAFETY: output count points to one writable scalar.
+        self.check(unsafe { count_fn(handle, &mut count) })?;
+        let length = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("native effect text is too large"))?;
+        let mut bytes = vec![0_u8; length];
+        let mut copied = count;
+        // SAFETY: destination has exactly count writable bytes.
+        self.check(unsafe { copy_fn(handle, bytes.as_mut_ptr().cast(), count, &mut copied) })?;
+        if copied != count {
+            return Err(CnaError::Native {
+                code: sys::CNA_RESULT_INTERNAL,
+                message: "CNA changed an effect text value between count and copy".to_owned(),
+            });
+        }
+        String::from_utf8(bytes).map_err(|_| CnaError::Native {
+            code: sys::CNA_RESULT_ENCODING,
+            message: "CNA returned invalid UTF-8 effect text".to_owned(),
+        })
+    }
+
+    pub(crate) fn effect_annotation_name(&self, handle: sys::CNA_Handle) -> Result<String> {
+        self.copy_effect_text(
+            handle,
+            self.effect_annotation_get_name_byte_count,
+            self.effect_annotation_copy_name,
+        )
+    }
+
+    pub(crate) fn effect_annotation_semantic(&self, handle: sys::CNA_Handle) -> Result<String> {
+        self.copy_effect_text(
+            handle,
+            self.effect_annotation_get_semantic_byte_count,
+            self.effect_annotation_copy_semantic,
+        )
+    }
+
+    pub(crate) fn effect_annotation_string(&self, handle: sys::CNA_Handle) -> Result<String> {
+        self.copy_effect_text(
+            handle,
+            self.effect_annotation_get_value_string_byte_count,
+            self.effect_annotation_copy_value_string,
+        )
+    }
+
+    pub(crate) fn effect_parameter_name(&self, handle: sys::CNA_Handle) -> Result<String> {
+        self.copy_effect_text(
+            handle,
+            self.effect_parameter_get_name_byte_count,
+            self.effect_parameter_copy_name,
+        )
+    }
+
+    pub(crate) fn effect_parameter_semantic(&self, handle: sys::CNA_Handle) -> Result<String> {
+        self.copy_effect_text(
+            handle,
+            self.effect_parameter_get_semantic_byte_count,
+            self.effect_parameter_copy_semantic,
+        )
+    }
+
+    pub(crate) fn effect_parameter_string(&self, handle: sys::CNA_Handle) -> Result<String> {
+        self.copy_effect_text(
+            handle,
+            self.effect_parameter_get_value_string_byte_count,
+            self.effect_parameter_copy_value_string,
+        )
+    }
+
+    pub(crate) fn effect_pass_name(&self, handle: sys::CNA_Handle) -> Result<String> {
+        self.copy_effect_text(
+            handle,
+            self.effect_pass_get_name_byte_count,
+            self.effect_pass_copy_name,
+        )
+    }
+
+    pub(crate) fn effect_technique_name(&self, handle: sys::CNA_Handle) -> Result<String> {
+        self.copy_effect_text(
+            handle,
+            self.effect_technique_get_name_byte_count,
+            self.effect_technique_copy_name,
+        )
+    }
+
+    pub(crate) fn effect_annotation_info(
+        &self,
+        handle: sys::CNA_Handle,
+        info: &mut sys::CNA_EffectAnnotationInfo,
+    ) -> Result<()> {
+        // SAFETY: output is a writable versioned descriptor.
+        self.check(unsafe { (self.effect_annotation_get_info)(handle, info) })
+    }
+
+    pub(crate) fn effect_parameter_info(
+        &self,
+        handle: sys::CNA_Handle,
+        info: &mut sys::CNA_EffectParameterInfo,
+    ) -> Result<()> {
+        // SAFETY: output is a writable versioned descriptor.
+        self.check(unsafe { (self.effect_parameter_get_info)(handle, info) })
+    }
+
+    pub(crate) fn effect_annotation_value<T: Copy + Default>(
+        &self,
+        handle: sys::CNA_Handle,
+        function: unsafe extern "C" fn(sys::CNA_Handle, *mut T) -> sys::CNA_Result,
+    ) -> Result<T> {
+        let mut value = T::default();
+        // SAFETY: the selected C function and T are paired by the private caller.
+        self.check(unsafe { function(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn annotation_boolean(&self, handle: sys::CNA_Handle) -> Result<sys::CNA_Bool> {
+        self.effect_annotation_value(handle, self.effect_annotation_get_value_boolean)
+    }
+    pub(crate) fn annotation_int32(&self, handle: sys::CNA_Handle) -> Result<i32> {
+        self.effect_annotation_value(handle, self.effect_annotation_get_value_int32)
+    }
+    pub(crate) fn annotation_single(&self, handle: sys::CNA_Handle) -> Result<f32> {
+        self.effect_annotation_value(handle, self.effect_annotation_get_value_single)
+    }
+    pub(crate) fn annotation_vector2(&self, handle: sys::CNA_Handle) -> Result<sys::CNA_Vector2> {
+        self.effect_annotation_value(handle, self.effect_annotation_get_value_vector2)
+    }
+    pub(crate) fn annotation_vector3(&self, handle: sys::CNA_Handle) -> Result<sys::CNA_Vector3> {
+        self.effect_annotation_value(handle, self.effect_annotation_get_value_vector3)
+    }
+    pub(crate) fn annotation_vector4(&self, handle: sys::CNA_Handle) -> Result<sys::CNA_Vector4> {
+        self.effect_annotation_value(handle, self.effect_annotation_get_value_vector4)
+    }
+    pub(crate) fn annotation_matrix(&self, handle: sys::CNA_Handle) -> Result<sys::CNA_Matrix> {
+        self.effect_annotation_value(handle, self.effect_annotation_get_value_matrix)
+    }
+
+    pub(crate) fn effect_parameter_value<T: Copy + Default>(
+        &self,
+        handle: sys::CNA_Handle,
+        value_type: sys::CNA_EffectValueType,
+    ) -> Result<T> {
+        let mut value = T::default();
+        // SAFETY: private callers pair the tagged identity with the exact POD T.
+        self.check(unsafe {
+            (self.effect_parameter_get_value)(handle, value_type, (&mut value as *mut T).cast())
+        })?;
+        Ok(value)
+    }
+
+    pub(crate) fn effect_parameter_values<T: Copy + Default>(
+        &self,
+        handle: sys::CNA_Handle,
+        value_type: sys::CNA_EffectValueType,
+        count: usize,
+    ) -> Result<Vec<T>> {
+        let native_count = u64::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("effect value count is too large"))?;
+        let mut values = vec![T::default(); count];
+        let mut actual = 0;
+        let pointer = if values.is_empty() {
+            core::ptr::null_mut()
+        } else {
+            values.as_mut_ptr().cast()
+        };
+        // SAFETY: private callers pair T with the tag and destination capacity.
+        self.check(unsafe {
+            (self.effect_parameter_get_values)(
+                handle,
+                value_type,
+                native_count,
+                pointer,
+                native_count,
+                &mut actual,
+            )
+        })?;
+        values.truncate(usize::try_from(actual).map_err(|_| CnaError::Native {
+            code: sys::CNA_RESULT_OVERFLOW,
+            message: "CNA returned an oversized effect array count".to_owned(),
+        })?);
+        Ok(values)
+    }
+
+    pub(crate) fn set_effect_parameter_value<T: Copy>(
+        &self,
+        handle: sys::CNA_Handle,
+        value_type: sys::CNA_EffectValueType,
+        value: &T,
+    ) -> Result<()> {
+        // SAFETY: private callers pair T with the tagged native overload.
+        self.check(unsafe {
+            (self.effect_parameter_set_value)(handle, value_type, (value as *const T).cast())
+        })
+    }
+
+    pub(crate) fn set_effect_parameter_values<T: Copy>(
+        &self,
+        handle: sys::CNA_Handle,
+        value_type: sys::CNA_EffectValueType,
+        values: &[T],
+    ) -> Result<()> {
+        let count = u64::try_from(values.len())
+            .map_err(|_| CnaError::InvalidInput("effect value count is too large"))?;
+        let pointer = if values.is_empty() {
+            core::ptr::null()
+        } else {
+            values.as_ptr().cast()
+        };
+        // SAFETY: private callers pair T with the tag and slice capacity.
+        self.check(unsafe {
+            (self.effect_parameter_set_values)(handle, value_type, pointer, count)
+        })
+    }
+
+    pub(crate) fn set_effect_parameter_string(
+        &self,
+        handle: sys::CNA_Handle,
+        value: sys::CNA_StringView,
+    ) -> Result<()> {
+        // SAFETY: string view remains live for the synchronous copying call.
+        self.check(unsafe { (self.effect_parameter_set_value_string)(handle, value) })
+    }
+
+    pub(crate) fn effect_parameter_texture(
+        &self,
+        handle: sys::CNA_Handle,
+        texture_type: sys::CNA_EffectTextureType,
+    ) -> Result<sys::CNA_Handle> {
+        let mut texture = sys::CNA_INVALID_HANDLE;
+        // SAFETY: output points to one writable handle.
+        self.check(unsafe {
+            (self.effect_parameter_get_value_texture)(handle, texture_type, &mut texture)
+        })?;
+        Ok(texture)
+    }
+
+    pub(crate) fn set_effect_parameter_texture(
+        &self,
+        handle: sys::CNA_Handle,
+        texture_type: sys::CNA_EffectTextureType,
+        texture: sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: the wrapper validates the texture handle and device identity.
+        self.check(unsafe {
+            (self.effect_parameter_set_value_texture)(handle, texture_type, texture)
+        })
+    }
+
+    pub(crate) fn effect_parameter_child_collection(
+        &self,
+        handle: sys::CNA_Handle,
+        structure_members: bool,
+        collection: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: output receives one owned child collection view.
+        let result = unsafe {
+            if structure_members {
+                (self.effect_parameter_get_structure_members)(handle, collection)
+            } else {
+                (self.effect_parameter_get_elements)(handle, collection)
+            }
+        };
+        self.check(result)
+    }
+
+    pub(crate) fn effect_parameter_annotations(
+        &self,
+        handle: sys::CNA_Handle,
+        collection: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: output receives one owned annotation collection view.
+        self.check(unsafe { (self.effect_parameter_get_annotations)(handle, collection) })
+    }
+
+    pub(crate) fn effect_pass_annotations(
+        &self,
+        handle: sys::CNA_Handle,
+        collection: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: output receives one owned annotation collection view.
+        self.check(unsafe { (self.effect_pass_get_annotations)(handle, collection) })
+    }
+
+    pub(crate) fn effect_technique_passes(
+        &self,
+        handle: sys::CNA_Handle,
+        collection: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: output receives one owned pass collection view.
+        self.check(unsafe { (self.effect_technique_get_passes)(handle, collection) })
+    }
+
+    pub(crate) fn effect_technique_annotations(
+        &self,
+        handle: sys::CNA_Handle,
+        collection: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: output receives one owned annotation collection view.
+        self.check(unsafe { (self.effect_technique_get_annotations)(handle, collection) })
+    }
+
+    pub(crate) fn create_effect_annotation(
+        &self,
+        info: &sys::CNA_EffectAnnotationCreateInfo,
+        annotation: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: the versioned descriptor and referenced slices remain live
+        // for this synchronous copying call.
+        self.check(unsafe { (self.effect_annotation_create)(info, annotation) })
+    }
+
+    pub(crate) fn add_effect_annotation(
+        &self,
+        collection: sys::CNA_Handle,
+        annotation: sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: both owned handles are live; CNA copies the annotation value.
+        self.check(unsafe { (self.effect_annotation_collection_add)(collection, annotation) })
+    }
+
+    pub(crate) fn add_effect_parameter(
+        &self,
+        collection: sys::CNA_Handle,
+        info: &sys::CNA_EffectParameterCreateInfo,
+        parameter: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: the versioned descriptor remains live and output receives an
+        // independently owned stable parameter view.
+        self.check(unsafe {
+            (self.effect_parameter_collection_add_create)(collection, info, parameter)
+        })
+    }
+
+    pub(crate) fn add_effect_technique(
+        &self,
+        collection: sys::CNA_Handle,
+        name: sys::CNA_StringView,
+        technique: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: the text view is synchronously copied and output is valid.
+        self.check(unsafe {
+            (self.effect_technique_collection_add_named)(collection, name, technique)
+        })
+    }
+
+    pub(crate) fn add_effect_pass(
+        &self,
+        collection: sys::CNA_Handle,
+        name: sys::CNA_StringView,
+        technique_identity: u64,
+        pass: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: the text view is synchronously copied and output is valid.
+        self.check(unsafe {
+            (self.effect_pass_collection_add_create)(collection, name, technique_identity, pass)
+        })
+    }
+
+    pub(crate) fn effect_collection_count(&self, handle: sys::CNA_Handle, kind: u8) -> Result<u64> {
+        let mut count = 0;
+        // SAFETY: every branch has the identical count signature and kind is private.
+        let result = unsafe {
+            match kind {
+                0 => (self.effect_annotation_collection_get_count)(handle, &mut count),
+                1 => (self.effect_parameter_collection_get_count)(handle, &mut count),
+                2 => (self.effect_pass_collection_get_count)(handle, &mut count),
+                3 => (self.effect_technique_collection_get_count)(handle, &mut count),
+                _ => return Err(CnaError::InvalidInput("unknown effect collection kind")),
+            }
+        };
+        self.check(result)?;
+        Ok(count)
+    }
+
+    pub(crate) fn effect_collection_get_at(
+        &self,
+        handle: sys::CNA_Handle,
+        kind: u8,
+        index: u64,
+    ) -> Result<sys::CNA_Handle> {
+        let mut child = sys::CNA_INVALID_HANDLE;
+        // SAFETY: every branch has the identical indexed-view signature.
+        let result = unsafe {
+            match kind {
+                0 => (self.effect_annotation_collection_get_at)(handle, index, &mut child),
+                1 => (self.effect_parameter_collection_get_at)(handle, index, &mut child),
+                2 => (self.effect_pass_collection_get_at)(handle, index, &mut child),
+                3 => (self.effect_technique_collection_get_at)(handle, index, &mut child),
+                _ => return Err(CnaError::InvalidInput("unknown effect collection kind")),
+            }
+        };
+        self.check(result)?;
+        Ok(child)
+    }
+
+    pub(crate) fn effect_collection_find(
+        &self,
+        handle: sys::CNA_Handle,
+        kind: u8,
+        value: sys::CNA_StringView,
+        semantic: bool,
+    ) -> Result<Option<sys::CNA_Handle>> {
+        let mut found = sys::CNA_FALSE;
+        let mut child = sys::CNA_INVALID_HANDLE;
+        // SAFETY: every branch has the identical find-view signature.
+        let result = unsafe {
+            match (kind, semantic) {
+                (0, false) => {
+                    (self.effect_annotation_collection_find)(handle, value, &mut found, &mut child)
+                }
+                (1, false) => (self.effect_parameter_collection_find_name)(
+                    handle, value, &mut found, &mut child,
+                ),
+                (1, true) => (self.effect_parameter_collection_find_semantic)(
+                    handle, value, &mut found, &mut child,
+                ),
+                (2, false) => {
+                    (self.effect_pass_collection_find)(handle, value, &mut found, &mut child)
+                }
+                (3, false) => {
+                    (self.effect_technique_collection_find)(handle, value, &mut found, &mut child)
+                }
+                _ => return Err(CnaError::InvalidInput("unknown effect collection lookup")),
+            }
+        };
+        self.check(result)?;
+        Ok((found == sys::CNA_TRUE).then_some(child))
+    }
+
+    pub(crate) fn destroy_effect_view(&self, handle: sys::CNA_Handle, kind: u8) -> Result<()> {
+        // SAFETY: private view wrappers transfer exactly-once ownership.
+        let result = unsafe {
+            match kind {
+                0 => (self.effect_annotation_destroy)(handle),
+                1 => (self.effect_parameter_destroy)(handle),
+                2 => (self.effect_pass_destroy)(handle),
+                3 => (self.effect_technique_destroy)(handle),
+                4 => (self.effect_annotation_collection_destroy)(handle),
+                5 => (self.effect_parameter_collection_destroy)(handle),
+                6 => (self.effect_pass_collection_destroy)(handle),
+                7 => (self.effect_technique_collection_destroy)(handle),
+                _ => return Err(CnaError::InvalidInput("unknown effect view kind")),
+            }
+        };
+        self.check(result)
+    }
+
+    pub(crate) fn apply_effect_pass(&self, pass: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: pass view and its retained owning effect are live.
+        self.check(unsafe { (self.effect_pass_apply)(pass) })
     }
 }

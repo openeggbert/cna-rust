@@ -7,7 +7,9 @@
 
 use std::any::Any;
 use std::error::Error;
+use std::sync::Arc;
 
+use crate::content::ContentManager;
 use crate::error::Result;
 use crate::extensions::events::{EventArgs, EventHandler};
 use crate::graphics::GraphicsDevice;
@@ -38,6 +40,14 @@ pub trait Game: GameStateAccess {
 
     fn Services(&self) -> &GameServiceContainer {
         self.game_state().Services()
+    }
+
+    fn Content(&self) -> Arc<ContentManager> {
+        self.game_state().Content()
+    }
+
+    fn SetContent(&mut self, value: Arc<ContentManager>) {
+        self.game_state().SetContent(value);
     }
 
     fn InactiveSleepTime(&self) -> TimeSpan {
@@ -152,6 +162,7 @@ pub trait Game: GameStateAccess {
 
     fn DisposeWithDisposing(&mut self, disposing: bool) {
         if disposing {
+            let _ = self.Content().Dispose();
             let _ = self.game_state().emit_disposed();
         }
     }

@@ -154,6 +154,25 @@ impl PresentationParameters {
         true
     }
 
+    pub(super) fn to_native(&self, headless_ext: bool) -> sys::CNA_PresentationParameters {
+        let value = self.read();
+        sys::CNA_PresentationParameters {
+            struct_size: core::mem::size_of::<sys::CNA_PresentationParameters>() as u32,
+            struct_version: 1,
+            back_buffer_format: value.back_buffer_format as u32,
+            back_buffer_width: value.back_buffer_width,
+            back_buffer_height: value.back_buffer_height,
+            depth_stencil_format: value.depth_stencil_format as u32,
+            multi_sample_count: value.multi_sample_count,
+            presentation_interval: value.presentation_interval as u32,
+            display_orientation: value.display_orientation.bits() as u32,
+            render_target_usage: value.render_target_usage as u32,
+            is_full_screen: u8::from(value.is_full_screen),
+            headless_ext: u8::from(headless_ext),
+            reserved: [0; 2],
+        }
+    }
+
     #[must_use]
     pub fn Clone(&self) -> Self {
         self.clone()

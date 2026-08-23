@@ -73,6 +73,7 @@ pub(super) fn run_one_frame_borrowed<G: Game>(game: &mut G) -> Result<()> {
     run_inner(game, RunMode::OneFrame)
 }
 
+#[allow(clippy::too_many_lines)]
 fn run_inner<G: Game>(game: &mut G, mode: RunMode) -> Result<()> {
     let native = Native::load()?;
     let mut state = Box::new(CallbackState {
@@ -167,6 +168,7 @@ fn run_inner<G: Game>(game: &mut G, mode: RunMode) -> Result<()> {
     // ABI 0.7 checks for owned children before native Shutdown sends the
     // user's Exiting/UnloadContent lifecycle callbacks. Release registered
     // native children here without synthesizing a second user callback.
+    let content_cleanup_result = state.game.game_state().cleanup_content();
     let cleanup_result = state
         .device
         .as_ref()
@@ -193,6 +195,7 @@ fn run_inner<G: Game>(game: &mut G, mode: RunMode) -> Result<()> {
     }
     run_result?;
     unsubscribe_result?;
+    content_cleanup_result?;
     cleanup_result?;
     destroy_result
 }
@@ -337,6 +340,11 @@ unsafe extern "C" fn callback<G: Game, const LIFECYCLE: u8>(
         }
         Lifecycle::EndRun => {
             state.game.EndRun();
+            // CNA retains raw renderer buffer bindings. Clear them while the
+            // callback-scoped device handle is still valid so registered
+            // buffers can be destroyed safely during host teardown.
+            device.unbind_all_render_targets()?;
+            device.unbind_all_buffers()?;
             Ok(())
         }
         Lifecycle::LoadContent => state.game.LoadContent(&mut game_context),

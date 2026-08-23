@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use cna_sys as sys;
 
+use crate::content::ContentManager;
 use crate::error::{CnaError, Result};
 use crate::extensions::events::{EventArgs, EventHandler};
 use crate::graphics::resource::EventHandlers;
@@ -29,7 +30,8 @@ pub(crate) struct ActiveGame {
 pub struct GameState {
     launch_parameters: LaunchParameters,
     components: GameComponentCollection,
-    services: GameServiceContainer,
+    services: Arc<GameServiceContainer>,
+    content: Mutex<Arc<ContentManager>>,
     window: GameWindow,
     is_active: AtomicBool,
     is_fixed_time_step: AtomicBool,
@@ -48,10 +50,13 @@ pub struct GameState {
 impl GameState {
     #[must_use]
     pub fn new() -> Self {
+        let services = Arc::new(GameServiceContainer::new());
+        let service_provider: Arc<dyn super::ServiceProvider> = Arc::clone(&services) as Arc<_>;
         Self {
             launch_parameters: LaunchParameters::new(),
             components: GameComponentCollection::new(),
-            services: GameServiceContainer::new(),
+            services,
+            content: Mutex::new(Arc::new(ContentManager::new(service_provider))),
             window: GameWindow::new("CNA Rust"),
             is_active: AtomicBool::new(true),
             is_fixed_time_step: AtomicBool::new(true),
@@ -85,6 +90,7 @@ impl GameState {
                 CnaError::InvalidInput("graphics device identity was already initialized")
             })?;
         }
+        self.Content().bind_graphics_device(device)?;
         let is_fixed_time_step = self.is_fixed_time_step.load(Ordering::Acquire);
         let is_mouse_visible = self.is_mouse_visible.load(Ordering::Acquire);
         let target_elapsed_time_ticks = self.target_elapsed_time_ticks.load(Ordering::Acquire);
@@ -147,6 +153,27 @@ impl GameState {
     #[must_use]
     pub fn Services(&self) -> &GameServiceContainer {
         &self.services
+    }
+
+    #[must_use]
+    pub fn Content(&self) -> Arc<ContentManager> {
+        Arc::clone(
+            &self
+                .content
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        )
+    }
+
+    pub fn SetContent(&self, value: Arc<ContentManager>) {
+        *self
+            .content
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = value;
+    }
+
+    pub(crate) fn cleanup_content(&self) -> Result<()> {
+        self.Content().cleanup_for_game_shutdown()
     }
 
     #[must_use]

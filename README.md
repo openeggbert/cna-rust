@@ -1,9 +1,9 @@
 # CNA-Rust
 
 CNA-Rust is an early, measurable safe Rust projection of Microsoft XNA
-Framework 4.0 backed by CNA C++. It is functional for one small native 2D game
-slice; it is **not** yet an XNA-complete binding and does not compile XNA C#
-source as Rust.
+Framework 4.0 backed by CNA C++. Its Content/XNB, 2D sprite/font, base Effect,
+and typed device/buffer foundations are functional; it is **not** yet an
+XNA-complete binding and does not compile XNA C# source as Rust.
 
 ```text
 cna::Microsoft::Xna::Framework::*
@@ -46,35 +46,45 @@ hierarchy and deliberate CNA extensions.
   zero. Clippy still reports audited compatibility warnings; they are not
   globally hidden.
 - XNA 4.0 Windows runtime inventory remains 257 CLR types and 2,964 members;
-  259 Rust types are expected and 117 strict types now exist.
-- Strict diagnostics are 178: 142 missing types and 36 missing members.
-  `Game`, `GraphicsDevice`, and `SpriteBatch` have respectively 2, 26, and 8
-  local diagnostics. Parameter/signature and disposal mismatches are zero. Type kind,
-  base/trait/interface, return, generic/bound, ref/out, enum/value, flags, and
-  delegate mismatches remain zero.
+  259 Rust types are expected and 165 strict types now exist.
+- Strict diagnostics are 94, all of them missing types. Missing members and
+  constructor/overload/property/event mapping mismatches are zero.
+  `Game`, `GraphicsDevice`, and `SpriteBatch` each have zero local diagnostics.
+  Parameter/signature, disposal, type-kind, base/trait/interface, return,
+  generic/bound, ref/out, enum/value, flags, and delegate mismatches remain
+  zero.
 - Unexpected types/members, internal leaks, raw-handle leaks, public unsafe
   APIs, allowlist entries, and unmeasured categories remain zero.
-- Curves and all remaining packed vectors are real. `GraphicsResource`,
-  `Texture`, and `Texture2D` have zero local diagnostics. Managed graphics
-  states are complete and `SpriteBatch` implements all texture draw overloads.
-- Components, per-game typed services, launch parameters, `GameWindow`,
-  display/presentation types, adapter/device status, and stable device
-  texture/sampler collections are real and have zero local diagnostics.
-- The XNA-derived corpus passes 123 named observations and 124 assertions.
-- The reviewed ABI slice is 104 functions. Full compiler-derived prototypes are
-  checked for all 104, and all 419 independent C/Rust prototype/layout/callback/
-  constant measurements match.
+- `ContentManager` and the managed uncompressed XNB reader pipeline are real:
+  typed cache/disposal, custom readers, existing/shared/external resources,
+  primitive readers, Texture2D, SpriteFont, and Effect readers are covered.
+  Raw PNG `Texture2D::FromStream` remains a separate route.
+- Typed vertex declarations and vertex/index buffers, device binding/draw/
+  reset/back-buffer routes, TextureCube, and render targets are complete. CNA
+  calls are never replaced by no-ops; HEADLESS limitations are explicit.
+- The base Effect reflection/parameter/pass/technique graph is complete, and
+  `EffectPass.Apply` plus both Effect-bearing SpriteBatch Begin overloads use
+  real CNA execution routes. Compiled effect bytecode is unsupported by the
+  current HEADLESS renderer and returns its exact error.
+- `SpriteFont` loads through XNB with one atlas owner, measures strings, and all
+  six `DrawString` projections submit native glyph commands.
+- The XNA-derived corpus passes 140 named observations and 141 assertions.
+- The reviewed ABI slice is 235 functions. It has 879 full prototype type
+  positions and 805 independent C/Rust measurements across 48 layouts, three
+  callback signatures, scalar representations, and 206 constants, all with
+  zero mismatches.
 - Linux x86-64 HEADLESS validation freshly passes 60 and 600 template frames,
-  146 isolated native game lifetime cycles (including injected failures), and
-  a generated vendored consumer build/test plus 60 frames.
+  177 created native game lifetimes, ten buffer-binding cycles, ten
+  SpriteFont/content cycles, ten Effect parent/child cycles, and a generated
+  vendored consumer build/test plus 60 frames.
 
-`GraphicsDevice` now has durable shared identity while its private CNA handle
+`GraphicsDevice` has durable shared identity while its private CNA handle
 remains callback-scoped. Resources retain device association without owning
 the native device, share deterministic invalidation, and are released before
-parent destruction. User `UnloadContent` remains exactly once and is separate
-from internal pre-destroy child cleanup. Persistent presentation, adapter,
-texture/sampler collection, and graphics-state access preserves shared logical
-identity instead of constructing unrelated wrappers.
+parent destruction. Bound buffers/render targets cannot be destroyed while CNA
+may retain a raw binding. User `UnloadContent` remains exactly once and is
+separate from internal pre-destroy child cleanup. ContentManager owns loaded
+resources, not the native Game.
 
 Canonical CNA HEAD `1bb2145d99ed572dd4eb15009c34e2e5f410fcf0` still fails an
 unmodified C API build at `CnaCApiCoreExt.cpp:250`: the renderer identity
@@ -110,7 +120,7 @@ Rust slice.
 ## Verification
 
 ```bash
-cargo fmt --check
+cargo fmt --all -- --check
 cargo check --workspace
 cargo clippy --workspace --all-targets --all-features
 cargo test --workspace --all-features
@@ -123,6 +133,8 @@ XNA_REFERENCE_PATH=/path/to/xna4/windows \
 XNA_REFERENCE_PATH=/path/to/xna4/windows \
   python3 tools/api-compat/verify.py --report-only \
   --output target/xna-api-report.json
+
+python3 tools/api-compat/verify.py --leak-only
 
 python3 tools/native-abi/verify.py \
   --cna-root /path/to/cna \
@@ -138,8 +150,8 @@ inspection. The mapping transforms CLR concepts before comparison; it does not
 compare raw C# syntax to Rust syntax.
 
 `tools/native-stress/run-sanitized.sh` is an optional ASan/UBSan path for a
-separately instrumented exact ABI-0.7 CNA library. No sanitizer run is part of
-the current evidence.
+separately instrumented exact ABI-0.7 CNA library. Sanitizer status for this
+run is `not-run`; native crash absence is not allocator-level leak proof.
 
 See the [normative mapping](docs/xna-rust-mapping.md),
 [architecture](docs/architecture.md), and [measured roadmap](plan.md).

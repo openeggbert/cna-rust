@@ -57,10 +57,46 @@ pub const CNA_DEPTH_FORMAT_DEPTH24_STENCIL8: CNA_DepthFormat = 3;
 pub const CNA_RENDER_TARGET_USAGE_DISCARD_CONTENTS: CNA_RenderTargetUsage = 0;
 pub const CNA_RENDER_TARGET_USAGE_PRESERVE_CONTENTS: CNA_RenderTargetUsage = 1;
 pub const CNA_RENDER_TARGET_USAGE_PLATFORM_CONTENTS: CNA_RenderTargetUsage = 2;
+pub const CNA_CUBE_MAP_FACE_POSITIVE_X: CNA_CubeMapFace = 0;
+pub const CNA_CUBE_MAP_FACE_NEGATIVE_X: CNA_CubeMapFace = 1;
+pub const CNA_CUBE_MAP_FACE_POSITIVE_Y: CNA_CubeMapFace = 2;
+pub const CNA_CUBE_MAP_FACE_NEGATIVE_Y: CNA_CubeMapFace = 3;
+pub const CNA_CUBE_MAP_FACE_POSITIVE_Z: CNA_CubeMapFace = 4;
+pub const CNA_CUBE_MAP_FACE_NEGATIVE_Z: CNA_CubeMapFace = 5;
+pub const CNA_RENDER_TARGET_KIND_2D: CNA_RenderTargetKind = 1;
+pub const CNA_RENDER_TARGET_KIND_CUBE: CNA_RenderTargetKind = 2;
 pub const CNA_SHADER_STAGE_PIXEL: CNA_ShaderStage = 0;
 pub const CNA_SHADER_STAGE_VERTEX: CNA_ShaderStage = 1;
 pub const CNA_MAX_SAMPLERS: u32 = 16;
 pub const CNA_TEXTURE_COLLECTION_MAX_TEXTURES: u32 = 16;
+pub const CNA_EFFECT_PARAMETER_CLASS_SCALAR: CNA_EffectParameterClass = 0;
+pub const CNA_EFFECT_PARAMETER_CLASS_VECTOR: CNA_EffectParameterClass = 1;
+pub const CNA_EFFECT_PARAMETER_CLASS_MATRIX: CNA_EffectParameterClass = 2;
+pub const CNA_EFFECT_PARAMETER_CLASS_OBJECT: CNA_EffectParameterClass = 3;
+pub const CNA_EFFECT_PARAMETER_CLASS_STRUCT: CNA_EffectParameterClass = 4;
+pub const CNA_EFFECT_PARAMETER_TYPE_VOID: CNA_EffectParameterType = 0;
+pub const CNA_EFFECT_PARAMETER_TYPE_BOOL: CNA_EffectParameterType = 1;
+pub const CNA_EFFECT_PARAMETER_TYPE_INT32: CNA_EffectParameterType = 2;
+pub const CNA_EFFECT_PARAMETER_TYPE_SINGLE: CNA_EffectParameterType = 3;
+pub const CNA_EFFECT_PARAMETER_TYPE_STRING: CNA_EffectParameterType = 4;
+pub const CNA_EFFECT_PARAMETER_TYPE_TEXTURE: CNA_EffectParameterType = 5;
+pub const CNA_EFFECT_PARAMETER_TYPE_TEXTURE1D: CNA_EffectParameterType = 6;
+pub const CNA_EFFECT_PARAMETER_TYPE_TEXTURE2D: CNA_EffectParameterType = 7;
+pub const CNA_EFFECT_PARAMETER_TYPE_TEXTURE3D: CNA_EffectParameterType = 8;
+pub const CNA_EFFECT_PARAMETER_TYPE_TEXTURE_CUBE: CNA_EffectParameterType = 9;
+pub const CNA_EFFECT_VALUE_BOOLEAN: CNA_EffectValueType = 0;
+pub const CNA_EFFECT_VALUE_INT32: CNA_EffectValueType = 1;
+pub const CNA_EFFECT_VALUE_SINGLE: CNA_EffectValueType = 2;
+pub const CNA_EFFECT_VALUE_MATRIX: CNA_EffectValueType = 3;
+pub const CNA_EFFECT_VALUE_MATRIX_TRANSPOSE: CNA_EffectValueType = 4;
+pub const CNA_EFFECT_VALUE_QUATERNION: CNA_EffectValueType = 5;
+pub const CNA_EFFECT_VALUE_VECTOR2: CNA_EffectValueType = 6;
+pub const CNA_EFFECT_VALUE_VECTOR3: CNA_EffectValueType = 7;
+pub const CNA_EFFECT_VALUE_VECTOR4: CNA_EffectValueType = 8;
+pub const CNA_EFFECT_TEXTURE_BASE: CNA_EffectTextureType = 0;
+pub const CNA_EFFECT_TEXTURE_2D: CNA_EffectTextureType = 1;
+pub const CNA_EFFECT_TEXTURE_3D: CNA_EffectTextureType = 2;
+pub const CNA_EFFECT_TEXTURE_CUBE: CNA_EffectTextureType = 3;
 pub const CNA_GRAPHICS_CAPABILITY_THREE_D: CNA_GraphicsCapability = 0;
 pub const CNA_GRAPHICS_CAPABILITY_DEPTH_STENCIL_BUFFER: CNA_GraphicsCapability = 1;
 pub const CNA_SPRITE_SORT_MODE_DEFERRED: CNA_SpriteSortMode = 0;
@@ -161,6 +197,47 @@ pub const CNA_TEXTURE_DATA_HALF_VECTOR4: CNA_TextureDataType = 16;
 pub const CNA_TEXTURE_DATA_USHORT: CNA_TextureDataType = 17;
 pub const CNA_TEXTURE_IMAGE_FORMAT_PNG: CNA_TextureImageFormat = 0;
 pub const CNA_TEXTURE_IMAGE_FORMAT_JPEG: CNA_TextureImageFormat = 1;
+pub const CNA_BUFFER_USAGE_NONE: CNA_BufferUsage = 0;
+pub const CNA_BUFFER_USAGE_WRITE_ONLY: CNA_BufferUsage = 1;
+pub const CNA_INDEX_ELEMENT_SIZE_SIXTEEN_BITS: CNA_IndexElementSize = 0;
+pub const CNA_INDEX_ELEMENT_SIZE_THIRTY_TWO_BITS: CNA_IndexElementSize = 1;
+pub const CNA_SET_DATA_NONE: CNA_SetDataOptions = 0;
+pub const CNA_SET_DATA_DISCARD: CNA_SetDataOptions = 1;
+pub const CNA_SET_DATA_NO_OVERWRITE: CNA_SetDataOptions = 2;
+pub const CNA_PRIMITIVE_TRIANGLE_LIST: CNA_PrimitiveType = 0;
+pub const CNA_PRIMITIVE_TRIANGLE_STRIP: CNA_PrimitiveType = 1;
+pub const CNA_PRIMITIVE_LINE_LIST: CNA_PrimitiveType = 2;
+pub const CNA_PRIMITIVE_LINE_STRIP: CNA_PrimitiveType = 3;
+pub const CNA_USER_VERTEX_SOURCE_RAW_STREAM: CNA_UserVertexSource = 0;
+pub const CNA_VERTEX_ELEMENT_FORMAT_SINGLE: CNA_VertexElementFormat = 0;
+pub const CNA_VERTEX_ELEMENT_FORMAT_VECTOR2: CNA_VertexElementFormat = 1;
+pub const CNA_VERTEX_ELEMENT_FORMAT_VECTOR3: CNA_VertexElementFormat = 2;
+pub const CNA_VERTEX_ELEMENT_FORMAT_VECTOR4: CNA_VertexElementFormat = 3;
+pub const CNA_VERTEX_ELEMENT_FORMAT_COLOR: CNA_VertexElementFormat = 4;
+pub const CNA_VERTEX_ELEMENT_FORMAT_BYTE4: CNA_VertexElementFormat = 5;
+pub const CNA_VERTEX_ELEMENT_FORMAT_SHORT2: CNA_VertexElementFormat = 6;
+pub const CNA_VERTEX_ELEMENT_FORMAT_SHORT4: CNA_VertexElementFormat = 7;
+pub const CNA_VERTEX_ELEMENT_FORMAT_NORMALIZED_SHORT2: CNA_VertexElementFormat = 8;
+pub const CNA_VERTEX_ELEMENT_FORMAT_NORMALIZED_SHORT4: CNA_VertexElementFormat = 9;
+pub const CNA_VERTEX_ELEMENT_FORMAT_HALF_VECTOR2: CNA_VertexElementFormat = 10;
+pub const CNA_VERTEX_ELEMENT_FORMAT_HALF_VECTOR4: CNA_VertexElementFormat = 11;
+pub const CNA_VERTEX_ELEMENT_USAGE_POSITION: CNA_VertexElementUsage = 0;
+pub const CNA_VERTEX_ELEMENT_USAGE_COLOR: CNA_VertexElementUsage = 1;
+pub const CNA_VERTEX_ELEMENT_USAGE_TEXTURE_COORDINATE: CNA_VertexElementUsage = 2;
+pub const CNA_VERTEX_ELEMENT_USAGE_NORMAL: CNA_VertexElementUsage = 3;
+pub const CNA_VERTEX_ELEMENT_USAGE_BINORMAL: CNA_VertexElementUsage = 4;
+pub const CNA_VERTEX_ELEMENT_USAGE_TANGENT: CNA_VertexElementUsage = 5;
+pub const CNA_VERTEX_ELEMENT_USAGE_BLEND_INDICES: CNA_VertexElementUsage = 6;
+pub const CNA_VERTEX_ELEMENT_USAGE_BLEND_WEIGHT: CNA_VertexElementUsage = 7;
+pub const CNA_VERTEX_ELEMENT_USAGE_DEPTH: CNA_VertexElementUsage = 8;
+pub const CNA_VERTEX_ELEMENT_USAGE_FOG: CNA_VertexElementUsage = 9;
+pub const CNA_VERTEX_ELEMENT_USAGE_POINT_SIZE: CNA_VertexElementUsage = 10;
+pub const CNA_VERTEX_ELEMENT_USAGE_SAMPLE: CNA_VertexElementUsage = 11;
+pub const CNA_VERTEX_ELEMENT_USAGE_TESSELLATE_FACTOR: CNA_VertexElementUsage = 12;
+pub const CNA_VERTEX_TYPE_POSITION_COLOR: CNA_VertexType = 0;
+pub const CNA_VERTEX_TYPE_POSITION_COLOR_TEXTURE: CNA_VertexType = 1;
+pub const CNA_VERTEX_TYPE_POSITION_NORMAL_TEXTURE: CNA_VertexType = 4;
+pub const CNA_VERTEX_TYPE_POSITION_TEXTURE: CNA_VertexType = 6;
 pub const CNA_KEY_ESCAPE: CNA_Key = 27;
 pub const CNA_MOUSE_BUTTON_LEFT: CNA_MouseButtonFlags = 1 << 0;
 pub const CNA_MOUSE_BUTTON_MIDDLE: CNA_MouseButtonFlags = 1 << 1;
@@ -199,10 +276,24 @@ pub type CNA_GraphicsProfile = u32;
 pub type CNA_PresentInterval = u32;
 pub type CNA_DepthFormat = u32;
 pub type CNA_RenderTargetUsage = u32;
+pub type CNA_CubeMapFace = u32;
+pub type CNA_RenderTargetKind = u32;
 pub type CNA_ShaderStage = u32;
 pub type CNA_NativeHandleValue = u64;
 pub type CNA_Handle = u64;
 pub type CNA_GameEventRegistrationHandle = CNA_Handle;
+pub type CNA_VertexDeclarationHandle = CNA_Handle;
+pub type CNA_VertexBufferHandle = CNA_Handle;
+pub type CNA_IndexBufferHandle = CNA_Handle;
+pub type CNA_EffectHandle = CNA_Handle;
+pub type CNA_EffectAnnotationHandle = CNA_Handle;
+pub type CNA_EffectAnnotationCollectionHandle = CNA_Handle;
+pub type CNA_EffectParameterHandle = CNA_Handle;
+pub type CNA_EffectParameterCollectionHandle = CNA_Handle;
+pub type CNA_EffectPassHandle = CNA_Handle;
+pub type CNA_EffectPassCollectionHandle = CNA_Handle;
+pub type CNA_EffectTechniqueHandle = CNA_Handle;
+pub type CNA_EffectTechniqueCollectionHandle = CNA_Handle;
 pub type CNA_ErrorCategory = u32;
 pub type CNA_GraphicsCapability = u32;
 pub type CNA_GraphicsCapabilityFlags = u64;
@@ -210,8 +301,17 @@ pub type CNA_GraphicsRendererType = u32;
 pub type CNA_SurfaceFormat = u32;
 pub type CNA_TextureDataType = u32;
 pub type CNA_TextureImageFormat = u32;
+pub type CNA_BufferUsage = u32;
+pub type CNA_IndexElementSize = u32;
+pub type CNA_SetDataOptions = u32;
+pub type CNA_PrimitiveType = u32;
+pub type CNA_UserVertexSource = u32;
+pub type CNA_VertexElementFormat = u32;
+pub type CNA_VertexElementUsage = u32;
+pub type CNA_VertexType = u32;
 pub type CNA_SpriteSortMode = u32;
 pub type CNA_SpriteEffects = u32;
+pub type CNA_Char16 = u16;
 pub type CNA_Blend = u32;
 pub type CNA_BlendFunction = u32;
 pub type CNA_ColorWriteChannels = u32;
@@ -231,6 +331,10 @@ pub type CNA_PlayerIndex = u32;
 pub type CNA_GamePadDeadZone = u32;
 pub type CNA_GamePadButtonFlags = u32;
 pub type CNA_GamePadType = u32;
+pub type CNA_EffectParameterClass = u32;
+pub type CNA_EffectParameterType = u32;
+pub type CNA_EffectValueType = u32;
+pub type CNA_EffectTextureType = u32;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -256,12 +360,335 @@ pub struct CNA_Vector2 {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_Vector3 {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_Vector4 {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub w: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_Quaternion {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub w: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_Matrix {
+    pub m11: f32,
+    pub m12: f32,
+    pub m13: f32,
+    pub m14: f32,
+    pub m21: f32,
+    pub m22: f32,
+    pub m23: f32,
+    pub m24: f32,
+    pub m31: f32,
+    pub m32: f32,
+    pub m33: f32,
+    pub m34: f32,
+    pub m41: f32,
+    pub m42: f32,
+    pub m43: f32,
+    pub m44: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_EffectAnnotationInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub row_count: i32,
+    pub column_count: i32,
+    pub parameter_class: CNA_EffectParameterClass,
+    pub parameter_type: CNA_EffectParameterType,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_EffectAnnotationCreateInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub name: CNA_StringView,
+    pub semantic: CNA_StringView,
+    pub row_count: i32,
+    pub column_count: i32,
+    pub parameter_class: CNA_EffectParameterClass,
+    pub parameter_type: CNA_EffectParameterType,
+    pub data: *const f32,
+    pub data_count: u64,
+    pub cached_string: CNA_StringView,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_EffectParameterInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub row_count: i32,
+    pub column_count: i32,
+    pub parameter_class: CNA_EffectParameterClass,
+    pub parameter_type: CNA_EffectParameterType,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_EffectParameterCreateInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub name: CNA_StringView,
+    pub semantic: CNA_StringView,
+    pub row_count: i32,
+    pub column_count: i32,
+    pub parameter_class: CNA_EffectParameterClass,
+    pub parameter_type: CNA_EffectParameterType,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_VertexElement {
+    pub offset: i32,
+    pub format: CNA_VertexElementFormat,
+    pub usage: CNA_VertexElementUsage,
+    pub usage_index: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_VertexBufferCreateInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub vertex_declaration: CNA_Handle,
+    pub vertex_count: i32,
+    pub buffer_usage: CNA_BufferUsage,
+    pub dynamic: CNA_Bool,
+    pub reserved: [u8; 7],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_VertexBufferInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub vertex_count: i32,
+    pub buffer_usage: CNA_BufferUsage,
+    pub dynamic: CNA_Bool,
+    pub is_content_lost: CNA_Bool,
+    pub has_renderer: CNA_Bool,
+    pub reserved0: u8,
+    pub vertex_stride: i32,
+    pub vertex_element_count: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_VertexBufferTransfer {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub vertex_type: CNA_VertexType,
+    pub options: CNA_SetDataOptions,
+    pub start_index: u64,
+    pub element_count: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_VertexBufferBinding {
+    pub vertex_buffer: CNA_Handle,
+    pub vertex_offset: i32,
+    pub instance_frequency: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_IndexBufferCreateInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub index_count: i32,
+    pub index_element_size: CNA_IndexElementSize,
+    pub buffer_usage: CNA_BufferUsage,
+    pub dynamic: CNA_Bool,
+    pub reserved: [u8; 3],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_IndexBufferInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub index_count: i32,
+    pub index_element_size: CNA_IndexElementSize,
+    pub buffer_usage: CNA_BufferUsage,
+    pub dynamic: CNA_Bool,
+    pub is_content_lost: CNA_Bool,
+    pub has_renderer: CNA_Bool,
+    pub reserved: u8,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_IndexBufferTransfer {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub index_element_size: CNA_IndexElementSize,
+    pub options: CNA_SetDataOptions,
+    pub start_index: u64,
+    pub element_count: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_UserPrimitives {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub primitive_type: CNA_PrimitiveType,
+    pub vertex_source: CNA_UserVertexSource,
+    pub vertex_data: *const c_void,
+    pub vertex_declaration: CNA_VertexDeclarationHandle,
+    pub vertex_offset: i32,
+    pub num_vertices: i32,
+    pub primitive_count: i32,
+    pub reserved: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_UserIndices {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub index_element_size: CNA_IndexElementSize,
+    pub index_offset: i32,
+    pub index_data: *const c_void,
+}
+
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct CNA_Rectangle {
     pub x: i32,
     pub y: i32,
     pub width: i32,
     pub height: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_BackBufferReadback {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub has_source_rectangle: CNA_Bool,
+    pub reserved: [u8; 3],
+    pub source_rectangle: CNA_Rectangle,
+    pub start_index: u64,
+    pub element_count: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_TextureCubeCreateInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub size: u32,
+    pub mip_map: CNA_Bool,
+    pub reserved0: [u8; 3],
+    pub format: CNA_SurfaceFormat,
+    pub reserved1: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_TextureCubeInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub size: u32,
+    pub level_count: u32,
+    pub format: CNA_SurfaceFormat,
+    pub reserved: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_TextureCubeTransfer {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub face: CNA_CubeMapFace,
+    pub level: i32,
+    pub has_rectangle: CNA_Bool,
+    pub reserved0: [u8; 3],
+    pub rectangle: CNA_Rectangle,
+    pub reserved1: u32,
+    pub start_index: u64,
+    pub element_count: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_RenderTarget2DCreateInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub width: u32,
+    pub height: u32,
+    pub mip_map: CNA_Bool,
+    pub reserved0: [u8; 3],
+    pub format: CNA_SurfaceFormat,
+    pub depth_format: CNA_DepthFormat,
+    pub multi_sample_count: i32,
+    pub usage: CNA_RenderTargetUsage,
+    pub reserved1: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_RenderTargetCubeCreateInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub size: u32,
+    pub mip_map: CNA_Bool,
+    pub reserved: [u8; 3],
+    pub format: CNA_SurfaceFormat,
+    pub depth_format: CNA_DepthFormat,
+    pub multi_sample_count: i32,
+    pub usage: CNA_RenderTargetUsage,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_RenderTargetInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub kind: CNA_RenderTargetKind,
+    pub width: u32,
+    pub height: u32,
+    pub level_count: u32,
+    pub format: CNA_SurfaceFormat,
+    pub depth_format: CNA_DepthFormat,
+    pub multi_sample_count: i32,
+    pub usage: CNA_RenderTargetUsage,
+    pub is_content_lost: CNA_Bool,
+    pub renderer_available: CNA_Bool,
+    pub reserved: [u8; 2],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_RenderTargetBinding {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub render_target: CNA_Handle,
+    pub array_slice: i32,
+    pub cube_map_face: CNA_CubeMapFace,
 }
 
 #[repr(C)]
@@ -584,6 +1011,62 @@ pub struct CNA_SpriteCommand {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_SpriteFontGlyph {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub glyph_bounds: CNA_Rectangle,
+    pub cropping: CNA_Rectangle,
+    pub character: CNA_Char16,
+    pub reserved: u16,
+    pub kerning: CNA_Vector3,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_SpriteFontCreateInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub texture: CNA_Handle,
+    pub glyphs: *const CNA_SpriteFontGlyph,
+    pub glyph_count: u64,
+    pub line_spacing: i32,
+    pub spacing: f32,
+    pub default_character: CNA_Char16,
+    pub has_default_character: CNA_Bool,
+    pub reserved: [u8; 5],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_SpriteFontInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub character_count: u64,
+    pub line_spacing: i32,
+    pub spacing: f32,
+    pub default_character: CNA_Char16,
+    pub has_default_character: CNA_Bool,
+    pub reserved: [u8; 5],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_SpriteTextCommand {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub sprite_font: CNA_Handle,
+    pub text: CNA_StringView,
+    pub position: CNA_Vector2,
+    pub color: CNA_Color,
+    pub rotation: f32,
+    pub origin: CNA_Vector2,
+    pub scale: CNA_Vector2,
+    pub effects: CNA_SpriteEffects,
+    pub layer_depth: f32,
+}
+
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct CNA_KeyboardState {
     pub struct_size: u32,
@@ -840,8 +1323,52 @@ pub type cna_graphics_device_set_depth_stencil_state_fn =
 pub type cna_graphics_device_set_rasterizer_state_fn =
     unsafe extern "C" fn(CNA_Handle, *const CNA_RasterizerState) -> CNA_Result;
 pub type cna_graphics_device_present_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_graphics_device_reset_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_graphics_device_reset_with_parameters_fn =
+    unsafe extern "C" fn(CNA_Handle, *const CNA_PresentationParameters, *const u32) -> CNA_Result;
+pub type cna_graphics_device_get_backbuffer_data_window_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    *const CNA_BackBufferReadback,
+    *mut CNA_Color,
+    u64,
+) -> CNA_Result;
 pub type cna_graphics_device_clear_rgba_fn =
     unsafe extern "C" fn(CNA_Handle, f32, f32, f32, f32) -> CNA_Result;
+pub type cna_graphics_device_set_vertex_buffer_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_VertexBufferHandle) -> CNA_Result;
+pub type cna_graphics_device_set_vertex_buffer_offset_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_VertexBufferHandle, i32) -> CNA_Result;
+pub type cna_graphics_device_set_vertex_buffers_fn =
+    unsafe extern "C" fn(CNA_Handle, *const CNA_VertexBufferBinding, u64) -> CNA_Result;
+pub type cna_graphics_device_get_vertex_buffer_count_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut u64) -> CNA_Result;
+pub type cna_graphics_device_copy_vertex_buffers_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_VertexBufferBinding, u64, *mut u64) -> CNA_Result;
+pub type cna_graphics_device_get_vertex_buffer_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_VertexBufferHandle) -> CNA_Result;
+pub type cna_graphics_device_set_index_buffer_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_IndexBufferHandle) -> CNA_Result;
+pub type cna_graphics_device_get_index_buffer_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_IndexBufferHandle) -> CNA_Result;
+pub type cna_graphics_device_draw_primitives_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_PrimitiveType, i32, i32) -> CNA_Result;
+pub type cna_graphics_device_draw_indexed_primitives_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_PrimitiveType, i32, i32, i32, i32, i32) -> CNA_Result;
+pub type cna_graphics_device_draw_instanced_primitives_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_PrimitiveType, i32, i32, i32, i32, i32, i32) -> CNA_Result;
+pub type cna_graphics_device_draw_user_primitives_fn =
+    unsafe extern "C" fn(CNA_Handle, *const CNA_UserPrimitives) -> CNA_Result;
+pub type cna_graphics_device_draw_user_indexed_primitives_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    *const CNA_UserPrimitives,
+    *const CNA_UserIndices,
+) -> CNA_Result;
+pub type cna_graphics_device_set_render_targets_fn =
+    unsafe extern "C" fn(CNA_Handle, *const CNA_RenderTargetBinding, u64) -> CNA_Result;
+pub type cna_graphics_device_get_render_target_count_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut u64) -> CNA_Result;
+pub type cna_graphics_device_copy_render_targets_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_RenderTargetBinding, u64, *mut u64) -> CNA_Result;
 pub type cna_graphics_device_supports_capability_fn =
     unsafe extern "C" fn(CNA_Handle, CNA_GraphicsCapability, *mut CNA_Bool) -> CNA_Result;
 pub type cna_graphics_device_get_renderer_info_fn =
@@ -888,6 +1415,107 @@ pub type cna_texture2d_copy_encoded_fn = unsafe extern "C" fn(
     *mut u64,
 ) -> CNA_Result;
 pub type cna_texture2d_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_texturecube_create_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    *const CNA_TextureCubeCreateInfo,
+    *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_texturecube_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_texturecube_get_info_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_TextureCubeInfo) -> CNA_Result;
+pub type cna_texturecube_set_data_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    *const CNA_TextureCubeTransfer,
+    *const CNA_Color,
+    u64,
+) -> CNA_Result;
+pub type cna_texturecube_get_data_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    *const CNA_TextureCubeTransfer,
+    *mut CNA_Color,
+    u64,
+    *mut u64,
+) -> CNA_Result;
+pub type cna_render_target2d_create_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    *const CNA_RenderTarget2DCreateInfo,
+    *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_render_target_cube_create_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    *const CNA_RenderTargetCubeCreateInfo,
+    *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_render_target_get_info_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_RenderTargetInfo) -> CNA_Result;
+pub type cna_render_target_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_vertex_declaration_create_fn = unsafe extern "C" fn(
+    *const CNA_VertexElement,
+    u64,
+    *mut CNA_VertexDeclarationHandle,
+) -> CNA_Result;
+pub type cna_vertex_declaration_create_with_stride_fn = unsafe extern "C" fn(
+    i32,
+    *const CNA_VertexElement,
+    u64,
+    *mut CNA_VertexDeclarationHandle,
+) -> CNA_Result;
+pub type cna_vertex_declaration_destroy_fn =
+    unsafe extern "C" fn(CNA_VertexDeclarationHandle) -> CNA_Result;
+pub type cna_vertex_buffer_binding_init_fn = unsafe extern "C" fn(
+    CNA_VertexBufferHandle,
+    i32,
+    i32,
+    *mut CNA_VertexBufferBinding,
+) -> CNA_Result;
+pub type cna_vertex_buffer_create_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    *const CNA_VertexBufferCreateInfo,
+    *mut CNA_VertexBufferHandle,
+) -> CNA_Result;
+pub type cna_vertex_buffer_destroy_fn = unsafe extern "C" fn(CNA_VertexBufferHandle) -> CNA_Result;
+pub type cna_vertex_buffer_get_info_fn =
+    unsafe extern "C" fn(CNA_VertexBufferHandle, *mut CNA_VertexBufferInfo) -> CNA_Result;
+pub type cna_vertex_buffer_set_data_fn = unsafe extern "C" fn(
+    CNA_VertexBufferHandle,
+    *const CNA_VertexBufferTransfer,
+    *const c_void,
+    u64,
+) -> CNA_Result;
+pub type cna_vertex_buffer_set_data_raw_fn =
+    unsafe extern "C" fn(CNA_VertexBufferHandle, *const c_void, u64, u64, u32) -> CNA_Result;
+pub type cna_vertex_buffer_set_data_raw_at_fn =
+    unsafe extern "C" fn(CNA_VertexBufferHandle, u64, *const c_void, u64, u64, u32) -> CNA_Result;
+pub type cna_vertex_buffer_get_data_raw_fn =
+    unsafe extern "C" fn(CNA_VertexBufferHandle, u64, *mut c_void, u64, u64, u32) -> CNA_Result;
+pub type cna_index_buffer_create_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    *const CNA_IndexBufferCreateInfo,
+    *mut CNA_IndexBufferHandle,
+) -> CNA_Result;
+pub type cna_index_buffer_destroy_fn = unsafe extern "C" fn(CNA_IndexBufferHandle) -> CNA_Result;
+pub type cna_index_buffer_get_info_fn =
+    unsafe extern "C" fn(CNA_IndexBufferHandle, *mut CNA_IndexBufferInfo) -> CNA_Result;
+pub type cna_index_buffer_set_data_fn = unsafe extern "C" fn(
+    CNA_IndexBufferHandle,
+    *const CNA_IndexBufferTransfer,
+    *const c_void,
+    u64,
+) -> CNA_Result;
+pub type cna_index_buffer_set_data_at_fn = unsafe extern "C" fn(
+    CNA_IndexBufferHandle,
+    u64,
+    *const CNA_IndexBufferTransfer,
+    *const c_void,
+    u64,
+) -> CNA_Result;
+pub type cna_index_buffer_get_data_fn = unsafe extern "C" fn(
+    CNA_IndexBufferHandle,
+    *const CNA_IndexBufferTransfer,
+    *mut c_void,
+    u64,
+    *mut u64,
+) -> CNA_Result;
 pub type cna_sprite_batch_create_fn =
     unsafe extern "C" fn(CNA_Handle, *mut CNA_Handle) -> CNA_Result;
 pub type cna_sprite_batch_begin_fn =
@@ -900,10 +1528,265 @@ pub type cna_sprite_batch_begin_with_states_fn = unsafe extern "C" fn(
     *const CNA_DepthStencilState,
     *const CNA_RasterizerState,
 ) -> CNA_Result;
+pub type cna_sprite_batch_begin_with_effect_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    CNA_SpriteSortMode,
+    *const CNA_BlendState,
+    *const CNA_SamplerState,
+    *const CNA_DepthStencilState,
+    *const CNA_RasterizerState,
+    CNA_Handle,
+    *const CNA_Matrix,
+) -> CNA_Result;
 pub type cna_sprite_batch_submit_many_fn =
     unsafe extern "C" fn(CNA_Handle, *const CNA_SpriteCommand, u64) -> CNA_Result;
 pub type cna_sprite_batch_end_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
 pub type cna_sprite_batch_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_sprite_batch_draw_string_fn =
+    unsafe extern "C" fn(CNA_Handle, *const CNA_SpriteTextCommand) -> CNA_Result;
+pub type cna_sprite_font_create_fn =
+    unsafe extern "C" fn(*const CNA_SpriteFontCreateInfo, *mut CNA_Handle) -> CNA_Result;
+pub type cna_sprite_font_get_info_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_SpriteFontInfo) -> CNA_Result;
+pub type cna_sprite_font_copy_characters_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Char16, u64, *mut u64) -> CNA_Result;
+pub type cna_sprite_font_copy_glyphs_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_SpriteFontGlyph, u64, *mut u64) -> CNA_Result;
+pub type cna_sprite_font_set_default_character_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_Bool, CNA_Char16) -> CNA_Result;
+pub type cna_sprite_font_set_line_spacing_fn = unsafe extern "C" fn(CNA_Handle, i32) -> CNA_Result;
+pub type cna_sprite_font_set_spacing_fn = unsafe extern "C" fn(CNA_Handle, f32) -> CNA_Result;
+pub type cna_sprite_font_measure_utf8_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_StringView, *mut CNA_Vector2) -> CNA_Result;
+pub type cna_sprite_font_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_effect_create_empty_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_EffectHandle) -> CNA_Result;
+pub type cna_effect_create_compiled_fn =
+    unsafe extern "C" fn(CNA_Handle, *const u8, u64, *mut CNA_EffectHandle) -> CNA_Result;
+pub type cna_effect_material_create_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_EffectHandle) -> CNA_Result;
+pub type cna_effect_destroy_fn = unsafe extern "C" fn(CNA_EffectHandle) -> CNA_Result;
+pub type cna_effect_clone_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_EffectHandle) -> CNA_Result;
+pub type cna_effect_dispose_fn = unsafe extern "C" fn(CNA_EffectHandle) -> CNA_Result;
+pub type cna_effect_apply_fn = unsafe extern "C" fn(CNA_EffectHandle) -> CNA_Result;
+pub type cna_effect_get_parameters_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_EffectParameterCollectionHandle) -> CNA_Result;
+pub type cna_effect_get_techniques_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_EffectTechniqueCollectionHandle) -> CNA_Result;
+pub type cna_effect_get_current_technique_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_EffectTechniqueHandle) -> CNA_Result;
+pub type cna_effect_set_current_technique_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_EffectTechniqueHandle) -> CNA_Result;
+
+pub type cna_effect_annotation_destroy_fn =
+    unsafe extern "C" fn(CNA_EffectAnnotationHandle) -> CNA_Result;
+pub type cna_effect_annotation_create_fn = unsafe extern "C" fn(
+    *const CNA_EffectAnnotationCreateInfo,
+    *mut CNA_EffectAnnotationHandle,
+) -> CNA_Result;
+pub type cna_effect_annotation_get_info_fn =
+    unsafe extern "C" fn(CNA_EffectAnnotationHandle, *mut CNA_EffectAnnotationInfo) -> CNA_Result;
+pub type cna_effect_annotation_get_name_byte_count_fn =
+    unsafe extern "C" fn(CNA_EffectAnnotationHandle, *mut u64) -> CNA_Result;
+pub type cna_effect_annotation_copy_name_fn =
+    unsafe extern "C" fn(CNA_EffectAnnotationHandle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_effect_annotation_get_semantic_byte_count_fn =
+    unsafe extern "C" fn(CNA_EffectAnnotationHandle, *mut u64) -> CNA_Result;
+pub type cna_effect_annotation_copy_semantic_fn =
+    unsafe extern "C" fn(CNA_EffectAnnotationHandle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_effect_annotation_get_value_boolean_fn =
+    unsafe extern "C" fn(CNA_EffectAnnotationHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_effect_annotation_get_value_int32_fn =
+    unsafe extern "C" fn(CNA_EffectAnnotationHandle, *mut i32) -> CNA_Result;
+pub type cna_effect_annotation_get_value_single_fn =
+    unsafe extern "C" fn(CNA_EffectAnnotationHandle, *mut f32) -> CNA_Result;
+pub type cna_effect_annotation_get_value_string_byte_count_fn =
+    unsafe extern "C" fn(CNA_EffectAnnotationHandle, *mut u64) -> CNA_Result;
+pub type cna_effect_annotation_copy_value_string_fn =
+    unsafe extern "C" fn(CNA_EffectAnnotationHandle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_effect_annotation_get_value_vector2_fn =
+    unsafe extern "C" fn(CNA_EffectAnnotationHandle, *mut CNA_Vector2) -> CNA_Result;
+pub type cna_effect_annotation_get_value_vector3_fn =
+    unsafe extern "C" fn(CNA_EffectAnnotationHandle, *mut CNA_Vector3) -> CNA_Result;
+pub type cna_effect_annotation_get_value_vector4_fn =
+    unsafe extern "C" fn(CNA_EffectAnnotationHandle, *mut CNA_Vector4) -> CNA_Result;
+pub type cna_effect_annotation_get_value_matrix_fn =
+    unsafe extern "C" fn(CNA_EffectAnnotationHandle, *mut CNA_Matrix) -> CNA_Result;
+pub type cna_effect_annotation_collection_destroy_fn =
+    unsafe extern "C" fn(CNA_EffectAnnotationCollectionHandle) -> CNA_Result;
+pub type cna_effect_annotation_collection_add_fn = unsafe extern "C" fn(
+    CNA_EffectAnnotationCollectionHandle,
+    CNA_EffectAnnotationHandle,
+) -> CNA_Result;
+pub type cna_effect_annotation_collection_get_count_fn =
+    unsafe extern "C" fn(CNA_EffectAnnotationCollectionHandle, *mut u64) -> CNA_Result;
+pub type cna_effect_annotation_collection_get_at_fn = unsafe extern "C" fn(
+    CNA_EffectAnnotationCollectionHandle,
+    u64,
+    *mut CNA_EffectAnnotationHandle,
+) -> CNA_Result;
+pub type cna_effect_annotation_collection_find_fn = unsafe extern "C" fn(
+    CNA_EffectAnnotationCollectionHandle,
+    CNA_StringView,
+    *mut CNA_Bool,
+    *mut CNA_EffectAnnotationHandle,
+) -> CNA_Result;
+
+pub type cna_effect_parameter_destroy_fn =
+    unsafe extern "C" fn(CNA_EffectParameterHandle) -> CNA_Result;
+pub type cna_effect_parameter_get_info_fn =
+    unsafe extern "C" fn(CNA_EffectParameterHandle, *mut CNA_EffectParameterInfo) -> CNA_Result;
+pub type cna_effect_parameter_get_name_byte_count_fn =
+    unsafe extern "C" fn(CNA_EffectParameterHandle, *mut u64) -> CNA_Result;
+pub type cna_effect_parameter_copy_name_fn =
+    unsafe extern "C" fn(CNA_EffectParameterHandle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_effect_parameter_get_semantic_byte_count_fn =
+    unsafe extern "C" fn(CNA_EffectParameterHandle, *mut u64) -> CNA_Result;
+pub type cna_effect_parameter_copy_semantic_fn =
+    unsafe extern "C" fn(CNA_EffectParameterHandle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_effect_parameter_get_elements_fn = unsafe extern "C" fn(
+    CNA_EffectParameterHandle,
+    *mut CNA_EffectParameterCollectionHandle,
+) -> CNA_Result;
+pub type cna_effect_parameter_get_structure_members_fn = unsafe extern "C" fn(
+    CNA_EffectParameterHandle,
+    *mut CNA_EffectParameterCollectionHandle,
+) -> CNA_Result;
+pub type cna_effect_parameter_get_annotations_fn = unsafe extern "C" fn(
+    CNA_EffectParameterHandle,
+    *mut CNA_EffectAnnotationCollectionHandle,
+) -> CNA_Result;
+pub type cna_effect_parameter_get_value_fn =
+    unsafe extern "C" fn(CNA_EffectParameterHandle, CNA_EffectValueType, *mut c_void) -> CNA_Result;
+pub type cna_effect_parameter_get_values_fn = unsafe extern "C" fn(
+    CNA_EffectParameterHandle,
+    CNA_EffectValueType,
+    u64,
+    *mut c_void,
+    u64,
+    *mut u64,
+) -> CNA_Result;
+pub type cna_effect_parameter_set_value_fn = unsafe extern "C" fn(
+    CNA_EffectParameterHandle,
+    CNA_EffectValueType,
+    *const c_void,
+) -> CNA_Result;
+pub type cna_effect_parameter_set_values_fn = unsafe extern "C" fn(
+    CNA_EffectParameterHandle,
+    CNA_EffectValueType,
+    *const c_void,
+    u64,
+) -> CNA_Result;
+pub type cna_effect_parameter_get_value_string_byte_count_fn =
+    unsafe extern "C" fn(CNA_EffectParameterHandle, *mut u64) -> CNA_Result;
+pub type cna_effect_parameter_copy_value_string_fn =
+    unsafe extern "C" fn(CNA_EffectParameterHandle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_effect_parameter_set_value_string_fn =
+    unsafe extern "C" fn(CNA_EffectParameterHandle, CNA_StringView) -> CNA_Result;
+pub type cna_effect_parameter_get_value_texture_fn = unsafe extern "C" fn(
+    CNA_EffectParameterHandle,
+    CNA_EffectTextureType,
+    *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_effect_parameter_set_value_texture_fn = unsafe extern "C" fn(
+    CNA_EffectParameterHandle,
+    CNA_EffectTextureType,
+    CNA_Handle,
+) -> CNA_Result;
+pub type cna_effect_parameter_collection_destroy_fn =
+    unsafe extern "C" fn(CNA_EffectParameterCollectionHandle) -> CNA_Result;
+pub type cna_effect_parameter_collection_add_create_fn = unsafe extern "C" fn(
+    CNA_EffectParameterCollectionHandle,
+    *const CNA_EffectParameterCreateInfo,
+    *mut CNA_EffectParameterHandle,
+) -> CNA_Result;
+pub type cna_effect_parameter_collection_get_count_fn =
+    unsafe extern "C" fn(CNA_EffectParameterCollectionHandle, *mut u64) -> CNA_Result;
+pub type cna_effect_parameter_collection_get_at_fn = unsafe extern "C" fn(
+    CNA_EffectParameterCollectionHandle,
+    u64,
+    *mut CNA_EffectParameterHandle,
+) -> CNA_Result;
+pub type cna_effect_parameter_collection_find_name_fn = unsafe extern "C" fn(
+    CNA_EffectParameterCollectionHandle,
+    CNA_StringView,
+    *mut CNA_Bool,
+    *mut CNA_EffectParameterHandle,
+) -> CNA_Result;
+pub type cna_effect_parameter_collection_find_semantic_fn = unsafe extern "C" fn(
+    CNA_EffectParameterCollectionHandle,
+    CNA_StringView,
+    *mut CNA_Bool,
+    *mut CNA_EffectParameterHandle,
+) -> CNA_Result;
+
+pub type cna_effect_pass_destroy_fn = unsafe extern "C" fn(CNA_EffectPassHandle) -> CNA_Result;
+pub type cna_effect_pass_get_name_byte_count_fn =
+    unsafe extern "C" fn(CNA_EffectPassHandle, *mut u64) -> CNA_Result;
+pub type cna_effect_pass_copy_name_fn =
+    unsafe extern "C" fn(CNA_EffectPassHandle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_effect_pass_get_annotations_fn = unsafe extern "C" fn(
+    CNA_EffectPassHandle,
+    *mut CNA_EffectAnnotationCollectionHandle,
+) -> CNA_Result;
+pub type cna_effect_pass_apply_fn = unsafe extern "C" fn(CNA_EffectPassHandle) -> CNA_Result;
+pub type cna_effect_pass_collection_destroy_fn =
+    unsafe extern "C" fn(CNA_EffectPassCollectionHandle) -> CNA_Result;
+pub type cna_effect_pass_collection_add_create_fn = unsafe extern "C" fn(
+    CNA_EffectPassCollectionHandle,
+    CNA_StringView,
+    u64,
+    *mut CNA_EffectPassHandle,
+) -> CNA_Result;
+pub type cna_effect_pass_collection_get_count_fn =
+    unsafe extern "C" fn(CNA_EffectPassCollectionHandle, *mut u64) -> CNA_Result;
+pub type cna_effect_pass_collection_get_at_fn = unsafe extern "C" fn(
+    CNA_EffectPassCollectionHandle,
+    u64,
+    *mut CNA_EffectPassHandle,
+) -> CNA_Result;
+pub type cna_effect_pass_collection_find_fn = unsafe extern "C" fn(
+    CNA_EffectPassCollectionHandle,
+    CNA_StringView,
+    *mut CNA_Bool,
+    *mut CNA_EffectPassHandle,
+) -> CNA_Result;
+
+pub type cna_effect_technique_destroy_fn =
+    unsafe extern "C" fn(CNA_EffectTechniqueHandle) -> CNA_Result;
+pub type cna_effect_technique_get_name_byte_count_fn =
+    unsafe extern "C" fn(CNA_EffectTechniqueHandle, *mut u64) -> CNA_Result;
+pub type cna_effect_technique_copy_name_fn =
+    unsafe extern "C" fn(CNA_EffectTechniqueHandle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_effect_technique_get_passes_fn = unsafe extern "C" fn(
+    CNA_EffectTechniqueHandle,
+    *mut CNA_EffectPassCollectionHandle,
+) -> CNA_Result;
+pub type cna_effect_technique_get_annotations_fn = unsafe extern "C" fn(
+    CNA_EffectTechniqueHandle,
+    *mut CNA_EffectAnnotationCollectionHandle,
+) -> CNA_Result;
+pub type cna_effect_technique_collection_destroy_fn =
+    unsafe extern "C" fn(CNA_EffectTechniqueCollectionHandle) -> CNA_Result;
+pub type cna_effect_technique_collection_add_named_fn = unsafe extern "C" fn(
+    CNA_EffectTechniqueCollectionHandle,
+    CNA_StringView,
+    *mut CNA_EffectTechniqueHandle,
+) -> CNA_Result;
+pub type cna_effect_technique_collection_get_count_fn =
+    unsafe extern "C" fn(CNA_EffectTechniqueCollectionHandle, *mut u64) -> CNA_Result;
+pub type cna_effect_technique_collection_get_at_fn = unsafe extern "C" fn(
+    CNA_EffectTechniqueCollectionHandle,
+    u64,
+    *mut CNA_EffectTechniqueHandle,
+) -> CNA_Result;
+pub type cna_effect_technique_collection_find_fn = unsafe extern "C" fn(
+    CNA_EffectTechniqueCollectionHandle,
+    CNA_StringView,
+    *mut CNA_Bool,
+    *mut CNA_EffectTechniqueHandle,
+) -> CNA_Result;
 pub type cna_keyboard_get_state_fn =
     unsafe extern "C" fn(CNA_Handle, *mut CNA_KeyboardState) -> CNA_Result;
 pub type cna_keyboard_state_is_key_down_fn =
@@ -1012,6 +1895,129 @@ mod layout_tests {
         );
         assert_eq!(
             (
+                size_of::<CNA_VertexElement>(),
+                align_of::<CNA_VertexElement>()
+            ),
+            (16, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_VertexBufferCreateInfo>(),
+                align_of::<CNA_VertexBufferCreateInfo>()
+            ),
+            (32, 8)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_VertexBufferInfo>(),
+                align_of::<CNA_VertexBufferInfo>()
+            ),
+            (32, 8)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_VertexBufferTransfer>(),
+                align_of::<CNA_VertexBufferTransfer>()
+            ),
+            (32, 8)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_VertexBufferBinding>(),
+                align_of::<CNA_VertexBufferBinding>()
+            ),
+            (16, 8)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_IndexBufferCreateInfo>(),
+                align_of::<CNA_IndexBufferCreateInfo>()
+            ),
+            (24, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_IndexBufferInfo>(),
+                align_of::<CNA_IndexBufferInfo>()
+            ),
+            (24, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_IndexBufferTransfer>(),
+                align_of::<CNA_IndexBufferTransfer>()
+            ),
+            (32, 8)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_UserPrimitives>(),
+                align_of::<CNA_UserPrimitives>()
+            ),
+            (48, 8)
+        );
+        assert_eq!(
+            (size_of::<CNA_UserIndices>(), align_of::<CNA_UserIndices>()),
+            (24, 8)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_BackBufferReadback>(),
+                align_of::<CNA_BackBufferReadback>()
+            ),
+            (48, 8)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_TextureCubeCreateInfo>(),
+                align_of::<CNA_TextureCubeCreateInfo>()
+            ),
+            (24, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_TextureCubeInfo>(),
+                align_of::<CNA_TextureCubeInfo>()
+            ),
+            (24, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_TextureCubeTransfer>(),
+                align_of::<CNA_TextureCubeTransfer>()
+            ),
+            (56, 8)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_RenderTarget2DCreateInfo>(),
+                align_of::<CNA_RenderTarget2DCreateInfo>()
+            ),
+            (40, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_RenderTargetCubeCreateInfo>(),
+                align_of::<CNA_RenderTargetCubeCreateInfo>()
+            ),
+            (32, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_RenderTargetInfo>(),
+                align_of::<CNA_RenderTargetInfo>()
+            ),
+            (44, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_RenderTargetBinding>(),
+                align_of::<CNA_RenderTargetBinding>()
+            ),
+            (24, 8)
+        );
+        assert_eq!(
+            (
                 size_of::<CNA_SpriteBatchBeginInfo>(),
                 align_of::<CNA_SpriteBatchBeginInfo>()
             ),
@@ -1023,6 +2029,71 @@ mod layout_tests {
                 align_of::<CNA_SpriteCommand>()
             ),
             (72, 8)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_SpriteFontGlyph>(),
+                align_of::<CNA_SpriteFontGlyph>()
+            ),
+            (56, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_SpriteFontCreateInfo>(),
+                align_of::<CNA_SpriteFontCreateInfo>()
+            ),
+            (48, 8)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_SpriteFontInfo>(),
+                align_of::<CNA_SpriteFontInfo>()
+            ),
+            (32, 8)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_SpriteTextCommand>(),
+                align_of::<CNA_SpriteTextCommand>()
+            ),
+            (72, 8)
+        );
+        assert_eq!(
+            (size_of::<CNA_Vector4>(), align_of::<CNA_Vector4>()),
+            (16, 4)
+        );
+        assert_eq!(
+            (size_of::<CNA_Quaternion>(), align_of::<CNA_Quaternion>()),
+            (16, 4)
+        );
+        assert_eq!((size_of::<CNA_Matrix>(), align_of::<CNA_Matrix>()), (64, 4));
+        assert_eq!(
+            (
+                size_of::<CNA_EffectAnnotationCreateInfo>(),
+                align_of::<CNA_EffectAnnotationCreateInfo>()
+            ),
+            (88, 8)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_EffectAnnotationInfo>(),
+                align_of::<CNA_EffectAnnotationInfo>()
+            ),
+            (24, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_EffectParameterCreateInfo>(),
+                align_of::<CNA_EffectParameterCreateInfo>()
+            ),
+            (56, 8)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_EffectParameterInfo>(),
+                align_of::<CNA_EffectParameterInfo>()
+            ),
+            (24, 4)
         );
         assert_eq!(
             (

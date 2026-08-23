@@ -15,10 +15,17 @@ use crate::extensions::events::{EventArgs, EventHandler};
 
 use super::GraphicsDevice;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub(super) enum ResourceKind {
     Texture2D,
+    TextureCube,
+    RenderTarget2D,
+    RenderTargetCube,
     SpriteBatch,
+    SpriteFont,
+    Effect,
+    VertexBuffer,
+    IndexBuffer,
 }
 
 pub(super) struct ResourceState {
@@ -217,14 +224,41 @@ impl ResourceState {
         if *handle == sys::CNA_INVALID_HANDLE {
             return Ok(());
         }
+        if self.device.state.is_resource_bound(self.kind, *handle) {
+            return Err(CnaError::InvalidInput(
+                "a native graphics resource cannot be disposed while it remains bound to the graphics device",
+            ));
+        }
         if matches!(self.kind, ResourceKind::SpriteBatch) && self.is_active() {
             self.device.state.native().end_sprite_batch(*handle)?;
             self.set_active(false);
         }
         match self.kind {
             ResourceKind::Texture2D => self.device.state.native().destroy_texture(*handle)?,
+            ResourceKind::TextureCube => {
+                self.device.state.native().destroy_texture_cube(*handle)?;
+            }
+            ResourceKind::RenderTarget2D | ResourceKind::RenderTargetCube => {
+                self.device.state.native().destroy_render_target(*handle)?;
+            }
             ResourceKind::SpriteBatch => {
                 self.device.state.native().destroy_sprite_batch(*handle)?;
+            }
+            ResourceKind::SpriteFont => {
+                self.device.state.native().destroy_sprite_font(*handle)?;
+            }
+            ResourceKind::Effect => {
+                self.device
+                    .state
+                    .native()
+                    .dispose_effect_contents(*handle)?;
+                self.device.state.native().destroy_effect(*handle)?;
+            }
+            ResourceKind::VertexBuffer => {
+                self.device.state.native().destroy_vertex_buffer(*handle)?;
+            }
+            ResourceKind::IndexBuffer => {
+                self.device.state.native().destroy_index_buffer(*handle)?;
             }
         };
         *handle = sys::CNA_INVALID_HANDLE;

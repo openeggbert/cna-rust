@@ -2,6 +2,7 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
+mod content;
 mod error;
 mod game;
 mod graphics;
@@ -10,12 +11,21 @@ mod native;
 mod packed;
 mod value;
 
+pub use content::{
+    ContentDisposable, ContentDisposableRecorder, ContentLoadable, ContentManagerBase,
+    ContentReaderBase, ContentReaderExt, ContentResourceProvider, ContentTypeReaderBase,
+    ContentTypeReaderRegistration, ContentTypeReaderRegistry, SerializationInfo, StreamingContext,
+};
 pub use error::{CnaError, Result};
 pub use game::{
     run, run_for_frames, GameComponentBase, GameComponentCollectionExt, GameComponentRuntime,
     GameState, GameStateAccess, LaunchParametersExt, ServiceProvider,
 };
-pub use graphics::TextureRuntime;
+pub use graphics::{
+    BackBufferData, CubeTextureData, EffectAnnotationDescriptor, EffectBase,
+    EffectParameterDescriptor, EffectTechniqueDescriptor, IndexBufferBase, IndexData,
+    Texture2DBase, TextureCubeBase, TextureRuntime, VertexBufferBase, VertexData,
+};
 
 /// XNA 4.0 compatibility hierarchy. Casing intentionally follows XNA.
 #[allow(non_snake_case)]
@@ -39,15 +49,25 @@ pub mod Microsoft {
             #[allow(non_snake_case, clippy::module_name_repetitions)]
             pub mod Graphics {
                 pub use crate::graphics::{
-                    Blend, BlendFunction, BlendState, ClearOptions, ColorWriteChannels,
-                    CompareFunction, CullMode, DepthFormat, DepthStencilState, DisplayMode,
-                    DisplayModeCollection, FillMode, GraphicsAdapter, GraphicsDevice,
-                    GraphicsDeviceStatus, GraphicsProfile, GraphicsResource, PresentInterval,
-                    PresentationParameters, RasterizerState, RenderTargetUsage,
+                    Blend, BlendFunction, BlendState, BufferUsage, ClearOptions,
+                    ColorWriteChannels, CompareFunction, CubeMapFace, CullMode, DepthFormat,
+                    DepthStencilState, DisplayMode, DisplayModeCollection, DynamicIndexBuffer,
+                    DynamicVertexBuffer, Effect, EffectAnnotation, EffectAnnotationCollection,
+                    EffectMaterial, EffectParameter, EffectParameterClass,
+                    EffectParameterCollection, EffectParameterType, EffectPass,
+                    EffectPassCollection, EffectTechnique, EffectTechniqueCollection, FillMode,
+                    GraphicsAdapter, GraphicsDevice, GraphicsDeviceStatus, GraphicsProfile,
+                    GraphicsResource, IVertexType, IndexBuffer, IndexElementSize, PresentInterval,
+                    PresentationParameters, PrimitiveType, RasterizerState, RenderTarget2D,
+                    RenderTargetBinding, RenderTargetCube, RenderTargetUsage,
                     ResourceCreatedEventArgs, ResourceDestroyedEventArgs, SamplerState,
-                    SamplerStateCollection, SpriteBatch, SpriteEffects, SpriteSortMode,
-                    StencilOperation, SurfaceFormat, Texture, Texture2D, TextureAddressMode,
-                    TextureCollection, TextureFilter, Viewport,
+                    SamplerStateCollection, SetDataOptions, SpriteBatch, SpriteEffects, SpriteFont,
+                    SpriteSortMode, StencilOperation, SurfaceFormat, Texture, Texture2D,
+                    TextureAddressMode, TextureCollection, TextureCube, TextureFilter,
+                    VertexBuffer, VertexBufferBinding, VertexDeclaration, VertexElement,
+                    VertexElementFormat, VertexElementUsage, VertexPositionColor,
+                    VertexPositionColorTexture, VertexPositionNormalTexture, VertexPositionTexture,
+                    Viewport,
                 };
 
                 #[allow(non_snake_case)]
@@ -79,9 +99,17 @@ pub mod Microsoft {
                 }
             }
 
-            /// Reserved strict namespace for the not-yet-implemented XNB facade.
-            #[allow(non_snake_case)]
-            pub mod Content {}
+            /// Managed XNA content cache and XNB reader namespace.
+            #[allow(non_snake_case, clippy::module_name_repetitions)]
+            pub mod Content {
+                pub use crate::content::{
+                    ContentLoadException, ContentManager, ContentReader,
+                    ContentSerializerAttribute, ContentSerializerCollectionItemNameAttribute,
+                    ContentSerializerIgnoreAttribute, ContentSerializerRuntimeTypeAttribute,
+                    ContentSerializerTypeVersionAttribute, ContentTypeReader,
+                    ContentTypeReaderManager, ContentTypeReaderOfT, ResourceContentManager,
+                };
+            }
         }
     }
 }
@@ -117,9 +145,16 @@ pub mod extensions {
         pub struct WindowHandle(pub(crate) u64);
     }
 
+    #[allow(clippy::missing_errors_doc, clippy::module_name_repetitions)]
     pub mod graphics {
+        use std::sync::Arc;
+
         use crate::error::Result;
-        use crate::graphics::GraphicsDevice;
+        use crate::graphics::{
+            Effect, EffectAnnotation, EffectAnnotationCollection, EffectParameter,
+            EffectParameterCollection, EffectParameterDescriptor, EffectPass, EffectPassCollection,
+            EffectTechnique, EffectTechniqueCollection, EffectTechniqueDescriptor, GraphicsDevice,
+        };
 
         /// Renderer facts queried from CNA rather than inferred from a name.
         #[derive(Clone, Debug, Eq, PartialEq)]
@@ -150,6 +185,72 @@ pub mod extensions {
                     supports_depth_stencil,
                     max_texture_dimension,
                 })
+            }
+        }
+
+        /// CNA construction support for a reflection-capable empty Effect.
+        ///
+        /// This is intentionally outside XNA's namespace: XNA's public Effect
+        /// constructor accepts compiled bytecode, while CNA's empty graph is a
+        /// useful native integration and custom tooling primitive.
+        pub trait EffectFactoryExt {
+            fn create_empty_effect(&self) -> Result<Effect>;
+            fn create_reflection_effect(
+                &self,
+                parameters: &[EffectParameterDescriptor],
+                techniques: &[EffectTechniqueDescriptor],
+            ) -> Result<Effect>;
+        }
+
+        impl EffectFactoryExt for GraphicsDevice {
+            fn create_empty_effect(&self) -> Result<Effect> {
+                Effect::create_empty(self)
+            }
+
+            fn create_reflection_effect(
+                &self,
+                parameters: &[EffectParameterDescriptor],
+                techniques: &[EffectTechniqueDescriptor],
+            ) -> Result<Effect> {
+                Effect::create_reflection(self, parameters, techniques)
+            }
+        }
+
+        /// Restores the CLR integer indexer without inventing an additional
+        /// strict XNA member name in Rust's non-overloadable method surface.
+        pub trait EffectAnnotationCollectionExt {
+            fn item_at(&self, index: i32) -> Result<Arc<EffectAnnotation>>;
+        }
+        impl EffectAnnotationCollectionExt for EffectAnnotationCollection {
+            fn item_at(&self, index: i32) -> Result<Arc<EffectAnnotation>> {
+                self.item_at(index)
+            }
+        }
+
+        pub trait EffectParameterCollectionExt {
+            fn item_at(&self, index: i32) -> Result<Arc<EffectParameter>>;
+        }
+        impl EffectParameterCollectionExt for EffectParameterCollection {
+            fn item_at(&self, index: i32) -> Result<Arc<EffectParameter>> {
+                self.item_at(index)
+            }
+        }
+
+        pub trait EffectPassCollectionExt {
+            fn item_at(&self, index: i32) -> Result<Arc<EffectPass>>;
+        }
+        impl EffectPassCollectionExt for EffectPassCollection {
+            fn item_at(&self, index: i32) -> Result<Arc<EffectPass>> {
+                self.item_at(index)
+            }
+        }
+
+        pub trait EffectTechniqueCollectionExt {
+            fn item_at(&self, index: i32) -> Result<Arc<EffectTechnique>>;
+        }
+        impl EffectTechniqueCollectionExt for EffectTechniqueCollection {
+            fn item_at(&self, index: i32) -> Result<Arc<EffectTechnique>> {
+                self.item_at(index)
             }
         }
     }

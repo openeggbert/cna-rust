@@ -57,7 +57,7 @@ impl Default for GameServiceContainer {
 }
 
 /// Rust projection of `System.IServiceProvider` for XNA service containers.
-pub trait ServiceProvider {
+pub trait ServiceProvider: Send + Sync {
     fn GetService(&self, r#type: TypeId) -> Option<Arc<dyn Any + Send + Sync>>;
 }
 

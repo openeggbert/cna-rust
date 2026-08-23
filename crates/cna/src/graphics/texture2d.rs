@@ -12,12 +12,16 @@ use std::sync::Arc;
 
 use cna_sys as sys;
 
+use crate::content::{ContentDisposable, ContentLoadable};
 use crate::error::{CnaError, Result};
 use crate::extensions::events::EventHandler;
 use crate::value::Rectangle;
 
 use super::resource::{ResourceKind, ResourceState};
 use super::{GraphicsDevice, GraphicsResource, SurfaceFormat, Texture, TextureRuntime};
+
+/// Composition marker for XNA types inheriting `Texture2D`.
+pub trait Texture2DBase: Texture {}
 
 /// Owned native XNA `Texture2D` resource.
 pub struct Texture2D {
@@ -474,7 +478,13 @@ impl Texture for Texture2D {
     }
 }
 
+impl Texture2DBase for Texture2D {}
+
 impl TextureRuntime for Texture2D {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     fn bind_texture_slot(
         &self,
         device: &GraphicsDevice,
@@ -497,6 +507,18 @@ impl TextureRuntime for Texture2D {
             index,
             texture,
         )
+    }
+}
+
+impl ContentDisposable for Texture2D {
+    fn DisposeContent(&self) -> Result<()> {
+        self.state.dispose_native()
+    }
+}
+
+impl ContentLoadable for Texture2D {
+    fn ContentDisposable(value: &Arc<Self>) -> Option<Arc<dyn ContentDisposable>> {
+        Some(Arc::clone(value) as Arc<dyn ContentDisposable>)
     }
 }
 

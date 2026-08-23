@@ -1,23 +1,43 @@
 //! Crash-isolated ownership and callback stress for an explicitly supplied CNA library.
 
-#![allow(clippy::too_many_lines)]
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::float_cmp,
+    clippy::needless_pass_by_value,
+    clippy::too_many_lines
+)]
 
+use std::any::TypeId;
+use std::fs;
 use std::io::Cursor;
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex, OnceLock, Weak};
 
+use cna::extensions::graphics::{
+    EffectAnnotationCollectionExt, EffectFactoryExt, EffectParameterCollectionExt,
+    EffectPassCollectionExt, EffectTechniqueCollectionExt,
+};
 use cna::Microsoft::Xna::Framework::Graphics::{
-    BlendState, DepthStencilState, GraphicsAdapter, GraphicsDevice, GraphicsDeviceStatus,
-    GraphicsProfile, GraphicsResource, RasterizerState, SamplerState, SpriteBatch, SpriteSortMode,
-    Texture, Texture2D,
+    BlendState, BufferUsage, CubeMapFace, DepthStencilState, DynamicIndexBuffer,
+    DynamicVertexBuffer, Effect, EffectMaterial, EffectParameterClass, EffectParameterType,
+    GraphicsAdapter, GraphicsDevice, GraphicsDeviceStatus, GraphicsProfile, GraphicsResource,
+    IndexBuffer, IndexElementSize, PrimitiveType, RasterizerState, RenderTarget2D,
+    RenderTargetBinding, RenderTargetCube, SamplerState, SetDataOptions, SpriteBatch, SpriteFont,
+    SpriteSortMode, SurfaceFormat, Texture, Texture2D, TextureCube, VertexBuffer,
+    VertexBufferBinding, VertexDeclaration, VertexElement, VertexElementFormat, VertexElementUsage,
+    VertexPositionColor,
 };
 use cna::Microsoft::Xna::Framework::{
-    Color, Game, GameContext, GameTime, IDrawable, IGameComponent, IUpdateable, Rectangle, Vector2,
+    Color, Game, GameContext, GameTime, IDrawable, IGameComponent, IUpdateable, Matrix, Rectangle,
+    Vector2, Vector3, Vector4,
 };
 use cna::{
-    run_for_frames, CnaError, GameComponentCollectionExt, GameComponentRuntime, GameState,
-    GameStateAccess, Result,
+    run_for_frames, CnaError, EffectAnnotationDescriptor, EffectParameterDescriptor,
+    EffectTechniqueDescriptor, GameComponentCollectionExt, GameComponentRuntime, GameState,
+    GameStateAccess, Result, VertexData,
 };
 
 const CHILD_CASE: &str = "CNA_RUST_NATIVE_STRESS_CHILD";
@@ -828,6 +848,924 @@ impl Game for TextureTransferGame {
     }
 }
 
+#[derive(Clone, Copy, Default)]
+struct CustomVertex {
+    x: f32,
+    y: f32,
+}
+
+impl VertexData for CustomVertex {
+    fn vertex_declaration() -> &'static VertexDeclaration {
+        static DECLARATION: OnceLock<VertexDeclaration> = OnceLock::new();
+        DECLARATION.get_or_init(|| {
+            VertexDeclaration::from_vertex_stride_and_elements(
+                8,
+                &[VertexElement::new(
+                    0,
+                    VertexElementFormat::Vector2,
+                    VertexElementUsage::Position,
+                    0,
+                )],
+            )
+            .expect("valid custom vertex declaration")
+        })
+    }
+
+    fn write_bytes(&self, destination: &mut Vec<u8>) {
+        destination.extend_from_slice(&self.x.to_ne_bytes());
+        destination.extend_from_slice(&self.y.to_ne_bytes());
+    }
+
+    fn read_bytes(source: &[u8]) -> Result<Self> {
+        if source.len() != 8 {
+            return Err(CnaError::InvalidInput(
+                "custom vertex payload must contain eight bytes",
+            ));
+        }
+        Ok(Self {
+            x: f32::from_ne_bytes(source[0..4].try_into().expect("four-byte x")),
+            y: f32::from_ne_bytes(source[4..8].try_into().expect("four-byte y")),
+        })
+    }
+}
+
+#[derive(Default)]
+struct BufferTransferGame {
+    state: Arc<GameState>,
+    vertex: Option<VertexBuffer>,
+    index: Option<IndexBuffer>,
+    texture_cube: Option<TextureCube>,
+    render_target2d: Option<RenderTarget2D>,
+    render_target_cube: Option<RenderTargetCube>,
+}
+
+struct SpriteFontXnbGame {
+    state: Arc<GameState>,
+    root: PathBuf,
+    retained_font: Arc<Mutex<Option<Arc<SpriteFont>>>>,
+}
+
+struct EffectXnbGame {
+    state: Arc<GameState>,
+    root: PathBuf,
+}
+
+#[derive(Default)]
+struct EffectStressGame {
+    state: Arc<GameState>,
+}
+
+impl GameStateAccess for EffectStressGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for EffectStressGame {
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let device = game.GraphicsDevice()?;
+        let bool_bits = f32::from_bits(1);
+        let mut effect = device.create_reflection_effect(
+            &[
+                EffectParameterDescriptor {
+                    name: "Gain".to_owned(),
+                    semantic: "SCALAR".to_owned(),
+                    row_count: 1,
+                    column_count: 1,
+                    parameter_class: EffectParameterClass::Scalar,
+                    parameter_type: EffectParameterType::Single,
+                    annotations: vec![EffectAnnotationDescriptor {
+                        name: "Visible".to_owned(),
+                        semantic: String::new(),
+                        row_count: 1,
+                        column_count: 1,
+                        parameter_class: EffectParameterClass::Scalar,
+                        parameter_type: EffectParameterType::Bool,
+                        data: vec![bool_bits],
+                        cached_string: String::new(),
+                    }],
+                },
+                EffectParameterDescriptor {
+                    name: "Enabled".to_owned(),
+                    semantic: String::new(),
+                    row_count: 1,
+                    column_count: 1,
+                    parameter_class: EffectParameterClass::Scalar,
+                    parameter_type: EffectParameterType::Bool,
+                    annotations: Vec::new(),
+                },
+                EffectParameterDescriptor {
+                    name: "Count".to_owned(),
+                    semantic: String::new(),
+                    row_count: 1,
+                    column_count: 1,
+                    parameter_class: EffectParameterClass::Scalar,
+                    parameter_type: EffectParameterType::Int32,
+                    annotations: Vec::new(),
+                },
+                EffectParameterDescriptor {
+                    name: "Tint".to_owned(),
+                    semantic: String::new(),
+                    row_count: 1,
+                    column_count: 4,
+                    parameter_class: EffectParameterClass::Vector,
+                    parameter_type: EffectParameterType::Single,
+                    annotations: Vec::new(),
+                },
+                EffectParameterDescriptor {
+                    name: "Transform".to_owned(),
+                    semantic: String::new(),
+                    row_count: 4,
+                    column_count: 4,
+                    parameter_class: EffectParameterClass::Matrix,
+                    parameter_type: EffectParameterType::Single,
+                    annotations: Vec::new(),
+                },
+            ],
+            &[
+                EffectTechniqueDescriptor {
+                    name: "FirstTechnique".to_owned(),
+                    passes: vec!["P0".to_owned(), "StatePass".to_owned()],
+                },
+                EffectTechniqueDescriptor {
+                    name: "SecondTechnique".to_owned(),
+                    passes: vec!["P1".to_owned()],
+                },
+            ],
+        )?;
+
+        let parameters = effect.Parameters()?;
+        assert!(Arc::ptr_eq(&parameters, &effect.Parameters()?));
+        assert_eq!(parameters.Count()?, 5);
+        let gain = parameters.Item("Gain")?.expect("Gain parameter");
+        assert!(Arc::ptr_eq(&gain, &parameters.item_at(0)?));
+        assert_eq!(gain.Name()?, "Gain");
+        assert_eq!(gain.Semantic()?, "SCALAR");
+        assert!(Arc::ptr_eq(
+            &gain,
+            &parameters
+                .GetParameterBySemantic("SCALAR")?
+                .expect("semantic lookup")
+        ));
+        gain.SetValueWithValueAsSingle(0.75)?;
+        assert_eq!(gain.GetValueSingle()?, 0.75);
+        let annotations = gain.Annotations()?;
+        assert_eq!(annotations.Count()?, 1);
+        let visible = annotations.Item("Visible")?.expect("Visible annotation");
+        assert!(Arc::ptr_eq(&visible, &annotations.item_at(0)?));
+        assert!(visible.GetValueBoolean()?);
+        assert_eq!(visible.ParameterType()?, EffectParameterType::Bool);
+
+        let enabled = parameters.Item("Enabled")?.expect("Enabled parameter");
+        enabled.SetValueWithValueAsBoolean(true)?;
+        assert!(enabled.GetValueBoolean()?);
+        let count = parameters.Item("Count")?.expect("Count parameter");
+        count.SetValueWithValueAsInt32(7)?;
+        assert_eq!(count.GetValueInt32()?, 7);
+        let tint = parameters.Item("Tint")?.expect("Tint parameter");
+        let tint_value = Vector4::from_x_and_y_and_z_and_w(0.1, 0.2, 0.3, 0.4);
+        tint.SetValueWithValueAsVector4(tint_value)?;
+        assert_eq!(tint.GetValueVector4()?, tint_value);
+        let transform = parameters.Item("Transform")?.expect("Transform parameter");
+        transform.SetValueWithValueAsMatrix(Matrix::Identity)?;
+        assert_eq!(transform.GetValueMatrix()?, Matrix::Identity);
+
+        let techniques = effect.Techniques()?;
+        assert!(Arc::ptr_eq(&techniques, &effect.Techniques()?));
+        // CNA's empty Effect starts with XNA's default technique; the two
+        // reflected techniques follow it in insertion order.
+        assert_eq!(techniques.Count()?, 3);
+        let first = techniques.Item("FirstTechnique")?.expect("first technique");
+        assert!(Arc::ptr_eq(&first, &techniques.item_at(1)?));
+        assert!(Arc::ptr_eq(&first, &effect.CurrentTechnique()?));
+        let passes = first.Passes()?;
+        assert_eq!(passes.Count()?, 3);
+        let first_pass = passes.Item("P0")?.expect("first pass");
+        assert!(Arc::ptr_eq(&first_pass, &passes.item_at(0)?));
+        match first_pass.Apply() {
+            Ok(()) | Err(CnaError::Native { code: 6, .. }) => {}
+            Err(error) => return Err(error),
+        }
+        let second = techniques
+            .Item("SecondTechnique")?
+            .expect("second technique");
+        effect.SetCurrentTechnique(&second)?;
+        assert!(Arc::ptr_eq(&second, &effect.CurrentTechnique()?));
+
+        let cloned = effect.Clone()?;
+        assert_eq!(cloned.Parameters()?.Count()?, 5);
+        let material = EffectMaterial::new(&effect)?;
+        assert_eq!(material.Parameters()?.Count()?, 5);
+
+        let mut batch = SpriteBatch::new(&device)?;
+        let blend = BlendState::AlphaBlend;
+        let sampler = SamplerState::LinearClamp;
+        let depth = DepthStencilState::None;
+        let rasterizer = RasterizerState::CullCounterClockwise;
+        let result = batch.BeginWithSortModeAndBlendStateAndSamplerStateAndDepthStencilStateAndRasterizerStateAndEffect(
+            SpriteSortMode::Immediate, &blend, &sampler, &depth, &rasterizer, Some(&effect),
+        );
+        match result {
+            Ok(()) => batch.End()?,
+            Err(CnaError::Native { code: 6, .. }) => {
+                batch.Begin()?;
+                batch.End()?;
+            }
+            Err(error) => return Err(error),
+        }
+        batch.BeginWithSortModeAndBlendStateAndSamplerStateAndDepthStencilStateAndRasterizerStateAndEffectAndTransformMatrix(
+            SpriteSortMode::Deferred, &blend, &sampler, &depth, &rasterizer, None, Matrix::Identity,
+        )?;
+        batch.End()?;
+
+        effect.DisposeWithNoArguments()?;
+        effect.DisposeWithNoArguments()?;
+        assert!(gain.Name().is_err());
+        assert!(matches!(
+            batch.BeginWithSortModeAndBlendStateAndSamplerStateAndDepthStencilStateAndRasterizerStateAndEffect(
+                SpriteSortMode::Deferred, &blend, &sampler, &depth, &rasterizer, Some(&effect),
+            ),
+            Err(CnaError::InvalidInput(_))
+        ));
+        batch.Begin()?;
+        batch.End()?;
+        Ok(())
+    }
+}
+
+impl GameStateAccess for SpriteFontXnbGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for SpriteFontXnbGame {
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        self.Content()
+            .SetRootDirectory(self.root.to_str().expect("UTF-8 SpriteFont fixture path"))?;
+        let font = self.Content().Load::<SpriteFont>("font")?;
+        let cached = self.Content().Load::<SpriteFont>("FONT")?;
+        assert!(Arc::ptr_eq(&font, &cached));
+        assert_eq!(font.Characters(), ['?']);
+        assert_eq!(font.DefaultCharacter(), Some('?'));
+        assert_eq!(font.LineSpacing(), 2);
+        assert_eq!(font.Spacing(), 0.0);
+        assert_eq!(font.MeasureString("?")?, Vector2::from_x_and_y(1.0, 2.0));
+        assert_eq!(
+            font.MeasureStringWithText("??")?,
+            Vector2::from_x_and_y(2.0, 2.0)
+        );
+        let multiline = font.MeasureString("?\n?")?;
+        assert_eq!(multiline.X, 1.0);
+        assert_eq!(multiline.Y, 4.0);
+        font.SetLineSpacing(3)?;
+        font.SetSpacing(0.25)?;
+        assert_eq!(font.LineSpacing(), 3);
+        assert_eq!(font.Spacing(), 0.25);
+        assert!(font.SetSpacing(f32::NAN).is_err());
+        assert!(font.SetDefaultCharacter(Some('Z')).is_err());
+
+        let device = game.GraphicsDevice()?;
+        let mut batch = SpriteBatch::new(&device)?;
+        batch.Begin()?;
+        batch.DrawString(&font, "", Vector2::Zero, Color::White)?;
+        batch.DrawStringWithSpriteFontAndTextAndPositionAndColor(
+            &font,
+            "?",
+            Vector2::Zero,
+            Color::White,
+        )?;
+        batch.DrawStringWithSpriteFontAndTextAndPositionAndColorAndRotationAndOriginAndScaleAndEffectsAndLayerDepthAsSpriteFontAndStringAndVector2AndColorAndSingleAndVector2AndSingleAndSpriteEffectsAndSingle(
+            &font, "?", Vector2::Zero, Color::White, 0.0, Vector2::Zero, 1.0,
+            cna::Microsoft::Xna::Framework::Graphics::SpriteEffects::None, 0.0,
+        )?;
+        batch.DrawStringWithSpriteFontAndTextAndPositionAndColorAndRotationAndOriginAndScaleAndEffectsAndLayerDepthAsSpriteFontAndStringAndVector2AndColorAndSingleAndVector2AndVector2AndSpriteEffectsAndSingle(
+            &font, "?", Vector2::Zero, Color::White, 0.0, Vector2::Zero, Vector2::One,
+            cna::Microsoft::Xna::Framework::Graphics::SpriteEffects::FlipHorizontally, 0.0,
+        )?;
+        batch.DrawStringWithSpriteFontAndTextAndPositionAndColorAndRotationAndOriginAndScaleAndEffectsAndLayerDepthAsSpriteFontAndStringBuilderAndVector2AndColorAndSingleAndVector2AndSingleAndSpriteEffectsAndSingle(
+            &font, "?", Vector2::Zero, Color::White, 0.0, Vector2::Zero, 1.0,
+            cna::Microsoft::Xna::Framework::Graphics::SpriteEffects::None, 0.0,
+        )?;
+        batch.DrawStringWithSpriteFontAndTextAndPositionAndColorAndRotationAndOriginAndScaleAndEffectsAndLayerDepthAsSpriteFontAndStringBuilderAndVector2AndColorAndSingleAndVector2AndVector2AndSpriteEffectsAndSingle(
+            &font, "?", Vector2::Zero, Color::White, 0.0, Vector2::Zero, Vector2::One,
+            cna::Microsoft::Xna::Framework::Graphics::SpriteEffects::FlipVertically, 0.0,
+        )?;
+        font.SetDefaultCharacter(None)?;
+        assert!(batch
+            .DrawString(&font, "Z", Vector2::Zero, Color::White)
+            .is_err());
+        font.SetDefaultCharacter(Some('?'))?;
+        batch.End()?;
+
+        *self
+            .retained_font
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(font);
+        Ok(())
+    }
+}
+
+impl GameStateAccess for EffectXnbGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for EffectXnbGame {
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let _ = game;
+        self.Content()
+            .SetRootDirectory(self.root.to_str().expect("UTF-8 Effect fixture path"))?;
+        match self.Content().Load::<Effect>("effect") {
+            Ok(effect) => {
+                let cached = self.Content().Load::<Effect>("EFFECT")?;
+                assert!(Arc::ptr_eq(&effect, &cached));
+                assert_eq!(effect.Name(), "effect");
+                assert!(effect.Techniques()?.Count()? > 0);
+            }
+            Err(CnaError::Content(error)) => {
+                let message = error.to_string();
+                assert!(
+                    message.contains("could not construct Effect content asset 'effect'"),
+                    "unexpected Effect content error: {message}"
+                );
+                assert!(
+                    message.contains("CNA error 6")
+                        && message.contains("does not support compiled XNA/FNA Effect"),
+                    "missing native inner error: {message}"
+                );
+                assert!(matches!(
+                    self.Content().Load::<Effect>("effect"),
+                    Err(CnaError::Content(_))
+                ));
+            }
+            Err(error) => return Err(error),
+        }
+        Ok(())
+    }
+}
+
+struct SpriteFontFixture(PathBuf);
+
+impl SpriteFontFixture {
+    fn new() -> Self {
+        let path =
+            std::env::temp_dir().join(format!("cna-rust-sprite-font-xnb-{}", std::process::id()));
+        fs::create_dir_all(&path).expect("create SpriteFont XNB fixture directory");
+        fs::write(path.join("font.xnb"), sprite_font_xnb()).expect("write SpriteFont XNB fixture");
+        Self(path)
+    }
+}
+
+impl Drop for SpriteFontFixture {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+struct EffectFixture(PathBuf);
+
+impl EffectFixture {
+    fn new() -> Self {
+        let path = std::env::temp_dir().join(format!("cna-rust-effect-xnb-{}", std::process::id()));
+        fs::create_dir_all(&path).expect("create Effect XNB fixture directory");
+        fs::write(path.join("effect.xnb"), effect_xnb()).expect("write Effect XNB fixture");
+        Self(path)
+    }
+}
+
+impl Drop for EffectFixture {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+fn effect_xnb() -> Vec<u8> {
+    let effect_code = fs::read(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../../cna/modules/renderers/fna3d/effects/CnaConformanceEffect.fxb"),
+    )
+    .expect("read CNA's legal conformance Effect bytecode fixture");
+    let mut payload = Vec::new();
+    write_7bit(&mut payload, 1);
+    write_xnb_string(&mut payload, "Microsoft.Xna.Framework.Content.EffectReader");
+    payload.extend_from_slice(&0_i32.to_le_bytes());
+    write_7bit(&mut payload, 0);
+    payload.push(1);
+    payload.extend_from_slice(
+        &i32::try_from(effect_code.len())
+            .expect("Effect fixture bytecode length")
+            .to_le_bytes(),
+    );
+    payload.extend_from_slice(&effect_code);
+
+    let mut bytes = b"XNBw\x05\x00".to_vec();
+    bytes.extend_from_slice(
+        &u32::try_from(10 + payload.len())
+            .expect("Effect fixture size")
+            .to_le_bytes(),
+    );
+    bytes.extend_from_slice(&payload);
+    bytes
+}
+
+fn sprite_font_xnb() -> Vec<u8> {
+    const READERS: &[&str] = &[
+        "Microsoft.Xna.Framework.Content.SpriteFontReader",
+        "Microsoft.Xna.Framework.Content.Texture2DReader",
+        "Microsoft.Xna.Framework.Content.ListReader`1[[Microsoft.Xna.Framework.Rectangle]]",
+        "Microsoft.Xna.Framework.Content.ListReader`1[[System.Char]]",
+        "Microsoft.Xna.Framework.Content.ListReader`1[[Microsoft.Xna.Framework.Vector3]]",
+        "Microsoft.Xna.Framework.Content.RectangleReader",
+        "Microsoft.Xna.Framework.Content.CharReader",
+        "Microsoft.Xna.Framework.Content.Vector3Reader",
+    ];
+    let mut payload = Vec::new();
+    write_7bit(&mut payload, READERS.len());
+    for reader in READERS {
+        write_xnb_string(&mut payload, reader);
+        payload.extend_from_slice(&0_i32.to_le_bytes());
+    }
+    write_7bit(&mut payload, 0);
+    payload.push(1); // SpriteFont root reader.
+    payload.push(2); // Texture2D atlas reader.
+    payload.extend_from_slice(&0_i32.to_le_bytes()); // SurfaceFormat.Color.
+    payload.extend_from_slice(&1_i32.to_le_bytes());
+    payload.extend_from_slice(&1_i32.to_le_bytes());
+    payload.extend_from_slice(&1_i32.to_le_bytes()); // One mip.
+    payload.extend_from_slice(&4_i32.to_le_bytes());
+    payload.extend_from_slice(&[255, 255, 255, 255]);
+    payload.push(3); // Glyph Rectangle list.
+    payload.extend_from_slice(&1_i32.to_le_bytes());
+    write_rectangle(&mut payload, Rectangle::new(0, 0, 1, 1));
+    payload.push(3); // Cropping Rectangle list.
+    payload.extend_from_slice(&1_i32.to_le_bytes());
+    write_rectangle(&mut payload, Rectangle::new(0, 0, 1, 1));
+    payload.push(4); // Character list.
+    payload.extend_from_slice(&1_i32.to_le_bytes());
+    payload.extend_from_slice(&u16::from(b'?').to_le_bytes());
+    payload.extend_from_slice(&2_i32.to_le_bytes()); // Line spacing.
+    payload.extend_from_slice(&0_f32.to_le_bytes()); // Extra spacing.
+    payload.push(5); // Kerning Vector3 list.
+    payload.extend_from_slice(&1_i32.to_le_bytes());
+    payload.extend_from_slice(&0_f32.to_le_bytes());
+    payload.extend_from_slice(&1_f32.to_le_bytes());
+    payload.extend_from_slice(&0_f32.to_le_bytes());
+    payload.push(1); // Has default character.
+    payload.extend_from_slice(&u16::from(b'?').to_le_bytes());
+
+    let mut bytes = b"XNBw\x05\x00".to_vec();
+    bytes.extend_from_slice(
+        &u32::try_from(10 + payload.len())
+            .expect("SpriteFont fixture size")
+            .to_le_bytes(),
+    );
+    bytes.extend_from_slice(&payload);
+    bytes
+}
+
+fn write_7bit(bytes: &mut Vec<u8>, mut value: usize) {
+    loop {
+        let mut next = u8::try_from(value & 0x7f).expect("seven-bit fixture chunk");
+        value >>= 7;
+        if value != 0 {
+            next |= 0x80;
+        }
+        bytes.push(next);
+        if value == 0 {
+            return;
+        }
+    }
+}
+
+fn write_xnb_string(bytes: &mut Vec<u8>, value: &str) {
+    write_7bit(bytes, value.len());
+    bytes.extend_from_slice(value.as_bytes());
+}
+
+fn write_rectangle(bytes: &mut Vec<u8>, value: Rectangle) {
+    bytes.extend_from_slice(&value.X.to_le_bytes());
+    bytes.extend_from_slice(&value.Y.to_le_bytes());
+    bytes.extend_from_slice(&value.Width.to_le_bytes());
+    bytes.extend_from_slice(&value.Height.to_le_bytes());
+}
+
+impl GameStateAccess for BufferTransferGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for BufferTransferGame {
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let mut device = game.GraphicsDevice()?;
+        let declaration = VertexPositionColor::VertexDeclaration();
+        assert_eq!(declaration.VertexStride(), 16);
+
+        let mut vertex = VertexBuffer::new(&device, declaration, 3, BufferUsage::None)?;
+        let vertices = [
+            VertexPositionColor::new(Vector3::Zero, Color::Red),
+            VertexPositionColor::new(Vector3::UnitX, Color::Green),
+            VertexPositionColor::new(Vector3::UnitY, Color::Blue),
+        ];
+        vertex.SetData(&vertices)?;
+        let mut vertex_readback = [VertexPositionColor::default(); 3];
+        vertex.GetData(&mut vertex_readback)?;
+        assert_eq!(vertex_readback, vertices);
+
+        let typed = VertexBuffer::from_graphics_device_and_vertex_type_and_vertex_count_and_usage(
+            &device,
+            TypeId::of::<VertexPositionColor>(),
+            3,
+            BufferUsage::None,
+        )?;
+        typed.SetData(&vertices)?;
+        assert!(typed
+            .VertexDeclaration()
+            .GetVertexElements()
+            .iter()
+            .eq(declaration.GetVertexElements().iter()));
+
+        let custom = VertexBuffer::new(
+            &device,
+            CustomVertex::vertex_declaration(),
+            2,
+            BufferUsage::None,
+        )?;
+        let custom_data = [
+            CustomVertex { x: 1.0, y: 2.0 },
+            CustomVertex { x: 3.0, y: 4.0 },
+        ];
+        custom.SetData(&custom_data)?;
+        let mut custom_readback = [CustomVertex::default(); 2];
+        custom.GetData(&mut custom_readback)?;
+        assert_eq!(custom_readback[0].x, 1.0);
+        assert_eq!(custom_readback[1].y, 4.0);
+
+        let dynamic = DynamicVertexBuffer::new(&device, declaration, 3, BufferUsage::None)?;
+        dynamic.SetData(&vertices, 0, 3, SetDataOptions::Discard)?;
+        dynamic.SetData(&vertices, 0, 3, SetDataOptions::NoOverwrite)?;
+        assert!(!dynamic.IsContentLost()?);
+        assert!(matches!(
+            dynamic.SetDataWithOffsetInBytesAndDataAndStartIndexAndElementCountAndVertexStrideAndOptions(
+                16,
+                &vertices,
+                0,
+                1,
+                16,
+                SetDataOptions::Discard,
+            ),
+            Err(CnaError::InvalidInput(_))
+        ));
+
+        let binding = VertexBufferBinding::from_vertex_buffer_and_vertex_offset(&vertex, 1)?;
+        device.SetVertexBuffers(&[binding.clone()])?;
+        assert!(device.GetVertexBuffers()? == [binding]);
+        assert!(matches!(
+            vertex.DisposeWithNoArguments(),
+            Err(CnaError::InvalidInput(_))
+        ));
+        device.SetVertexBuffers(&[])?;
+        vertex.DisposeWithNoArguments()?;
+        vertex.DisposeWithNoArguments()?;
+
+        let indices16 =
+            IndexBuffer::new(&device, IndexElementSize::SixteenBits, 3, BufferUsage::None)?;
+        indices16.SetData(&[0_u16, 1, 2])?;
+        let mut read16 = [0_u16; 3];
+        indices16.GetData(&mut read16)?;
+        assert_eq!(read16, [0, 1, 2]);
+
+        let indices32 = IndexBuffer::new(
+            &device,
+            IndexElementSize::ThirtyTwoBits,
+            3,
+            BufferUsage::None,
+        )?;
+        indices32.SetData(&[2_u32, 1, 0])?;
+        let mut read32 = [0_u32; 3];
+        indices32.GetData(&mut read32)?;
+        assert_eq!(read32, [2, 1, 0]);
+
+        let dynamic_index =
+            DynamicIndexBuffer::new(&device, IndexElementSize::SixteenBits, 3, BufferUsage::None)?;
+        dynamic_index.SetData(&[0_u16, 1, 2], 0, 3, SetDataOptions::Discard)?;
+        dynamic_index.SetData(&[0_u16, 1, 2], 0, 3, SetDataOptions::NoOverwrite)?;
+        assert!(matches!(
+            dynamic_index.SetDataWithOffsetInBytesAndDataAndStartIndexAndElementCountAndOptions(
+                2,
+                &[2_u16],
+                0,
+                1,
+                SetDataOptions::NoOverwrite,
+            ),
+            Err(CnaError::InvalidInput(_))
+        ));
+        dynamic_index.SetDataWithOffsetInBytesAndDataAndStartIndexAndElementCountAndOptions(
+            2,
+            &[2_u16],
+            0,
+            1,
+            SetDataOptions::None,
+        )?;
+        assert!(!dynamic_index.IsContentLost()?);
+
+        device.SetVertexBufferWithVertexBuffer(&typed)?;
+        device.SetIndices(Some(&indices32))?;
+        assert!(device.Indices()?.is_some());
+
+        assert!(matches!(
+            device.DrawPrimitives(PrimitiveType::TriangleList, 1, 1),
+            Err(CnaError::InvalidInput(_))
+        ));
+        assert_missing_effect(device.DrawPrimitives(PrimitiveType::TriangleList, 0, 1));
+        assert_missing_effect(device.DrawIndexedPrimitives(
+            PrimitiveType::TriangleList,
+            0,
+            0,
+            3,
+            0,
+            1,
+        ));
+        assert_missing_effect(device.DrawInstancedPrimitives(
+            PrimitiveType::TriangleList,
+            0,
+            0,
+            3,
+            0,
+            1,
+            1,
+        ));
+
+        assert!(matches!(
+            device.DrawUserPrimitives(PrimitiveType::TriangleList, &vertices[..2], 0, 1),
+            Err(CnaError::InvalidInput(_))
+        ));
+        assert_missing_effect(device.DrawUserPrimitives(
+            PrimitiveType::TriangleList,
+            &vertices,
+            0,
+            1,
+        ));
+        assert_missing_effect(device.DrawUserPrimitivesWithPrimitiveTypeAndVertexDataAndVertexOffsetAndPrimitiveCountAndVertexDeclaration(
+            PrimitiveType::TriangleList,
+            &vertices,
+            0,
+            1,
+            declaration,
+        ));
+
+        let indices_i32 = [0_i32, 1, 2];
+        let indices_i16 = [0_i16, 1, 2];
+        assert!(matches!(
+            device.DrawUserIndexedPrimitives(
+                PrimitiveType::TriangleList,
+                &vertices,
+                0,
+                3,
+                &[0_i32, 1, 3],
+                0,
+                1,
+            ),
+            Err(CnaError::InvalidInput(_))
+        ));
+        assert_missing_effect(device.DrawUserIndexedPrimitives(
+            PrimitiveType::TriangleList,
+            &vertices,
+            0,
+            3,
+            &indices_i32,
+            0,
+            1,
+        ));
+        assert_missing_effect(device.DrawUserIndexedPrimitivesWithPrimitiveTypeAndVertexDataAndVertexOffsetAndNumVerticesAndIndexDataAndIndexOffsetAndPrimitiveCount(
+            PrimitiveType::TriangleList,
+            &vertices,
+            0,
+            3,
+            &indices_i16,
+            0,
+            1,
+        ));
+        assert_missing_effect(device.DrawUserIndexedPrimitivesWithPrimitiveTypeAndVertexDataAndVertexOffsetAndNumVerticesAndIndexDataAndIndexOffsetAndPrimitiveCountAndVertexDeclarationAsPrimitiveTypeAnd0ArrayAndInt32AndInt32AndInt32ArrayAndInt32AndInt32AndVertexDeclaration(
+            PrimitiveType::TriangleList,
+            &vertices,
+            0,
+            3,
+            &indices_i32,
+            0,
+            1,
+            declaration,
+        ));
+        assert_missing_effect(device.DrawUserIndexedPrimitivesWithPrimitiveTypeAndVertexDataAndVertexOffsetAndNumVerticesAndIndexDataAndIndexOffsetAndPrimitiveCountAndVertexDeclarationAsPrimitiveTypeAnd0ArrayAndInt32AndInt32AndInt16ArrayAndInt32AndInt32AndVertexDeclaration(
+            PrimitiveType::TriangleList,
+            &vertices,
+            0,
+            3,
+            &indices_i16,
+            0,
+            1,
+            declaration,
+        ));
+
+        device.ClearWithColor(Color::CornflowerBlue)?;
+        let mut region = [Color::Transparent; 2];
+        assert_headless_readback_unsupported(device.GetBackBufferData(
+            Some(Rectangle::new(0, 0, 1, 1)),
+            &mut region,
+            1,
+            1,
+        ));
+        assert_eq!(region, [Color::Transparent; 2]);
+        let parameters = device.PresentationParameters()?.Clone();
+        let pixel_count = usize::try_from(
+            parameters
+                .BackBufferWidth()
+                .checked_mul(parameters.BackBufferHeight())
+                .expect("back-buffer pixel count"),
+        )
+        .expect("positive back-buffer pixel count");
+        let mut complete = vec![Color::Transparent; pixel_count];
+        assert_headless_readback_unsupported(device.GetBackBufferDataWithData(&mut complete));
+        assert!(complete.iter().all(|pixel| *pixel == Color::Transparent));
+        let mut offset_complete = vec![Color::Transparent; pixel_count + 1];
+        assert_headless_readback_unsupported(
+            device.GetBackBufferDataWithDataAndStartIndexAndElementCount(
+                &mut offset_complete,
+                1,
+                pixel_count as i32,
+            ),
+        );
+        assert_eq!(offset_complete[0], Color::Transparent);
+        assert!(offset_complete[1..]
+            .iter()
+            .all(|pixel| *pixel == Color::Transparent));
+
+        let reset_events = Arc::new(Mutex::new(Vec::new()));
+        let resetting_events = Arc::clone(&reset_events);
+        device.AddDeviceResettingHandler(Box::new(
+            move |_: &dyn std::any::Any, _: cna::extensions::events::EventArgs| {
+                resetting_events
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .push("resetting");
+            },
+        ));
+        let reset_complete_events = Arc::clone(&reset_events);
+        device.AddDeviceResetHandler(Box::new(
+            move |_: &dyn std::any::Any, _: cna::extensions::events::EventArgs| {
+                reset_complete_events
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .push("reset");
+            },
+        ));
+        device.Reset()?;
+        device.ResetWithPresentationParameters(&parameters)?;
+        device.ResetWithPresentationParametersAndGraphicsAdapter(&parameters, device.Adapter()?)?;
+        assert_eq!(
+            *reset_events
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            [
+                "resetting",
+                "reset",
+                "resetting",
+                "reset",
+                "resetting",
+                "reset"
+            ]
+        );
+        assert_eq!(device.GetVertexBuffers()?.len(), 1);
+        assert!(device.Indices()?.is_some());
+
+        let texture_cube = TextureCube::new(&device, 1, false, SurfaceFormat::Color)?;
+        let mut cube_readback = [Color::Transparent];
+        match texture_cube.SetData(CubeMapFace::PositiveX, &[Color::Red]) {
+            Ok(()) => {
+                texture_cube.GetData(CubeMapFace::PositiveX, &mut cube_readback)?;
+                assert_eq!(cube_readback, [Color::Red]);
+            }
+            Err(CnaError::Native { code: 6, .. }) => {
+                assert_native_not_supported(
+                    texture_cube.GetData(CubeMapFace::PositiveX, &mut cube_readback),
+                );
+                assert_eq!(cube_readback, [Color::Transparent]);
+            }
+            Err(error) => return Err(error),
+        }
+
+        let mut render_target2d = RenderTarget2D::new(&device, 1, 1)?;
+        let render_target2d_other = RenderTarget2D::new(&device, 2, 2)?;
+        let binding2d = RenderTargetBinding::new(&render_target2d)?;
+        let binding2d_other = RenderTargetBinding::new(&render_target2d_other)?;
+        assert!(matches!(
+            device.SetRenderTargets(&[binding2d.clone(), binding2d.clone()]),
+            Err(CnaError::InvalidInput(_))
+        ));
+        assert!(matches!(
+            device.SetRenderTargets(&[binding2d.clone(), binding2d_other]),
+            Err(CnaError::InvalidInput(_))
+        ));
+        match device.SetRenderTargetWithRenderTarget(Some(&render_target2d)) {
+            Ok(()) => {
+                let observed = device.GetRenderTargets();
+                let dispose_while_bound = render_target2d.DisposeWithNoArguments();
+                device.SetRenderTargets(&[])?;
+                assert_eq!(observed?.len(), 1);
+                assert!(matches!(
+                    dispose_while_bound,
+                    Err(CnaError::InvalidInput(_))
+                ));
+            }
+            Err(CnaError::Native { code: 6, .. }) => {
+                assert!(device.GetRenderTargets()?.is_empty());
+            }
+            Err(error) => return Err(error),
+        }
+
+        let render_target_cube = RenderTargetCube::new(
+            &device,
+            1,
+            false,
+            SurfaceFormat::Color,
+            cna::Microsoft::Xna::Framework::Graphics::DepthFormat::None,
+        )?;
+        match device.SetRenderTarget(Some(&render_target_cube), CubeMapFace::NegativeZ) {
+            Ok(()) => {
+                let observed = device.GetRenderTargets();
+                device.SetRenderTargets(&[])?;
+                let observed = observed?;
+                assert_eq!(observed.len(), 1);
+                assert_eq!(observed[0].CubeMapFace(), CubeMapFace::NegativeZ);
+            }
+            Err(CnaError::Native { code: 6, .. }) => {
+                assert!(device.GetRenderTargets()?.is_empty());
+            }
+            Err(error) => return Err(error),
+        }
+        device.SetRenderTargets(&[])?;
+
+        self.vertex = Some(typed);
+        self.index = Some(indices32);
+        self.texture_cube = Some(texture_cube);
+        self.render_target2d = Some(render_target2d);
+        self.render_target_cube = Some(render_target_cube);
+        Ok(())
+    }
+
+    fn UnloadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let _ = game;
+        assert!(self
+            .vertex
+            .as_ref()
+            .expect("retained vertex buffer")
+            .IsDisposed());
+        assert!(self
+            .index
+            .as_ref()
+            .expect("retained index buffer")
+            .IsDisposed());
+        assert!(self
+            .texture_cube
+            .as_ref()
+            .expect("retained cube texture")
+            .IsDisposed());
+        assert!(self
+            .render_target2d
+            .as_ref()
+            .expect("retained 2D render target")
+            .IsDisposed());
+        assert!(self
+            .render_target_cube
+            .as_ref()
+            .expect("retained cube render target")
+            .IsDisposed());
+        Ok(())
+    }
+}
+
+fn assert_missing_effect(result: Result<()>) {
+    assert!(matches!(
+        result,
+        Err(CnaError::Native { code: 12, message })
+            if message.contains("no effect has been applied")
+    ));
+}
+
+fn assert_headless_readback_unsupported(result: Result<()>) {
+    assert!(matches!(
+        result,
+        Err(CnaError::Native { code: 6, message })
+            if message.contains("Headless renderer does not rasterize")
+    ));
+}
+
+fn assert_native_not_supported(result: Result<()>) {
+    assert!(matches!(result, Err(CnaError::Native { code: 6, .. })));
+}
+
 #[derive(Default)]
 struct FaultTextureInfoGame {
     state: Arc<GameState>,
@@ -861,6 +1799,10 @@ fn native_stress_isolated() {
         "lifecycle-100",
         "resources-25",
         "texture-transfers-10",
+        "buffer-transfers-10",
+        "sprite-font-xnb-10",
+        "effect-xnb-1",
+        "effect-graph-10",
         "lifecycle-order-and-identity",
         "component-order-and-mutation",
         "callback-panic",
@@ -898,6 +1840,50 @@ fn run_child_case(case: &str) {
             for _ in 0..10 {
                 run_for_frames(TextureTransferGame::default(), 1)
                     .expect("Texture2D transfer/validation/event cycle");
+            }
+        }
+        "buffer-transfers-10" => {
+            for _ in 0..10 {
+                run_for_frames(BufferTransferGame::default(), 1)
+                    .expect("buffer transfer/binding/ownership cycle");
+            }
+        }
+        "sprite-font-xnb-10" => {
+            let fixture = SpriteFontFixture::new();
+            for _ in 0..10 {
+                let retained_font = Arc::new(Mutex::new(None));
+                run_for_frames(
+                    SpriteFontXnbGame {
+                        state: Arc::new(GameState::new()),
+                        root: fixture.0.clone(),
+                        retained_font: Arc::clone(&retained_font),
+                    },
+                    1,
+                )
+                .expect("SpriteFont XNB/content/draw-string ownership cycle");
+                let font = retained_font
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .take()
+                    .expect("retained SpriteFont after game shutdown");
+                assert!(font.MeasureString("?").is_err());
+            }
+        }
+        "effect-xnb-1" => {
+            let fixture = EffectFixture::new();
+            run_for_frames(
+                EffectXnbGame {
+                    state: Arc::new(GameState::new()),
+                    root: fixture.0.clone(),
+                },
+                1,
+            )
+            .expect("Effect XNB reader pipeline and backend failure cycle");
+        }
+        "effect-graph-10" => {
+            for _ in 0..10 {
+                run_for_frames(EffectStressGame::default(), 1)
+                    .expect("Effect reflection/parameter/pass/SpriteBatch ownership cycle");
             }
         }
         "lifecycle-order-and-identity" => {

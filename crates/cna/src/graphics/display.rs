@@ -340,4 +340,14 @@ impl GraphicsAdapter {
         device.ensure_alive()?;
         Ok(device)
     }
+
+    pub(super) fn index_for(&self, expected: &Arc<DeviceState>) -> Result<u32> {
+        let device = self.device()?;
+        if !Arc::ptr_eq(&device, expected) {
+            return Err(CnaError::InvalidInput(
+                "graphics adapter belongs to another graphics device",
+            ));
+        }
+        Ok(self.index)
+    }
 }

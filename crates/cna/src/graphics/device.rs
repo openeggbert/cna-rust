@@ -18,12 +18,37 @@ use crate::extensions::window::WindowHandle;
 use crate::native::Native;
 use crate::value::{Color, Rectangle, Vector4};
 
-use super::resource::{EventHandlers, ResourceState};
+use super::buffer::encode_vertices;
+use super::resource::{EventHandlers, ResourceKind, ResourceState};
 use super::{
     BlendState, DepthStencilState, DisplayMode, GraphicsAdapter, GraphicsDeviceStatus,
-    GraphicsProfile, PresentationParameters, RasterizerState, ResourceCreatedEventArgs,
-    ResourceDestroyedEventArgs, SamplerStateCollection, TextureCollection, Viewport,
+    GraphicsProfile, IndexBuffer, PresentationParameters, PrimitiveType, RasterizerState,
+    RenderTarget2D, RenderTargetBinding, RenderTargetCube, ResourceCreatedEventArgs,
+    ResourceDestroyedEventArgs, SamplerStateCollection, TextureCollection, VertexBuffer,
+    VertexBufferBinding, VertexData, VertexDeclaration, Viewport,
 };
+
+mod back_buffer_data_sealed {
+    pub trait Sealed {}
+}
+
+/// Safe element contract for the ABI-0.7 RGBA8 back-buffer transfer route.
+///
+/// The trait is sealed because CNA currently guarantees only XNA `Color`
+/// readback. Broader XNA element formats are rejected structurally instead of
+/// being reinterpreted as arbitrary Rust memory.
+pub trait BackBufferData: back_buffer_data_sealed::Sealed + Copy + Send + Sync + 'static {
+    #[doc(hidden)]
+    fn from_color(value: Color) -> Self;
+}
+
+impl back_buffer_data_sealed::Sealed for Color {}
+
+impl BackBufferData for Color {
+    fn from_color(value: Color) -> Self {
+        value
+    }
+}
 
 /// Shared validity and child-resource registry for one game-owned device.
 pub(super) struct DeviceState {
@@ -47,6 +72,12 @@ pub(super) struct DeviceState {
     vertex_sampler_states: OnceLock<SamplerStateCollection>,
     textures: OnceLock<TextureCollection>,
     vertex_textures: OnceLock<TextureCollection>,
+    bound_vertex_buffers: Mutex<Vec<VertexBufferBinding>>,
+    bound_vertex_handles: Mutex<Vec<sys::CNA_Handle>>,
+    bound_index_buffer: Mutex<Option<IndexBuffer>>,
+    bound_index_handle: Mutex<sys::CNA_Handle>,
+    bound_render_targets: Mutex<Vec<RenderTargetBinding>>,
+    bound_render_target_handles: Mutex<Vec<sys::CNA_Handle>>,
     pub(super) adapters: OnceLock<Vec<GraphicsAdapter>>,
 }
 
@@ -103,6 +134,70 @@ impl DeviceState {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         resources.retain(|entry| entry.strong_count() != 0);
         resources.push(Arc::downgrade(resource));
+    }
+
+    pub(super) fn is_resource_bound(&self, kind: ResourceKind, handle: sys::CNA_Handle) -> bool {
+        match kind {
+            ResourceKind::VertexBuffer => self
+                .bound_vertex_handles
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .contains(&handle),
+            ResourceKind::IndexBuffer => {
+                *self
+                    .bound_index_handle
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    == handle
+            }
+            ResourceKind::RenderTarget2D | ResourceKind::RenderTargetCube => self
+                .bound_render_target_handles
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .contains(&handle),
+            ResourceKind::Texture2D
+            | ResourceKind::TextureCube
+            | ResourceKind::SpriteBatch
+            | ResourceKind::SpriteFont
+            | ResourceKind::Effect => false,
+        }
+    }
+
+    fn unbind_all_buffers(&self) -> Result<()> {
+        let device = self.handle()?;
+        self.native.set_graphics_vertex_buffers(device, &[])?;
+        self.native
+            .set_graphics_index_buffer(device, sys::CNA_INVALID_HANDLE)?;
+        self.bound_vertex_buffers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clear();
+        self.bound_vertex_handles
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clear();
+        *self
+            .bound_index_buffer
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+        *self
+            .bound_index_handle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = sys::CNA_INVALID_HANDLE;
+        Ok(())
+    }
+
+    fn unbind_all_render_targets(&self) -> Result<()> {
+        self.native.set_render_targets(self.handle()?, &[])?;
+        self.bound_render_targets
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clear();
+        self.bound_render_target_handles
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clear();
+        Ok(())
     }
 
     pub(super) fn dispose_resources(&self) -> Result<()> {
@@ -168,9 +263,26 @@ impl GraphicsDevice {
                 vertex_sampler_states: OnceLock::new(),
                 textures: OnceLock::new(),
                 vertex_textures: OnceLock::new(),
+                bound_vertex_buffers: Mutex::new(Vec::new()),
+                bound_vertex_handles: Mutex::new(Vec::new()),
+                bound_index_buffer: Mutex::new(None),
+                bound_index_handle: Mutex::new(sys::CNA_INVALID_HANDLE),
+                bound_render_targets: Mutex::new(Vec::new()),
+                bound_render_target_handles: Mutex::new(Vec::new()),
                 adapters: OnceLock::new(),
             }),
         }
+    }
+
+    pub fn new(
+        adapter: &GraphicsAdapter,
+        graphicsProfile: GraphicsProfile,
+        presentationParameters: &PresentationParameters,
+    ) -> Result<Self> {
+        let _ = (adapter, graphicsProfile, presentationParameters);
+        Err(CnaError::UnsupportedRuntime(
+            "CNA ABI 0.7 exposes only the game-owned GraphicsDevice; it has no independent device constructor",
+        ))
     }
 
     pub(super) fn handle(&self) -> Result<sys::CNA_Handle> {
@@ -633,6 +745,904 @@ impl GraphicsDevice {
         Ok(())
     }
 
+    pub fn Indices(&self) -> Result<Option<IndexBuffer>> {
+        let device = self.state.handle()?;
+        let mut native_handle = sys::CNA_INVALID_HANDLE;
+        self.state
+            .native
+            .graphics_index_buffer(device, &mut native_handle)?;
+        let cached = self
+            .state
+            .bound_index_buffer
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        match cached {
+            Some(buffer) if buffer.handle()? == native_handle => Ok(Some(buffer)),
+            None if native_handle == sys::CNA_INVALID_HANDLE => Ok(None),
+            _ => Err(CnaError::Native {
+                code: sys::CNA_RESULT_INVALID_STATE,
+                message:
+                    "native index-buffer binding changed outside CNA-Rust's safe identity registry"
+                        .to_owned(),
+            }),
+        }
+    }
+
+    pub fn SetIndices(&mut self, value: Option<&IndexBuffer>) -> Result<()> {
+        let native_handle = match value {
+            Some(buffer) => {
+                if !buffer.is_same_device(self) {
+                    return Err(CnaError::InvalidInput(
+                        "index buffer belongs to a different graphics device",
+                    ));
+                }
+                buffer.handle()?
+            }
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        self.state
+            .native
+            .set_graphics_index_buffer(self.state.handle()?, native_handle)?;
+        *self
+            .state
+            .bound_index_buffer
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = value.cloned();
+        *self
+            .state
+            .bound_index_handle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = native_handle;
+        Ok(())
+    }
+
+    pub fn GetVertexBuffers(&self) -> Result<Vec<VertexBufferBinding>> {
+        let device = self.state.handle()?;
+        let mut count = 0_u64;
+        self.state
+            .native
+            .graphics_vertex_buffer_count(device, &mut count)?;
+        let count_usize = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("native vertex binding count is too large"))?;
+        let mut native_bindings = vec![sys::CNA_VertexBufferBinding::default(); count_usize];
+        let mut copied = 0_u64;
+        self.state.native.copy_graphics_vertex_buffers(
+            device,
+            &mut native_bindings,
+            &mut copied,
+        )?;
+        if copied != count {
+            return Err(CnaError::Native {
+                code: sys::CNA_RESULT_INTERNAL,
+                message: "CNA returned inconsistent vertex binding counts".to_owned(),
+            });
+        }
+        let mut first = sys::CNA_INVALID_HANDLE;
+        self.state
+            .native
+            .graphics_vertex_buffer(device, &mut first)?;
+        let expected_first = native_bindings
+            .first()
+            .map_or(sys::CNA_INVALID_HANDLE, |binding| binding.vertex_buffer);
+        if first != expected_first {
+            return Err(CnaError::Native {
+                code: sys::CNA_RESULT_INTERNAL,
+                message: "CNA returned inconsistent first vertex-buffer identity".to_owned(),
+            });
+        }
+        let cached = self
+            .state
+            .bound_vertex_buffers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if cached.len() != native_bindings.len() {
+            return Err(CnaError::Native {
+                code: sys::CNA_RESULT_INVALID_STATE,
+                message: "native vertex bindings changed outside CNA-Rust's safe identity registry"
+                    .to_owned(),
+            });
+        }
+        for (logical, native) in cached.iter().zip(&native_bindings) {
+            if logical.VertexBuffer().handle()? != native.vertex_buffer
+                || logical.VertexOffset() != native.vertex_offset
+                || logical.InstanceFrequency() != native.instance_frequency
+            {
+                return Err(CnaError::Native {
+                    code: sys::CNA_RESULT_INVALID_STATE,
+                    message: "native vertex binding identity differs from CNA-Rust's safe registry"
+                        .to_owned(),
+                });
+            }
+        }
+        Ok(cached)
+    }
+
+    pub fn SetVertexBuffer(&self, vertexBuffer: &VertexBuffer, vertexOffset: i32) -> Result<()> {
+        if !vertexBuffer.is_same_device(self) {
+            return Err(CnaError::InvalidInput(
+                "vertex buffer belongs to a different graphics device",
+            ));
+        }
+        let binding =
+            VertexBufferBinding::from_vertex_buffer_and_vertex_offset(vertexBuffer, vertexOffset)?;
+        self.state.native.set_graphics_vertex_buffer(
+            self.state.handle()?,
+            vertexBuffer.handle()?,
+            vertexOffset,
+        )?;
+        *self
+            .state
+            .bound_vertex_buffers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = vec![binding];
+        *self
+            .state
+            .bound_vertex_handles
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = vec![vertexBuffer.handle()?];
+        Ok(())
+    }
+
+    pub fn SetVertexBufferWithVertexBuffer(&self, vertexBuffer: &VertexBuffer) -> Result<()> {
+        self.SetVertexBuffer(vertexBuffer, 0)
+    }
+
+    pub fn SetVertexBuffers(&self, vertexBuffers: &[VertexBufferBinding]) -> Result<()> {
+        let mut native = Vec::with_capacity(vertexBuffers.len());
+        let mut handles = Vec::with_capacity(vertexBuffers.len());
+        for binding in vertexBuffers {
+            if !binding.VertexBuffer().is_same_device(self) {
+                return Err(CnaError::InvalidInput(
+                    "vertex buffer belongs to a different graphics device",
+                ));
+            }
+            native.push(binding.to_native()?);
+            handles.push(binding.VertexBuffer().handle()?);
+        }
+        self.state
+            .native
+            .set_graphics_vertex_buffers(self.state.handle()?, &native)?;
+        *self
+            .state
+            .bound_vertex_buffers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = vertexBuffers.to_vec();
+        *self
+            .state
+            .bound_vertex_handles
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = handles;
+        Ok(())
+    }
+
+    pub fn DrawPrimitives(
+        &self,
+        primitiveType: PrimitiveType,
+        startVertex: i32,
+        primitiveCount: i32,
+    ) -> Result<()> {
+        let required = primitive_element_count(primitiveType, primitiveCount)?;
+        let start = usize::try_from(startVertex)
+            .map_err(|_| CnaError::InvalidInput("start vertex must not be negative"))?;
+        let bindings = self
+            .state
+            .bound_vertex_buffers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let binding = bindings.first().ok_or(CnaError::InvalidInput(
+            "DrawPrimitives requires a bound vertex buffer",
+        ))?;
+        binding.VertexBuffer().handle()?;
+        let begin = start
+            .checked_add(binding.VertexOffset() as usize)
+            .ok_or(CnaError::InvalidInput("vertex draw range overflows"))?;
+        let end = begin
+            .checked_add(required)
+            .ok_or(CnaError::InvalidInput("vertex draw range overflows"))?;
+        if end > binding.VertexBuffer().VertexCount() as usize {
+            return Err(CnaError::InvalidInput(
+                "vertex draw range exceeds the bound buffer",
+            ));
+        }
+        self.state.native.draw_primitives(
+            self.state.handle()?,
+            primitiveType as u32,
+            startVertex,
+            primitiveCount,
+        )
+    }
+
+    pub fn DrawIndexedPrimitives(
+        &self,
+        primitiveType: PrimitiveType,
+        baseVertex: i32,
+        minVertexIndex: i32,
+        numVertices: i32,
+        startIndex: i32,
+        primitiveCount: i32,
+    ) -> Result<()> {
+        self.validate_indexed_draw(
+            primitiveType,
+            baseVertex,
+            minVertexIndex,
+            numVertices,
+            startIndex,
+            primitiveCount,
+        )?;
+        self.state.native.draw_indexed_primitives(
+            self.state.handle()?,
+            primitiveType as u32,
+            baseVertex,
+            minVertexIndex,
+            numVertices,
+            startIndex,
+            primitiveCount,
+        )
+    }
+
+    pub fn DrawInstancedPrimitives(
+        &self,
+        primitiveType: PrimitiveType,
+        baseVertex: i32,
+        minVertexIndex: i32,
+        numVertices: i32,
+        startIndex: i32,
+        primitiveCount: i32,
+        instanceCount: i32,
+    ) -> Result<()> {
+        self.validate_indexed_draw(
+            primitiveType,
+            baseVertex,
+            minVertexIndex,
+            numVertices,
+            startIndex,
+            primitiveCount,
+        )?;
+        if instanceCount <= 0 {
+            return Err(CnaError::InvalidInput(
+                "instance count must be greater than zero",
+            ));
+        }
+        self.state.native.draw_instanced_primitives(
+            self.state.handle()?,
+            primitiveType as u32,
+            baseVertex,
+            minVertexIndex,
+            numVertices,
+            startIndex,
+            primitiveCount,
+            instanceCount,
+        )
+    }
+
+    pub fn DrawUserPrimitives<T: VertexData>(
+        &self,
+        primitiveType: PrimitiveType,
+        vertexData: &[T],
+        vertexOffset: i32,
+        primitiveCount: i32,
+    ) -> Result<()> {
+        self.draw_user_primitives(
+            primitiveType,
+            vertexData,
+            vertexOffset,
+            primitiveCount,
+            T::vertex_declaration(),
+        )
+    }
+
+    pub fn DrawUserPrimitivesWithPrimitiveTypeAndVertexDataAndVertexOffsetAndPrimitiveCountAndVertexDeclaration<
+        T: VertexData,
+    >(
+        &self,
+        primitiveType: PrimitiveType,
+        vertexData: &[T],
+        vertexOffset: i32,
+        primitiveCount: i32,
+        vertexDeclaration: &VertexDeclaration,
+    ) -> Result<()> {
+        self.draw_user_primitives(
+            primitiveType,
+            vertexData,
+            vertexOffset,
+            primitiveCount,
+            vertexDeclaration,
+        )
+    }
+
+    pub fn DrawUserIndexedPrimitives<T: VertexData>(
+        &self,
+        primitiveType: PrimitiveType,
+        vertexData: &[T],
+        vertexOffset: i32,
+        numVertices: i32,
+        indexData: &[i32],
+        indexOffset: i32,
+        primitiveCount: i32,
+    ) -> Result<()> {
+        self.draw_user_indexed_primitives(
+            primitiveType,
+            vertexData,
+            vertexOffset,
+            numVertices,
+            indexData,
+            indexOffset,
+            primitiveCount,
+            T::vertex_declaration(),
+        )
+    }
+
+    pub fn DrawUserIndexedPrimitivesWithPrimitiveTypeAndVertexDataAndVertexOffsetAndNumVerticesAndIndexDataAndIndexOffsetAndPrimitiveCount<
+        T: VertexData,
+    >(
+        &self,
+        primitiveType: PrimitiveType,
+        vertexData: &[T],
+        vertexOffset: i32,
+        numVertices: i32,
+        indexData: &[i16],
+        indexOffset: i32,
+        primitiveCount: i32,
+    ) -> Result<()> {
+        self.draw_user_indexed_primitives(
+            primitiveType,
+            vertexData,
+            vertexOffset,
+            numVertices,
+            indexData,
+            indexOffset,
+            primitiveCount,
+            T::vertex_declaration(),
+        )
+    }
+
+    pub fn DrawUserIndexedPrimitivesWithPrimitiveTypeAndVertexDataAndVertexOffsetAndNumVerticesAndIndexDataAndIndexOffsetAndPrimitiveCountAndVertexDeclarationAsPrimitiveTypeAnd0ArrayAndInt32AndInt32AndInt32ArrayAndInt32AndInt32AndVertexDeclaration<
+        T: VertexData,
+    >(
+        &self,
+        primitiveType: PrimitiveType,
+        vertexData: &[T],
+        vertexOffset: i32,
+        numVertices: i32,
+        indexData: &[i32],
+        indexOffset: i32,
+        primitiveCount: i32,
+        vertexDeclaration: &VertexDeclaration,
+    ) -> Result<()> {
+        self.draw_user_indexed_primitives(
+            primitiveType,
+            vertexData,
+            vertexOffset,
+            numVertices,
+            indexData,
+            indexOffset,
+            primitiveCount,
+            vertexDeclaration,
+        )
+    }
+
+    pub fn DrawUserIndexedPrimitivesWithPrimitiveTypeAndVertexDataAndVertexOffsetAndNumVerticesAndIndexDataAndIndexOffsetAndPrimitiveCountAndVertexDeclarationAsPrimitiveTypeAnd0ArrayAndInt32AndInt32AndInt16ArrayAndInt32AndInt32AndVertexDeclaration<
+        T: VertexData,
+    >(
+        &self,
+        primitiveType: PrimitiveType,
+        vertexData: &[T],
+        vertexOffset: i32,
+        numVertices: i32,
+        indexData: &[i16],
+        indexOffset: i32,
+        primitiveCount: i32,
+        vertexDeclaration: &VertexDeclaration,
+    ) -> Result<()> {
+        self.draw_user_indexed_primitives(
+            primitiveType,
+            vertexData,
+            vertexOffset,
+            numVertices,
+            indexData,
+            indexOffset,
+            primitiveCount,
+            vertexDeclaration,
+        )
+    }
+
+    fn validate_indexed_draw(
+        &self,
+        primitive_type: PrimitiveType,
+        base_vertex: i32,
+        min_vertex_index: i32,
+        num_vertices: i32,
+        start_index: i32,
+        primitive_count: i32,
+    ) -> Result<()> {
+        let index_elements = primitive_element_count(primitive_type, primitive_count)?;
+        let min_vertex = usize::try_from(min_vertex_index)
+            .map_err(|_| CnaError::InvalidInput("minimum vertex index must not be negative"))?;
+        let vertex_count = usize::try_from(num_vertices)
+            .map_err(|_| CnaError::InvalidInput("vertex count must not be negative"))?;
+        let index_start = usize::try_from(start_index)
+            .map_err(|_| CnaError::InvalidInput("start index must not be negative"))?;
+        if vertex_count == 0 {
+            return Err(CnaError::InvalidInput(
+                "indexed draws require at least one vertex",
+            ));
+        }
+        let vertex_bindings = self
+            .state
+            .bound_vertex_buffers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let vertex = vertex_bindings.first().ok_or(CnaError::InvalidInput(
+            "indexed draws require a bound vertex buffer",
+        ))?;
+        vertex.VertexBuffer().handle()?;
+        let first =
+            i64::from(base_vertex) + i64::from(min_vertex_index) + i64::from(vertex.VertexOffset());
+        let end = first
+            .checked_add(i64::from(num_vertices))
+            .ok_or(CnaError::InvalidInput("indexed vertex range overflows"))?;
+        if first < 0 || end > i64::from(vertex.VertexBuffer().VertexCount()) {
+            return Err(CnaError::InvalidInput(
+                "indexed vertex range exceeds the bound vertex buffer",
+            ));
+        }
+        let index = self
+            .state
+            .bound_index_buffer
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+            .ok_or(CnaError::InvalidInput(
+                "indexed draws require a bound index buffer",
+            ))?;
+        index.handle()?;
+        let index_end = index_start
+            .checked_add(index_elements)
+            .ok_or(CnaError::InvalidInput("indexed draw range overflows"))?;
+        if index_end > index.IndexCount() as usize
+            || min_vertex
+                .checked_add(vertex_count)
+                .ok_or(CnaError::InvalidInput("indexed vertex range overflows"))?
+                > vertex.VertexBuffer().VertexCount() as usize
+        {
+            return Err(CnaError::InvalidInput(
+                "indexed draw range exceeds a bound buffer",
+            ));
+        }
+        Ok(())
+    }
+
+    fn draw_user_primitives<T: VertexData>(
+        &self,
+        primitive_type: PrimitiveType,
+        vertex_data: &[T],
+        vertex_offset: i32,
+        primitive_count: i32,
+        declaration: &VertexDeclaration,
+    ) -> Result<()> {
+        let required = primitive_element_count(primitive_type, primitive_count)?;
+        let offset = usize::try_from(vertex_offset)
+            .map_err(|_| CnaError::InvalidInput("vertex offset must not be negative"))?;
+        if offset
+            .checked_add(required)
+            .ok_or(CnaError::InvalidInput("user vertex range overflows"))?
+            > vertex_data.len()
+        {
+            return Err(CnaError::InvalidInput(
+                "user vertex range exceeds the supplied slice",
+            ));
+        }
+        validate_user_declaration::<T>(declaration)?;
+        let bytes = encode_vertices(vertex_data);
+        self.with_user_declaration(declaration, |native_declaration| {
+            let primitives = sys::CNA_UserPrimitives {
+                struct_size: size_of::<sys::CNA_UserPrimitives>() as u32,
+                struct_version: 1,
+                primitive_type: primitive_type as u32,
+                vertex_source: sys::CNA_USER_VERTEX_SOURCE_RAW_STREAM,
+                vertex_data: bytes.as_ptr().cast(),
+                vertex_declaration: native_declaration,
+                vertex_offset,
+                num_vertices: 0,
+                primitive_count,
+                reserved: 0,
+            };
+            self.state
+                .native
+                .draw_user_primitives(self.state.handle()?, &primitives)
+        })
+    }
+
+    fn draw_user_indexed_primitives<T: VertexData, I: UserIndexData>(
+        &self,
+        primitive_type: PrimitiveType,
+        vertex_data: &[T],
+        vertex_offset: i32,
+        num_vertices: i32,
+        index_data: &[I],
+        index_offset: i32,
+        primitive_count: i32,
+        declaration: &VertexDeclaration,
+    ) -> Result<()> {
+        let required_indices = primitive_element_count(primitive_type, primitive_count)?;
+        let vertex_offset_usize = usize::try_from(vertex_offset)
+            .map_err(|_| CnaError::InvalidInput("vertex offset must not be negative"))?;
+        let vertex_count = usize::try_from(num_vertices)
+            .map_err(|_| CnaError::InvalidInput("vertex count must not be negative"))?;
+        let index_offset_usize = usize::try_from(index_offset)
+            .map_err(|_| CnaError::InvalidInput("index offset must not be negative"))?;
+        if vertex_count == 0
+            || vertex_offset_usize
+                .checked_add(vertex_count)
+                .ok_or(CnaError::InvalidInput("user vertex range overflows"))?
+                > vertex_data.len()
+        {
+            return Err(CnaError::InvalidInput(
+                "user vertex range exceeds the supplied slice",
+            ));
+        }
+        let index_end = index_offset_usize
+            .checked_add(required_indices)
+            .ok_or(CnaError::InvalidInput("user index range overflows"))?;
+        let indices =
+            index_data
+                .get(index_offset_usize..index_end)
+                .ok_or(CnaError::InvalidInput(
+                    "user index range exceeds the supplied slice",
+                ))?;
+        if indices
+            .iter()
+            .any(|value| value.value() < 0 || value.value() as usize >= vertex_count)
+        {
+            return Err(CnaError::InvalidInput(
+                "user index references a vertex outside numVertices",
+            ));
+        }
+        validate_user_declaration::<T>(declaration)?;
+        let bytes = encode_vertices(vertex_data);
+        self.with_user_declaration(declaration, |native_declaration| {
+            let primitives = sys::CNA_UserPrimitives {
+                struct_size: size_of::<sys::CNA_UserPrimitives>() as u32,
+                struct_version: 1,
+                primitive_type: primitive_type as u32,
+                vertex_source: sys::CNA_USER_VERTEX_SOURCE_RAW_STREAM,
+                vertex_data: bytes.as_ptr().cast(),
+                vertex_declaration: native_declaration,
+                vertex_offset,
+                num_vertices,
+                primitive_count,
+                reserved: 0,
+            };
+            let indices = sys::CNA_UserIndices {
+                struct_size: size_of::<sys::CNA_UserIndices>() as u32,
+                struct_version: 1,
+                index_element_size: I::ELEMENT_SIZE,
+                index_offset,
+                index_data: index_data.as_ptr().cast(),
+            };
+            self.state.native.draw_user_indexed_primitives(
+                self.state.handle()?,
+                &primitives,
+                &indices,
+            )
+        })
+    }
+
+    fn with_user_declaration(
+        &self,
+        declaration: &VertexDeclaration,
+        operation: impl FnOnce(sys::CNA_VertexDeclarationHandle) -> Result<()>,
+    ) -> Result<()> {
+        declaration.ensure_open()?;
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        self.state.native.create_vertex_declaration(
+            declaration.VertexStride(),
+            &declaration.native_elements(),
+            &mut handle,
+        )?;
+        let result = operation(handle);
+        let cleanup = self.state.native.destroy_vertex_declaration(handle);
+        result?;
+        cleanup
+    }
+
+    pub fn GetBackBufferData<T: BackBufferData>(
+        &self,
+        rect: Option<Rectangle>,
+        data: &mut [T],
+        startIndex: i32,
+        elementCount: i32,
+    ) -> Result<()> {
+        let start = usize::try_from(startIndex)
+            .map_err(|_| CnaError::InvalidInput("start index must not be negative"))?;
+        let count = usize::try_from(elementCount)
+            .map_err(|_| CnaError::InvalidInput("element count must not be negative"))?;
+        let end = start.checked_add(count).ok_or(CnaError::InvalidInput(
+            "back-buffer destination range overflows",
+        ))?;
+        if end > data.len() {
+            return Err(CnaError::InvalidInput(
+                "back-buffer destination range exceeds the supplied slice",
+            ));
+        }
+        if let Some(source) = rect {
+            if source.X < 0 || source.Y < 0 || source.Width < 0 || source.Height < 0 {
+                return Err(CnaError::InvalidInput(
+                    "back-buffer source rectangle must not contain negative values",
+                ));
+            }
+            let parameters = self.PresentationParameters()?;
+            let right = source
+                .X
+                .checked_add(source.Width)
+                .ok_or(CnaError::InvalidInput(
+                    "back-buffer source rectangle overflows",
+                ))?;
+            let bottom = source
+                .Y
+                .checked_add(source.Height)
+                .ok_or(CnaError::InvalidInput(
+                    "back-buffer source rectangle overflows",
+                ))?;
+            if right > parameters.BackBufferWidth() || bottom > parameters.BackBufferHeight() {
+                return Err(CnaError::InvalidInput(
+                    "back-buffer source rectangle exceeds the back buffer",
+                ));
+            }
+        }
+        let source_rectangle =
+            rect.map_or_else(sys::CNA_Rectangle::default, |value| sys::CNA_Rectangle {
+                x: value.X,
+                y: value.Y,
+                width: value.Width,
+                height: value.Height,
+            });
+        let readback = sys::CNA_BackBufferReadback {
+            struct_size: size_of::<sys::CNA_BackBufferReadback>() as u32,
+            struct_version: 1,
+            has_source_rectangle: u8::from(rect.is_some()),
+            reserved: [0; 3],
+            source_rectangle,
+            start_index: start as u64,
+            element_count: count as u64,
+        };
+        let mut colors = vec![sys::CNA_Color::default(); data.len()];
+        self.state.native.get_backbuffer_data_window(
+            self.state.handle()?,
+            &readback,
+            &mut colors,
+        )?;
+        for (destination, value) in data[start..end].iter_mut().zip(&colors[start..end]) {
+            *destination = T::from_color(
+                Color::from_r_and_g_and_b_and_a_as_int32_and_int32_and_int32_and_int32(
+                    i32::from(value.r),
+                    i32::from(value.g),
+                    i32::from(value.b),
+                    i32::from(value.a),
+                ),
+            );
+        }
+        Ok(())
+    }
+
+    pub fn GetBackBufferDataWithData<T: BackBufferData>(&self, data: &mut [T]) -> Result<()> {
+        let count = i32::try_from(data.len())
+            .map_err(|_| CnaError::InvalidInput("back-buffer destination is too large"))?;
+        self.GetBackBufferData(None, data, 0, count)
+    }
+
+    pub fn GetBackBufferDataWithDataAndStartIndexAndElementCount<T: BackBufferData>(
+        &self,
+        data: &mut [T],
+        startIndex: i32,
+        elementCount: i32,
+    ) -> Result<()> {
+        self.GetBackBufferData(None, data, startIndex, elementCount)
+    }
+
+    pub fn Reset(&self) -> Result<()> {
+        if self.state.device_resetting.emit(self, EventArgs) {
+            return Err(CnaError::Callback(
+                "GraphicsDevice.DeviceResetting handler panicked".to_owned(),
+            ));
+        }
+        self.state
+            .native
+            .reset_graphics_device(self.state.handle()?)?;
+        self.after_reset()?;
+        if self.state.device_reset.emit(self, EventArgs) {
+            Err(CnaError::Callback(
+                "GraphicsDevice.DeviceReset handler panicked".to_owned(),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn ResetWithPresentationParameters(
+        &self,
+        presentationParameters: &PresentationParameters,
+    ) -> Result<()> {
+        self.reset_with_parameters(presentationParameters, None)
+    }
+
+    pub fn ResetWithPresentationParametersAndGraphicsAdapter(
+        &self,
+        presentationParameters: &PresentationParameters,
+        graphicsAdapter: &GraphicsAdapter,
+    ) -> Result<()> {
+        let adapter_index = graphicsAdapter.index_for(&self.state)?;
+        self.reset_with_parameters(presentationParameters, Some(adapter_index))
+    }
+
+    fn reset_with_parameters(
+        &self,
+        parameters: &PresentationParameters,
+        adapter_index: Option<u32>,
+    ) -> Result<()> {
+        let mut current = sys::CNA_PresentationParameters {
+            struct_size: size_of::<sys::CNA_PresentationParameters>() as u32,
+            struct_version: 1,
+            ..sys::CNA_PresentationParameters::default()
+        };
+        let handle = self.state.handle()?;
+        self.state
+            .native
+            .presentation_parameters(handle, &mut current)?;
+        let native = parameters.to_native(current.headless_ext != sys::CNA_FALSE);
+        if self.state.device_resetting.emit(self, EventArgs) {
+            return Err(CnaError::Callback(
+                "GraphicsDevice.DeviceResetting handler panicked".to_owned(),
+            ));
+        }
+        self.state
+            .native
+            .reset_graphics_device_with_parameters(handle, &native, adapter_index)?;
+        self.after_reset()?;
+        if self.state.device_reset.emit(self, EventArgs) {
+            Err(CnaError::Callback(
+                "GraphicsDevice.DeviceReset handler panicked".to_owned(),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn after_reset(&self) -> Result<()> {
+        *self
+            .state
+            .blend_state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+        *self
+            .state
+            .depth_stencil_state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+        *self
+            .state
+            .rasterizer_state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+        if let Some(collection) = self.state.sampler_states.get() {
+            collection.clear_cache();
+        }
+        if let Some(collection) = self.state.vertex_sampler_states.get() {
+            collection.clear_cache();
+        }
+        if let Some(collection) = self.state.textures.get() {
+            collection.clear_cache();
+        }
+        if let Some(collection) = self.state.vertex_textures.get() {
+            collection.clear_cache();
+        }
+        let _ = self.PresentationParameters()?;
+        Ok(())
+    }
+
+    pub fn SetRenderTarget(
+        &self,
+        renderTarget: Option<&RenderTargetCube>,
+        cubeMapFace: super::CubeMapFace,
+    ) -> Result<()> {
+        match renderTarget {
+            Some(target) => {
+                self.SetRenderTargets(&[RenderTargetBinding::from_render_target_and_cube_map_face(
+                    target,
+                    cubeMapFace,
+                )?])
+            }
+            None => self.SetRenderTargets(&[]),
+        }
+    }
+
+    pub fn SetRenderTargetWithRenderTarget(
+        &self,
+        renderTarget: Option<&RenderTarget2D>,
+    ) -> Result<()> {
+        match renderTarget {
+            Some(target) => self.SetRenderTargets(&[RenderTargetBinding::new(target)?]),
+            None => self.SetRenderTargets(&[]),
+        }
+    }
+
+    pub fn SetRenderTargets(&self, renderTargets: &[RenderTargetBinding]) -> Result<()> {
+        let mut handles = Vec::with_capacity(renderTargets.len());
+        let mut native = Vec::with_capacity(renderTargets.len());
+        let mut expected_shape = None;
+        for binding in renderTargets {
+            if !binding.device().is_same_device(self) {
+                return Err(CnaError::InvalidInput(
+                    "render target belongs to another graphics device",
+                ));
+            }
+            let handle = binding.handle()?;
+            if handles.contains(&handle) {
+                return Err(CnaError::InvalidInput(
+                    "the same render target cannot occupy multiple binding slots",
+                ));
+            }
+            let shape = binding.dimensions_and_samples();
+            if expected_shape.is_some_and(|expected| expected != shape) {
+                return Err(CnaError::InvalidInput(
+                    "all render targets must have compatible dimensions and multisampling",
+                ));
+            }
+            expected_shape = Some(shape);
+            handles.push(handle);
+            native.push(binding.to_native()?);
+        }
+        self.state
+            .native
+            .set_render_targets(self.state.handle()?, &native)?;
+        *self
+            .state
+            .bound_render_targets
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = renderTargets.to_vec();
+        *self
+            .state
+            .bound_render_target_handles
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = handles;
+        Ok(())
+    }
+
+    pub fn GetRenderTargets(&self) -> Result<Vec<RenderTargetBinding>> {
+        let handle = self.state.handle()?;
+        let mut count = 0;
+        self.state.native.render_target_count(handle, &mut count)?;
+        let length = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("render-target binding count is too large"))?;
+        let mut native = vec![sys::CNA_RenderTargetBinding::default(); length];
+        if length != 0 {
+            self.state
+                .native
+                .copy_render_targets(handle, &mut native, &mut count)?;
+        }
+        let cached = self
+            .state
+            .bound_render_targets
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if cached.len() != length
+            || cached.iter().zip(&native).any(|(logical, observed)| {
+                logical.handle().ok() != Some(observed.render_target)
+                    || logical.CubeMapFace() as u32 != observed.cube_map_face
+                    || observed.array_slice != 0
+            })
+        {
+            return Err(CnaError::Native {
+                code: sys::CNA_RESULT_INVALID_STATE,
+                message: "native render-target bindings changed outside CNA-Rust's safe identity registry"
+                    .to_owned(),
+            });
+        }
+        Ok(cached.clone())
+    }
+
     pub fn Present(
         &self,
         sourceRectangle: Option<Rectangle>,
@@ -684,6 +1694,14 @@ impl GraphicsDevice {
         self.state.leave_callback();
     }
 
+    pub(crate) fn unbind_all_buffers(&self) -> Result<()> {
+        self.state.unbind_all_buffers()
+    }
+
+    pub(crate) fn unbind_all_render_targets(&self) -> Result<()> {
+        self.state.unbind_all_render_targets()
+    }
+
     pub(crate) fn invalidate(&self) {
         if self.state.invalidate() {
             let _ = self.state.disposing.emit(self, EventArgs);
@@ -721,6 +1739,53 @@ impl GraphicsDevice {
             supports_depth,
             info.max_texture_dimension,
         ))
+    }
+}
+
+fn primitive_element_count(primitive_type: PrimitiveType, primitive_count: i32) -> Result<usize> {
+    let count = usize::try_from(primitive_count)
+        .map_err(|_| CnaError::InvalidInput("primitive count must be greater than zero"))?;
+    if count == 0 {
+        return Err(CnaError::InvalidInput(
+            "primitive count must be greater than zero",
+        ));
+    }
+    match primitive_type {
+        PrimitiveType::TriangleList => count.checked_mul(3),
+        PrimitiveType::TriangleStrip => count.checked_add(2),
+        PrimitiveType::LineList => count.checked_mul(2),
+        PrimitiveType::LineStrip => count.checked_add(1),
+    }
+    .ok_or(CnaError::InvalidInput("primitive element count overflows"))
+}
+
+fn validate_user_declaration<T: VertexData>(declaration: &VertexDeclaration) -> Result<()> {
+    declaration.ensure_open()?;
+    if declaration.structurally_equals(T::vertex_declaration()) {
+        Ok(())
+    } else {
+        Err(CnaError::InvalidInput(
+            "vertex declaration does not match the safe VertexData encoding",
+        ))
+    }
+}
+
+trait UserIndexData: Copy {
+    const ELEMENT_SIZE: sys::CNA_IndexElementSize;
+    fn value(self) -> i64;
+}
+
+impl UserIndexData for i16 {
+    const ELEMENT_SIZE: sys::CNA_IndexElementSize = sys::CNA_INDEX_ELEMENT_SIZE_SIXTEEN_BITS;
+    fn value(self) -> i64 {
+        i64::from(self)
+    }
+}
+
+impl UserIndexData for i32 {
+    const ELEMENT_SIZE: sys::CNA_IndexElementSize = sys::CNA_INDEX_ELEMENT_SIZE_THIRTY_TWO_BITS;
+    fn value(self) -> i64 {
+        i64::from(self)
     }
 }
 

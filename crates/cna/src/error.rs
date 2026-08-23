@@ -29,6 +29,8 @@ pub enum CnaError {
     UnsupportedRuntime(&'static str),
     /// A mapped XNA file/stream operation failed.
     Io(String),
+    /// XNA content loading or XNB decoding failed.
+    Content(crate::content::ContentLoadException),
 }
 
 impl fmt::Display for CnaError {
@@ -49,12 +51,19 @@ impl fmt::Display for CnaError {
                 formatter.write_str(message)
             }
             Self::Io(message) => formatter.write_str(message),
+            Self::Content(error) => error.fmt(formatter),
             Self::UnsupportedPlatform => formatter.write_str("CNA dynamic loading is not implemented on this platform"),
         }
     }
 }
 
 impl std::error::Error for CnaError {}
+
+impl From<crate::content::ContentLoadException> for CnaError {
+    fn from(value: crate::content::ContentLoadException) -> Self {
+        Self::Content(value)
+    }
+}
 
 /// Result type used by the safe CNA API.
 pub type Result<T> = core::result::Result<T, CnaError>;

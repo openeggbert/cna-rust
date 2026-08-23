@@ -32,6 +32,10 @@ impl DisplayOrientation {
     pub(crate) const fn from_bits(value: i32) -> Self {
         Self(value)
     }
+
+    pub(crate) const fn bits(self) -> i32 {
+        self.0
+    }
 }
 
 impl BitOr for DisplayOrientation {
