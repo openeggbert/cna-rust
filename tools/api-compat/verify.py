@@ -601,6 +601,67 @@ def game_lifecycle_signature(contract_type: dict, member: dict) -> dict | None:
     return {"parameters": parameters, "returnType": "Result<()>", "generics": [], "refOut": []}
 
 
+def design_converter_signature(
+    contract_type: dict, member: dict, rules: dict,
+) -> dict | None:
+    """Apply the formal typed Rust projection of CLR's designer-only converter plumbing."""
+    projection = rules.get("designTypeConverterProjection", {})
+    type_name = contract_type["name"]
+    math_type = projection.get("mathType")
+    converters = projection.get("converters", {})
+    target = converters.get(type_name)
+    if type_name != math_type and target is None:
+        return None
+
+    receiver = [] if member["kind"] == "constructor" or member.get("static") else [
+        {"name": "self", "type": "&Self"}
+    ]
+    name = member["name"]
+    if member["kind"] == "constructor":
+        return {"parameters": [], "returnType": "Self", "generics": [], "refOut": []}
+    if type_name == math_type:
+        if name in {"CanConvertFrom", "CanConvertTo"}:
+            parameter_name = "sourceType" if name == "CanConvertFrom" else "destinationType"
+            return {
+                "parameters": receiver + [{"name": parameter_name, "type": projection["typeIdentity"]}],
+                "returnType": "bool", "generics": [], "refOut": [],
+            }
+        if name in {"GetCreateInstanceSupported", "GetPropertiesSupported"}:
+            return {"parameters": receiver, "returnType": "bool", "generics": [], "refOut": []}
+        if name == "GetProperties":
+            return {
+                "parameters": receiver, "returnType": projection["propertyDescriptors"],
+                "generics": [], "refOut": [],
+            }
+        return None
+
+    if name == "ConvertFrom":
+        return {
+            "parameters": receiver + [
+                {"name": "culture", "type": projection["culture"]},
+                {"name": "value", "type": "Option<&DesignValue>"},
+            ],
+            "returnType": f"Result<{target}>", "generics": [], "refOut": [],
+        }
+    if name == "ConvertTo":
+        return {
+            "parameters": receiver + [
+                {"name": "culture", "type": projection["culture"]},
+                {"name": "value", "type": "Option<&DesignValue>"},
+                {"name": "destinationType", "type": f"Option<{projection['typeIdentity']}>"},
+            ],
+            "returnType": f"Result<{projection['conversion']}>", "generics": [], "refOut": [],
+        }
+    if name == "CreateInstance":
+        return {
+            "parameters": receiver + [
+                {"name": "propertyValues", "type": f"Option<{projection['propertyValues']}>"},
+            ],
+            "returnType": f"Result<{target}>", "generics": [], "refOut": [],
+        }
+    return None
+
+
 def callable_descriptor(
     contract_type: dict,
     member: dict,
@@ -610,9 +671,11 @@ def callable_descriptor(
     origin: str,
     overload: int = 0,
 ) -> dict:
-    lifecycle = game_lifecycle_signature(contract_type, member)
-    if lifecycle is not None:
-        signature = lifecycle
+    specialized = game_lifecycle_signature(contract_type, member)
+    if specialized is None:
+        specialized = design_converter_signature(contract_type, member, rules)
+    if specialized is not None:
+        signature = specialized
     else:
         generics = projected_generic_parameters(contract_type, member, rules)
         generic_overrides = rules.get("genericBoundOverrides", {}).get(
@@ -698,6 +761,8 @@ def mapped_members(contract_type: dict, rules: dict, reference_types: dict[str, 
     methods = collections.defaultdict(list)
     for member in contract_type["members"]:
         kind = member["kind"]
+        if contract_type["name"] + "::" + member["name"] in rules.get("omittedMembers", []):
+            continue
         if kind == "field":
             if member["name"] == "value__":
                 continue

@@ -189,6 +189,32 @@ participates in ordinary initialize/update/order/enabled/dispose behavior. No
 Gamer, Guide, Avatar, network, achievement, or leaderboard service is in the
 selected profile or fabricated by the component.
 
+## Managed Design converters
+
+Design is a pure managed layer over the existing XNA value types. The twelve
+concrete converters compose the shared `MathTypeConverterBase` contract; no
+converter, property descriptor, culture, or reconstruction operation crosses
+the CNA ABI. The strict namespace contains only the thirteen XNA converter
+types. Crate-root `DesignType`, `DesignCulture`, `DesignValue`, ordered
+property records, and executable reconstruction descriptors form the compact
+Rust support vocabulary documented by the normative mapping.
+
+Metadata is static and immutable. Property extraction produces an ordered
+owned snapshot; nested Vector3 values are copied. Creation consumes an ordered
+slice but performs explicit name lookup, so caller ordering cannot alter the
+result and no hash iteration becomes observable. Reconstruction descriptors
+select one of twelve closed constructor identities rather than retaining a
+reflection object or resolving a dynamic symbol. The value union prevents
+arbitrary `Any`, handles, raw pointers, and implementation objects from
+crossing the public converter boundary.
+
+Culture is explicit and contains only information the XNA IL actually uses:
+decimal separator, list separator, and the three special Single symbols. The
+format path intentionally implements XNA Windows legacy Single text instead
+of inheriting Rust `Display`, while parsing targets `f32` directly. Six
+converters accept component strings; the other six preserve XNA's unsupported
+input behavior and use the inherited value-string fallback for output.
+
 ## Content and XNB
 
 `ContentManager` owns an `Arc<ContentManagerInner>` with its service provider,
@@ -335,9 +361,12 @@ compiler-produced rustdoc JSON. Schema 2 measures every declared structural
 category and emits the deterministic type scoreboard. `unmeasuredCategories`
 and the allowlist are empty; the leak-only public-surface gate is zero.
 
-The XNA-derived managed corpus has 145 named observations plus a final count
-assertion (146 assertions total). New platform-neutral groups cover Gesture
-flags/samples and device-information default/reference/clone behavior. The
+The XNA-derived managed corpus has 185 named observations plus a final count
+assertion (186 assertions total). The 40-observation Design group covers
+capabilities, ordered metadata/extraction, component cultures, malformed and
+wrong inputs, creation, Matrix's Translation asymmetry, nested snapshots, and
+all reconstruction identities. The earlier platform-neutral groups cover
+Gesture flags/samples and device-information default/reference/clone behavior. The
 native suite uses isolated child processes for 209 created game lifetimes and
 1,012 owned child-handle constructions, including ten buffer binding cycles,
 ten SpriteFont atlas/content cycles, ten Effect parent/child cycles, ten
@@ -357,10 +386,10 @@ its unmodified C API build at `CnaCApiCoreExt.cpp:250`: the renderer identity
 assertion reduces to `49 == 50`. Runtime evidence therefore uses the clearly
 labelled experimental ABI-0.7 HEADLESS library.
 
-Graphics, Framework/core, Input, Storage, and GamerServices have zero missing
-types. Every remaining strict diagnostic is a whole missing type in Design
-(13), Audio (19), or Media (24); each is a separate future milestone requiring
-its own regenerated dependency/ownership review. LZX is complete for XNA 4.0
+Graphics, Framework/core, Input, Storage, GamerServices, and Design have zero
+missing types. Every remaining strict diagnostic is a whole missing type in
+Audio (19) or Media (24); each is a separate future milestone requiring its
+own regenerated dependency/ownership review. LZX is complete for XNA 4.0
 Windows framing. Repeated frame hosting still needs a CNA core-callback-context
 rebinding route. PNG decoding remains a texture route, not an alias for XNB
 content.

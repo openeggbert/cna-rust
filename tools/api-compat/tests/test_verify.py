@@ -263,6 +263,62 @@ class VerifierMappingTests(unittest.TestCase):
         self.assertEqual(container_members["CreateFile"]["returnType"],
                          "Result<StorageStream>")
 
+    def test_design_type_converter_uses_typed_rust_projection(self):
+        math = {
+            "name": "Microsoft.Xna.Framework.Design.MathTypeConverter", "kind": "class",
+            "genericParameters": [], "members": [
+                {"kind": "constructor", "name": ".ctor", "parameters": []},
+                {"kind": "method", "name": "CanConvertFrom", "static": False,
+                 "returnType": "System.Boolean", "genericParameters": [], "parameters": [
+                     {"name": "context", "type": "System.ComponentModel.ITypeDescriptorContext"},
+                     {"name": "sourceType", "type": "System.Type"},
+                 ]},
+                {"kind": "method", "name": "GetProperties", "static": False,
+                 "returnType": "System.ComponentModel.PropertyDescriptorCollection",
+                 "genericParameters": [], "parameters": [
+                     {"name": "context", "type": "System.ComponentModel.ITypeDescriptorContext"},
+                     {"name": "value", "type": "System.Object"},
+                     {"name": "attributes", "type": "System.Attribute[]"},
+                 ]},
+                {"kind": "field", "name": "propertyDescriptions",
+                 "type": "System.ComponentModel.PropertyDescriptorCollection", "static": False},
+                {"kind": "field", "name": "supportStringConvert",
+                 "type": "System.Boolean", "static": False},
+            ],
+        }
+        vector = {
+            "name": "Microsoft.Xna.Framework.Design.Vector3Converter", "kind": "class",
+            "genericParameters": [], "members": [
+                {"kind": "constructor", "name": ".ctor", "parameters": []},
+                {"kind": "method", "name": "ConvertFrom", "static": False,
+                 "returnType": "System.Object", "genericParameters": [], "parameters": []},
+                {"kind": "method", "name": "ConvertTo", "static": False,
+                 "returnType": "System.Object", "genericParameters": [], "parameters": []},
+                {"kind": "method", "name": "CreateInstance", "static": False,
+                 "returnType": "System.Object", "genericParameters": [], "parameters": []},
+            ],
+        }
+        index = {math["name"]: math, vector["name"]: vector}
+        math_members = VERIFY.mapped_members(math, RULES, index)
+        self.assertEqual(math_members["CanConvertFrom"]["parameters"], [
+            {"name": "self", "type": "&Self"},
+            {"name": "sourceType", "type": "DesignType"},
+        ])
+        self.assertEqual(math_members["GetProperties"]["returnType"],
+                         "&[DesignPropertyDescriptor]")
+        self.assertNotIn("propertyDescriptions", math_members)
+        self.assertNotIn("supportStringConvert", math_members)
+        vector_members = VERIFY.mapped_members(vector, RULES, index)
+        self.assertEqual(vector_members["ConvertFrom"]["parameters"], [
+            {"name": "self", "type": "&Self"},
+            {"name": "culture", "type": "&DesignCulture"},
+            {"name": "value", "type": "Option<&DesignValue>"},
+        ])
+        self.assertEqual(vector_members["ConvertFrom"]["returnType"], "Result<Vector3>")
+        self.assertEqual(vector_members["ConvertTo"]["returnType"], "Result<DesignConversion>")
+        self.assertEqual(vector_members["CreateInstance"]["parameters"][-1],
+                         {"name": "propertyValues", "type": "Option<&[DesignPropertyValue]>"})
+
     def test_curve_collection_returns_shared_key_handle_and_owned_iterator(self):
         key = {"name": "Microsoft.Xna.Framework.CurveKey", "kind": "class"}
         collection = {

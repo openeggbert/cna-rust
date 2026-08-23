@@ -3,6 +3,7 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 mod content;
+mod design;
 mod error;
 mod game;
 mod graphics;
@@ -16,6 +17,10 @@ pub use content::{
     ContentDisposable, ContentDisposableRecorder, ContentLoadable, ContentManagerBase,
     ContentReaderBase, ContentReaderExt, ContentResourceProvider, ContentTypeReaderBase,
     ContentTypeReaderRegistration, ContentTypeReaderRegistry, SerializationInfo, StreamingContext,
+};
+pub use design::{
+    DesignConstructor, DesignConversion, DesignCulture, DesignInstanceDescriptor,
+    DesignPropertyDescriptor, DesignPropertyValue, DesignType, DesignValue, MathTypeConverterBase,
 };
 pub use error::{CnaError, Result};
 pub use game::{
@@ -52,6 +57,16 @@ pub mod Microsoft {
                 MathHelper, Matrix, Plane, PlaneIntersectionType, Point, Quaternion, Ray,
                 Rectangle, Vector2, Vector3, Vector4,
             };
+
+            #[allow(non_snake_case)]
+            pub mod Design {
+                pub use crate::design::{
+                    BoundingBoxConverter, BoundingSphereConverter, ColorConverter,
+                    MathTypeConverter, MatrixConverter, PlaneConverter, PointConverter,
+                    QuaternionConverter, RayConverter, RectangleConverter, Vector2Converter,
+                    Vector3Converter, Vector4Converter,
+                };
+            }
 
             #[allow(non_snake_case, clippy::module_name_repetitions)]
             pub mod Graphics {

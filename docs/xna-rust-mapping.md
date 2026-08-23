@@ -211,6 +211,78 @@ types preserving mutation and read-only rules, with `IntoIterator`, `Index`,
 and `AsRef<[T]>` added only when behavior remains equivalent. Native array
 storage is never exposed directly.
 
+## Design-time math converters
+
+The thirteen `Microsoft.Xna.Framework.Design` types are an observable value
+conversion API, but their CLR base classes and host services are not a useful
+Rust runtime model. CNA-Rust therefore does not publish a fake
+`System::ComponentModel` namespace. The strict converter types remain under
+the XNA Design namespace; their small shared support vocabulary is published
+at crate root so it cannot be confused with additional XNA types.
+
+`MathTypeConverter` is the concrete, directly constructible XNA foundation.
+Its common observable behavior is also represented by the crate-root
+`MathTypeConverterBase` trait, which is the declared base projection for the
+twelve concrete converters. The protected CLR implementation fields
+`propertyDescriptions` and `supportStringConvert` are omitted: they are not
+public state, and their effects are represented by the trait operations and
+immutable converter metadata.
+
+The CLR concepts used by the selected contract map as follows:
+
+| CLR concept | Rust projection |
+|---|---|
+| `TypeConverter` / `ExpandableObjectConverter` | `MathTypeConverterBase`; no general CLR converter hierarchy |
+| `System.Type` | closed, stable `DesignType` enum; never public `std::any::TypeId` |
+| `CultureInfo` | explicit `&DesignCulture` containing only decimal/list/special-number symbols |
+| `PropertyDescriptor` | immutable `DesignPropertyDescriptor` with stable name and `DesignType` |
+| `PropertyDescriptorCollection` | immutable ordered `&[DesignPropertyDescriptor]` |
+| `InstanceDescriptor` | executable `DesignInstanceDescriptor` with stable `DesignConstructor`, ordered arguments, and completeness |
+| `IDictionary` | optional ordered `&[DesignPropertyValue]`; reconstruction looks up names explicitly |
+| `object` converter values | closed `DesignValue` union plus `Option` for CLR null |
+| `ITypeDescriptorContext` | omitted; XNA converter IL does not observe it outside CLR delegation/converter lookup |
+| `Attribute[]` property filters | omitted; all XNA math converters return their fixed descriptor collection without inspecting it |
+
+`DesignValue` is deliberately not `dyn Any`. It admits only the strings,
+component scalars, and existing XNA value types needed by this family. This
+makes null and wrong-type failures deterministic without leaking arbitrary
+reflection objects. A property input is name-addressed: source order is not
+semantically significant, unrelated names are ignored as CLR `IDictionary`
+entries are, and every required name must occur exactly once with a non-null
+value of the exact mapped type. Property metadata and extracted values retain
+the XNA descriptor order. Nested XNA value types are copied, preserving CLR
+value-type snapshot semantics.
+
+`DesignInstanceDescriptor` is not a reflection framework. It can identify and
+invoke only the twelve constructors selected by XNA's concrete converters.
+Arguments remain ordered and typed `DesignValue`s, and every descriptor is
+complete because XNA constructs each one with the three-argument
+`InstanceDescriptor` overload's default completeness. Matrix exposes
+`Translation` as its first property but reconstructs from `M11` through `M44`;
+that asymmetry is retained.
+
+All conversion, extraction, creation, and descriptor invocation operations
+that can observe CLR conversion exceptions return `Result`. `CanConvertFrom`
+and `CanConvertTo` remain infallible capability checks. A null destination
+type, null value, incompatible value, malformed component, missing/duplicate
+property, or wrong property type is a deterministic error. Extra property
+names are ignored.
+
+String-support flags follow XNA IL, not converter naming. Point, Vector2,
+Vector3, Vector4, Quaternion, and Color accept component strings. Rectangle,
+Matrix, BoundingBox, BoundingSphere, Plane, and Ray reject string input.
+Every concrete converter can convert its selected value to a string and an
+instance descriptor. Supported component strings use the culture list
+separator followed by one space on output. Integer/byte conversion is decimal;
+Single conversion reproduces the XNA Windows CLR seven-significant-digit
+legacy half-up rounding, exponent threshold/casing, culture decimal symbol,
+special values, and
+the observable normalization of negative zero to `0`. Parsing is directly to
+binary32, accepts surrounding component whitespace and exponent notation,
+preserves signed zero, accepts the culture's NaN/infinity tokens, and rejects
+finite overflow. The unsupported-input converters use the inherited value
+`ToString` fallback rather than inventing a component grammar.
+
 ## Begin/End asynchronous operations and storage streams
 
 The XNA Storage `Begin*`/`End*` pattern maps to a concrete crate-root

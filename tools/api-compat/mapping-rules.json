@@ -50,6 +50,18 @@
     "Microsoft.Xna.Framework.GameServiceContainer::System.IServiceProvider": "ServiceProvider"
   },
   "baseProjectionOverrides": {
+    "Microsoft.Xna.Framework.Design.BoundingBoxConverter": "MathTypeConverterBase",
+    "Microsoft.Xna.Framework.Design.BoundingSphereConverter": "MathTypeConverterBase",
+    "Microsoft.Xna.Framework.Design.ColorConverter": "MathTypeConverterBase",
+    "Microsoft.Xna.Framework.Design.MatrixConverter": "MathTypeConverterBase",
+    "Microsoft.Xna.Framework.Design.PlaneConverter": "MathTypeConverterBase",
+    "Microsoft.Xna.Framework.Design.PointConverter": "MathTypeConverterBase",
+    "Microsoft.Xna.Framework.Design.QuaternionConverter": "MathTypeConverterBase",
+    "Microsoft.Xna.Framework.Design.RayConverter": "MathTypeConverterBase",
+    "Microsoft.Xna.Framework.Design.RectangleConverter": "MathTypeConverterBase",
+    "Microsoft.Xna.Framework.Design.Vector2Converter": "MathTypeConverterBase",
+    "Microsoft.Xna.Framework.Design.Vector3Converter": "MathTypeConverterBase",
+    "Microsoft.Xna.Framework.Design.Vector4Converter": "MathTypeConverterBase",
     "Microsoft.Xna.Framework.DrawableGameComponent": "GameComponentBase",
     "Microsoft.Xna.Framework.GamerServices.GamerServicesComponent": "GameComponentBase",
     "Microsoft.Xna.Framework.Content.ContentTypeReader`1": "ContentTypeReaderBase",
@@ -69,6 +81,32 @@
     "System.IComparable",
     "System.IConvertible",
     "System.IFormattable"
+  ],
+  "designTypeConverterProjection": {
+    "mathType": "Microsoft.Xna.Framework.Design.MathTypeConverter",
+    "typeIdentity": "DesignType",
+    "culture": "&DesignCulture",
+    "propertyDescriptors": "&[DesignPropertyDescriptor]",
+    "propertyValues": "&[DesignPropertyValue]",
+    "conversion": "DesignConversion",
+    "converters": {
+      "Microsoft.Xna.Framework.Design.BoundingBoxConverter": "BoundingBox",
+      "Microsoft.Xna.Framework.Design.BoundingSphereConverter": "BoundingSphere",
+      "Microsoft.Xna.Framework.Design.ColorConverter": "Color",
+      "Microsoft.Xna.Framework.Design.MatrixConverter": "Matrix",
+      "Microsoft.Xna.Framework.Design.PlaneConverter": "Plane",
+      "Microsoft.Xna.Framework.Design.PointConverter": "Point",
+      "Microsoft.Xna.Framework.Design.QuaternionConverter": "Quaternion",
+      "Microsoft.Xna.Framework.Design.RayConverter": "Ray",
+      "Microsoft.Xna.Framework.Design.RectangleConverter": "Rectangle",
+      "Microsoft.Xna.Framework.Design.Vector2Converter": "Vector2",
+      "Microsoft.Xna.Framework.Design.Vector3Converter": "Vector3",
+      "Microsoft.Xna.Framework.Design.Vector4Converter": "Vector4"
+    }
+  },
+  "omittedMembers": [
+    "Microsoft.Xna.Framework.Design.MathTypeConverter::propertyDescriptions",
+    "Microsoft.Xna.Framework.Design.MathTypeConverter::supportStringConvert"
   ],
   "fallibleMembers": [
     "Microsoft.Xna.Framework.Game::Initialize",

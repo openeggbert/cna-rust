@@ -25,9 +25,9 @@ MSRV: Rust 1.74
 | XNA reference types | 257 | 257 |
 | XNA reference members | 2,964 | 2,964 |
 | expected mapped Rust types | 259 | 259 |
-| actual strict Rust types | 192 | 203 |
-| total diagnostics | 67 | 56 |
-| missing types | 67 | 56 |
+| actual strict Rust types | 203 | 216 |
+| total diagnostics | 56 | 43 |
+| missing types | 56 | 43 |
 | missing members | 0 | 0 |
 
 Constructor, overload, property, event, base projection, trait, interface,
@@ -36,7 +36,7 @@ delegate, disposal, unexpected type/member, type-kind, internal-type leak,
 raw-handle leak, public unsafe API, allowlist, and unmeasured-category counts
 are all zero.
 
-The 56 diagnostics are only whole missing types:
+The 43 diagnostics are only whole missing types:
 
 ```text
 Graphics           0
@@ -44,7 +44,7 @@ Framework/core     0
 Input               0
 Storage             0
 GamerServices       0
-Design             13
+Design              0
 Audio              19
 Media              24
 ```
@@ -76,12 +76,23 @@ Media              24
 - [x] Completed `GamerServicesComponent` as a real GameComponent lifecycle
   bridge without expanding into the separate Gamer/Guide/Avatar/network
   profile.
+- [x] Regenerated the exact Design queue and completed `MathTypeConverter`
+  plus all twelve concrete value converters as one dependency-coherent family.
+  The formal projection uses a closed value/type vocabulary, explicit culture,
+  immutable ordered properties, deterministic creation, and executable closed
+  reconstruction descriptors; it publishes no fake CLR component model.
+- [x] Verified the six supported component-string converters and the six that
+  intentionally reject string input, including XNA Windows Single text,
+  invariant/en-US/de-DE, malformed/wrong/null values, Matrix Translation
+  asymmetry, nested value snapshots, and all constructor round trips.
+- [x] Kept Design managed-only: the reviewed native ABI, ownership inventory,
+  and template source are unchanged.
 - [x] Rechecked repeated RunOneFrame/Tick and canonical CNA HEAD without
   weakening the milestone. Both external blockers remain documented below.
 
 Focused evidence lives in `docs/lzx-xnb-evidence.md`,
-`docs/framework-evidence.md`, `docs/input-touch-evidence.md`, and
-`docs/storage-evidence.md`.
+`docs/framework-evidence.md`, `docs/input-touch-evidence.md`,
+`docs/storage-evidence.md`, and `docs/design-evidence.md`.
 
 ## Ownership and callback model
 
@@ -111,35 +122,44 @@ handle for a successful owner-thread retry.
 `GamerServicesComponent` composes the existing `GameComponent`; it owns no
 native GamerServices handle and fabricates no unavailable service.
 
+Design is pure managed code over existing copied XNA values. The strict Design
+namespace contains only its thirteen reference types; crate-root support
+abstractions replace the observable TypeConverter vocabulary without exposing
+`System.ComponentModel`, reflection objects, arbitrary `Any`, handles, or raw
+pointers. Property order is immutable, creation performs explicit name lookup,
+and nested values are snapshots.
+
 ## Measured evidence
 
 | Measurement | Previous | Current |
 |---|---:|---:|
-| named XNA-derived observations | 140 | 145 |
-| assertions including final count | 141 | 146 |
+| named XNA-derived observations | 145 | 185 |
+| assertions including final count | 146 | 186 |
 | behavior failures | 0 | 0 |
-| reviewed ABI functions | 347 | 431 |
-| prototype type positions | 1,220 | 1,509 |
-| independent C/Rust ABI measurements | 840 | 936 |
-| layouts / callbacks / constants | 51 / 3 / 206 | 56 / 5 / 243 |
+| reviewed ABI functions | 431 | 431 |
+| prototype type positions | 1,509 | 1,509 |
+| independent C/Rust ABI measurements | 936 | 936 |
+| layouts / callbacks / constants | 56 / 5 / 243 | 56 / 5 / 243 |
 | ABI mismatches | 0 | 0 |
-| native game lifetimes with a created game | 197 | 209 |
-| owned native child-handle constructions | 893 | 1,012 |
+| native game lifetimes with a created game | 209 | 209 |
+| owned native child-handle constructions | 1,012 | 1,012 |
 | native crashes / observed double-free or UAF | 0 / 0 | 0 / 0 |
 
-The five new platform-neutral observations cover Gesture flags/sample values
-and Framework device-information defaults/reference/explicit-clone behavior.
-Storage filesystem, hardware Touch, and native lifecycle transitions stay in
-native qualification rather than being mislabeled as neutral golden data.
+The 40 new Design observations cover capability support, every property shape,
+string culture and error behavior, creation, Matrix asymmetry, nested snapshot
+semantics, constructor identities, descriptor execution, and deterministic
+base/map failures. Storage filesystem, hardware Touch, and native lifecycle
+transitions stay in native qualification rather than being mislabeled as
+neutral golden data.
 
 The native handle total is derived from explicit constructors: each of ten
 small-family cycles adds one manager, six manager registrations, one storage
 device, one container, one container registration, and one stream (110); the
 process-wide DeviceChanged registration adds one; the isolated callback-panic
 case adds one manager plus six registrations and one selector device (8).
-Thus `893 + 110 + 1 + 8 = 1,012`. The suite now has 209 created Game
-lifetimes. Sanitizer status remains `not-run`; crash absence is not a leak
-proof.
+Thus `893 + 110 + 1 + 8 = 1,012`. Design creates no handles, so the suite
+remains at 209 created Game lifetimes and 1,012 child constructions. Sanitizer
+status remains `not-run`; crash absence is not a leak proof.
 
 ## External blockers
 
@@ -164,12 +184,12 @@ or unsupported mutation is used.
 This milestone stops here. The only remaining selected families are separate
 future milestones:
 
-1. Design (13)
-2. Audio (19)
-3. Media (24)
+1. Audio (19)
+2. Media (24)
 
-Each requires its own regenerated dependency/ownership review. Do not reopen
-completed Graphics or small families merely to begin one of them.
+Each requires its own regenerated native dependency/ownership/callback review.
+Do not reopen completed Graphics, Framework/core, Input, Storage,
+GamerServices, Design, or LZX merely to begin one of them.
 
 ## Definition of complete compatibility
 

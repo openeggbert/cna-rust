@@ -15,6 +15,11 @@ use cna::Microsoft::Xna::Framework::Content::{
     ContentLoadException, ContentSerializerAttribute, ContentSerializerCollectionItemNameAttribute,
     ContentSerializerRuntimeTypeAttribute, ContentSerializerTypeVersionAttribute,
 };
+use cna::Microsoft::Xna::Framework::Design::{
+    BoundingBoxConverter, BoundingSphereConverter, ColorConverter, MathTypeConverter,
+    MatrixConverter, PlaneConverter, PointConverter, QuaternionConverter, RayConverter,
+    RectangleConverter, Vector2Converter, Vector3Converter, Vector4Converter,
+};
 use cna::Microsoft::Xna::Framework::Graphics::PackedVector::{
     Alpha8, Bgra5551, Byte4, HalfSingle, NormalizedByte2, Short2,
 };
@@ -41,7 +46,10 @@ use cna::Microsoft::Xna::Framework::{
     PreparingDeviceSettingsEventArgs, Quaternion, Ray, Rectangle, TimeSpan, Vector2, Vector3,
     Vector4,
 };
-use cna::{GameComponentCollectionExt, GameState, GameStateAccess};
+use cna::{
+    DesignConstructor, DesignConversion, DesignCulture, DesignPropertyValue, DesignType,
+    DesignValue, GameComponentCollectionExt, GameState, GameStateAccess, MathTypeConverterBase,
+};
 
 #[derive(Default)]
 struct CorpusGame {
@@ -58,6 +66,49 @@ impl Game for CorpusGame {}
 
 fn bits(value: f32) -> u32 {
     value.to_bits()
+}
+
+fn design_properties(converter: &dyn MathTypeConverterBase) -> Vec<(&'static str, DesignType)> {
+    converter
+        .GetProperties()
+        .iter()
+        .map(|value| (value.Name(), value.ValueType()))
+        .collect()
+}
+
+fn design_support(converter: &dyn MathTypeConverterBase) -> (bool, bool, bool, bool, bool, bool) {
+    (
+        converter.CanConvertFrom(DesignType::String),
+        converter.CanConvertFrom(DesignType::Int32),
+        converter.CanConvertTo(DesignType::String),
+        converter.CanConvertTo(DesignType::InstanceDescriptor),
+        converter.GetCreateInstanceSupported(),
+        converter.GetPropertiesSupported(),
+    )
+}
+
+fn design_text(value: DesignConversion) -> String {
+    match value {
+        DesignConversion::String(value) => value,
+        DesignConversion::InstanceDescriptor(_) => panic!("expected Design string conversion"),
+    }
+}
+
+fn design_constructor(
+    converter: &dyn MathTypeConverterBase,
+    value: &DesignValue,
+) -> DesignConstructor {
+    match converter
+        .ConvertTo(
+            &DesignCulture::Invariant,
+            Some(value),
+            Some(DesignType::InstanceDescriptor),
+        )
+        .expect("XNA Design descriptor")
+    {
+        DesignConversion::InstanceDescriptor(value) => value.Constructor(),
+        DesignConversion::String(_) => panic!("expected Design reconstruction descriptor"),
+    }
 }
 
 fn matrix_bits(value: Matrix) -> [u32; 16] {
@@ -1391,5 +1442,575 @@ fn pinned_xna_math_observations() {
         (0, 321, false)
     );
 
-    assert_eq!(observations, 145);
+    // XNA Design metadata, IL, and Windows TypeConverter behavior are mapped
+    // through a closed Rust value/type domain; no CLR designer host is used.
+    let math_converter = MathTypeConverter::new();
+    observe!(
+        (
+            math_converter.CanConvertFrom(DesignType::String),
+            math_converter.CanConvertTo(DesignType::String),
+            math_converter.CanConvertTo(DesignType::InstanceDescriptor),
+            math_converter.GetCreateInstanceSupported(),
+            math_converter.GetPropertiesSupported(),
+        ),
+        (true, true, true, true, true)
+    );
+    observe!(
+        design_properties(&PointConverter::new()),
+        vec![("X", DesignType::Int32), ("Y", DesignType::Int32)]
+    );
+    observe!(
+        design_properties(&RectangleConverter::new()),
+        vec![
+            ("X", DesignType::Int32),
+            ("Y", DesignType::Int32),
+            ("Width", DesignType::Int32),
+            ("Height", DesignType::Int32),
+        ]
+    );
+    observe!(
+        design_properties(&Vector2Converter::new()),
+        vec![("X", DesignType::Single), ("Y", DesignType::Single)]
+    );
+    observe!(
+        design_properties(&Vector3Converter::new()),
+        vec![
+            ("X", DesignType::Single),
+            ("Y", DesignType::Single),
+            ("Z", DesignType::Single),
+        ]
+    );
+    observe!(
+        design_properties(&Vector4Converter::new()),
+        vec![
+            ("X", DesignType::Single),
+            ("Y", DesignType::Single),
+            ("Z", DesignType::Single),
+            ("W", DesignType::Single),
+        ]
+    );
+    observe!(
+        design_properties(&QuaternionConverter::new()),
+        vec![
+            ("X", DesignType::Single),
+            ("Y", DesignType::Single),
+            ("Z", DesignType::Single),
+            ("W", DesignType::Single),
+        ]
+    );
+    observe!(
+        design_properties(&ColorConverter::new()),
+        vec![
+            ("R", DesignType::Byte),
+            ("G", DesignType::Byte),
+            ("B", DesignType::Byte),
+            ("A", DesignType::Byte),
+        ]
+    );
+    observe!(
+        design_properties(&MatrixConverter::new()),
+        vec![
+            ("Translation", DesignType::Vector3),
+            ("M11", DesignType::Single),
+            ("M12", DesignType::Single),
+            ("M13", DesignType::Single),
+            ("M14", DesignType::Single),
+            ("M21", DesignType::Single),
+            ("M22", DesignType::Single),
+            ("M23", DesignType::Single),
+            ("M24", DesignType::Single),
+            ("M31", DesignType::Single),
+            ("M32", DesignType::Single),
+            ("M33", DesignType::Single),
+            ("M34", DesignType::Single),
+            ("M41", DesignType::Single),
+            ("M42", DesignType::Single),
+            ("M43", DesignType::Single),
+            ("M44", DesignType::Single),
+        ]
+    );
+    observe!(
+        design_properties(&BoundingBoxConverter::new()),
+        vec![("Min", DesignType::Vector3), ("Max", DesignType::Vector3)]
+    );
+    observe!(
+        design_properties(&BoundingSphereConverter::new()),
+        vec![
+            ("Center", DesignType::Vector3),
+            ("Radius", DesignType::Single)
+        ]
+    );
+    observe!(
+        design_properties(&PlaneConverter::new()),
+        vec![("Normal", DesignType::Vector3), ("D", DesignType::Single)]
+    );
+    observe!(
+        design_properties(&RayConverter::new()),
+        vec![
+            ("Position", DesignType::Vector3),
+            ("Direction", DesignType::Vector3),
+        ]
+    );
+    observe!(
+        design_support(&PointConverter::new()),
+        (true, false, true, true, true, true)
+    );
+    observe!(
+        design_support(&RectangleConverter::new()),
+        (false, false, true, true, true, true)
+    );
+    observe!(
+        design_support(&Vector3Converter::new()),
+        (true, false, true, true, true, true)
+    );
+    observe!(
+        design_support(&BoundingBoxConverter::new()),
+        (false, false, true, true, true, true)
+    );
+
+    let design_point = DesignValue::Point(Point::new(1, -2));
+    observe!(
+        design_text(
+            PointConverter::new()
+                .ConvertTo(
+                    &DesignCulture::Invariant,
+                    Some(&design_point),
+                    Some(DesignType::String),
+                )
+                .expect("Point Design string")
+        ),
+        "1, -2"
+    );
+    observe!(
+        design_text(
+            PointConverter::new()
+                .ConvertTo(
+                    &DesignCulture::DeDe,
+                    Some(&design_point),
+                    Some(DesignType::String),
+                )
+                .expect("Point German Design string")
+        ),
+        "1; -2"
+    );
+    let design_vector3 = DesignValue::Vector3(Vector3::from_x_and_y_and_z(1.25, -2.5, 3.75));
+    observe!(
+        design_text(
+            Vector3Converter::new()
+                .ConvertTo(
+                    &DesignCulture::Invariant,
+                    Some(&design_vector3),
+                    Some(DesignType::String),
+                )
+                .expect("Vector3 Design string")
+        ),
+        "1.25, -2.5, 3.75"
+    );
+    observe!(
+        design_text(
+            Vector3Converter::new()
+                .ConvertTo(
+                    &DesignCulture::DeDe,
+                    Some(&design_vector3),
+                    Some(DesignType::String),
+                )
+                .expect("Vector3 German Design string")
+        ),
+        "1,25; -2,5; 3,75"
+    );
+    let design_special = DesignValue::Vector4(Vector4::from_x_and_y_and_z_and_w(
+        f32::NAN,
+        f32::INFINITY,
+        f32::NEG_INFINITY,
+        -0.0,
+    ));
+    observe!(
+        design_text(
+            Vector4Converter::new()
+                .ConvertTo(
+                    &DesignCulture::Invariant,
+                    Some(&design_special),
+                    Some(DesignType::String),
+                )
+                .expect("Vector4 special Design string")
+        ),
+        "NaN, Infinity, -Infinity, 0"
+    );
+    observe!(
+        design_text(
+            Vector4Converter::new()
+                .ConvertTo(
+                    &DesignCulture::DeDe,
+                    Some(&design_special),
+                    Some(DesignType::String),
+                )
+                .expect("Vector4 German special Design string")
+        ),
+        "NaN; +unendlich; -unendlich; 0"
+    );
+    let design_color = DesignValue::Color(
+        Color::from_r_and_g_and_b_and_a_as_int32_and_int32_and_int32_and_int32(0, 255, 10, 40),
+    );
+    observe!(
+        design_text(
+            ColorConverter::new()
+                .ConvertTo(
+                    &DesignCulture::Invariant,
+                    Some(&design_color),
+                    Some(DesignType::String),
+                )
+                .expect("Color Design string")
+        ),
+        "0, 255, 10, 40"
+    );
+
+    observe!(
+        (
+            design_text(
+                RectangleConverter::new()
+                    .ConvertTo(
+                        &DesignCulture::DeDe,
+                        Some(&DesignValue::Rectangle(Rectangle::new(1, 2, 3, 4))),
+                        Some(DesignType::String),
+                    )
+                    .expect("Rectangle fallback string")
+            ),
+            design_text(
+                MatrixConverter::new()
+                    .ConvertTo(
+                        &DesignCulture::DeDe,
+                        Some(&DesignValue::Matrix(Matrix::Identity)),
+                        Some(DesignType::String),
+                    )
+                    .expect("Matrix fallback string")
+            ),
+        ),
+        (
+            "{X:1 Y:2 Width:3 Height:4}".to_owned(),
+            "{ {M11:1 M12:0 M13:0 M14:0} {M21:0 M22:1 M23:0 M24:0} {M31:0 M32:0 M33:1 M34:0} {M41:0 M42:0 M43:0 M44:1} }".to_owned(),
+        )
+    );
+    let parsed_point = PointConverter::new()
+        .ConvertFrom(
+            &DesignCulture::Invariant,
+            Some(&DesignValue::String("2147483647, -2147483648".to_owned())),
+        )
+        .expect("Point bounds parse");
+    observe!((parsed_point.X, parsed_point.Y), (i32::MAX, i32::MIN));
+    let parsed_vector = Vector3Converter::new()
+        .ConvertFrom(
+            &DesignCulture::Invariant,
+            Some(&DesignValue::String("-0, 1e-30, 3.40282347E+38".to_owned())),
+        )
+        .expect("Vector3 edge parse");
+    observe!(
+        (
+            bits(parsed_vector.X),
+            bits(parsed_vector.Y),
+            bits(parsed_vector.Z)
+        ),
+        (0x8000_0000, 0x0da2_4260, 0x7f7f_ffff)
+    );
+    let parsed_german = Vector3Converter::new()
+        .ConvertFrom(
+            &DesignCulture::DeDe,
+            Some(&DesignValue::String("1,5; -2,25; 3,75".to_owned())),
+        )
+        .expect("Vector3 German parse");
+    observe!(
+        (
+            bits(parsed_german.X),
+            bits(parsed_german.Y),
+            bits(parsed_german.Z)
+        ),
+        (0x3fc0_0000, 0xc010_0000, 0x4070_0000)
+    );
+    let parsed_special = Vector3Converter::new()
+        .ConvertFrom(
+            &DesignCulture::DeDe,
+            Some(&DesignValue::String(
+                "NaN; +unendlich; -unendlich".to_owned(),
+            )),
+        )
+        .expect("Vector3 German special parse");
+    observe!(
+        (
+            bits(parsed_special.X),
+            bits(parsed_special.Y),
+            bits(parsed_special.Z)
+        ),
+        (0x7fc0_0000, 0x7f80_0000, 0xff80_0000)
+    );
+    let parsed_color = ColorConverter::new()
+        .ConvertFrom(
+            &DesignCulture::Invariant,
+            Some(&DesignValue::String("0,255,10,40".to_owned())),
+        )
+        .expect("Color component parse");
+    observe!(
+        (
+            parsed_color.R(),
+            parsed_color.G(),
+            parsed_color.B(),
+            parsed_color.A()
+        ),
+        (0, 255, 10, 40)
+    );
+
+    let design_vector_converter = Vector3Converter::new();
+    observe!(
+        (
+            design_vector_converter
+                .ConvertFrom(
+                    &DesignCulture::Invariant,
+                    Some(&DesignValue::String(String::new())),
+                )
+                .is_err(),
+            design_vector_converter
+                .ConvertFrom(
+                    &DesignCulture::Invariant,
+                    Some(&DesignValue::String("1,2".to_owned())),
+                )
+                .is_err(),
+            design_vector_converter
+                .ConvertFrom(
+                    &DesignCulture::Invariant,
+                    Some(&DesignValue::String("1,2,3,4".to_owned())),
+                )
+                .is_err(),
+            design_vector_converter
+                .ConvertFrom(
+                    &DesignCulture::Invariant,
+                    Some(&DesignValue::String("1,,3".to_owned())),
+                )
+                .is_err(),
+        ),
+        (true, true, true, true)
+    );
+    observe!(
+        design_vector_converter
+            .ConvertFrom(
+                &DesignCulture::DeDe,
+                Some(&DesignValue::String("1.5; -2.25; 3.75".to_owned())),
+            )
+            .is_err(),
+        true
+    );
+    observe!(
+        (
+            design_vector_converter
+                .ConvertFrom(
+                    &DesignCulture::Invariant,
+                    Some(&DesignValue::String("3.5e38,0,0".to_owned())),
+                )
+                .is_err(),
+            PointConverter::new()
+                .ConvertFrom(
+                    &DesignCulture::Invariant,
+                    Some(&DesignValue::String("2147483648,0".to_owned())),
+                )
+                .is_err(),
+            ColorConverter::new()
+                .ConvertFrom(
+                    &DesignCulture::Invariant,
+                    Some(&DesignValue::String("256,0,0,0".to_owned())),
+                )
+                .is_err(),
+        ),
+        (true, true, true)
+    );
+
+    observe!(
+        PointConverter::new()
+            .CreateInstance(Some(&[
+                DesignPropertyValue::new("X", DesignValue::Int32(1)),
+                DesignPropertyValue::new("Y", DesignValue::Int32(2)),
+            ]))
+            .expect("Point reconstruction"),
+        Point::new(1, 2)
+    );
+    observe!(
+        Vector3Converter::new()
+            .CreateInstance(Some(&[
+                DesignPropertyValue::new("X", DesignValue::Single(1.0)),
+                DesignPropertyValue::new("Y", DesignValue::Single(2.0)),
+                DesignPropertyValue::new("Z", DesignValue::Single(3.0)),
+                DesignPropertyValue::new("Extra", DesignValue::Single(4.0)),
+            ]))
+            .expect("Vector3 reconstruction with extra property"),
+        Vector3::from_x_and_y_and_z(1.0, 2.0, 3.0)
+    );
+    let matrix_values: Vec<_> = (1..=16)
+        .enumerate()
+        .map(|(index, component)| {
+            let row = index / 4 + 1;
+            let column = index % 4 + 1;
+            DesignPropertyValue::new(
+                format!("M{row}{column}"),
+                DesignValue::Single(component as f32),
+            )
+        })
+        .chain([DesignPropertyValue::new(
+            "Translation",
+            DesignValue::Vector3(Vector3::from_x_and_y_and_z(100.0, 200.0, 300.0)),
+        )])
+        .collect();
+    let rebuilt_matrix = MatrixConverter::new()
+        .CreateInstance(Some(&matrix_values))
+        .expect("Matrix scalar reconstruction");
+    observe!(
+        (
+            rebuilt_matrix.M11,
+            rebuilt_matrix.M24,
+            rebuilt_matrix.M41,
+            rebuilt_matrix.M44
+        ),
+        (1.0, 8.0, 13.0, 16.0)
+    );
+    let design_sphere = DesignValue::BoundingSphere(BoundingSphere::new(
+        Vector3::from_x_and_y_and_z(1.0, 2.0, 3.0),
+        4.0,
+    ));
+    let mut sphere_values = BoundingSphereConverter::new()
+        .GetPropertyValues(Some(&design_sphere))
+        .expect("BoundingSphere properties");
+    sphere_values[0] = DesignPropertyValue::new(
+        "Center",
+        DesignValue::Vector3(Vector3::from_x_and_y_and_z(99.0, 2.0, 3.0)),
+    );
+    observe!(
+        (design_sphere, sphere_values[0].Value().clone()),
+        (
+            DesignValue::BoundingSphere(BoundingSphere::new(
+                Vector3::from_x_and_y_and_z(1.0, 2.0, 3.0),
+                4.0,
+            )),
+            DesignValue::Vector3(Vector3::from_x_and_y_and_z(99.0, 2.0, 3.0)),
+        )
+    );
+    observe!(
+        [
+            design_constructor(
+                &PointConverter::new(),
+                &DesignValue::Point(Point::new(1, 2))
+            ),
+            design_constructor(
+                &RectangleConverter::new(),
+                &DesignValue::Rectangle(Rectangle::new(1, 2, 3, 4)),
+            ),
+            design_constructor(
+                &Vector2Converter::new(),
+                &DesignValue::Vector2(Vector2::from_x_and_y(1.0, 2.0)),
+            ),
+            design_constructor(
+                &Vector3Converter::new(),
+                &DesignValue::Vector3(Vector3::from_x_and_y_and_z(1.0, 2.0, 3.0)),
+            ),
+            design_constructor(
+                &Vector4Converter::new(),
+                &DesignValue::Vector4(Vector4::from_x_and_y_and_z_and_w(1.0, 2.0, 3.0, 4.0)),
+            ),
+            design_constructor(
+                &QuaternionConverter::new(),
+                &DesignValue::Quaternion(Quaternion::from_x_and_y_and_z_and_w(1.0, 2.0, 3.0, 4.0,)),
+            ),
+            design_constructor(
+                &ColorConverter::new(),
+                &DesignValue::Color(
+                    Color::from_r_and_g_and_b_and_a_as_int32_and_int32_and_int32_and_int32(
+                        10, 20, 30, 40,
+                    ),
+                ),
+            ),
+            design_constructor(
+                &MatrixConverter::new(),
+                &DesignValue::Matrix(Matrix::Identity),
+            ),
+            design_constructor(
+                &BoundingBoxConverter::new(),
+                &DesignValue::BoundingBox(BoundingBox::new(Vector3::new(1.0), Vector3::new(2.0),)),
+            ),
+            design_constructor(
+                &BoundingSphereConverter::new(),
+                &DesignValue::BoundingSphere(BoundingSphere::new(Vector3::new(1.0), 2.0)),
+            ),
+            design_constructor(
+                &PlaneConverter::new(),
+                &DesignValue::Plane(Plane::from_normal_and_d(Vector3::new(1.0), 2.0)),
+            ),
+            design_constructor(
+                &RayConverter::new(),
+                &DesignValue::Ray(Ray::new(Vector3::new(1.0), Vector3::new(2.0))),
+            ),
+        ],
+        [
+            DesignConstructor::PointInt32Int32,
+            DesignConstructor::RectangleInt32Int32Int32Int32,
+            DesignConstructor::Vector2SingleSingle,
+            DesignConstructor::Vector3SingleSingleSingle,
+            DesignConstructor::Vector4SingleSingleSingleSingle,
+            DesignConstructor::QuaternionSingleSingleSingleSingle,
+            DesignConstructor::ColorInt32Int32Int32Int32,
+            DesignConstructor::MatrixSixteenSingles,
+            DesignConstructor::BoundingBoxVector3Vector3,
+            DesignConstructor::BoundingSphereVector3Single,
+            DesignConstructor::PlaneVector3Single,
+            DesignConstructor::RayVector3Vector3,
+        ]
+    );
+    observe!(
+        (
+            design_vector_converter.CreateInstance(None).is_err(),
+            design_vector_converter
+                .CreateInstance(Some(&[
+                    DesignPropertyValue::new("X", DesignValue::Single(1.0)),
+                    DesignPropertyValue::new("Y", DesignValue::Single(2.0)),
+                ]))
+                .is_err(),
+            design_vector_converter
+                .CreateInstance(Some(&[
+                    DesignPropertyValue::new("X", DesignValue::Int32(1)),
+                    DesignPropertyValue::new("Y", DesignValue::Single(2.0)),
+                    DesignPropertyValue::new("Z", DesignValue::Single(3.0)),
+                ]))
+                .is_err(),
+            design_vector_converter
+                .CreateInstance(Some(&[
+                    DesignPropertyValue::new("X", DesignValue::Single(1.0)),
+                    DesignPropertyValue::new("Y", DesignValue::Null),
+                    DesignPropertyValue::new("Z", DesignValue::Single(3.0)),
+                ]))
+                .is_err(),
+        ),
+        (true, true, true, true)
+    );
+    observe!(
+        (
+            design_text(
+                design_vector_converter
+                    .ConvertTo(
+                        &DesignCulture::Invariant,
+                        Some(&DesignValue::Point(Point::Zero)),
+                        Some(DesignType::String),
+                    )
+                    .expect("base Point string fallback")
+            ),
+            design_vector_converter
+                .ConvertTo(
+                    &DesignCulture::Invariant,
+                    Some(&DesignValue::Vector3(Vector3::Zero)),
+                    Some(DesignType::Int32),
+                )
+                .is_err(),
+            BoundingBoxConverter::new()
+                .ConvertFrom(
+                    &DesignCulture::Invariant,
+                    Some(&DesignValue::String("1,2".to_owned())),
+                )
+                .is_err(),
+        ),
+        ("{X:0 Y:0}".to_owned(), true, true)
+    );
+
+    assert_eq!(observations, 185);
 }

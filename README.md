@@ -3,9 +3,10 @@
 CNA-Rust is an early, measurable safe Rust projection of Microsoft XNA
 Framework 4.0 backed by CNA C++. Its Graphics projection, compressed and
 uncompressed XNB pipeline, Framework device management, Touch/Gesture,
-Storage, GamerServicesComponent, 2D sprite/font, Model graph, stock effects,
-and typed device/buffer foundations are functional; it is **not** yet an
-XNA-complete binding and does not compile XNA C# source as Rust.
+Storage, GamerServicesComponent, managed Design converters, 2D sprite/font,
+Model graph, stock effects, and typed device/buffer foundations are functional;
+it is **not** yet an XNA-complete binding and does not compile XNA C# source as
+Rust.
 
 ```text
 cna::Microsoft::Xna::Framework::*
@@ -48,10 +49,10 @@ hierarchy and deliberate CNA extensions.
   zero. Clippy still reports audited compatibility warnings; they are not
   globally hidden.
 - XNA 4.0 Windows runtime inventory remains 257 CLR types and 2,964 members;
-  259 Rust types are expected and 203 strict types now exist.
-- Strict diagnostics are 56, all of them missing types. Graphics,
-  Framework/core, Input, Storage, and GamerServices have zero missing types.
-  Only Design (13), Audio (19), and Media (24) remain. Missing members and
+  259 Rust types are expected and 216 strict types now exist.
+- Strict diagnostics are 43, all of them missing types. Graphics,
+  Framework/core, Input, Storage, GamerServices, and Design have zero missing
+  types. Only Audio (19) and Media (24) remain. Missing members and
   constructor/overload/property/event mapping mismatches are zero.
   `Game`, `GraphicsDevice`, and `SpriteBatch` each have zero local diagnostics.
   Parameter/signature, disposal, type-kind, base/trait/interface, return,
@@ -80,6 +81,12 @@ hierarchy and deliberate CNA extensions.
 - `GamerServicesComponent` participates in normal GameComponent lifecycle
   without expanding the selected profile into Gamer, Guide, Avatar, or network
   services.
+- All thirteen Design converter types are complete through a small managed
+  Rust projection: stable type identities, explicit cultures, ordered property
+  metadata/values, deterministic CreateInstance, and executable reconstruction
+  descriptors. No fake ComponentModel hierarchy, arbitrary reflection, or CNA
+  ABI route is exposed. Six converters accept XNA component strings; six
+  deliberately reject string input while retaining value-string output.
 - Typed vertex declarations and vertex/index buffers, device binding/draw/
   reset/back-buffer routes, TextureCube, and render targets are complete. CNA
   calls are never replaced by no-ops; HEADLESS limitations are explicit.
@@ -99,7 +106,8 @@ hierarchy and deliberate CNA extensions.
   error 6. OcclusionQuery's real native state machine is verified.
 - `SpriteFont` loads through XNB with one atlas owner, measures strings, and all
   six `DrawString` projections submit native glyph commands.
-- The XNA-derived corpus passes 145 named observations and 146 assertions.
+- The XNA-derived corpus passes 185 named observations and 186 assertions,
+  including a focused 40-observation Design group.
 - The reviewed ABI slice is 431 functions. It has 1,509 full prototype type
   positions and 936 independent C/Rust measurements across 56 layouts, five
   callback signatures, scalar representations, and 243 constants, all with
@@ -191,7 +199,8 @@ See the [normative mapping](docs/xna-rust-mapping.md),
 [LZX evidence](docs/lzx-xnb-evidence.md),
 [Framework evidence](docs/framework-evidence.md),
 [Touch evidence](docs/input-touch-evidence.md),
-[Storage evidence](docs/storage-evidence.md), and [measured roadmap](plan.md).
+[Storage evidence](docs/storage-evidence.md),
+[Design evidence](docs/design-evidence.md), and [measured roadmap](plan.md).
 
 ## Packaging
 
