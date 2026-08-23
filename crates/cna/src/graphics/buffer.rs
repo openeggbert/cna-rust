@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use cna_sys as sys;
 
+use crate::content::{ContentDisposable, ContentLoadable};
 use crate::error::{CnaError, Result};
 use crate::extensions::events::{EventArgs, EventHandler};
 
@@ -546,12 +547,43 @@ impl VertexBuffer {
     pub(crate) fn is_same_device(&self, device: &GraphicsDevice) -> bool {
         self.state.device().is_same_device(device)
     }
+
+    pub(crate) fn set_xnb_bytes(&self, bytes: &[u8]) -> Result<()> {
+        let expected = usize::try_from(self.vertex_count)
+            .ok()
+            .and_then(|count| count.checked_mul(self.declaration.VertexStride() as usize))
+            .ok_or(CnaError::InvalidInput("vertex-buffer XNB size overflows"))?;
+        if bytes.len() != expected {
+            return Err(CnaError::InvalidInput(
+                "vertex-buffer XNB payload has the wrong length",
+            ));
+        }
+        self.state.device().state.native().set_raw_vertex_data(
+            self.state.require_handle()?,
+            None,
+            bytes,
+            self.vertex_count as u64,
+            self.declaration.VertexStride() as u32,
+        )
+    }
 }
 
 impl VertexBufferBase for VertexBuffer {}
 
 impl Drop for VertexBuffer {
     fn drop(&mut self) {}
+}
+
+impl ContentDisposable for VertexBuffer {
+    fn DisposeContent(&self) -> Result<()> {
+        self.state.dispose_native()
+    }
+}
+
+impl ContentLoadable for VertexBuffer {
+    fn ContentDisposable(value: &Arc<Self>) -> Option<Arc<dyn ContentDisposable>> {
+        Some(Arc::clone(value) as Arc<dyn ContentDisposable>)
+    }
 }
 
 impl GraphicsResource for VertexBuffer {
@@ -1154,6 +1186,18 @@ impl GraphicsResource for IndexBuffer {
     }
     fn Dispose(&mut self, value: bool) -> Result<()> {
         Self::Dispose(self, value)
+    }
+}
+
+impl ContentDisposable for IndexBuffer {
+    fn DisposeContent(&self) -> Result<()> {
+        self.state.dispose_native()
+    }
+}
+
+impl ContentLoadable for IndexBuffer {
+    fn ContentDisposable(value: &Arc<Self>) -> Option<Arc<dyn ContentDisposable>> {
+        Some(Arc::clone(value) as Arc<dyn ContentDisposable>)
     }
 }
 

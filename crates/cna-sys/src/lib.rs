@@ -285,7 +285,9 @@ pub type CNA_GameEventRegistrationHandle = CNA_Handle;
 pub type CNA_VertexDeclarationHandle = CNA_Handle;
 pub type CNA_VertexBufferHandle = CNA_Handle;
 pub type CNA_IndexBufferHandle = CNA_Handle;
+pub type CNA_OcclusionQueryHandle = CNA_Handle;
 pub type CNA_EffectHandle = CNA_Handle;
+pub type CNA_DirectionalLightHandle = CNA_Handle;
 pub type CNA_EffectAnnotationHandle = CNA_Handle;
 pub type CNA_EffectAnnotationCollectionHandle = CNA_Handle;
 pub type CNA_EffectParameterHandle = CNA_Handle;
@@ -591,6 +593,50 @@ pub struct CNA_BackBufferReadback {
     pub has_source_rectangle: CNA_Bool,
     pub reserved: [u8; 3],
     pub source_rectangle: CNA_Rectangle,
+    pub start_index: u64,
+    pub element_count: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_Texture3DCreateInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub width: u32,
+    pub height: u32,
+    pub depth: u32,
+    pub mip_map: CNA_Bool,
+    pub reserved0: [u8; 3],
+    pub format: CNA_SurfaceFormat,
+    pub reserved1: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_Texture3DInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub width: u32,
+    pub height: u32,
+    pub depth: u32,
+    pub level_count: u32,
+    pub format: CNA_SurfaceFormat,
+    pub reserved: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_Texture3DTransfer {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub level: i32,
+    pub left: i32,
+    pub top: i32,
+    pub right: i32,
+    pub bottom: i32,
+    pub front: i32,
+    pub back: i32,
+    pub reserved: u32,
     pub start_index: u64,
     pub element_count: u64,
 }
@@ -1363,6 +1409,17 @@ pub type cna_graphics_device_draw_user_indexed_primitives_fn = unsafe extern "C"
     *const CNA_UserPrimitives,
     *const CNA_UserIndices,
 ) -> CNA_Result;
+pub type cna_occlusion_query_create_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_OcclusionQueryHandle) -> CNA_Result;
+pub type cna_occlusion_query_begin_fn =
+    unsafe extern "C" fn(CNA_OcclusionQueryHandle) -> CNA_Result;
+pub type cna_occlusion_query_end_fn = unsafe extern "C" fn(CNA_OcclusionQueryHandle) -> CNA_Result;
+pub type cna_occlusion_query_get_is_complete_fn =
+    unsafe extern "C" fn(CNA_OcclusionQueryHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_occlusion_query_get_pixel_count_fn =
+    unsafe extern "C" fn(CNA_OcclusionQueryHandle, *mut i32) -> CNA_Result;
+pub type cna_occlusion_query_destroy_fn =
+    unsafe extern "C" fn(CNA_OcclusionQueryHandle) -> CNA_Result;
 pub type cna_graphics_device_set_render_targets_fn =
     unsafe extern "C" fn(CNA_Handle, *const CNA_RenderTargetBinding, u64) -> CNA_Result;
 pub type cna_graphics_device_get_render_target_count_fn =
@@ -1415,6 +1472,24 @@ pub type cna_texture2d_copy_encoded_fn = unsafe extern "C" fn(
     *mut u64,
 ) -> CNA_Result;
 pub type cna_texture2d_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_texture3d_create_fn =
+    unsafe extern "C" fn(CNA_Handle, *const CNA_Texture3DCreateInfo, *mut CNA_Handle) -> CNA_Result;
+pub type cna_texture3d_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_texture3d_get_info_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Texture3DInfo) -> CNA_Result;
+pub type cna_texture3d_set_data_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    *const CNA_Texture3DTransfer,
+    *const CNA_Color,
+    u64,
+) -> CNA_Result;
+pub type cna_texture3d_get_data_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    *const CNA_Texture3DTransfer,
+    *mut CNA_Color,
+    u64,
+    *mut u64,
+) -> CNA_Result;
 pub type cna_texturecube_create_fn = unsafe extern "C" fn(
     CNA_Handle,
     *const CNA_TextureCubeCreateInfo,
@@ -1578,6 +1653,204 @@ pub type cna_effect_get_current_technique_fn =
     unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_EffectTechniqueHandle) -> CNA_Result;
 pub type cna_effect_set_current_technique_fn =
     unsafe extern "C" fn(CNA_EffectHandle, CNA_EffectTechniqueHandle) -> CNA_Result;
+
+pub type cna_directional_light_create_fn =
+    unsafe extern "C" fn(*mut CNA_DirectionalLightHandle) -> CNA_Result;
+pub type cna_directional_light_destroy_fn =
+    unsafe extern "C" fn(CNA_DirectionalLightHandle) -> CNA_Result;
+pub type cna_directional_light_get_diffuse_color_fn =
+    unsafe extern "C" fn(CNA_DirectionalLightHandle, *mut CNA_Vector3) -> CNA_Result;
+pub type cna_directional_light_set_diffuse_color_fn =
+    unsafe extern "C" fn(CNA_DirectionalLightHandle, CNA_Vector3) -> CNA_Result;
+pub type cna_directional_light_get_direction_fn =
+    unsafe extern "C" fn(CNA_DirectionalLightHandle, *mut CNA_Vector3) -> CNA_Result;
+pub type cna_directional_light_set_direction_fn =
+    unsafe extern "C" fn(CNA_DirectionalLightHandle, CNA_Vector3) -> CNA_Result;
+pub type cna_directional_light_get_specular_color_fn =
+    unsafe extern "C" fn(CNA_DirectionalLightHandle, *mut CNA_Vector3) -> CNA_Result;
+pub type cna_directional_light_set_specular_color_fn =
+    unsafe extern "C" fn(CNA_DirectionalLightHandle, CNA_Vector3) -> CNA_Result;
+pub type cna_directional_light_get_enabled_fn =
+    unsafe extern "C" fn(CNA_DirectionalLightHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_directional_light_set_enabled_fn =
+    unsafe extern "C" fn(CNA_DirectionalLightHandle, CNA_Bool) -> CNA_Result;
+pub type cna_basic_effect_create_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_EffectHandle) -> CNA_Result;
+pub type cna_effect_matrices_get_world_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Matrix) -> CNA_Result;
+pub type cna_effect_matrices_set_world_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Matrix) -> CNA_Result;
+pub type cna_effect_matrices_get_view_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Matrix) -> CNA_Result;
+pub type cna_effect_matrices_set_view_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Matrix) -> CNA_Result;
+pub type cna_effect_matrices_get_projection_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Matrix) -> CNA_Result;
+pub type cna_effect_matrices_set_projection_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Matrix) -> CNA_Result;
+pub type cna_effect_fog_get_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Vector3) -> CNA_Result;
+pub type cna_effect_fog_set_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Vector3) -> CNA_Result;
+pub type cna_effect_fog_get_enabled_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_effect_fog_set_enabled_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Bool) -> CNA_Result;
+pub type cna_effect_fog_get_start_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut f32) -> CNA_Result;
+pub type cna_effect_fog_set_start_fn = unsafe extern "C" fn(CNA_EffectHandle, f32) -> CNA_Result;
+pub type cna_effect_fog_get_end_fn = unsafe extern "C" fn(CNA_EffectHandle, *mut f32) -> CNA_Result;
+pub type cna_effect_fog_set_end_fn = unsafe extern "C" fn(CNA_EffectHandle, f32) -> CNA_Result;
+pub type cna_effect_lights_get_ambient_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Vector3) -> CNA_Result;
+pub type cna_effect_lights_set_ambient_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Vector3) -> CNA_Result;
+pub type cna_effect_lights_get_directional_light_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, u32, *mut CNA_DirectionalLightHandle) -> CNA_Result;
+pub type cna_effect_lights_get_enabled_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_effect_lights_set_enabled_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Bool) -> CNA_Result;
+pub type cna_effect_lights_enable_default_fn = unsafe extern "C" fn(CNA_EffectHandle) -> CNA_Result;
+pub type cna_basic_effect_get_vertex_color_enabled_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_basic_effect_set_vertex_color_enabled_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Bool) -> CNA_Result;
+pub type cna_basic_effect_get_prefer_per_pixel_lighting_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_basic_effect_set_prefer_per_pixel_lighting_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Bool) -> CNA_Result;
+pub type cna_basic_effect_get_diffuse_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Vector3) -> CNA_Result;
+pub type cna_basic_effect_set_diffuse_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Vector3) -> CNA_Result;
+pub type cna_basic_effect_get_emissive_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Vector3) -> CNA_Result;
+pub type cna_basic_effect_set_emissive_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Vector3) -> CNA_Result;
+pub type cna_basic_effect_get_specular_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Vector3) -> CNA_Result;
+pub type cna_basic_effect_set_specular_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Vector3) -> CNA_Result;
+pub type cna_basic_effect_get_specular_power_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut f32) -> CNA_Result;
+pub type cna_basic_effect_set_specular_power_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, f32) -> CNA_Result;
+pub type cna_basic_effect_get_alpha_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut f32) -> CNA_Result;
+pub type cna_basic_effect_set_alpha_fn = unsafe extern "C" fn(CNA_EffectHandle, f32) -> CNA_Result;
+pub type cna_basic_effect_get_texture_enabled_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_basic_effect_set_texture_enabled_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Bool) -> CNA_Result;
+pub type cna_basic_effect_set_texture_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Handle) -> CNA_Result;
+pub type cna_alpha_test_effect_create_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_EffectHandle) -> CNA_Result;
+pub type cna_alpha_test_effect_get_diffuse_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Vector3) -> CNA_Result;
+pub type cna_alpha_test_effect_set_diffuse_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Vector3) -> CNA_Result;
+pub type cna_alpha_test_effect_get_alpha_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut f32) -> CNA_Result;
+pub type cna_alpha_test_effect_set_alpha_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, f32) -> CNA_Result;
+pub type cna_alpha_test_effect_set_texture_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Handle) -> CNA_Result;
+pub type cna_alpha_test_effect_get_vertex_color_enabled_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_alpha_test_effect_set_vertex_color_enabled_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Bool) -> CNA_Result;
+pub type cna_alpha_test_effect_get_alpha_function_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_CompareFunction) -> CNA_Result;
+pub type cna_alpha_test_effect_set_alpha_function_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_CompareFunction) -> CNA_Result;
+pub type cna_alpha_test_effect_get_reference_alpha_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut i32) -> CNA_Result;
+pub type cna_alpha_test_effect_set_reference_alpha_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, i32) -> CNA_Result;
+pub type cna_dual_texture_effect_create_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_EffectHandle) -> CNA_Result;
+pub type cna_dual_texture_effect_get_diffuse_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Vector3) -> CNA_Result;
+pub type cna_dual_texture_effect_set_diffuse_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Vector3) -> CNA_Result;
+pub type cna_dual_texture_effect_get_alpha_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut f32) -> CNA_Result;
+pub type cna_dual_texture_effect_set_alpha_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, f32) -> CNA_Result;
+pub type cna_dual_texture_effect_set_texture_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, u32, CNA_Handle) -> CNA_Result;
+pub type cna_dual_texture_effect_get_vertex_color_enabled_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_dual_texture_effect_set_vertex_color_enabled_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Bool) -> CNA_Result;
+pub type cna_environment_map_effect_create_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_EffectHandle) -> CNA_Result;
+pub type cna_environment_map_effect_get_diffuse_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Vector3) -> CNA_Result;
+pub type cna_environment_map_effect_set_diffuse_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Vector3) -> CNA_Result;
+pub type cna_environment_map_effect_get_emissive_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Vector3) -> CNA_Result;
+pub type cna_environment_map_effect_set_emissive_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Vector3) -> CNA_Result;
+pub type cna_environment_map_effect_get_alpha_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut f32) -> CNA_Result;
+pub type cna_environment_map_effect_set_alpha_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, f32) -> CNA_Result;
+pub type cna_environment_map_effect_set_texture_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Handle) -> CNA_Result;
+pub type cna_environment_map_effect_set_environment_map_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Handle) -> CNA_Result;
+pub type cna_environment_map_effect_get_amount_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut f32) -> CNA_Result;
+pub type cna_environment_map_effect_set_amount_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, f32) -> CNA_Result;
+pub type cna_environment_map_effect_get_specular_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Vector3) -> CNA_Result;
+pub type cna_environment_map_effect_set_specular_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Vector3) -> CNA_Result;
+pub type cna_environment_map_effect_get_fresnel_factor_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut f32) -> CNA_Result;
+pub type cna_environment_map_effect_set_fresnel_factor_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, f32) -> CNA_Result;
+pub type cna_skinned_effect_create_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_EffectHandle) -> CNA_Result;
+pub type cna_skinned_effect_get_diffuse_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Vector3) -> CNA_Result;
+pub type cna_skinned_effect_set_diffuse_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Vector3) -> CNA_Result;
+pub type cna_skinned_effect_get_emissive_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Vector3) -> CNA_Result;
+pub type cna_skinned_effect_set_emissive_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Vector3) -> CNA_Result;
+pub type cna_skinned_effect_get_specular_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Vector3) -> CNA_Result;
+pub type cna_skinned_effect_set_specular_color_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Vector3) -> CNA_Result;
+pub type cna_skinned_effect_get_specular_power_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut f32) -> CNA_Result;
+pub type cna_skinned_effect_set_specular_power_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, f32) -> CNA_Result;
+pub type cna_skinned_effect_get_alpha_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut f32) -> CNA_Result;
+pub type cna_skinned_effect_set_alpha_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, f32) -> CNA_Result;
+pub type cna_skinned_effect_get_prefer_per_pixel_lighting_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_skinned_effect_set_prefer_per_pixel_lighting_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Bool) -> CNA_Result;
+pub type cna_skinned_effect_set_texture_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, CNA_Handle) -> CNA_Result;
+pub type cna_skinned_effect_get_weights_per_vertex_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *mut i32) -> CNA_Result;
+pub type cna_skinned_effect_set_weights_per_vertex_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, i32) -> CNA_Result;
+pub type cna_skinned_effect_set_bone_transforms_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, *const CNA_Matrix, u64) -> CNA_Result;
+pub type cna_skinned_effect_copy_bone_transforms_fn =
+    unsafe extern "C" fn(CNA_EffectHandle, u64, *mut CNA_Matrix, u64, *mut u64) -> CNA_Result;
 
 pub type cna_effect_annotation_destroy_fn =
     unsafe extern "C" fn(CNA_EffectAnnotationHandle) -> CNA_Result;
@@ -1966,6 +2239,27 @@ mod layout_tests {
                 align_of::<CNA_BackBufferReadback>()
             ),
             (48, 8)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_Texture3DCreateInfo>(),
+                align_of::<CNA_Texture3DCreateInfo>()
+            ),
+            (32, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_Texture3DInfo>(),
+                align_of::<CNA_Texture3DInfo>()
+            ),
+            (32, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_Texture3DTransfer>(),
+                align_of::<CNA_Texture3DTransfer>()
+            ),
+            (56, 8)
         );
         assert_eq!(
             (

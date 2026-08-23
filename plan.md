@@ -16,31 +16,29 @@ MSRV: Rust 1.74
   behavior; never add signature-only placeholders.
 - Treat the generated `typeScoreboard` as the only authoritative work queue.
 
-## Final strict measurement for this run
+## Current strict measurement
 
-| Measurement | Run baseline | Final |
+| Measurement | Graphics-run baseline | Current |
 |---|---:|---:|
 | XNA reference types | 257 | 257 |
 | XNA reference members | 2,964 | 2,964 |
 | expected mapped Rust types | 259 | 259 |
-| actual strict Rust types | 117 | 165 |
-| total diagnostics | 178 | 94 |
-| missing types | 142 | 94 |
-| missing members | 36 | 0 |
-| constructor mapping mismatches | 1 | 0 |
-| overload mapping mismatches | 17 | 0 |
-| property mapping mismatches | 4 | 0 |
-| event mapping mismatches | 0 | 0 |
+| actual strict Rust types | 165 | 192 |
+| total diagnostics | 94 | 67 |
+| missing types | 94 | 67 |
+| missing members | 0 | 0 |
+| Graphics missing types | 27 | 0 |
 
-Base projection, trait, interface, parameter, return, generic,
-generic-bound, ref/out, enum/value, flags, delegate, disposal, unexpected
-type/member, type-kind, internal-type leak, raw-handle leak, public unsafe API,
-allowlist, and unmeasured-category counts are all zero.
+Constructor, overload, property, event, base projection, trait, interface,
+parameter, return, generic, generic-bound, ref/out, enum value, flags,
+delegate, and disposal mismatch counts are all zero. Unexpected types and
+members, type-kind mismatches, internal-type leaks, raw-handle leaks, public
+unsafe APIs, allowlist entries, and unmeasured categories are also all zero.
 
-The 94 remaining diagnostics are only missing types:
+The 67 remaining diagnostics are only whole missing types:
 
 ```text
-Graphics          27
+Graphics           0
 Media             24
 Audio             19
 Design            13
@@ -50,106 +48,99 @@ Storage             3
 GamerServices       1
 ```
 
-## Primary scoreboard outcome
+## Completed dependency chain
 
-| Strict type | Run baseline | Final |
+- [x] Completed the Model graph: Model, bones, meshes, mesh parts, collections,
+  enumerators, effects, transforms, tags, stable identity, validation, and
+  parent invalidation.
+- [x] Implemented Model.Draw through ordinary VertexBuffer, IndexBuffer,
+  EffectPass.Apply, and GraphicsDevice indexed-draw routes. No second native
+  Model renderer exists.
+- [x] Added the ordinary managed Model XNB reader with shared-resource fixups,
+  rollback, cache/unload/reload, and legal synthetic graph evidence.
+- [x] Completed BasicEffect, AlphaTestEffect, DualTextureEffect,
+  EnvironmentMapEffect, and SkinnedEffect through their distinct CNA stock
+  effect APIs, including clone, pass application, texture retention, defaults,
+  validation, and XNB readers.
+- [x] Completed IEffectFog, IEffectLights, IEffectMatrices, and stable
+  parent-owned DirectionalLight views without duplicate public state.
+- [x] Completed Texture3D with typed Color transfers, mips/boxes/windows,
+  validation, disposal, and a built-in XNB reader. The reviewed native route is
+  bound; qualified HEADLESS construction remains explicitly backend-blocked by
+  CNA error 6.
+- [x] Completed OcclusionQuery with real create/begin/end/completion/result/
+  destroy routes and state-machine validation.
+- [x] Completed IGraphicsDeviceService and the three mapped graphics exception
+  support types under the normative Rust error policy.
+- [x] Audited all new Graphics content readers. TextureCube now also has its
+  missing built-in reader; legal Texture3D/TextureCube fixtures exercise normal
+  construction or explicit backend failure and rollback.
+- [x] Kept XNA LZX explicitly unimplemented rather than landing a partial or
+  MonoGame-specific decoder.
+- [x] Rechecked repeated RunOneFrame/Tick and canonical CNA HEAD. Neither
+  unrelated blocker was allowed to weaken Graphics completion.
+
+## Ownership model
+
+Model owns the complete graph. Child facades use stable `Arc` identity; bone
+parents and mesh-part back-links are `Weak`, and the shared lifetime contains
+no facade back-link, so there is no strong cycle. Buffers and Effects retain
+their existing single native owners. Shared mesh parts refer to those owners
+without constructing aliases that can destroy the same handle.
+
+DirectionalLight objects are parent-owned stock-effect views. They retain the
+parent ResourceState, never own the Effect, and are invalidated after parent
+disposal. ContentManager records the Model last so reverse unload invalidates
+the graph before releasing effects and buffers. Parent shutdown, retained
+children, repeated disposal, partial XNB failure, and shared resources are all
+covered by crash-isolated stress.
+
+See `docs/graphics-evidence.md` for the capability table and exact graph/XNB
+evidence boundaries.
+
+## Measured evidence
+
+| Measurement | Previous | Current |
 |---|---:|---:|
-| `Game` | 2 | 0 |
-| `GraphicsDevice` | 26 | 0 |
-| `SpriteBatch` | 8 | 0 |
-
-Every one of the 48 added strict types has zero local diagnostics: the complete
-selected Content family; typed vertex/index declarations and buffers;
-`TextureCube`; render targets; `SpriteFont`; and the base Effect reflection
-graph.
-
-## Completed implementation
-
-- [x] Added a real typed `ContentManager`/`ContentReader` XNB pipeline with
-  validated uncompressed framing, reader tables and versions, activation,
-  existing instances, shared resources, external references, typed caching,
-  disposal tracking, rollback, custom readers, and primitive/value readers.
-- [x] Wired one stable per-game `ContentManager`, cleared both final `Game`
-  members, and preserved child-content disposal before native parent teardown.
-  Raw PNG `Texture2D::FromStream` remains separate from XNB.
-- [x] Added real Texture2D and SpriteFont XNB readers. The legal synthetic
-  SpriteFont fixture constructs its atlas through the normal Texture2D reader,
-  preserves cache identity, measures text, submits glyph draws, and unloads
-  without double ownership.
-- [x] Audited repeated `RunOneFrame`/`Tick`. CNA ABI 0.7 exposes no callback
-  user-data rebinding route, so arbitrary repeated borrowed-game ticks remain
-  an explicit safe backend blocker; the owned one-session host remains intact.
-- [x] Added exact typed vertex declarations, five built-in vertex layouts,
-  vertex/index and dynamic buffers, transfer validation, binding identity,
-  wrong-device/disposed checks, and refusal to destroy a bound buffer.
-- [x] Completed all `GraphicsDevice` buffer properties, typed `DrawUser*`,
-  bound draw/instanced routes, render-target binding, reset/present, and
-  back-buffer overloads through real CNA calls. HEADLESS-specific unsupported
-  paths return exact errors instead of success.
-- [x] Added the complete base `Effect` ownership/reflection family, typed
-  scalar/vector/quaternion/matrix/string/texture parameter access, stable
-  child/collection identity, clone/material support, real `EffectPass.Apply`,
-  and reviewed tooling extensions for constructing a native reflection graph.
-- [x] Cleared both Effect-bearing `SpriteBatch.Begin` overloads without
-  ignoring the Effect, including `None`, matrix, device, disposed, and recovery
-  validation.
-- [x] Added real `SpriteFont` state, atlas ownership, measurement, and all six
-  `DrawString` projections backed by CNA glyph submission.
-- [x] Added a legal uncompressed Effect XNB probe. Its managed reader pipeline
-  is verified; compiled Effect construction is truthfully backend-blocked by
-  the current HEADLESS renderer (`CNA error 6`).
-
-## Evidence
-
-| Measurement | Run baseline | Final |
-|---|---:|---:|
-| named XNA-derived observations | 123 | 140 |
-| assertions including final count | 124 | 141 |
-| reviewed ABI functions | 104 | 235 |
-| prototype type positions | 388 | 879 |
-| independent C/Rust ABI measurements | 419 | 805 |
-| layouts / callbacks / constants | 19 / 3 / 129 | 48 / 3 / 206 |
+| named XNA-derived observations | 140 | 140 |
+| assertions including final count | 141 | 141 |
+| behavior failures | 0 | 0 |
+| reviewed ABI functions | 235 | 347 |
+| prototype type positions | 879 | 1,220 |
+| independent C/Rust ABI measurements | 805 | 840 |
+| layouts / callbacks / constants | 48 / 3 / 206 | 51 / 3 / 206 |
 | ABI mismatches | 0 | 0 |
-| native game lifetimes with a created game | 146 | 177 |
-| owned native child-resource constructions | 103 | 283 |
+| native game lifetimes with a created game | 177 | 197 |
+| owned native child-handle constructions | 283 | 893 |
 | native crashes / observed double-free or UAF | 0 / 0 | 0 / 0 |
 
-The native suite includes ten buffer-binding cycles, ten SpriteFont/atlas/XNB
-cycles, ten Effect parent/child/clone/material cycles, and one compiled-Effect
-XNB backend-failure cycle. The managed corpus adds Content metadata/cache and
-vertex declaration/value observations. Native-dependent draw, reflection, and
-font measurement evidence remains in crash-isolated native stress rather than
-being mislabeled as a platform-neutral text observation.
-
-Linux x86-64 experimental ABI-0.7 HEADLESS template tests and fresh 60/600
-frame runs pass. A fresh generated consumer vendors both crates, contains no
-developer or sibling path, passes its workspace tests, and completes 60 native
-frames. The canary continues to exercise real PNG, Texture2D, SpriteBatch,
-input, service identity, and clean shutdown; it makes no windowed-rendering or
-XNB-template claim.
+The behavior count deliberately did not grow: Model/stock-effect/query
+construction and application require a native device and remain in native
+stress instead of being described as platform-neutral XNA observations.
+HEADLESS verifies native command paths, not visible 3D or shader output.
 
 Canonical read-only CNA HEAD remains
 `1bb2145d99ed572dd4eb15009c34e2e5f410fcf0`; its unmodified C API build blocker
-at `CnaCApiCoreExt.cpp:250` is still the renderer identity assertion
-`49 == 50`. Runtime evidence therefore continues to use the labelled
-experimental exact ABI-0.7 HEADLESS artifact. No exact ABI-0.7 ASan/UBSan CNA
-artifact was available, so sanitizer status is `not-run`; crash absence is not
-claimed as allocator-level leak freedom.
+at `CnaCApiCoreExt.cpp:250` remains renderer identity `49 == 50`. Runtime
+evidence therefore continues to use the labelled experimental exact ABI-0.7
+HEADLESS artifact. No exact ABI-0.7 sanitizer artifact was available;
+sanitizer status is `not-run`, and crash absence is not leak proof.
 
 ## Next dependency-ordered work
 
-1. Add Model only now that buffers, Effect, and ContentReader are real; retain
-   parent-owned bone/mesh/part/effect identity.
-2. Add Texture3D and the stock effects through reviewed CNA routes, then extend
-   graphic XNB readers without side channels.
-3. Add uncompressed remaining content readers before optional XNA LZX. Do not
-   substitute a MonoGame-specific compression format.
+1. Preserve Graphics zero and all structural/safety zeros on every subsequent
+   change.
+2. Consider XNA LZX only as a complete framed decoder with malformed-input,
+   cleanup, cache, and unload evidence; do not land half a decoder.
+3. Regenerate the scoreboard and prefer one complete small family among
+   Framework/core, Input, Storage, or GamerServices. Do not start broad Audio
+   or Media merely to reduce the type count.
 4. Resolve repeated frame hosting only through a durable CNA callback context
-   or a reviewed ABI rebinding route.
-5. Continue the generated missing-type scoreboard; Audio/Media remain behind
-   the current graphics/content foundations rather than displacing them.
-6. Run ASan/UBSan when canonical CNA can produce an unmodified, instrumented,
-   exact ABI-0.7 artifact.
+   or a reviewed ABI user-data rebinding route.
+5. Run ASan/UBSan only when an exact unmodified ABI-0.7 CNA artifact is
+   available.
+
+No post-Graphics small family was started in this run.
 
 ## Definition of complete compatibility
 

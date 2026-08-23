@@ -24,7 +24,7 @@ pub use game::{
 pub use graphics::{
     BackBufferData, CubeTextureData, EffectAnnotationDescriptor, EffectBase,
     EffectParameterDescriptor, EffectTechniqueDescriptor, IndexBufferBase, IndexData,
-    Texture2DBase, TextureCubeBase, TextureRuntime, VertexBufferBase, VertexData,
+    Texture2DBase, Texture3DData, TextureCubeBase, TextureRuntime, VertexBufferBase, VertexData,
 };
 
 /// XNA 4.0 compatibility hierarchy. Casing intentionally follows XNA.
@@ -49,25 +49,32 @@ pub mod Microsoft {
             #[allow(non_snake_case, clippy::module_name_repetitions)]
             pub mod Graphics {
                 pub use crate::graphics::{
-                    Blend, BlendFunction, BlendState, BufferUsage, ClearOptions,
-                    ColorWriteChannels, CompareFunction, CubeMapFace, CullMode, DepthFormat,
-                    DepthStencilState, DisplayMode, DisplayModeCollection, DynamicIndexBuffer,
-                    DynamicVertexBuffer, Effect, EffectAnnotation, EffectAnnotationCollection,
-                    EffectMaterial, EffectParameter, EffectParameterClass,
-                    EffectParameterCollection, EffectParameterType, EffectPass,
-                    EffectPassCollection, EffectTechnique, EffectTechniqueCollection, FillMode,
-                    GraphicsAdapter, GraphicsDevice, GraphicsDeviceStatus, GraphicsProfile,
-                    GraphicsResource, IVertexType, IndexBuffer, IndexElementSize, PresentInterval,
-                    PresentationParameters, PrimitiveType, RasterizerState, RenderTarget2D,
-                    RenderTargetBinding, RenderTargetCube, RenderTargetUsage,
-                    ResourceCreatedEventArgs, ResourceDestroyedEventArgs, SamplerState,
-                    SamplerStateCollection, SetDataOptions, SpriteBatch, SpriteEffects, SpriteFont,
-                    SpriteSortMode, StencilOperation, SurfaceFormat, Texture, Texture2D,
-                    TextureAddressMode, TextureCollection, TextureCube, TextureFilter,
-                    VertexBuffer, VertexBufferBinding, VertexDeclaration, VertexElement,
-                    VertexElementFormat, VertexElementUsage, VertexPositionColor,
-                    VertexPositionColorTexture, VertexPositionNormalTexture, VertexPositionTexture,
-                    Viewport,
+                    AlphaTestEffect, BasicEffect, Blend, BlendFunction, BlendState, BufferUsage,
+                    ClearOptions, ColorWriteChannels, CompareFunction, CubeMapFace, CullMode,
+                    DepthFormat, DepthStencilState, DeviceLostException, DeviceNotResetException,
+                    DirectionalLight, DisplayMode, DisplayModeCollection, DualTextureEffect,
+                    DynamicIndexBuffer, DynamicVertexBuffer, Effect, EffectAnnotation,
+                    EffectAnnotationCollection, EffectMaterial, EffectParameter,
+                    EffectParameterClass, EffectParameterCollection, EffectParameterType,
+                    EffectPass, EffectPassCollection, EffectTechnique, EffectTechniqueCollection,
+                    EnvironmentMapEffect, FillMode, GraphicsAdapter, GraphicsDevice,
+                    GraphicsDeviceStatus, GraphicsProfile, GraphicsResource, IEffectFog,
+                    IEffectLights, IEffectMatrices, IGraphicsDeviceService, IVertexType,
+                    IndexBuffer, IndexElementSize, Model, ModelBone, ModelBoneCollection,
+                    ModelBoneCollectionEnumerator, ModelEffectCollection,
+                    ModelEffectCollectionEnumerator, ModelMesh, ModelMeshCollection,
+                    ModelMeshCollectionEnumerator, ModelMeshPart, ModelMeshPartCollection,
+                    ModelMeshPartCollectionEnumerator, NoSuitableGraphicsDeviceException,
+                    OcclusionQuery, PresentInterval, PresentationParameters, PrimitiveType,
+                    RasterizerState, RenderTarget2D, RenderTargetBinding, RenderTargetCube,
+                    RenderTargetUsage, ResourceCreatedEventArgs, ResourceDestroyedEventArgs,
+                    SamplerState, SamplerStateCollection, SetDataOptions, SkinnedEffect,
+                    SpriteBatch, SpriteEffects, SpriteFont, SpriteSortMode, StencilOperation,
+                    SurfaceFormat, Texture, Texture2D, Texture3D, TextureAddressMode,
+                    TextureCollection, TextureCube, TextureFilter, VertexBuffer,
+                    VertexBufferBinding, VertexDeclaration, VertexElement, VertexElementFormat,
+                    VertexElementUsage, VertexPositionColor, VertexPositionColorTexture,
+                    VertexPositionNormalTexture, VertexPositionTexture, Viewport,
                 };
 
                 #[allow(non_snake_case)]
@@ -154,6 +161,8 @@ pub mod extensions {
             Effect, EffectAnnotation, EffectAnnotationCollection, EffectParameter,
             EffectParameterCollection, EffectParameterDescriptor, EffectPass, EffectPassCollection,
             EffectTechnique, EffectTechniqueCollection, EffectTechniqueDescriptor, GraphicsDevice,
+            ModelBone, ModelBoneCollection, ModelEffectCollection, ModelMesh, ModelMeshCollection,
+            ModelMeshPart, ModelMeshPartCollection,
         };
 
         /// Renderer facts queried from CNA rather than inferred from a name.
@@ -185,6 +194,52 @@ pub mod extensions {
                     supports_depth_stencil,
                     max_texture_dimension,
                 })
+            }
+        }
+
+        /// Inherited read-only collection operations for XNA model graph views.
+        #[allow(non_snake_case)]
+        pub trait ModelCollectionExt<T: ?Sized> {
+            fn Count(&self) -> Result<i32>;
+            fn ItemAt(&self, index: i32) -> Result<Arc<T>>;
+        }
+
+        macro_rules! model_collection_ext {
+            ($collection:ty, $item:ty) => {
+                impl ModelCollectionExt<$item> for $collection {
+                    fn Count(&self) -> Result<i32> {
+                        i32::try_from(self.count()).map_err(|_| {
+                            crate::CnaError::InvalidInput("model collection count exceeds i32")
+                        })
+                    }
+
+                    fn ItemAt(&self, index: i32) -> Result<Arc<$item>> {
+                        let index = usize::try_from(index).map_err(|_| {
+                            crate::CnaError::InvalidInput(
+                                "model collection index must not be negative",
+                            )
+                        })?;
+                        self.item_at(index)
+                    }
+                }
+            };
+        }
+
+        model_collection_ext!(ModelBoneCollection, ModelBone);
+        model_collection_ext!(ModelMeshCollection, ModelMesh);
+        model_collection_ext!(ModelMeshPartCollection, ModelMeshPart);
+
+        impl ModelCollectionExt<dyn crate::graphics::EffectBase> for ModelEffectCollection {
+            fn Count(&self) -> Result<i32> {
+                i32::try_from(self.count()?)
+                    .map_err(|_| crate::CnaError::InvalidInput("model effect count exceeds i32"))
+            }
+
+            fn ItemAt(&self, index: i32) -> Result<Arc<dyn crate::graphics::EffectBase>> {
+                let index = usize::try_from(index).map_err(|_| {
+                    crate::CnaError::InvalidInput("model collection index must not be negative")
+                })?;
+                self.item_at(index)
             }
         }
 

@@ -12,3 +12,7 @@ mod loader;
 mod window;
 
 pub(crate) use api::Native;
+pub(crate) use graphics::{
+    BasicBoolProperty, BasicFloatProperty, BasicVector3Property, StockEffectKind,
+    StockMatrixProperty,
+};

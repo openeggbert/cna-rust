@@ -192,8 +192,27 @@ struct EffectReflectionBlueprint {
 }
 
 /// XNA base relationship used by `EffectMaterial`.
-pub trait EffectBase: GraphicsResource {
+pub trait EffectBase: GraphicsResource + Send + Sync {
     fn AsEffect(&self) -> &Effect;
+
+    #[doc(hidden)]
+    fn set_model_matrices_for_model(
+        &self,
+        world: Matrix,
+        view: Matrix,
+        projection: Matrix,
+    ) -> Result<()> {
+        let _ = (world, view, projection);
+        Err(CnaError::InvalidInput(
+            "a Model effect must implement IEffectMatrices",
+        ))
+    }
+}
+
+impl EffectBase for Effect {
+    fn AsEffect(&self) -> &Effect {
+        self
+    }
 }
 
 #[allow(non_snake_case)]
@@ -371,7 +390,7 @@ impl Effect {
         Ok(())
     }
 
-    fn from_handle(device: &GraphicsDevice, handle: sys::CNA_Handle) -> Self {
+    pub(super) fn from_handle(device: &GraphicsDevice, handle: sys::CNA_Handle) -> Self {
         Self {
             state: ResourceState::new(device, handle, ResourceKind::Effect),
             parameters: Mutex::new(None),
@@ -429,6 +448,33 @@ impl Effect {
 
     pub(crate) fn is_same_device(&self, device: &GraphicsDevice) -> bool {
         self.state.device().is_same_device(device)
+    }
+
+    pub(super) fn state_arc(&self) -> Arc<ResourceState> {
+        Arc::clone(&self.state)
+    }
+
+    pub(super) fn native(&self) -> &crate::native::Native {
+        self.state.device().state.native()
+    }
+
+    pub(crate) fn set_model_matrices(
+        &self,
+        world: Matrix,
+        view: Matrix,
+        projection: Matrix,
+    ) -> Result<()> {
+        use crate::native::StockMatrixProperty;
+        let handle = self.handle()?;
+        self.native()
+            .set_stock_matrix(handle, StockMatrixProperty::World, native_matrix(world))?;
+        self.native()
+            .set_stock_matrix(handle, StockMatrixProperty::View, native_matrix(view))?;
+        self.native().set_stock_matrix(
+            handle,
+            StockMatrixProperty::Projection,
+            native_matrix(projection),
+        )
     }
 
     pub fn Parameters(&self) -> Result<Arc<EffectParameterCollection>> {
@@ -1631,7 +1677,7 @@ pub(crate) fn native_matrix(value: Matrix) -> sys::CNA_Matrix {
     }
 }
 
-fn from_native_matrix(value: sys::CNA_Matrix) -> Matrix {
+pub(crate) fn from_native_matrix(value: sys::CNA_Matrix) -> Matrix {
     Matrix::new(
         value.m11, value.m12, value.m13, value.m14, value.m21, value.m22, value.m23, value.m24,
         value.m31, value.m32, value.m33, value.m34, value.m41, value.m42, value.m43, value.m44,
@@ -1649,14 +1695,14 @@ fn native_quaternion(value: Quaternion) -> sys::CNA_Quaternion {
 fn from_native_quaternion(value: sys::CNA_Quaternion) -> Quaternion {
     Quaternion::from_x_and_y_and_z_and_w(value.x, value.y, value.z, value.w)
 }
-fn native_vector3(value: Vector3) -> sys::CNA_Vector3 {
+pub(crate) fn native_vector3(value: Vector3) -> sys::CNA_Vector3 {
     sys::CNA_Vector3 {
         x: value.X,
         y: value.Y,
         z: value.Z,
     }
 }
-fn from_native_vector3(value: sys::CNA_Vector3) -> Vector3 {
+pub(crate) fn from_native_vector3(value: sys::CNA_Vector3) -> Vector3 {
     Vector3::from_x_and_y_and_z(value.x, value.y, value.z)
 }
 fn native_vector4(value: Vector4) -> sys::CNA_Vector4 {

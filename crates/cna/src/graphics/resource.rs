@@ -18,6 +18,7 @@ use super::GraphicsDevice;
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub(super) enum ResourceKind {
     Texture2D,
+    Texture3D,
     TextureCube,
     RenderTarget2D,
     RenderTargetCube,
@@ -26,6 +27,7 @@ pub(super) enum ResourceKind {
     Effect,
     VertexBuffer,
     IndexBuffer,
+    OcclusionQuery,
 }
 
 pub(super) struct ResourceState {
@@ -235,6 +237,7 @@ impl ResourceState {
         }
         match self.kind {
             ResourceKind::Texture2D => self.device.state.native().destroy_texture(*handle)?,
+            ResourceKind::Texture3D => self.device.state.native().destroy_texture3d(*handle)?,
             ResourceKind::TextureCube => {
                 self.device.state.native().destroy_texture_cube(*handle)?;
             }
@@ -259,6 +262,12 @@ impl ResourceState {
             }
             ResourceKind::IndexBuffer => {
                 self.device.state.native().destroy_index_buffer(*handle)?;
+            }
+            ResourceKind::OcclusionQuery => {
+                self.device
+                    .state
+                    .native()
+                    .destroy_occlusion_query(*handle)?;
             }
         };
         *handle = sys::CNA_INVALID_HANDLE;

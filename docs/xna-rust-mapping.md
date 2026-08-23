@@ -288,6 +288,46 @@ inputs map to `&str` in this profile because Rust has no separate mutable
 builder reference type at the call boundary and the operation only observes
 text. Scalar and vector scale overloads remain mechanically distinct.
 
+## Models and stock effects
+
+The Model graph is reference-valued. `Model` owns strong identities for every
+bone, mesh, mesh part, collection, buffer, and effect required by the graph.
+Repeated collection/index/name access returns the same `Arc` facade. Back-links
+that would otherwise close a strong cycle use `Weak`: in particular bone
+parents and mesh-part sibling/owner links. The shared lifetime contains no
+strong facade back-link. Retaining a child can therefore preserve its safe
+facade identity without keeping an uncollectable Model cycle alive; after
+Model invalidation, child operations return an error.
+
+Model `Tag` values map to `Option<Arc<dyn Any + Send + Sync>>`, matching the
+same safe retained object policy used by other reference-valued tags.
+`ModelMeshPart.Effect` maps to `Option<Arc<dyn EffectBase>>` because XNA permits
+different Effect subclasses and multiple parts can observe one shared effect
+identity. The trait object retains the one concrete native owner; it never
+creates an Effect wrapper from a raw handle. Model collection CLR enumerators
+are non-Copy Rust structs because they retain reference identities while
+advancing. Their flattened names follow the general nested-type rule.
+
+BasicEffect, AlphaTestEffect, DualTextureEffect, EnvironmentMapEffect, and
+SkinnedEffect each compose the public `EffectBase` contract while retaining a
+distinct concrete CNA stock-effect owner. Shared implementation is private and
+does not merge their public types. IEffectFog, IEffectLights, and
+IEffectMatrices map to Rust traits implemented directly by the corresponding
+concrete effects; they expose the same underlying state rather than a copied
+interface object.
+
+DirectionalLight properties return stable borrowed children of a stock
+effect. A light shares the parent ResourceState, never destroys the Effect, and
+fails after parent disposal. The parent destroys each native light view once.
+Stock-effect Texture2D/TextureCube properties use `Option<Arc<T>>` so an
+assigned native raw texture handle is always backed by a safe tracked identity.
+
+Generic Texture3D transfer methods map through the sealed crate-root
+`Texture3DData` safety contract. It admits only element layouts with an exact
+reviewed CNA encoding; this profile currently exposes `Color`. The strict
+surface remains typed slices rather than public bytes, and an unsupported
+SurfaceFormat/type combination is an error.
+
 ## Events and delegates
 
 An event `Foo` maps to `AddFooHandler` and `RemoveFooHandler`. The returned

@@ -9,6 +9,7 @@ use core::any::Any;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
+use crate::content::ContentLoadable;
 use crate::error::{CnaError, Result};
 use crate::extensions::events::{EventArgs, EventHandler};
 use crate::value::{Color, Vector2, Vector3};
@@ -142,6 +143,8 @@ pub struct VertexDeclaration {
     elements: Vec<VertexElement>,
     state: DeclarationState,
 }
+
+impl ContentLoadable for VertexDeclaration {}
 
 #[allow(non_snake_case)]
 impl VertexDeclaration {

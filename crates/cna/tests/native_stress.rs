@@ -18,17 +18,18 @@ use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use cna::extensions::graphics::{
     EffectAnnotationCollectionExt, EffectFactoryExt, EffectParameterCollectionExt,
-    EffectPassCollectionExt, EffectTechniqueCollectionExt,
+    EffectPassCollectionExt, EffectTechniqueCollectionExt, ModelCollectionExt,
 };
 use cna::Microsoft::Xna::Framework::Graphics::{
-    BlendState, BufferUsage, CubeMapFace, DepthStencilState, DynamicIndexBuffer,
-    DynamicVertexBuffer, Effect, EffectMaterial, EffectParameterClass, EffectParameterType,
+    AlphaTestEffect, BasicEffect, BlendState, BufferUsage, CompareFunction, CubeMapFace,
+    DepthStencilState, DualTextureEffect, DynamicIndexBuffer, DynamicVertexBuffer, Effect,
+    EffectMaterial, EffectParameterClass, EffectParameterType, EnvironmentMapEffect,
     GraphicsAdapter, GraphicsDevice, GraphicsDeviceStatus, GraphicsProfile, GraphicsResource,
-    IndexBuffer, IndexElementSize, PrimitiveType, RasterizerState, RenderTarget2D,
-    RenderTargetBinding, RenderTargetCube, SamplerState, SetDataOptions, SpriteBatch, SpriteFont,
-    SpriteSortMode, SurfaceFormat, Texture, Texture2D, TextureCube, VertexBuffer,
-    VertexBufferBinding, VertexDeclaration, VertexElement, VertexElementFormat, VertexElementUsage,
-    VertexPositionColor,
+    IndexBuffer, IndexElementSize, Model, ModelBone, OcclusionQuery, PrimitiveType,
+    RasterizerState, RenderTarget2D, RenderTargetBinding, RenderTargetCube, SamplerState,
+    SetDataOptions, SkinnedEffect, SpriteBatch, SpriteFont, SpriteSortMode, SurfaceFormat, Texture,
+    Texture2D, Texture3D, TextureCube, VertexBuffer, VertexBufferBinding, VertexDeclaration,
+    VertexElement, VertexElementFormat, VertexElementUsage, VertexPositionColor,
 };
 use cna::Microsoft::Xna::Framework::{
     Color, Game, GameContext, GameTime, IDrawable, IGameComponent, IUpdateable, Matrix, Rectangle,
@@ -910,6 +911,278 @@ struct EffectXnbGame {
     root: PathBuf,
 }
 
+struct ModelXnbGame {
+    state: Arc<GameState>,
+    root: PathBuf,
+    retained_model: Arc<Mutex<Option<Arc<Model>>>>,
+    retained_bone: Arc<Mutex<Option<Arc<ModelBone>>>>,
+}
+
+#[derive(Default)]
+struct RemainingGraphicsGame {
+    state: Arc<GameState>,
+    texture3d: Option<Texture3D>,
+}
+
+impl GameStateAccess for ModelXnbGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for ModelXnbGame {
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let _ = game;
+        self.Content()
+            .SetRootDirectory(self.root.to_str().expect("UTF-8 Model fixture path"))?;
+
+        assert!(self.Content().Load::<Texture3D>("model").is_err());
+        assert!(self.Content().Load::<Model>("bad-root").is_err());
+        assert!(self.Content().Load::<Model>("missing-effect").is_err());
+
+        let first = self.Content().Load::<Model>("model")?;
+        let cached = self.Content().Load::<Model>("MODEL")?;
+        assert!(Arc::ptr_eq(&first, &cached));
+        assert_eq!(first.Bones()?.Count()?, 2);
+        assert_eq!(first.Meshes()?.Count()?, 1);
+        assert_eq!(first.Root()?.Name()?, "Root");
+
+        match self.Content().Load::<Texture3D>("texture3d") {
+            Ok(texture) => {
+                assert_eq!(
+                    (texture.Width(), texture.Height(), texture.Depth()),
+                    (2, 2, 2)
+                );
+                assert_eq!(texture.LevelCount(), 2);
+                assert!(Arc::ptr_eq(
+                    &texture,
+                    &self.Content().Load::<Texture3D>("TEXTURE3D")?
+                ));
+            }
+            Err(CnaError::Content(error)) => {
+                let message = error.to_string();
+                assert!(
+                    message.contains("CNA error 6")
+                        && message.contains("does not support real volume (3D) texture storage"),
+                    "unexpected Texture3D content error: {message}"
+                );
+            }
+            Err(error) => return Err(error),
+        }
+        match self.Content().Load::<TextureCube>("texture-cube") {
+            Ok(texture) => {
+                assert_eq!(texture.Size(), 1);
+                assert_eq!(texture.LevelCount(), 1);
+                assert!(Arc::ptr_eq(
+                    &texture,
+                    &self.Content().Load::<TextureCube>("TEXTURE-CUBE")?
+                ));
+            }
+            Err(CnaError::Content(error)) => {
+                assert!(
+                    error.to_string().contains("CNA error 6"),
+                    "unexpected TextureCube content error: {error}"
+                );
+            }
+            Err(error) => return Err(error),
+        }
+        let root_a = first.Bones()?.ItemAt(0)?;
+        let root_b = first.Bones()?.ItemAt(0)?;
+        assert!(Arc::ptr_eq(&root_a, &root_b));
+        let child = first.Bones()?.ItemAt(1)?;
+        assert!(Arc::ptr_eq(
+            &child.Parent()?.expect("child parent"),
+            &root_a
+        ));
+        assert_eq!(root_a.Children()?.Count()?, 1);
+        assert!(Arc::ptr_eq(&root_a.Children()?.ItemAt(0)?, &child));
+
+        let mesh = first.Meshes()?.ItemAt(0)?;
+        assert_eq!(mesh.Name()?, "Triangle");
+        assert!(std::ptr::eq(mesh.ParentBone()?, child.as_ref()));
+        assert_eq!(mesh.MeshParts()?.Count()?, 2);
+        assert_eq!(mesh.Effects()?.Count()?, 1);
+        let part0 = mesh.MeshParts()?.ItemAt(0)?;
+        let part1 = mesh.MeshParts()?.ItemAt(1)?;
+        assert!(std::ptr::eq(part0.VertexBuffer()?, part1.VertexBuffer()?));
+        assert!(std::ptr::eq(part0.IndexBuffer()?, part1.IndexBuffer()?));
+        let effect0 = part0.Effect()?.expect("part 0 effect");
+        let effect1 = part1.Effect()?.expect("part 1 effect");
+        assert!(Arc::ptr_eq(&effect0, &effect1));
+        assert_eq!(
+            first
+                .Tag()?
+                .expect("model tag")
+                .downcast::<String>()
+                .expect("string model tag")
+                .as_str(),
+            "model-tag"
+        );
+
+        let mut local = vec![Matrix::Identity; 2];
+        first.CopyBoneTransformsTo(&mut local)?;
+        assert_eq!(local[1].M41, 2.0);
+        let mut absolute = vec![Matrix::Identity; 2];
+        first.CopyAbsoluteBoneTransformsTo(&mut absolute)?;
+        assert_eq!(absolute[1].M41, 2.0);
+        first.Draw(Matrix::Identity, Matrix::Identity, Matrix::Identity)?;
+
+        let alpha = self.Content().Load::<AlphaTestEffect>("alpha")?;
+        assert_eq!(alpha.AlphaFunction()?, CompareFunction::Greater);
+        assert_eq!(alpha.ReferenceAlpha()?, 127);
+        assert_eq!(alpha.Alpha()?, 0.75);
+        apply_current_passes(&alpha)?;
+        let dual = self.Content().Load::<DualTextureEffect>("dual")?;
+        assert_eq!(dual.Alpha()?, 0.5);
+        apply_current_passes(&dual)?;
+        let environment = self.Content().Load::<EnvironmentMapEffect>("environment")?;
+        assert_eq!(environment.EnvironmentMapAmount()?, 0.25);
+        assert_eq!(environment.FresnelFactor()?, 0.75);
+        apply_current_passes(&environment)?;
+        let skinned = self.Content().Load::<SkinnedEffect>("skinned")?;
+        assert_eq!(skinned.WeightsPerVertex()?, 2);
+        assert_eq!(skinned.SpecularPower()?, 8.0);
+        apply_current_passes(&skinned)?;
+
+        self.Content().Unload()?;
+        assert!(first.Bones().is_err());
+        assert!(root_a.Name().is_err());
+        assert!(part0.VertexBuffer().is_err());
+
+        let reloaded = self.Content().Load::<Model>("model")?;
+        assert!(!Arc::ptr_eq(&first, &reloaded));
+        let retained_bone = reloaded.Bones()?.ItemAt(1)?;
+        *self
+            .retained_bone
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(retained_bone);
+        *self
+            .retained_model
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(reloaded);
+        Ok(())
+    }
+}
+
+impl GameStateAccess for RemainingGraphicsGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for RemainingGraphicsGame {
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let device = game.GraphicsDevice()?;
+        let mut basic = BasicEffect::from_device(&device)?;
+        assert!(std::ptr::eq(
+            basic.DirectionalLight0()?,
+            basic.DirectionalLight0()?
+        ));
+        basic.SetFogEnabled(true)?;
+        basic.SetFogStart(2.0)?;
+        basic.SetFogEnd(8.0)?;
+        basic.SetLightingEnabled(true)?;
+        basic.DirectionalLight0()?.SetEnabled(true)?;
+        basic
+            .DirectionalLight0()?
+            .SetDirection(Vector3::from_x_and_y_and_z(0.0, -1.0, 0.0))?;
+        let clone = BasicEffect::new(&basic)?;
+        assert_eq!(clone.FogEnabled()?, basic.FogEnabled()?);
+        assert_eq!(clone.FogStart()?, 2.0);
+        apply_current_passes(&basic)?;
+        apply_current_passes(&clone)?;
+
+        let alpha = AlphaTestEffect::from_device(&device)?;
+        apply_current_passes(&alpha)?;
+        let dual = DualTextureEffect::from_device(&device)?;
+        apply_current_passes(&dual)?;
+        let environment = EnvironmentMapEffect::from_device(&device)?;
+        assert!(std::ptr::eq(
+            environment.DirectionalLight0()?,
+            environment.DirectionalLight0()?
+        ));
+        apply_current_passes(&environment)?;
+        let skinned = SkinnedEffect::from_device(&device)?;
+        apply_current_passes(&skinned)?;
+
+        match Texture3D::new(&device, 2, 2, 2, true, SurfaceFormat::Color) {
+            Ok(texture) => {
+                assert_eq!(texture.LevelCount(), 2);
+                let voxels = [
+                    Color::Red,
+                    Color::Green,
+                    Color::Blue,
+                    Color::White,
+                    Color::Black,
+                    Color::Yellow,
+                    Color::CornflowerBlue,
+                    Color::Transparent,
+                ];
+                texture.SetData(&voxels)?;
+                let mut readback = [Color::Transparent; 8];
+                texture.GetData(&mut readback)?;
+                assert_eq!(readback, voxels);
+                texture.SetDataWithLevelAndLeftAndTopAndRightAndBottomAndFrontAndBackAndDataAndStartIndexAndElementCount(
+                    1,
+                    0,
+                    0,
+                    1,
+                    1,
+                    0,
+                    1,
+                    &[Color::Magenta],
+                    0,
+                    1,
+                )?;
+                assert!(texture
+                    .SetDataWithLevelAndLeftAndTopAndRightAndBottomAndFrontAndBackAndDataAndStartIndexAndElementCount(
+                        2, 0, 0, 1, 1, 0, 1, &[Color::White], 0, 1,
+                    )
+                    .is_err());
+                self.texture3d = Some(texture);
+            }
+            Err(CnaError::Native { code: 6, .. }) => {}
+            Err(error) => return Err(error),
+        }
+
+        let mut query = OcclusionQuery::new(&device)?;
+        assert!(query.End().is_err());
+        match query.Begin() {
+            Ok(()) => {
+                assert!(query.Begin().is_err());
+                assert!(!query.IsComplete()?);
+                assert!(query.PixelCount().is_err());
+                query.End()?;
+                match query.IsComplete() {
+                    Ok(true) => {
+                        assert_eq!(query.PixelCount()?, 1);
+                    }
+                    Ok(false) | Err(CnaError::Native { code: 6, .. }) => {}
+                    Err(error) => return Err(error),
+                }
+            }
+            Err(CnaError::Native { code: 6, .. }) => {}
+            Err(error) => return Err(error),
+        }
+        query.Dispose(true)?;
+        query.Dispose(true)?;
+        assert!(query.Begin().is_err());
+        let mut active_query = OcclusionQuery::new(&device)?;
+        if active_query.Begin().is_ok() {
+            active_query.Dispose(true)?;
+            assert!(active_query.End().is_err());
+        }
+        Ok(())
+    }
+}
+
+fn apply_current_passes(effect: &Effect) -> Result<()> {
+    for pass in effect.CurrentTechnique()?.Passes()?.GetEnumerator()? {
+        pass.Apply()?;
+    }
+    Ok(())
+}
+
 #[derive(Default)]
 struct EffectStressGame {
     state: Arc<GameState>,
@@ -1238,6 +1511,249 @@ impl EffectFixture {
 impl Drop for EffectFixture {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+struct ModelFixture(PathBuf);
+
+impl ModelFixture {
+    fn new() -> Self {
+        let path = std::env::temp_dir().join(format!("cna-rust-model-xnb-{}", std::process::id()));
+        fs::create_dir_all(&path).expect("create Model XNB fixture directory");
+        fs::write(path.join("model.xnb"), model_xnb(1, 3)).expect("write valid Model XNB fixture");
+        fs::write(path.join("bad-root.xnb"), model_xnb(3, 3))
+            .expect("write malformed-root Model XNB fixture");
+        fs::write(path.join("missing-effect.xnb"), model_xnb(1, 0))
+            .expect("write missing-effect Model XNB fixture");
+        fs::write(path.join("alpha.xnb"), alpha_test_effect_xnb())
+            .expect("write AlphaTestEffect XNB fixture");
+        fs::write(path.join("dual.xnb"), dual_texture_effect_xnb())
+            .expect("write DualTextureEffect XNB fixture");
+        fs::write(path.join("environment.xnb"), environment_map_effect_xnb())
+            .expect("write EnvironmentMapEffect XNB fixture");
+        fs::write(path.join("skinned.xnb"), skinned_effect_xnb())
+            .expect("write SkinnedEffect XNB fixture");
+        fs::write(path.join("texture3d.xnb"), texture3d_xnb())
+            .expect("write Texture3D XNB fixture");
+        fs::write(path.join("texture-cube.xnb"), texture_cube_xnb())
+            .expect("write TextureCube XNB fixture");
+        Self(path)
+    }
+}
+
+impl Drop for ModelFixture {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+fn model_xnb(root_reference: u8, effect_shared_reference: u8) -> Vec<u8> {
+    const READERS: &[&str] = &[
+        "Microsoft.Xna.Framework.Content.ModelReader",
+        "Microsoft.Xna.Framework.Content.StringReader",
+        "Microsoft.Xna.Framework.Content.VertexBufferReader",
+        "Microsoft.Xna.Framework.Content.IndexBufferReader",
+        "Microsoft.Xna.Framework.Content.BasicEffectReader",
+    ];
+    let mut payload = Vec::new();
+    write_7bit(&mut payload, READERS.len());
+    for reader in READERS {
+        write_xnb_string(&mut payload, reader);
+        payload.extend_from_slice(&0_i32.to_le_bytes());
+    }
+    write_7bit(&mut payload, 3);
+
+    payload.push(1); // ModelReader root object.
+    payload.extend_from_slice(&2_u32.to_le_bytes());
+    write_dispatched_string(&mut payload, "Root");
+    write_matrix(&mut payload, Matrix::Identity);
+    write_dispatched_string(&mut payload, "Child");
+    let mut child_transform = Matrix::Identity;
+    child_transform.M41 = 2.0;
+    write_matrix(&mut payload, child_transform);
+
+    payload.push(0); // Root parent.
+    payload.extend_from_slice(&1_u32.to_le_bytes());
+    payload.push(2); // Root child is Child.
+    payload.push(1); // Child parent is Root (reader validates, hierarchy comes from children).
+    payload.extend_from_slice(&0_u32.to_le_bytes());
+
+    payload.extend_from_slice(&1_i32.to_le_bytes());
+    write_dispatched_string(&mut payload, "Triangle");
+    payload.push(2); // Parent bone is Child.
+    for value in [0.0_f32, 0.0, 0.0, 2.0] {
+        payload.extend_from_slice(&value.to_le_bytes());
+    }
+    write_dispatched_string(&mut payload, "mesh-tag");
+    payload.extend_from_slice(&2_i32.to_le_bytes());
+    for part_index in 0..2_i32 {
+        for value in [0_i32, 3, 0, 1] {
+            payload.extend_from_slice(&value.to_le_bytes());
+        }
+        write_dispatched_string(&mut payload, &format!("part-{part_index}"));
+        write_7bit(&mut payload, 1);
+        write_7bit(&mut payload, 2);
+        write_7bit(&mut payload, usize::from(effect_shared_reference));
+    }
+    payload.push(root_reference);
+    write_dispatched_string(&mut payload, "model-tag");
+
+    payload.push(3); // Shared VertexBuffer.
+    payload.extend_from_slice(&12_i32.to_le_bytes());
+    payload.extend_from_slice(&1_i32.to_le_bytes());
+    for value in [0_i32, 2, 0, 0] {
+        payload.extend_from_slice(&value.to_le_bytes());
+    }
+    payload.extend_from_slice(&3_u32.to_le_bytes());
+    for value in [0.0_f32, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0] {
+        payload.extend_from_slice(&value.to_le_bytes());
+    }
+
+    payload.push(4); // Shared IndexBuffer.
+    payload.push(1); // Sixteen-bit indices.
+    payload.extend_from_slice(&6_i32.to_le_bytes());
+    for value in [0_u16, 1, 2] {
+        payload.extend_from_slice(&value.to_le_bytes());
+    }
+
+    payload.push(5); // Shared BasicEffect.
+    write_xnb_string(&mut payload, "");
+    for value in [
+        1.0_f32, 1.0, 1.0, // Diffuse.
+        0.0, 0.0, 0.0, // Emissive.
+        1.0, 1.0, 1.0, // Specular.
+        16.0, 1.0, // Power and alpha.
+    ] {
+        payload.extend_from_slice(&value.to_le_bytes());
+    }
+    payload.push(0); // VertexColorEnabled.
+
+    let mut bytes = b"XNBw\x05\x00".to_vec();
+    bytes.extend_from_slice(
+        &u32::try_from(10 + payload.len())
+            .expect("Model fixture size")
+            .to_le_bytes(),
+    );
+    bytes.extend_from_slice(&payload);
+    bytes
+}
+
+fn stock_effect_xnb(reader: &str, body: &[u8]) -> Vec<u8> {
+    let mut payload = Vec::new();
+    write_7bit(&mut payload, 1);
+    write_xnb_string(&mut payload, reader);
+    payload.extend_from_slice(&0_i32.to_le_bytes());
+    write_7bit(&mut payload, 0);
+    payload.push(1);
+    payload.extend_from_slice(body);
+    let mut bytes = b"XNBw\x05\x00".to_vec();
+    bytes.extend_from_slice(
+        &u32::try_from(10 + payload.len())
+            .expect("stock-effect fixture size")
+            .to_le_bytes(),
+    );
+    bytes.extend_from_slice(&payload);
+    bytes
+}
+
+fn texture3d_xnb() -> Vec<u8> {
+    let mut body = Vec::new();
+    body.extend_from_slice(&0_i32.to_le_bytes()); // SurfaceFormat.Color.
+    body.extend_from_slice(&2_i32.to_le_bytes()); // Width.
+    body.extend_from_slice(&2_i32.to_le_bytes()); // Height.
+    body.extend_from_slice(&2_i32.to_le_bytes()); // Depth.
+    body.extend_from_slice(&2_i32.to_le_bytes()); // Complete mip chain.
+    body.extend_from_slice(&32_i32.to_le_bytes());
+    body.extend_from_slice(&[255_u8; 32]);
+    body.extend_from_slice(&4_i32.to_le_bytes());
+    body.extend_from_slice(&[255_u8; 4]);
+    stock_effect_xnb("Microsoft.Xna.Framework.Content.Texture3DReader", &body)
+}
+
+fn texture_cube_xnb() -> Vec<u8> {
+    let mut body = Vec::new();
+    body.extend_from_slice(&0_i32.to_le_bytes()); // SurfaceFormat.Color.
+    body.extend_from_slice(&1_i32.to_le_bytes()); // Size.
+    body.extend_from_slice(&1_i32.to_le_bytes()); // One mip.
+    for _ in 0..6 {
+        body.extend_from_slice(&4_i32.to_le_bytes());
+        body.extend_from_slice(&[255_u8; 4]);
+    }
+    stock_effect_xnb("Microsoft.Xna.Framework.Content.TextureCubeReader", &body)
+}
+
+fn write_vector3(bytes: &mut Vec<u8>, value: [f32; 3]) {
+    for component in value {
+        bytes.extend_from_slice(&component.to_le_bytes());
+    }
+}
+
+fn alpha_test_effect_xnb() -> Vec<u8> {
+    let mut body = Vec::new();
+    write_xnb_string(&mut body, "");
+    body.extend_from_slice(&6_i32.to_le_bytes());
+    body.extend_from_slice(&127_u32.to_le_bytes());
+    write_vector3(&mut body, [0.25, 0.5, 0.75]);
+    body.extend_from_slice(&0.75_f32.to_le_bytes());
+    body.push(1);
+    stock_effect_xnb(
+        "Microsoft.Xna.Framework.Content.AlphaTestEffectReader",
+        &body,
+    )
+}
+
+fn dual_texture_effect_xnb() -> Vec<u8> {
+    let mut body = Vec::new();
+    write_xnb_string(&mut body, "");
+    write_xnb_string(&mut body, "");
+    write_vector3(&mut body, [0.2, 0.4, 0.6]);
+    body.extend_from_slice(&0.5_f32.to_le_bytes());
+    body.push(1);
+    stock_effect_xnb(
+        "Microsoft.Xna.Framework.Content.DualTextureEffectReader",
+        &body,
+    )
+}
+
+fn environment_map_effect_xnb() -> Vec<u8> {
+    let mut body = Vec::new();
+    write_xnb_string(&mut body, "");
+    write_xnb_string(&mut body, "");
+    body.extend_from_slice(&0.25_f32.to_le_bytes());
+    write_vector3(&mut body, [0.1, 0.2, 0.3]);
+    body.extend_from_slice(&0.75_f32.to_le_bytes());
+    write_vector3(&mut body, [0.4, 0.5, 0.6]);
+    write_vector3(&mut body, [0.1, 0.0, 0.0]);
+    body.extend_from_slice(&0.8_f32.to_le_bytes());
+    stock_effect_xnb(
+        "Microsoft.Xna.Framework.Content.EnvironmentMapEffectReader",
+        &body,
+    )
+}
+
+fn skinned_effect_xnb() -> Vec<u8> {
+    let mut body = Vec::new();
+    write_xnb_string(&mut body, "");
+    body.extend_from_slice(&2_i32.to_le_bytes());
+    write_vector3(&mut body, [0.7, 0.6, 0.5]);
+    write_vector3(&mut body, [0.1, 0.2, 0.3]);
+    write_vector3(&mut body, [0.9, 0.8, 0.7]);
+    body.extend_from_slice(&8.0_f32.to_le_bytes());
+    body.extend_from_slice(&0.9_f32.to_le_bytes());
+    stock_effect_xnb("Microsoft.Xna.Framework.Content.SkinnedEffectReader", &body)
+}
+
+fn write_dispatched_string(bytes: &mut Vec<u8>, value: &str) {
+    bytes.push(2);
+    write_xnb_string(bytes, value);
+}
+
+fn write_matrix(bytes: &mut Vec<u8>, value: Matrix) {
+    for component in [
+        value.M11, value.M12, value.M13, value.M14, value.M21, value.M22, value.M23, value.M24,
+        value.M31, value.M32, value.M33, value.M34, value.M41, value.M42, value.M43, value.M44,
+    ] {
+        bytes.extend_from_slice(&component.to_le_bytes());
     }
 }
 
@@ -1802,6 +2318,8 @@ fn native_stress_isolated() {
         "buffer-transfers-10",
         "sprite-font-xnb-10",
         "effect-xnb-1",
+        "model-xnb-10",
+        "remaining-graphics-10",
         "effect-graph-10",
         "lifecycle-order-and-identity",
         "component-order-and-mutation",
@@ -1879,6 +2397,44 @@ fn run_child_case(case: &str) {
                 1,
             )
             .expect("Effect XNB reader pipeline and backend failure cycle");
+        }
+        "model-xnb-10" => {
+            let fixture = ModelFixture::new();
+            for _ in 0..10 {
+                let retained_model = Arc::new(Mutex::new(None));
+                let retained_bone = Arc::new(Mutex::new(None));
+                run_for_frames(
+                    ModelXnbGame {
+                        state: Arc::new(GameState::new()),
+                        root: fixture.0.clone(),
+                        retained_model: Arc::clone(&retained_model),
+                        retained_bone: Arc::clone(&retained_bone),
+                    },
+                    1,
+                )
+                .expect("Model XNB/shared-resource/draw/unload ownership cycle");
+                assert!(retained_model
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .as_ref()
+                    .expect("retained Model")
+                    .Bones()
+                    .is_err());
+                assert!(retained_bone
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .as_ref()
+                    .expect("retained ModelBone")
+                    .Name()
+                    .is_err());
+            }
+        }
+        "remaining-graphics-10" => {
+            for _ in 0..10 {
+                let game = RemainingGraphicsGame::default();
+                run_for_frames(game, 1)
+                    .expect("stock-effect/Texture3D/OcclusionQuery ownership cycle");
+            }
         }
         "effect-graph-10" => {
             for _ in 0..10 {

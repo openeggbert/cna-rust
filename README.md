@@ -1,9 +1,10 @@
 # CNA-Rust
 
 CNA-Rust is an early, measurable safe Rust projection of Microsoft XNA
-Framework 4.0 backed by CNA C++. Its Content/XNB, 2D sprite/font, base Effect,
-and typed device/buffer foundations are functional; it is **not** yet an
-XNA-complete binding and does not compile XNA C# source as Rust.
+Framework 4.0 backed by CNA C++. Its Graphics projection, uncompressed
+Graphics XNB pipeline, 2D sprite/font, Model graph, stock effects, and typed
+device/buffer foundations are functional; it is **not** yet an XNA-complete
+binding and does not compile XNA C# source as Rust.
 
 ```text
 cna::Microsoft::Xna::Framework::*
@@ -46,8 +47,9 @@ hierarchy and deliberate CNA extensions.
   zero. Clippy still reports audited compatibility warnings; they are not
   globally hidden.
 - XNA 4.0 Windows runtime inventory remains 257 CLR types and 2,964 members;
-  259 Rust types are expected and 165 strict types now exist.
-- Strict diagnostics are 94, all of them missing types. Missing members and
+  259 Rust types are expected and 192 strict types now exist.
+- Strict diagnostics are 67, all of them missing types. Graphics has zero
+  missing types. Missing members and
   constructor/overload/property/event mapping mismatches are zero.
   `Game`, `GraphicsDevice`, and `SpriteBatch` each have zero local diagnostics.
   Parameter/signature, disposal, type-kind, base/trait/interface, return,
@@ -57,8 +59,9 @@ hierarchy and deliberate CNA extensions.
   APIs, allowlist entries, and unmeasured categories remain zero.
 - `ContentManager` and the managed uncompressed XNB reader pipeline are real:
   typed cache/disposal, custom readers, existing/shared/external resources,
-  primitive readers, Texture2D, SpriteFont, and Effect readers are covered.
-  Raw PNG `Texture2D::FromStream` remains a separate route.
+  primitive readers, textures, SpriteFont, Effect, all five stock effects, and
+  the complete Model graph are covered. Raw PNG `Texture2D::FromStream`
+  remains a separate route. XNA LZX remains explicitly unimplemented.
 - Typed vertex declarations and vertex/index buffers, device binding/draw/
   reset/back-buffer routes, TextureCube, and render targets are complete. CNA
   calls are never replaced by no-ops; HEADLESS limitations are explicit.
@@ -66,17 +69,29 @@ hierarchy and deliberate CNA extensions.
   `EffectPass.Apply` plus both Effect-bearing SpriteBatch Begin overloads use
   real CNA execution routes. Compiled effect bytecode is unsupported by the
   current HEADLESS renderer and returns its exact error.
+- BasicEffect, AlphaTestEffect, DualTextureEffect, EnvironmentMapEffect, and
+  SkinnedEffect use their distinct real CNA routes. Their construction and
+  pass application are HEADLESS-verified; visible shader output is not.
+- Model preserves stable parent-owned bone/mesh/part identities without strong
+  ownership cycles. Its legal XNB fixture uses real shared buffers and a
+  shared BasicEffect; Model.Draw submits through the ordinary indexed device
+  route. HEADLESS verifies that command path, not visible Model rendering.
+- Texture3D is strict-complete with exact Color transfers and XNB support, but
+  the qualified HEADLESS renderer explicitly rejects volume storage with CNA
+  error 6. OcclusionQuery's real native state machine is verified.
 - `SpriteFont` loads through XNB with one atlas owner, measures strings, and all
   six `DrawString` projections submit native glyph commands.
 - The XNA-derived corpus passes 140 named observations and 141 assertions.
-- The reviewed ABI slice is 235 functions. It has 879 full prototype type
-  positions and 805 independent C/Rust measurements across 48 layouts, three
+- The reviewed ABI slice is 347 functions. It has 1,220 full prototype type
+  positions and 840 independent C/Rust measurements across 51 layouts, three
   callback signatures, scalar representations, and 206 constants, all with
   zero mismatches.
-- Linux x86-64 HEADLESS validation freshly passes 60 and 600 template frames,
-  177 created native game lifetimes, ten buffer-binding cycles, ten
-  SpriteFont/content cycles, ten Effect parent/child cycles, and a generated
-  vendored consumer build/test plus 60 frames.
+- Linux x86-64 HEADLESS validation covers 197 created native game lifetimes,
+  ten buffer-binding cycles, ten SpriteFont/content cycles, ten Effect
+  parent/child cycles, ten Model/XNB cycles, and ten stock-effect/Texture3D/
+  OcclusionQuery cycles. The unchanged template freshly passes 60 and 600
+  frames; a generated vendored consumer passes workspace tests, a 60-frame
+  native smoke, and the developer/sibling path audit.
 
 `GraphicsDevice` has durable shared identity while its private CNA handle
 remains callback-scoped. Resources retain device association without owning
@@ -154,7 +169,8 @@ separately instrumented exact ABI-0.7 CNA library. Sanitizer status for this
 run is `not-run`; native crash absence is not allocator-level leak proof.
 
 See the [normative mapping](docs/xna-rust-mapping.md),
-[architecture](docs/architecture.md), and [measured roadmap](plan.md).
+[architecture](docs/architecture.md), [Graphics evidence](docs/graphics-evidence.md),
+and [measured roadmap](plan.md).
 
 ## Packaging
 

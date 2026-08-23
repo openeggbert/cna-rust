@@ -13,8 +13,18 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::error::{CnaError, Result};
-use crate::graphics::{Effect, GraphicsResource, SpriteFont, SurfaceFormat, Texture2D};
-use crate::value::{Color, Matrix, Quaternion, Rectangle, Vector2, Vector3, Vector4};
+use crate::graphics::model::{
+    ModelBoneSpec, ModelEffectReference, ModelMeshPartPendingSpec, ModelMeshPendingSpec,
+};
+use crate::graphics::{
+    AlphaTestEffect, BasicEffect, BufferUsage, CompareFunction, CubeMapFace, DualTextureEffect,
+    Effect, EffectBase, EnvironmentMapEffect, GraphicsResource, IndexBuffer, IndexElementSize,
+    Model, SkinnedEffect, SpriteFont, SurfaceFormat, Texture, Texture2D, Texture3D, TextureCube,
+    VertexBuffer, VertexDeclaration, VertexElement, VertexElementFormat, VertexElementUsage,
+};
+use crate::value::{
+    BoundingSphere, Color, Matrix, Quaternion, Rectangle, Vector2, Vector3, Vector4,
+};
 
 use super::manager::{
     content_error, content_error_with_inner, ContentDisposable, ContentDisposableRecorder,
@@ -25,6 +35,7 @@ type ArcAny = Arc<dyn Any + Send + Sync>;
 type ReaderCallback =
     dyn Fn(&ContentReader, Option<ArcAny>) -> Result<ArcAny> + Send + Sync + 'static;
 type InitializeCallback = dyn Fn(&ContentTypeReaderManager) -> Result<()> + Send + Sync + 'static;
+type FinalizeCallback = dyn Fn(&ContentReader, &ArcAny) -> Result<()> + Send + Sync + 'static;
 type SharedFixup = Box<dyn FnOnce(ArcAny) -> Result<()> + Send>;
 
 struct ReaderDescriptor {
@@ -34,6 +45,7 @@ struct ReaderDescriptor {
     value_type: bool,
     initialize: Arc<InitializeCallback>,
     read: Arc<ReaderCallback>,
+    finalize: Arc<FinalizeCallback>,
     disposable: fn(&ArcAny) -> Option<Arc<dyn ContentDisposable>>,
 }
 
@@ -59,6 +71,7 @@ impl ContentTypeReader {
                         "abstract ContentTypeReader has no registered typed reader",
                     ))
                 }),
+                finalize: Arc::new(|_, _| Ok(())),
                 disposable: |_| None,
             }),
         })
@@ -97,6 +110,10 @@ impl ContentTypeReader {
 
     fn disposable(&self, value: &ArcAny) -> Option<Arc<dyn ContentDisposable>> {
         (self.descriptor.disposable)(value)
+    }
+
+    fn finalize(&self, input: &ContentReader, value: &ArcAny) -> Result<()> {
+        (self.descriptor.finalize)(input, value)
     }
 }
 
@@ -301,6 +318,10 @@ impl ContentReader {
             .transpose()
     }
 
+    pub(crate) fn read_object_erased_content(&self) -> Result<Option<ArcAny>> {
+        self.read_object_erased(None)
+    }
+
     pub fn ReadObjectWithExistingInstance<T: ContentLoadable>(
         &self,
         existingInstance: Option<Arc<T>>,
@@ -389,6 +410,16 @@ impl ContentReader {
         &self,
         fixup: Box<dyn FnOnce(Arc<T>) + Send>,
     ) -> Result<()> {
+        self.read_shared_resource_erased(Box::new(move |value| {
+            let typed = value
+                .downcast::<T>()
+                .map_err(|_| content_error("shared resource has the wrong Rust type"))?;
+            fixup(typed);
+            Ok(())
+        }))
+    }
+
+    pub(crate) fn read_shared_resource_erased(&self, fixup: SharedFixup) -> Result<()> {
         let index = self.read_7bit_encoded_i32()?;
         if index == 0 {
             return Ok(());
@@ -408,13 +439,7 @@ impl ContentReader {
                 &format!("invalid shared resource index {index}"),
             )
         })?;
-        slot.push(Box::new(move |value| {
-            let typed = value
-                .downcast::<T>()
-                .map_err(|_| content_error("shared resource has the wrong Rust type"))?;
-            fixup(typed);
-            Ok(())
-        }));
+        slot.push(fixup);
         Ok(())
     }
 
@@ -553,6 +578,11 @@ impl ContentReader {
                 callback(Arc::clone(&value))?;
             }
         }
+        let root_reader = readers
+            .iter()
+            .find(|reader| reader.TargetType() == root.as_ref().type_id())
+            .ok_or_else(|| xnb_error(&self.asset_name, "root content reader was not retained"))?;
+        root_reader.finalize(self, &root)?;
         root.downcast::<T>().map_err(|value| {
             content_error(format!(
                 "content asset '{}' produced '{}', not '{}'",
@@ -980,6 +1010,7 @@ impl ContentTypeReaderRegistry {
                 value_type: is_builtin_value_type(TypeId::of::<T>()),
                 initialize: Arc::new(initialize),
                 read: erased_read,
+                finalize: Arc::new(|_, _| Ok(())),
                 disposable: disposable_for::<T>,
             }),
         };
@@ -1057,6 +1088,7 @@ where
             value_type: true,
             initialize: Arc::new(|_| Ok(())),
             read: Arc::new(move |input, _| Ok(Arc::new(read(input)?) as ArcAny)),
+            finalize: Arc::new(|_, _| Ok(())),
             disposable: disposable_for::<T>,
         }),
     }
@@ -1067,6 +1099,15 @@ where
     T: ContentLoadable,
     F: Fn(&ContentReader) -> Result<T> + Send + Sync + 'static,
 {
+    class_reader_with_finalize(read, |_, _| Ok(()))
+}
+
+fn class_reader_with_finalize<T, F, G>(read: F, finalize: G) -> ContentTypeReader
+where
+    T: ContentLoadable,
+    F: Fn(&ContentReader) -> Result<T> + Send + Sync + 'static,
+    G: Fn(&ContentReader, &Arc<T>) -> Result<()> + Send + Sync + 'static,
+{
     ContentTypeReader {
         descriptor: Arc::new(ReaderDescriptor {
             target_type: TypeId::of::<T>(),
@@ -1075,6 +1116,12 @@ where
             value_type: false,
             initialize: Arc::new(|_| Ok(())),
             read: Arc::new(move |input, _| Ok(Arc::new(read(input)?) as ArcAny)),
+            finalize: Arc::new(move |input, value| {
+                let value = Arc::clone(value)
+                    .downcast::<T>()
+                    .map_err(|_| content_error("finalized content has the wrong Rust type"))?;
+                finalize(input, &value)
+            }),
             disposable: disposable_for::<T>,
         }),
     }
@@ -1131,6 +1178,7 @@ where
                 }
                 Ok(Arc::new(values) as ArcAny)
             }),
+            finalize: Arc::new(|_, _| Ok(())),
             disposable: disposable_for::<Vec<T>>,
         }),
     }
@@ -1294,6 +1342,663 @@ fn effect_reader() -> ContentTypeReader {
     })
 }
 
+fn vertex_declaration_reader() -> ContentTypeReader {
+    class_reader::<VertexDeclaration, _>(|input| {
+        let stride = input.read_i32()?;
+        let element_count = plausible_count(input.read_i32()?, 1024, "vertex element", input)?;
+        if element_count == 0 {
+            return Err(xnb_error(
+                &input.asset_name,
+                "a vertex declaration must contain at least one element",
+            ));
+        }
+        let mut elements = Vec::with_capacity(element_count);
+        for _ in 0..element_count {
+            let offset = input.read_i32()?;
+            let format = vertex_element_format(input.read_i32()?)
+                .ok_or_else(|| xnb_error(&input.asset_name, "invalid VertexElementFormat value"))?;
+            let usage = vertex_element_usage(input.read_i32()?)
+                .ok_or_else(|| xnb_error(&input.asset_name, "invalid VertexElementUsage value"))?;
+            let usage_index = input.read_i32()?;
+            elements.push(VertexElement::new(offset, format, usage, usage_index));
+        }
+        VertexDeclaration::from_vertex_stride_and_elements(stride, &elements)
+    })
+}
+
+fn vertex_buffer_reader() -> ContentTypeReader {
+    class_reader::<VertexBuffer, _>(|input| {
+        let declaration = vertex_declaration_reader().Read(input, None)?;
+        let declaration = declaration.downcast::<VertexDeclaration>().map_err(|_| {
+            xnb_error(
+                &input.asset_name,
+                "VertexBufferReader produced an invalid vertex declaration",
+            )
+        })?;
+        let vertex_count = input.read_u32()?;
+        if vertex_count == 0 || vertex_count > i32::MAX as u32 {
+            return Err(xnb_error(
+                &input.asset_name,
+                "vertex-buffer count must be positive and fit i32",
+            ));
+        }
+        let vertex_stride = usize::try_from(declaration.VertexStride())
+            .map_err(|_| xnb_error(&input.asset_name, "vertex stride is invalid"))?;
+        let byte_count = usize::try_from(vertex_count)
+            .ok()
+            .and_then(|count| count.checked_mul(vertex_stride))
+            .ok_or_else(|| xnb_error(&input.asset_name, "vertex-buffer byte count overflows"))?;
+        let payload = input.read_bytes(byte_count)?;
+        let buffer = VertexBuffer::new(
+            &input.content_manager.graphics_device()?,
+            &declaration,
+            i32::try_from(vertex_count)
+                .map_err(|_| xnb_error(&input.asset_name, "vertex count exceeds i32"))?,
+            BufferUsage::None,
+        )?;
+        buffer.set_xnb_bytes(&payload)?;
+        Ok(buffer)
+    })
+}
+
+fn index_buffer_reader() -> ContentTypeReader {
+    class_reader::<IndexBuffer, _>(|input| {
+        let sixteen_bits = input.read_u8()? != 0;
+        let byte_count = input.read_i32()?;
+        let width = if sixteen_bits { 2 } else { 4 };
+        if byte_count <= 0 || byte_count % width != 0 {
+            return Err(xnb_error(
+                &input.asset_name,
+                "index-buffer byte count is invalid",
+            ));
+        }
+        let payload = input
+            .read_bytes(usize::try_from(byte_count).map_err(|_| {
+                xnb_error(&input.asset_name, "index-buffer byte count is negative")
+            })?)?;
+        let element_size = if sixteen_bits {
+            IndexElementSize::SixteenBits
+        } else {
+            IndexElementSize::ThirtyTwoBits
+        };
+        let buffer = IndexBuffer::new(
+            &input.content_manager.graphics_device()?,
+            element_size,
+            byte_count / width,
+            BufferUsage::None,
+        )?;
+        if sixteen_bits {
+            let values = payload
+                .chunks_exact(2)
+                .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+                .collect::<Vec<_>>();
+            buffer.SetData(&values)?;
+        } else {
+            let values = payload
+                .chunks_exact(4)
+                .map(|bytes| u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+                .collect::<Vec<_>>();
+            buffer.SetData(&values)?;
+        }
+        Ok(buffer)
+    })
+}
+
+fn basic_effect_reader() -> ContentTypeReader {
+    class_reader::<BasicEffect, _>(|input| {
+        let texture = input.ReadExternalReference::<Texture2D>()?;
+        let mut effect = BasicEffect::from_device(&input.content_manager.graphics_device()?)?;
+        effect.SetTexture(texture.clone())?;
+        effect.SetTextureEnabled(texture.is_some())?;
+        effect.SetDiffuseColor(input.ReadVector3()?)?;
+        effect.SetEmissiveColor(input.ReadVector3()?)?;
+        effect.SetSpecularColor(input.ReadVector3()?)?;
+        effect.SetSpecularPower(input.ReadSingle()?)?;
+        effect.SetAlpha(input.ReadSingle()?)?;
+        effect.SetVertexColorEnabled(input.read_u8()? != 0)?;
+        Ok(effect)
+    })
+}
+
+fn alpha_test_effect_reader() -> ContentTypeReader {
+    class_reader::<AlphaTestEffect, _>(|input| {
+        let texture = input.ReadExternalReference::<Texture2D>()?;
+        let alpha_function = compare_function(input.read_i32()?)
+            .ok_or_else(|| xnb_error(&input.asset_name, "invalid alpha-test CompareFunction"))?;
+        let reference_alpha = input.read_u32()?;
+        if reference_alpha > 255 {
+            return Err(xnb_error(
+                &input.asset_name,
+                "alpha-test reference alpha exceeds 255",
+            ));
+        }
+        let mut effect = AlphaTestEffect::from_device(&input.content_manager.graphics_device()?)?;
+        effect.SetTexture(texture)?;
+        effect.SetAlphaFunction(alpha_function)?;
+        effect.SetReferenceAlpha(
+            i32::try_from(reference_alpha)
+                .map_err(|_| xnb_error(&input.asset_name, "reference alpha exceeds i32"))?,
+        )?;
+        effect.SetDiffuseColor(input.ReadVector3()?)?;
+        effect.SetAlpha(input.ReadSingle()?)?;
+        effect.SetVertexColorEnabled(input.read_u8()? != 0)?;
+        Ok(effect)
+    })
+}
+
+fn dual_texture_effect_reader() -> ContentTypeReader {
+    class_reader::<DualTextureEffect, _>(|input| {
+        let texture = input.ReadExternalReference::<Texture2D>()?;
+        let texture2 = input.ReadExternalReference::<Texture2D>()?;
+        let mut effect = DualTextureEffect::from_device(&input.content_manager.graphics_device()?)?;
+        effect.SetTexture(texture)?;
+        effect.SetTexture2(texture2)?;
+        effect.SetDiffuseColor(input.ReadVector3()?)?;
+        effect.SetAlpha(input.ReadSingle()?)?;
+        effect.SetVertexColorEnabled(input.read_u8()? != 0)?;
+        Ok(effect)
+    })
+}
+
+fn environment_map_effect_reader() -> ContentTypeReader {
+    class_reader::<EnvironmentMapEffect, _>(|input| {
+        let texture = input.ReadExternalReference::<Texture2D>()?;
+        let environment_map = input.ReadExternalReference::<TextureCube>()?;
+        let mut effect =
+            EnvironmentMapEffect::from_device(&input.content_manager.graphics_device()?)?;
+        effect.SetTexture(texture)?;
+        effect.SetEnvironmentMap(environment_map)?;
+        effect.SetEnvironmentMapAmount(input.ReadSingle()?)?;
+        effect.SetEnvironmentMapSpecular(input.ReadVector3()?)?;
+        effect.SetFresnelFactor(input.ReadSingle()?)?;
+        effect.SetDiffuseColor(input.ReadVector3()?)?;
+        effect.SetEmissiveColor(input.ReadVector3()?)?;
+        effect.SetAlpha(input.ReadSingle()?)?;
+        Ok(effect)
+    })
+}
+
+fn skinned_effect_reader() -> ContentTypeReader {
+    class_reader::<SkinnedEffect, _>(|input| {
+        let texture = input.ReadExternalReference::<Texture2D>()?;
+        let mut effect = SkinnedEffect::from_device(&input.content_manager.graphics_device()?)?;
+        effect.SetTexture(texture)?;
+        effect.SetWeightsPerVertex(input.read_i32()?)?;
+        effect.SetDiffuseColor(input.ReadVector3()?)?;
+        effect.SetEmissiveColor(input.ReadVector3()?)?;
+        effect.SetSpecularColor(input.ReadVector3()?)?;
+        effect.SetSpecularPower(input.ReadSingle()?)?;
+        effect.SetAlpha(input.ReadSingle()?)?;
+        Ok(effect)
+    })
+}
+
+fn texture3d_reader() -> ContentTypeReader {
+    class_reader::<Texture3D, _>(|input| {
+        let format_value = input.read_i32()?;
+        let format = u32::try_from(format_value)
+            .ok()
+            .and_then(SurfaceFormat::from_native)
+            .ok_or_else(|| xnb_error(&input.asset_name, "invalid Texture3D SurfaceFormat"))?;
+        if format != SurfaceFormat::Color {
+            return Err(xnb_error(
+                &input.asset_name,
+                "Texture3D XNB support requires SurfaceFormat.Color",
+            ));
+        }
+        let width = input.read_i32()?;
+        let height = input.read_i32()?;
+        let depth = input.read_i32()?;
+        let level_count = input.read_i32()?;
+        if width <= 0 || height <= 0 || depth <= 0 || level_count <= 0 {
+            return Err(xnb_error(
+                &input.asset_name,
+                "Texture3D dimensions and level count must be positive",
+            ));
+        }
+        let maximum_dimension = u32::try_from(width.max(height).max(depth))
+            .map_err(|_| xnb_error(&input.asset_name, "Texture3D dimensions are invalid"))?;
+        let complete_mip_count = i32::try_from(u32::BITS - maximum_dimension.leading_zeros())
+            .map_err(|_| xnb_error(&input.asset_name, "Texture3D mip count overflows"))?;
+        if level_count != 1 && level_count != complete_mip_count {
+            return Err(xnb_error(
+                &input.asset_name,
+                "Texture3D level count is not a complete mip chain",
+            ));
+        }
+        let texture = Texture3D::new(
+            &input.content_manager.graphics_device()?,
+            width,
+            height,
+            depth,
+            level_count > 1,
+            format,
+        )?;
+        if texture.LevelCount() != level_count {
+            return Err(xnb_error(
+                &input.asset_name,
+                "native Texture3D level count does not match the asset",
+            ));
+        }
+        for level in 0..level_count {
+            let shift = u32::try_from(level)
+                .map_err(|_| xnb_error(&input.asset_name, "Texture3D mip level is invalid"))?;
+            let level_width = width.checked_shr(shift).unwrap_or(0).max(1);
+            let level_height = height.checked_shr(shift).unwrap_or(0).max(1);
+            let level_depth = depth.checked_shr(shift).unwrap_or(0).max(1);
+            let level_height_usize = usize::try_from(level_height)
+                .map_err(|_| xnb_error(&input.asset_name, "Texture3D mip height is invalid"))?;
+            let level_depth_usize = usize::try_from(level_depth)
+                .map_err(|_| xnb_error(&input.asset_name, "Texture3D mip depth is invalid"))?;
+            let voxel_count = usize::try_from(level_width)
+                .ok()
+                .and_then(|value| value.checked_mul(level_height_usize))
+                .and_then(|value| value.checked_mul(level_depth_usize))
+                .ok_or_else(|| xnb_error(&input.asset_name, "Texture3D mip size overflows"))?;
+            let byte_count = input.read_i32()?;
+            let expected = voxel_count
+                .checked_mul(4)
+                .ok_or_else(|| xnb_error(&input.asset_name, "Texture3D byte size overflows"))?;
+            if usize::try_from(byte_count).ok() != Some(expected) {
+                return Err(xnb_error(
+                    &input.asset_name,
+                    "Texture3D mip byte count does not match its dimensions",
+                ));
+            }
+            let payload = input.read_bytes(expected)?;
+            let colors = payload
+                .chunks_exact(4)
+                .map(|rgba| {
+                    Color::from_r_and_g_and_b_and_a_as_int32_and_int32_and_int32_and_int32(
+                        i32::from(rgba[0]),
+                        i32::from(rgba[1]),
+                        i32::from(rgba[2]),
+                        i32::from(rgba[3]),
+                    )
+                })
+                .collect::<Vec<_>>();
+            texture.SetDataWithLevelAndLeftAndTopAndRightAndBottomAndFrontAndBackAndDataAndStartIndexAndElementCount(
+                level,
+                0,
+                0,
+                level_width,
+                level_height,
+                0,
+                level_depth,
+                &colors,
+                0,
+                i32::try_from(voxel_count)
+                    .map_err(|_| xnb_error(&input.asset_name, "Texture3D voxel count exceeds i32"))?,
+            )?;
+        }
+        Ok(texture)
+    })
+}
+
+#[allow(clippy::too_many_lines)]
+fn texture_cube_reader() -> ContentTypeReader {
+    class_reader::<TextureCube, _>(|input| {
+        let format_value = input.read_i32()?;
+        let format = u32::try_from(format_value)
+            .ok()
+            .and_then(SurfaceFormat::from_native)
+            .ok_or_else(|| xnb_error(&input.asset_name, "invalid TextureCube SurfaceFormat"))?;
+        if format != SurfaceFormat::Color {
+            return Err(xnb_error(
+                &input.asset_name,
+                "TextureCube XNB support requires SurfaceFormat.Color",
+            ));
+        }
+        let size = input.read_i32()?;
+        let level_count = input.read_i32()?;
+        if size <= 0 || level_count <= 0 {
+            return Err(xnb_error(
+                &input.asset_name,
+                "TextureCube size and level count must be positive",
+            ));
+        }
+        let complete_mip_count = i32::try_from(
+            u32::BITS
+                - u32::try_from(size)
+                    .map_err(|_| xnb_error(&input.asset_name, "TextureCube size is invalid"))?
+                    .leading_zeros(),
+        )
+        .map_err(|_| xnb_error(&input.asset_name, "TextureCube mip count overflows"))?;
+        if level_count != 1 && level_count != complete_mip_count {
+            return Err(xnb_error(
+                &input.asset_name,
+                "TextureCube level count is not a complete mip chain",
+            ));
+        }
+        let texture = TextureCube::new(
+            &input.content_manager.graphics_device()?,
+            size,
+            level_count > 1,
+            format,
+        )?;
+        if texture.LevelCount() != level_count {
+            return Err(xnb_error(
+                &input.asset_name,
+                "native TextureCube level count does not match the asset",
+            ));
+        }
+        for face in [
+            CubeMapFace::PositiveX,
+            CubeMapFace::NegativeX,
+            CubeMapFace::PositiveY,
+            CubeMapFace::NegativeY,
+            CubeMapFace::PositiveZ,
+            CubeMapFace::NegativeZ,
+        ] {
+            for level in 0..level_count {
+                let shift = u32::try_from(level).map_err(|_| {
+                    xnb_error(&input.asset_name, "TextureCube mip level is invalid")
+                })?;
+                let level_size = size.checked_shr(shift).unwrap_or(0).max(1);
+                let level_size_usize = usize::try_from(level_size)
+                    .map_err(|_| xnb_error(&input.asset_name, "TextureCube mip size is invalid"))?;
+                let pixel_count = usize::try_from(level_size)
+                    .ok()
+                    .and_then(|value| value.checked_mul(level_size_usize))
+                    .ok_or_else(|| {
+                        xnb_error(&input.asset_name, "TextureCube mip size overflows")
+                    })?;
+                let expected = pixel_count.checked_mul(4).ok_or_else(|| {
+                    xnb_error(&input.asset_name, "TextureCube byte size overflows")
+                })?;
+                let byte_count = input.read_i32()?;
+                if usize::try_from(byte_count).ok() != Some(expected) {
+                    return Err(xnb_error(
+                        &input.asset_name,
+                        "TextureCube mip byte count does not match its dimensions",
+                    ));
+                }
+                let payload = input.read_bytes(expected)?;
+                let colors = payload
+                    .chunks_exact(4)
+                    .map(|rgba| {
+                        Color::from_r_and_g_and_b_and_a_as_int32_and_int32_and_int32_and_int32(
+                            i32::from(rgba[0]),
+                            i32::from(rgba[1]),
+                            i32::from(rgba[2]),
+                            i32::from(rgba[3]),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                texture.SetDataWithCubeMapFaceAndLevelAndRectAndDataAndStartIndexAndElementCount(
+                    face,
+                    level,
+                    None,
+                    &colors,
+                    0,
+                    i32::try_from(pixel_count).map_err(|_| {
+                        xnb_error(&input.asset_name, "TextureCube pixel count exceeds i32")
+                    })?,
+                )?;
+            }
+        }
+        Ok(texture)
+    })
+}
+
+#[allow(clippy::too_many_lines)]
+fn model_reader() -> ContentTypeReader {
+    class_reader_with_finalize::<Model, _, _>(
+        |input| {
+            let bone_count = input.read_u32()?;
+            let bone_count = plausible_count_u32(bone_count, "bone", input)?;
+            let mut bone_specs = Vec::with_capacity(bone_count);
+            for _ in 0..bone_count {
+                let name = input
+                    .ReadObject::<String>()?
+                    .ok_or_else(|| xnb_error(&input.asset_name, "model bone name is null"))?;
+                bone_specs.push(ModelBoneSpec {
+                    name: (*name).clone(),
+                    transform: input.ReadMatrix()?,
+                    parent: None,
+                });
+            }
+            for parent_index in 0..bone_count {
+                let _serialized_parent = read_bone_reference(input, bone_count)?;
+                let child_count = plausible_count_u32(input.read_u32()?, "bone child", input)?;
+                for _ in 0..child_count {
+                    if let Some(child_index) = read_bone_reference(input, bone_count)? {
+                        if child_index == parent_index {
+                            return Err(xnb_error(
+                                &input.asset_name,
+                                "model bone cannot be its own child",
+                            ));
+                        }
+                        if bone_specs[child_index]
+                            .parent
+                            .replace(parent_index)
+                            .is_some()
+                        {
+                            return Err(xnb_error(
+                                &input.asset_name,
+                                "model bone has more than one parent",
+                            ));
+                        }
+                    }
+                }
+            }
+
+            let mesh_count = plausible_count(input.read_i32()?, 1_000_000, "mesh", input)?;
+            let mut mesh_specs = Vec::with_capacity(mesh_count);
+            for _ in 0..mesh_count {
+                let name = input
+                    .ReadObject::<String>()?
+                    .ok_or_else(|| xnb_error(&input.asset_name, "model mesh name is null"))?;
+                let parent_bone = read_bone_reference(input, bone_count)?.ok_or_else(|| {
+                    xnb_error(&input.asset_name, "model mesh parent bone is null")
+                })?;
+                let bounding_sphere =
+                    BoundingSphere::new(input.ReadVector3()?, input.ReadSingle()?);
+                let tag = input.read_object_erased_content()?;
+                let part_count = plausible_count(input.read_i32()?, 1_000_000, "mesh part", input)?;
+                let mut parts = Vec::with_capacity(part_count);
+                for _ in 0..part_count {
+                    let vertex_offset = input.read_i32()?;
+                    let num_vertices = input.read_i32()?;
+                    let start_index = input.read_i32()?;
+                    let primitive_count = input.read_i32()?;
+                    if vertex_offset < 0
+                        || num_vertices < 0
+                        || start_index < 0
+                        || primitive_count < 0
+                    {
+                        return Err(xnb_error(
+                            &input.asset_name,
+                            "model mesh-part ranges must not be negative",
+                        ));
+                    }
+                    let part_tag = input.read_object_erased_content()?;
+                    let vertex_buffer = Arc::new(Mutex::new(None));
+                    let vertex_slot = Arc::clone(&vertex_buffer);
+                    input.ReadSharedResource::<VertexBuffer>(Box::new(move |value| {
+                        *vertex_slot
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(value);
+                    }))?;
+                    let index_buffer = Arc::new(Mutex::new(None));
+                    let index_slot = Arc::clone(&index_buffer);
+                    input.ReadSharedResource::<IndexBuffer>(Box::new(move |value| {
+                        *index_slot
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(value);
+                    }))?;
+                    let effect = Arc::new(Mutex::new(None));
+                    let effect_slot = Arc::clone(&effect);
+                    input.read_shared_resource_erased(Box::new(move |value| {
+                        *effect_slot
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+                            Some(effect_reference_from_any(value)?);
+                        Ok(())
+                    }))?;
+                    parts.push(ModelMeshPartPendingSpec {
+                        vertex_buffer,
+                        index_buffer,
+                        effect,
+                        tag: part_tag,
+                        vertex_offset,
+                        num_vertices,
+                        start_index,
+                        primitive_count,
+                    });
+                }
+                mesh_specs.push(ModelMeshPendingSpec {
+                    name: (*name).clone(),
+                    parent_bone,
+                    bounding_sphere,
+                    tag,
+                    parts,
+                });
+            }
+            let root_index = read_bone_reference(input, bone_count)?
+                .ok_or_else(|| xnb_error(&input.asset_name, "model root bone is null"))?;
+            let tag = input.read_object_erased_content()?;
+            Model::from_pending(
+                &input.content_manager.graphics_device()?,
+                bone_specs,
+                mesh_specs,
+                root_index,
+                tag,
+            )
+        },
+        |input, model| {
+            model.finalize_pending()?;
+            input.record_disposable(Arc::clone(model) as Arc<dyn ContentDisposable>)
+        },
+    )
+}
+
+fn plausible_count(
+    value: i32,
+    maximum: usize,
+    description: &str,
+    input: &ContentReader,
+) -> Result<usize> {
+    if value < 0
+        || usize::try_from(value)
+            .ok()
+            .map_or(true, |value| value > maximum)
+    {
+        return Err(xnb_error(
+            &input.asset_name,
+            &format!("invalid {description} count {value}"),
+        ));
+    }
+    usize::try_from(value).map_err(|_| {
+        xnb_error(
+            &input.asset_name,
+            &format!("invalid {description} count {value}"),
+        )
+    })
+}
+
+fn plausible_count_u32(value: u32, description: &str, input: &ContentReader) -> Result<usize> {
+    if value > 1_000_000 {
+        return Err(xnb_error(
+            &input.asset_name,
+            &format!("invalid {description} count {value}"),
+        ));
+    }
+    Ok(value as usize)
+}
+
+fn read_bone_reference(input: &ContentReader, bone_count: usize) -> Result<Option<usize>> {
+    let raw = if bone_count < 255 {
+        u32::from(input.read_u8()?)
+    } else {
+        input.read_u32()?
+    };
+    if raw == 0 {
+        return Ok(None);
+    }
+    let index = usize::try_from(raw - 1)
+        .map_err(|_| xnb_error(&input.asset_name, "model bone reference overflows"))?;
+    if index >= bone_count {
+        return Err(xnb_error(
+            &input.asset_name,
+            "model bone reference is out of range",
+        ));
+    }
+    Ok(Some(index))
+}
+
+fn effect_reference_from_any(mut value: ArcAny) -> Result<ModelEffectReference> {
+    macro_rules! effect_type {
+        ($type:ty) => {
+            match value.downcast::<$type>() {
+                Ok(value) => return Ok(value as Arc<dyn EffectBase>),
+                Err(other) => value = other,
+            }
+        };
+    }
+    effect_type!(Effect);
+    effect_type!(BasicEffect);
+    effect_type!(AlphaTestEffect);
+    effect_type!(DualTextureEffect);
+    effect_type!(EnvironmentMapEffect);
+    effect_type!(SkinnedEffect);
+    let _ = value;
+    Err(content_error(
+        "model shared effect is not a supported Effect subtype",
+    ))
+}
+
+fn compare_function(value: i32) -> Option<CompareFunction> {
+    Some(match value {
+        0 => CompareFunction::Always,
+        1 => CompareFunction::Never,
+        2 => CompareFunction::Less,
+        3 => CompareFunction::LessEqual,
+        4 => CompareFunction::Equal,
+        5 => CompareFunction::GreaterEqual,
+        6 => CompareFunction::Greater,
+        7 => CompareFunction::NotEqual,
+        _ => return None,
+    })
+}
+
+fn vertex_element_format(value: i32) -> Option<VertexElementFormat> {
+    Some(match value {
+        0 => VertexElementFormat::Single,
+        1 => VertexElementFormat::Vector2,
+        2 => VertexElementFormat::Vector3,
+        3 => VertexElementFormat::Vector4,
+        4 => VertexElementFormat::Color,
+        5 => VertexElementFormat::Byte4,
+        6 => VertexElementFormat::Short2,
+        7 => VertexElementFormat::Short4,
+        8 => VertexElementFormat::NormalizedShort2,
+        9 => VertexElementFormat::NormalizedShort4,
+        10 => VertexElementFormat::HalfVector2,
+        11 => VertexElementFormat::HalfVector4,
+        _ => return None,
+    })
+}
+
+fn vertex_element_usage(value: i32) -> Option<VertexElementUsage> {
+    Some(match value {
+        0 => VertexElementUsage::Position,
+        1 => VertexElementUsage::Color,
+        2 => VertexElementUsage::TextureCoordinate,
+        3 => VertexElementUsage::Normal,
+        4 => VertexElementUsage::Binormal,
+        5 => VertexElementUsage::Tangent,
+        6 => VertexElementUsage::BlendIndices,
+        7 => VertexElementUsage::BlendWeight,
+        8 => VertexElementUsage::Depth,
+        9 => VertexElementUsage::Fog,
+        10 => VertexElementUsage::PointSize,
+        11 => VertexElementUsage::Sample,
+        12 => VertexElementUsage::TessellateFactor,
+        _ => return None,
+    })
+}
+
 fn builtin_reader(name: &str) -> Option<ContentTypeReader> {
     if name.starts_with("Microsoft.Xna.Framework.Content.ListReader`1") {
         if name.contains("Microsoft.Xna.Framework.Rectangle") {
@@ -1376,8 +2081,21 @@ fn builtin_reader(name: &str) -> Option<ContentTypeReader> {
             })
         }
         "Microsoft.Xna.Framework.Content.Texture2DReader" => texture2d_reader(),
+        "Microsoft.Xna.Framework.Content.Texture3DReader" => texture3d_reader(),
+        "Microsoft.Xna.Framework.Content.TextureCubeReader" => texture_cube_reader(),
+        "Microsoft.Xna.Framework.Content.VertexDeclarationReader" => vertex_declaration_reader(),
+        "Microsoft.Xna.Framework.Content.VertexBufferReader" => vertex_buffer_reader(),
+        "Microsoft.Xna.Framework.Content.IndexBufferReader" => index_buffer_reader(),
         "Microsoft.Xna.Framework.Content.SpriteFontReader" => sprite_font_reader(),
         "Microsoft.Xna.Framework.Content.EffectReader" => effect_reader(),
+        "Microsoft.Xna.Framework.Content.BasicEffectReader" => basic_effect_reader(),
+        "Microsoft.Xna.Framework.Content.AlphaTestEffectReader" => alpha_test_effect_reader(),
+        "Microsoft.Xna.Framework.Content.DualTextureEffectReader" => dual_texture_effect_reader(),
+        "Microsoft.Xna.Framework.Content.EnvironmentMapEffectReader" => {
+            environment_map_effect_reader()
+        }
+        "Microsoft.Xna.Framework.Content.SkinnedEffectReader" => skinned_effect_reader(),
+        "Microsoft.Xna.Framework.Content.ModelReader" => model_reader(),
         _ => return None,
     })
 }
@@ -1405,8 +2123,19 @@ fn builtin_reader_for_target(target: TypeId) -> Option<ContentTypeReader> {
         "Microsoft.Xna.Framework.Content.ColorReader",
         "Microsoft.Xna.Framework.Content.RectangleReader",
         "Microsoft.Xna.Framework.Content.Texture2DReader",
+        "Microsoft.Xna.Framework.Content.Texture3DReader",
+        "Microsoft.Xna.Framework.Content.TextureCubeReader",
+        "Microsoft.Xna.Framework.Content.VertexDeclarationReader",
+        "Microsoft.Xna.Framework.Content.VertexBufferReader",
+        "Microsoft.Xna.Framework.Content.IndexBufferReader",
         "Microsoft.Xna.Framework.Content.SpriteFontReader",
         "Microsoft.Xna.Framework.Content.EffectReader",
+        "Microsoft.Xna.Framework.Content.BasicEffectReader",
+        "Microsoft.Xna.Framework.Content.AlphaTestEffectReader",
+        "Microsoft.Xna.Framework.Content.DualTextureEffectReader",
+        "Microsoft.Xna.Framework.Content.EnvironmentMapEffectReader",
+        "Microsoft.Xna.Framework.Content.SkinnedEffectReader",
+        "Microsoft.Xna.Framework.Content.ModelReader",
         "Microsoft.Xna.Framework.Content.ListReader`1[[Microsoft.Xna.Framework.Rectangle]]",
         "Microsoft.Xna.Framework.Content.ListReader`1[[Microsoft.Xna.Framework.Vector3]]",
         "Microsoft.Xna.Framework.Content.ListReader`1[[System.Char]]",

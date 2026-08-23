@@ -58,6 +58,11 @@
     "Microsoft.Xna.Framework.Graphics.RenderTarget2D": "Texture2DBase",
     "Microsoft.Xna.Framework.Graphics.RenderTargetCube": "TextureCubeBase"
     ,"Microsoft.Xna.Framework.Graphics.EffectMaterial": "EffectBase"
+    ,"Microsoft.Xna.Framework.Graphics.BasicEffect": "EffectBase"
+    ,"Microsoft.Xna.Framework.Graphics.AlphaTestEffect": "EffectBase"
+    ,"Microsoft.Xna.Framework.Graphics.DualTextureEffect": "EffectBase"
+    ,"Microsoft.Xna.Framework.Graphics.EnvironmentMapEffect": "EffectBase"
+    ,"Microsoft.Xna.Framework.Graphics.SkinnedEffect": "EffectBase"
   },
   "ignoredClrInterfaces": [
     "System.IComparable",
@@ -135,6 +140,10 @@
     "Microsoft.Xna.Framework.Graphics.TextureCube::Dispose",
     "Microsoft.Xna.Framework.Graphics.TextureCube::SetData",
     "Microsoft.Xna.Framework.Graphics.TextureCube::GetData",
+    "Microsoft.Xna.Framework.Graphics.Texture3D::.ctor",
+    "Microsoft.Xna.Framework.Graphics.Texture3D::Dispose",
+    "Microsoft.Xna.Framework.Graphics.Texture3D::SetData",
+    "Microsoft.Xna.Framework.Graphics.Texture3D::GetData",
     "Microsoft.Xna.Framework.Graphics.RenderTarget2D::.ctor",
     "Microsoft.Xna.Framework.Graphics.RenderTarget2D::Dispose",
     "Microsoft.Xna.Framework.Graphics.RenderTargetCube::.ctor",
@@ -154,6 +163,28 @@
     "Microsoft.Xna.Framework.Graphics.SpriteFont::SetLineSpacing",
     "Microsoft.Xna.Framework.Graphics.SpriteFont::SetSpacing",
     "Microsoft.Xna.Framework.Graphics.SpriteFont::SetDefaultCharacter",
+    "Microsoft.Xna.Framework.Graphics.OcclusionQuery::*",
+    "Microsoft.Xna.Framework.Graphics.BasicEffect::*",
+    "Microsoft.Xna.Framework.Graphics.AlphaTestEffect::*",
+    "Microsoft.Xna.Framework.Graphics.DualTextureEffect::*",
+    "Microsoft.Xna.Framework.Graphics.EnvironmentMapEffect::*",
+    "Microsoft.Xna.Framework.Graphics.SkinnedEffect::*",
+    "Microsoft.Xna.Framework.Graphics.Model::*",
+    "Microsoft.Xna.Framework.Graphics.ModelBone::*",
+    "Microsoft.Xna.Framework.Graphics.ModelBoneCollection::*",
+    "Microsoft.Xna.Framework.Graphics.ModelBoneCollection+Enumerator::*",
+    "Microsoft.Xna.Framework.Graphics.ModelEffectCollection::*",
+    "Microsoft.Xna.Framework.Graphics.ModelEffectCollection+Enumerator::*",
+    "Microsoft.Xna.Framework.Graphics.ModelMesh::*",
+    "Microsoft.Xna.Framework.Graphics.ModelMeshCollection::*",
+    "Microsoft.Xna.Framework.Graphics.ModelMeshCollection+Enumerator::*",
+    "Microsoft.Xna.Framework.Graphics.ModelMeshPart::*",
+    "Microsoft.Xna.Framework.Graphics.ModelMeshPartCollection::*",
+    "Microsoft.Xna.Framework.Graphics.ModelMeshPartCollection+Enumerator::*",
+    "Microsoft.Xna.Framework.Graphics.DirectionalLight::*",
+    "Microsoft.Xna.Framework.Graphics.IEffectFog::*",
+    "Microsoft.Xna.Framework.Graphics.IEffectLights::*",
+    "Microsoft.Xna.Framework.Graphics.IEffectMatrices::*",
     "Microsoft.Xna.Framework.Input.Keyboard::GetState",
     "Microsoft.Xna.Framework.Input.Mouse::*",
     "Microsoft.Xna.Framework.Input.GamePad::*"
@@ -193,6 +224,7 @@
     "Microsoft.Xna.Framework.Graphics.PresentationParameters::*",
     "Microsoft.Xna.Framework.Graphics.SamplerStateCollection::*",
     "Microsoft.Xna.Framework.Graphics.TextureCollection::*"
+    ,"Microsoft.Xna.Framework.Graphics.DirectionalLight::*"
   ],
   "parameterTypeOverrides": {
     "Microsoft.Xna.Framework.Content.ContentManager::.ctor::serviceProvider": "Arc<dyn ServiceProvider>",
@@ -213,6 +245,16 @@
     "Microsoft.Xna.Framework.Graphics.SpriteBatch::DrawString::text": "&str",
     "Microsoft.Xna.Framework.Graphics.SpriteBatch::Begin::effect": "Option<&Graphics::Effect>",
     "Microsoft.Xna.Framework.Graphics.SpriteFont::MeasureString::text": "&str"
+    ,"Microsoft.Xna.Framework.Graphics.BasicEffect::Texture::value": "Option<Arc<Graphics::Texture2D>>"
+    ,"Microsoft.Xna.Framework.Graphics.AlphaTestEffect::Texture::value": "Option<Arc<Graphics::Texture2D>>"
+    ,"Microsoft.Xna.Framework.Graphics.DualTextureEffect::Texture::value": "Option<Arc<Graphics::Texture2D>>"
+    ,"Microsoft.Xna.Framework.Graphics.DualTextureEffect::Texture2::value": "Option<Arc<Graphics::Texture2D>>"
+    ,"Microsoft.Xna.Framework.Graphics.EnvironmentMapEffect::Texture::value": "Option<Arc<Graphics::Texture2D>>"
+    ,"Microsoft.Xna.Framework.Graphics.EnvironmentMapEffect::EnvironmentMap::value": "Option<Arc<Graphics::TextureCube>>"
+    ,"Microsoft.Xna.Framework.Graphics.SkinnedEffect::Texture::value": "Option<Arc<Graphics::Texture2D>>"
+    ,"Microsoft.Xna.Framework.Graphics.Model::Tag::value": "Option<Arc<dyn Any+Send+Sync>>"
+    ,"Microsoft.Xna.Framework.Graphics.ModelMesh::Tag::value": "Option<Arc<dyn Any+Send+Sync>>"
+    ,"Microsoft.Xna.Framework.Graphics.ModelMeshPart::Tag::value": "Option<Arc<dyn Any+Send+Sync>>"
   },
   "returnTypeOverrides": {
     "Microsoft.Xna.Framework.Content.ContentManager::ServiceProvider": "Arc<dyn ServiceProvider>",
@@ -271,6 +313,19 @@
     ,"Microsoft.Xna.Framework.Graphics.EffectParameter::GetValueTexture2D": "Option<Arc<dyn Graphics::Texture>>"
     ,"Microsoft.Xna.Framework.Graphics.EffectParameter::GetValueTextureCube": "Option<Arc<dyn Graphics::Texture>>"
     ,"Microsoft.Xna.Framework.Graphics.EffectParameter::GetValueTexture3D": "Option<Arc<dyn Graphics::Texture>>"
+    ,"Microsoft.Xna.Framework.Graphics.BasicEffect::Texture": "Option<Arc<Graphics::Texture2D>>"
+    ,"Microsoft.Xna.Framework.Graphics.AlphaTestEffect::Texture": "Option<Arc<Graphics::Texture2D>>"
+    ,"Microsoft.Xna.Framework.Graphics.DualTextureEffect::Texture": "Option<Arc<Graphics::Texture2D>>"
+    ,"Microsoft.Xna.Framework.Graphics.DualTextureEffect::Texture2": "Option<Arc<Graphics::Texture2D>>"
+    ,"Microsoft.Xna.Framework.Graphics.EnvironmentMapEffect::Texture": "Option<Arc<Graphics::Texture2D>>"
+    ,"Microsoft.Xna.Framework.Graphics.EnvironmentMapEffect::EnvironmentMap": "Option<Arc<Graphics::TextureCube>>"
+    ,"Microsoft.Xna.Framework.Graphics.SkinnedEffect::Texture": "Option<Arc<Graphics::Texture2D>>"
+    ,"Microsoft.Xna.Framework.Graphics.Model::Tag": "Option<Arc<dyn Any+Send+Sync>>"
+    ,"Microsoft.Xna.Framework.Graphics.ModelBone::Parent": "Option<Arc<Self>>"
+    ,"Microsoft.Xna.Framework.Graphics.ModelMesh::Tag": "Option<Arc<dyn Any+Send+Sync>>"
+    ,"Microsoft.Xna.Framework.Graphics.ModelMeshPart::Tag": "Option<Arc<dyn Any+Send+Sync>>"
+    ,"Microsoft.Xna.Framework.Graphics.ModelMeshPart::Effect": "Option<Arc<dyn EffectBase>>"
+    ,"Microsoft.Xna.Framework.Graphics.ModelEffectCollection+Enumerator::Current": "Arc<dyn EffectBase>"
   },
   "contextInjectedMembers": {
     "Microsoft.Xna.Framework.Graphics.GraphicsAdapter::UseReferenceDevice": [
@@ -488,6 +543,24 @@
     },
     "Microsoft.Xna.Framework.Graphics.TextureCube::GetDataWithCubeMapFaceAndLevelAndRectAndDataAndStartIndexAndElementCount": {
       "T": ["CubeTextureData"]
+    },
+    "Microsoft.Xna.Framework.Graphics.Texture3D::SetData": {
+      "T": ["Texture3DData"]
+    },
+    "Microsoft.Xna.Framework.Graphics.Texture3D::SetDataWithDataAndStartIndexAndElementCount": {
+      "T": ["Texture3DData"]
+    },
+    "Microsoft.Xna.Framework.Graphics.Texture3D::SetDataWithLevelAndLeftAndTopAndRightAndBottomAndFrontAndBackAndDataAndStartIndexAndElementCount": {
+      "T": ["Texture3DData"]
+    },
+    "Microsoft.Xna.Framework.Graphics.Texture3D::GetData": {
+      "T": ["Texture3DData"]
+    },
+    "Microsoft.Xna.Framework.Graphics.Texture3D::GetDataWithDataAndStartIndexAndElementCount": {
+      "T": ["Texture3DData"]
+    },
+    "Microsoft.Xna.Framework.Graphics.Texture3D::GetDataWithLevelAndLeftAndTopAndRightAndBottomAndFrontAndBackAndDataAndStartIndexAndElementCount": {
+      "T": ["Texture3DData"]
     }
   },
   "typeGenericBoundOverrides": {
@@ -496,6 +569,9 @@
     }
   },
   "projectedParameterTypeOverrides": {
+    "Microsoft.Xna.Framework.Graphics.ModelBoneCollection::TryGetValue::value": "&mut Option<Arc<Graphics::ModelBone>>",
+    "Microsoft.Xna.Framework.Graphics.ModelMeshCollection::TryGetValue::value": "&mut Option<Arc<Graphics::ModelMesh>>",
+    "Microsoft.Xna.Framework.Graphics.ModelMeshPart::SetEffect::value": "Option<Arc<dyn EffectBase>>",
     "Microsoft.Xna.Framework.Graphics.EffectParameter::SetValue::value": "Option<Arc<dyn Graphics::Texture>>",
     "Microsoft.Xna.Framework.Graphics.GraphicsDevice::SetRenderTargetWithRenderTarget::renderTarget": "Option<&Graphics::RenderTarget2D>",
     "Microsoft.Xna.Framework.Content.ContentReader::ReadObjectWithExistingInstance::existingInstance": "Option<Arc<T>>",
@@ -641,9 +717,17 @@
   },
   "nonCopyStructProjections": [
     "Microsoft.Xna.Framework.Graphics.VertexBufferBinding",
-    "Microsoft.Xna.Framework.Graphics.RenderTargetBinding"
+    "Microsoft.Xna.Framework.Graphics.RenderTargetBinding",
+    "Microsoft.Xna.Framework.Graphics.ModelBoneCollection+Enumerator",
+    "Microsoft.Xna.Framework.Graphics.ModelEffectCollection+Enumerator",
+    "Microsoft.Xna.Framework.Graphics.ModelMeshCollection+Enumerator",
+    "Microsoft.Xna.Framework.Graphics.ModelMeshPartCollection+Enumerator"
   ],
   "genericTypeRenames": {
+    "Microsoft.Xna.Framework.Graphics.ModelBoneCollection+Enumerator": "Microsoft.Xna.Framework.Graphics.ModelBoneCollectionEnumerator",
+    "Microsoft.Xna.Framework.Graphics.ModelEffectCollection+Enumerator": "Microsoft.Xna.Framework.Graphics.ModelEffectCollectionEnumerator",
+    "Microsoft.Xna.Framework.Graphics.ModelMeshCollection+Enumerator": "Microsoft.Xna.Framework.Graphics.ModelMeshCollectionEnumerator",
+    "Microsoft.Xna.Framework.Graphics.ModelMeshPartCollection+Enumerator": "Microsoft.Xna.Framework.Graphics.ModelMeshPartCollectionEnumerator",
     "Microsoft.Xna.Framework.Input.Touch.TouchCollection+Enumerator": "Microsoft.Xna.Framework.Input.Touch.TouchCollectionEnumerator",
     "Microsoft.Xna.Framework.Content.ContentTypeReader`1": "Microsoft.Xna.Framework.Content.ContentTypeReaderOfT",
     "Microsoft.Xna.Framework.Graphics.PackedVector.IPackedVector`1": "Microsoft.Xna.Framework.Graphics.PackedVector.IPackedVectorOfT"

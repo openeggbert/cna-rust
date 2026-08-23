@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use cna_sys as sys;
 
+use crate::content::{ContentDisposable, ContentLoadable};
 use crate::error::{CnaError, Result};
 use crate::extensions::events::EventHandler;
 use crate::value::{Color, Rectangle};
@@ -405,4 +406,16 @@ impl GraphicsResource for TextureCube {
 
 impl Drop for TextureCube {
     fn drop(&mut self) {}
+}
+
+impl ContentDisposable for TextureCube {
+    fn DisposeContent(&self) -> Result<()> {
+        self.state.dispose_native()
+    }
+}
+
+impl ContentLoadable for TextureCube {
+    fn ContentDisposable(value: &Arc<Self>) -> Option<Arc<dyn ContentDisposable>> {
+        Some(Arc::clone(value) as Arc<dyn ContentDisposable>)
+    }
 }

@@ -8,7 +8,694 @@ use crate::error::{CnaError, Result};
 
 use super::Native;
 
+#[derive(Clone, Copy)]
+pub(crate) enum StockMatrixProperty {
+    World,
+    View,
+    Projection,
+}
+
+#[derive(Clone, Copy)]
+#[allow(clippy::enum_variant_names)]
+pub(crate) enum BasicVector3Property {
+    FogColor,
+    AmbientLightColor,
+    DiffuseColor,
+    EmissiveColor,
+    SpecularColor,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum BasicBoolProperty {
+    FogEnabled,
+    LightingEnabled,
+    VertexColorEnabled,
+    PreferPerPixelLighting,
+    TextureEnabled,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum BasicFloatProperty {
+    FogStart,
+    FogEnd,
+    SpecularPower,
+    Alpha,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum StockEffectKind {
+    AlphaTest,
+    DualTexture,
+    EnvironmentMap,
+    Skinned,
+}
+
 impl Native {
+    pub(crate) fn create_stock_effect(
+        &self,
+        device: sys::CNA_Handle,
+        kind: StockEffectKind,
+        handle: &mut sys::CNA_EffectHandle,
+    ) -> Result<()> {
+        let function = match kind {
+            StockEffectKind::AlphaTest => self.alpha_test_effect_create,
+            StockEffectKind::DualTexture => self.dual_texture_effect_create,
+            StockEffectKind::EnvironmentMap => self.environment_map_effect_create,
+            StockEffectKind::Skinned => self.skinned_effect_create,
+        };
+        // SAFETY: device is live and output receives one owned stock-effect handle.
+        self.check(unsafe { function(device, handle) })
+    }
+
+    pub(crate) fn stock_diffuse_color(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        kind: StockEffectKind,
+    ) -> Result<sys::CNA_Vector3> {
+        let function = match kind {
+            StockEffectKind::AlphaTest => self.alpha_test_effect_get_diffuse_color,
+            StockEffectKind::DualTexture => self.dual_texture_effect_get_diffuse_color,
+            StockEffectKind::EnvironmentMap => self.environment_map_effect_get_diffuse_color,
+            StockEffectKind::Skinned => self.skinned_effect_get_diffuse_color,
+        };
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: effect is live and output is writable.
+        self.check(unsafe { function(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn set_stock_diffuse_color(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        kind: StockEffectKind,
+        value: sys::CNA_Vector3,
+    ) -> Result<()> {
+        let function = match kind {
+            StockEffectKind::AlphaTest => self.alpha_test_effect_set_diffuse_color,
+            StockEffectKind::DualTexture => self.dual_texture_effect_set_diffuse_color,
+            StockEffectKind::EnvironmentMap => self.environment_map_effect_set_diffuse_color,
+            StockEffectKind::Skinned => self.skinned_effect_set_diffuse_color,
+        };
+        // SAFETY: effect is live and vector is passed by value.
+        self.check(unsafe { function(handle, value) })
+    }
+
+    pub(crate) fn stock_alpha(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        kind: StockEffectKind,
+    ) -> Result<f32> {
+        let function = match kind {
+            StockEffectKind::AlphaTest => self.alpha_test_effect_get_alpha,
+            StockEffectKind::DualTexture => self.dual_texture_effect_get_alpha,
+            StockEffectKind::EnvironmentMap => self.environment_map_effect_get_alpha,
+            StockEffectKind::Skinned => self.skinned_effect_get_alpha,
+        };
+        let mut value = 0.0;
+        // SAFETY: effect is live and output is writable.
+        self.check(unsafe { function(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn set_stock_alpha(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        kind: StockEffectKind,
+        value: f32,
+    ) -> Result<()> {
+        let function = match kind {
+            StockEffectKind::AlphaTest => self.alpha_test_effect_set_alpha,
+            StockEffectKind::DualTexture => self.dual_texture_effect_set_alpha,
+            StockEffectKind::EnvironmentMap => self.environment_map_effect_set_alpha,
+            StockEffectKind::Skinned => self.skinned_effect_set_alpha,
+        };
+        // SAFETY: effect is live and scalar is passed by value.
+        self.check(unsafe { function(handle, value) })
+    }
+
+    pub(crate) fn stock_vertex_color(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        kind: StockEffectKind,
+    ) -> Result<bool> {
+        let function = match kind {
+            StockEffectKind::AlphaTest => self.alpha_test_effect_get_vertex_color_enabled,
+            StockEffectKind::DualTexture => self.dual_texture_effect_get_vertex_color_enabled,
+            _ => {
+                return Err(CnaError::InvalidInput(
+                    "stock effect has no vertex-color property",
+                ))
+            }
+        };
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: effect is live and output is writable.
+        self.check(unsafe { function(handle, &mut value) })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    pub(crate) fn set_stock_vertex_color(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        kind: StockEffectKind,
+        value: bool,
+    ) -> Result<()> {
+        let function = match kind {
+            StockEffectKind::AlphaTest => self.alpha_test_effect_set_vertex_color_enabled,
+            StockEffectKind::DualTexture => self.dual_texture_effect_set_vertex_color_enabled,
+            _ => {
+                return Err(CnaError::InvalidInput(
+                    "stock effect has no vertex-color property",
+                ))
+            }
+        };
+        // SAFETY: effect is live and CNA_Bool is passed by value.
+        self.check(unsafe { function(handle, u8::from(value)) })
+    }
+
+    pub(crate) fn stock_set_texture(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        kind: StockEffectKind,
+        index: u32,
+        texture: sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: effect/texture handles are same-device or texture is invalid.
+        let result = unsafe {
+            match kind {
+                StockEffectKind::AlphaTest => (self.alpha_test_effect_set_texture)(handle, texture),
+                StockEffectKind::DualTexture => {
+                    (self.dual_texture_effect_set_texture)(handle, index, texture)
+                }
+                StockEffectKind::EnvironmentMap => {
+                    (self.environment_map_effect_set_texture)(handle, texture)
+                }
+                StockEffectKind::Skinned => (self.skinned_effect_set_texture)(handle, texture),
+            }
+        };
+        self.check(result)
+    }
+
+    pub(crate) fn alpha_function(&self, handle: sys::CNA_EffectHandle) -> Result<u32> {
+        let mut value = 0;
+        // SAFETY: effect is live and output is writable.
+        self.check(unsafe { (self.alpha_test_effect_get_alpha_function)(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn set_alpha_function(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        value: u32,
+    ) -> Result<()> {
+        // SAFETY: effect is live and enum representation is audited.
+        self.check(unsafe { (self.alpha_test_effect_set_alpha_function)(handle, value) })
+    }
+
+    pub(crate) fn reference_alpha(&self, handle: sys::CNA_EffectHandle) -> Result<i32> {
+        let mut value = 0;
+        // SAFETY: effect is live and output is writable.
+        self.check(unsafe { (self.alpha_test_effect_get_reference_alpha)(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn set_reference_alpha(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        value: i32,
+    ) -> Result<()> {
+        // SAFETY: effect is live and scalar is passed by value.
+        self.check(unsafe { (self.alpha_test_effect_set_reference_alpha)(handle, value) })
+    }
+
+    pub(crate) fn environment_emissive(
+        &self,
+        handle: sys::CNA_EffectHandle,
+    ) -> Result<sys::CNA_Vector3> {
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: effect is live and output is writable.
+        self.check(unsafe {
+            (self.environment_map_effect_get_emissive_color)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    pub(crate) fn set_environment_emissive(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        value: sys::CNA_Vector3,
+    ) -> Result<()> {
+        // SAFETY: effect is live and vector is passed by value.
+        self.check(unsafe { (self.environment_map_effect_set_emissive_color)(handle, value) })
+    }
+
+    pub(crate) fn environment_float(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        property: u8,
+    ) -> Result<f32> {
+        let function = match property {
+            0 => self.environment_map_effect_get_amount,
+            _ => self.environment_map_effect_get_fresnel_factor,
+        };
+        let mut value = 0.0;
+        // SAFETY: effect is live and output is writable.
+        self.check(unsafe { function(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn set_environment_float(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        property: u8,
+        value: f32,
+    ) -> Result<()> {
+        let function = match property {
+            0 => self.environment_map_effect_set_amount,
+            _ => self.environment_map_effect_set_fresnel_factor,
+        };
+        // SAFETY: effect is live and scalar is passed by value.
+        self.check(unsafe { function(handle, value) })
+    }
+
+    pub(crate) fn environment_specular(
+        &self,
+        handle: sys::CNA_EffectHandle,
+    ) -> Result<sys::CNA_Vector3> {
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: effect is live and output is writable.
+        self.check(unsafe { (self.environment_map_effect_get_specular)(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn set_environment_specular(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        value: sys::CNA_Vector3,
+    ) -> Result<()> {
+        // SAFETY: effect is live and vector is passed by value.
+        self.check(unsafe { (self.environment_map_effect_set_specular)(handle, value) })
+    }
+
+    pub(crate) fn environment_set_map(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        texture: sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: handles are live same-device resources or map is invalid.
+        self.check(unsafe { (self.environment_map_effect_set_environment_map)(handle, texture) })
+    }
+
+    pub(crate) fn skinned_vector3(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        property: u8,
+    ) -> Result<sys::CNA_Vector3> {
+        let function = match property {
+            0 => self.skinned_effect_get_emissive_color,
+            _ => self.skinned_effect_get_specular_color,
+        };
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: effect is live and output is writable.
+        self.check(unsafe { function(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn set_skinned_vector3(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        property: u8,
+        value: sys::CNA_Vector3,
+    ) -> Result<()> {
+        let function = match property {
+            0 => self.skinned_effect_set_emissive_color,
+            _ => self.skinned_effect_set_specular_color,
+        };
+        // SAFETY: effect is live and vector is passed by value.
+        self.check(unsafe { function(handle, value) })
+    }
+
+    pub(crate) fn skinned_specular_power(&self, handle: sys::CNA_EffectHandle) -> Result<f32> {
+        let mut value = 0.0;
+        // SAFETY: effect is live and output is writable.
+        self.check(unsafe { (self.skinned_effect_get_specular_power)(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn set_skinned_specular_power(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        value: f32,
+    ) -> Result<()> {
+        // SAFETY: effect is live and scalar is passed by value.
+        self.check(unsafe { (self.skinned_effect_set_specular_power)(handle, value) })
+    }
+
+    pub(crate) fn skinned_prefer_pixel(&self, handle: sys::CNA_EffectHandle) -> Result<bool> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: effect is live and output is writable.
+        self.check(unsafe {
+            (self.skinned_effect_get_prefer_per_pixel_lighting)(handle, &mut value)
+        })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    pub(crate) fn set_skinned_prefer_pixel(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        value: bool,
+    ) -> Result<()> {
+        // SAFETY: effect is live and CNA_Bool is passed by value.
+        self.check(unsafe {
+            (self.skinned_effect_set_prefer_per_pixel_lighting)(handle, u8::from(value))
+        })
+    }
+
+    pub(crate) fn skinned_weights(&self, handle: sys::CNA_EffectHandle) -> Result<i32> {
+        let mut value = 0;
+        // SAFETY: effect is live and output is writable.
+        self.check(unsafe { (self.skinned_effect_get_weights_per_vertex)(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn set_skinned_weights(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        value: i32,
+    ) -> Result<()> {
+        // SAFETY: effect is live and scalar is passed by value.
+        self.check(unsafe { (self.skinned_effect_set_weights_per_vertex)(handle, value) })
+    }
+
+    pub(crate) fn set_skinned_bones(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        transforms: &[sys::CNA_Matrix],
+    ) -> Result<()> {
+        let count = u64::try_from(transforms.len())
+            .map_err(|_| CnaError::InvalidInput("bone transform array is too large"))?;
+        // SAFETY: CNA copies the live matrix slice synchronously.
+        self.check(unsafe {
+            (self.skinned_effect_set_bone_transforms)(handle, transforms.as_ptr(), count)
+        })
+    }
+
+    pub(crate) fn copy_skinned_bones(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        transforms: &mut [sys::CNA_Matrix],
+    ) -> Result<usize> {
+        let count = u64::try_from(transforms.len())
+            .map_err(|_| CnaError::InvalidInput("bone transform array is too large"))?;
+        let mut written = 0;
+        // SAFETY: CNA writes at most capacity matrices and reports the count.
+        self.check(unsafe {
+            (self.skinned_effect_copy_bone_transforms)(
+                handle,
+                count,
+                transforms.as_mut_ptr(),
+                count,
+                &mut written,
+            )
+        })?;
+        usize::try_from(written)
+            .map_err(|_| CnaError::InvalidInput("native bone count exceeds usize"))
+    }
+
+    pub(crate) fn create_basic_effect(
+        &self,
+        device: sys::CNA_Handle,
+        handle: &mut sys::CNA_EffectHandle,
+    ) -> Result<()> {
+        // SAFETY: the live borrowed device and owned output handle satisfy CNA's contract.
+        self.check(unsafe { (self.basic_effect_create)(device, handle) })
+    }
+
+    pub(crate) fn stock_matrix(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        property: StockMatrixProperty,
+    ) -> Result<sys::CNA_Matrix> {
+        let function = match property {
+            StockMatrixProperty::World => self.effect_matrices_get_world,
+            StockMatrixProperty::View => self.effect_matrices_get_view,
+            StockMatrixProperty::Projection => self.effect_matrices_get_projection,
+        };
+        let mut value = sys::CNA_Matrix::default();
+        // SAFETY: the effect is live and the result storage is writable.
+        self.check(unsafe { function(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn set_stock_matrix(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        property: StockMatrixProperty,
+        value: sys::CNA_Matrix,
+    ) -> Result<()> {
+        let function = match property {
+            StockMatrixProperty::World => self.effect_matrices_set_world,
+            StockMatrixProperty::View => self.effect_matrices_set_view,
+            StockMatrixProperty::Projection => self.effect_matrices_set_projection,
+        };
+        // SAFETY: the effect is live and the matrix is passed by value.
+        self.check(unsafe { function(handle, value) })
+    }
+
+    pub(crate) fn basic_vector3(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        property: BasicVector3Property,
+    ) -> Result<sys::CNA_Vector3> {
+        let function = match property {
+            BasicVector3Property::FogColor => self.effect_fog_get_color,
+            BasicVector3Property::AmbientLightColor => self.effect_lights_get_ambient_color,
+            BasicVector3Property::DiffuseColor => self.basic_effect_get_diffuse_color,
+            BasicVector3Property::EmissiveColor => self.basic_effect_get_emissive_color,
+            BasicVector3Property::SpecularColor => self.basic_effect_get_specular_color,
+        };
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the effect is live and the result storage is writable.
+        self.check(unsafe { function(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn set_basic_vector3(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        property: BasicVector3Property,
+        value: sys::CNA_Vector3,
+    ) -> Result<()> {
+        let function = match property {
+            BasicVector3Property::FogColor => self.effect_fog_set_color,
+            BasicVector3Property::AmbientLightColor => self.effect_lights_set_ambient_color,
+            BasicVector3Property::DiffuseColor => self.basic_effect_set_diffuse_color,
+            BasicVector3Property::EmissiveColor => self.basic_effect_set_emissive_color,
+            BasicVector3Property::SpecularColor => self.basic_effect_set_specular_color,
+        };
+        // SAFETY: the effect is live and the vector is passed by value.
+        self.check(unsafe { function(handle, value) })
+    }
+
+    pub(crate) fn basic_bool(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        property: BasicBoolProperty,
+    ) -> Result<bool> {
+        let function = match property {
+            BasicBoolProperty::FogEnabled => self.effect_fog_get_enabled,
+            BasicBoolProperty::LightingEnabled => self.effect_lights_get_enabled,
+            BasicBoolProperty::VertexColorEnabled => self.basic_effect_get_vertex_color_enabled,
+            BasicBoolProperty::PreferPerPixelLighting => {
+                self.basic_effect_get_prefer_per_pixel_lighting
+            }
+            BasicBoolProperty::TextureEnabled => self.basic_effect_get_texture_enabled,
+        };
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the effect is live and the result storage is writable.
+        self.check(unsafe { function(handle, &mut value) })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    pub(crate) fn set_basic_bool(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        property: BasicBoolProperty,
+        value: bool,
+    ) -> Result<()> {
+        let function = match property {
+            BasicBoolProperty::FogEnabled => self.effect_fog_set_enabled,
+            BasicBoolProperty::LightingEnabled => self.effect_lights_set_enabled,
+            BasicBoolProperty::VertexColorEnabled => self.basic_effect_set_vertex_color_enabled,
+            BasicBoolProperty::PreferPerPixelLighting => {
+                self.basic_effect_set_prefer_per_pixel_lighting
+            }
+            BasicBoolProperty::TextureEnabled => self.basic_effect_set_texture_enabled,
+        };
+        // SAFETY: the effect is live and CNA_Bool is passed by value.
+        self.check(unsafe { function(handle, u8::from(value)) })
+    }
+
+    pub(crate) fn basic_float(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        property: BasicFloatProperty,
+    ) -> Result<f32> {
+        let function = match property {
+            BasicFloatProperty::FogStart => self.effect_fog_get_start,
+            BasicFloatProperty::FogEnd => self.effect_fog_get_end,
+            BasicFloatProperty::SpecularPower => self.basic_effect_get_specular_power,
+            BasicFloatProperty::Alpha => self.basic_effect_get_alpha,
+        };
+        let mut value = 0.0;
+        // SAFETY: the effect is live and the result storage is writable.
+        self.check(unsafe { function(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn set_basic_float(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        property: BasicFloatProperty,
+        value: f32,
+    ) -> Result<()> {
+        let function = match property {
+            BasicFloatProperty::FogStart => self.effect_fog_set_start,
+            BasicFloatProperty::FogEnd => self.effect_fog_set_end,
+            BasicFloatProperty::SpecularPower => self.basic_effect_set_specular_power,
+            BasicFloatProperty::Alpha => self.basic_effect_set_alpha,
+        };
+        // SAFETY: the effect is live and the scalar is passed by value.
+        self.check(unsafe { function(handle, value) })
+    }
+
+    pub(crate) fn basic_set_texture(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        texture: sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: handles are live same-device resources or texture is invalid.
+        self.check(unsafe { (self.basic_effect_set_texture)(handle, texture) })
+    }
+
+    pub(crate) fn enable_default_lighting(&self, handle: sys::CNA_EffectHandle) -> Result<()> {
+        // SAFETY: handle is a live effect implementing IEffectLights.
+        self.check(unsafe { (self.effect_lights_enable_default)(handle) })
+    }
+
+    pub(crate) fn effect_directional_light(
+        &self,
+        handle: sys::CNA_EffectHandle,
+        index: u32,
+        light: &mut sys::CNA_DirectionalLightHandle,
+    ) -> Result<()> {
+        // SAFETY: index and output are validated synchronously by CNA.
+        self.check(unsafe { (self.effect_lights_get_directional_light)(handle, index, light) })
+    }
+
+    pub(crate) fn create_directional_light(
+        &self,
+        light: &mut sys::CNA_DirectionalLightHandle,
+    ) -> Result<()> {
+        // SAFETY: output receives one owned handle.
+        self.check(unsafe { (self.directional_light_create)(light) })
+    }
+
+    pub(crate) fn destroy_directional_light(
+        &self,
+        light: sys::CNA_DirectionalLightHandle,
+    ) -> Result<()> {
+        // SAFETY: caller owns the light and destroys it once.
+        self.check(unsafe { (self.directional_light_destroy)(light) })
+    }
+
+    pub(crate) fn directional_light_vector3(
+        &self,
+        light: sys::CNA_DirectionalLightHandle,
+        property: u8,
+    ) -> Result<sys::CNA_Vector3> {
+        let function = match property {
+            0 => self.directional_light_get_direction,
+            1 => self.directional_light_get_diffuse_color,
+            _ => self.directional_light_get_specular_color,
+        };
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: light is live and output is writable.
+        self.check(unsafe { function(light, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn set_directional_light_vector3(
+        &self,
+        light: sys::CNA_DirectionalLightHandle,
+        property: u8,
+        value: sys::CNA_Vector3,
+    ) -> Result<()> {
+        let function = match property {
+            0 => self.directional_light_set_direction,
+            1 => self.directional_light_set_diffuse_color,
+            _ => self.directional_light_set_specular_color,
+        };
+        // SAFETY: light is live and the vector is passed by value.
+        self.check(unsafe { function(light, value) })
+    }
+
+    pub(crate) fn directional_light_enabled(
+        &self,
+        light: sys::CNA_DirectionalLightHandle,
+    ) -> Result<bool> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: light is live and output is writable.
+        self.check(unsafe { (self.directional_light_get_enabled)(light, &mut value) })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    pub(crate) fn set_directional_light_enabled(
+        &self,
+        light: sys::CNA_DirectionalLightHandle,
+        value: bool,
+    ) -> Result<()> {
+        // SAFETY: light is live and CNA_Bool is passed by value.
+        self.check(unsafe { (self.directional_light_set_enabled)(light, u8::from(value)) })
+    }
+
+    pub(crate) fn create_occlusion_query(
+        &self,
+        device: sys::CNA_Handle,
+        handle: &mut sys::CNA_OcclusionQueryHandle,
+    ) -> Result<()> {
+        // SAFETY: device is live and CNA writes one owned query handle synchronously.
+        self.check(unsafe { (self.occlusion_query_create)(device, handle) })
+    }
+
+    pub(crate) fn begin_occlusion_query(&self, handle: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: caller owns and validates the live handle.
+        self.check(unsafe { (self.occlusion_query_begin)(handle) })
+    }
+
+    pub(crate) fn end_occlusion_query(&self, handle: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: caller owns and validates the begun query handle.
+        self.check(unsafe { (self.occlusion_query_end)(handle) })
+    }
+
+    pub(crate) fn occlusion_query_is_complete(&self, handle: sys::CNA_Handle) -> Result<bool> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: caller owns the live handle and output is writable.
+        self.check(unsafe { (self.occlusion_query_get_is_complete)(handle, &mut value) })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    pub(crate) fn occlusion_query_pixel_count(&self, handle: sys::CNA_Handle) -> Result<i32> {
+        let mut value = 0;
+        // SAFETY: caller owns the live handle and output is writable.
+        self.check(unsafe { (self.occlusion_query_get_pixel_count)(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn destroy_occlusion_query(&self, handle: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: ResourceState guarantees single destruction of the owned handle.
+        self.check(unsafe { (self.occlusion_query_destroy)(handle) })
+    }
+
     pub(crate) fn borrow_graphics_device(
         &self,
         game: sys::CNA_Handle,
@@ -594,6 +1281,67 @@ impl Native {
     ) -> Result<()> {
         // SAFETY: CNA copies the descriptor and writes one owned handle synchronously.
         self.check(unsafe { (self.texturecube_create)(device, info, handle) })
+    }
+
+    pub(crate) fn create_texture3d(
+        &self,
+        device: sys::CNA_Handle,
+        info: &sys::CNA_Texture3DCreateInfo,
+        handle: &mut sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: CNA copies the descriptor and writes one owned handle synchronously.
+        self.check(unsafe { (self.texture3d_create)(device, info, handle) })
+    }
+
+    pub(crate) fn destroy_texture3d(&self, handle: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: ResourceState guarantees single destruction of the owned handle.
+        self.check(unsafe { (self.texture3d_destroy)(handle) })
+    }
+
+    pub(crate) fn texture3d_info(
+        &self,
+        handle: sys::CNA_Handle,
+        info: &mut sys::CNA_Texture3DInfo,
+    ) -> Result<()> {
+        // SAFETY: caller initializes the complete versioned writable descriptor.
+        self.check(unsafe { (self.texture3d_get_info)(handle, info) })
+    }
+
+    pub(crate) fn set_texture3d_data(
+        &self,
+        handle: sys::CNA_Handle,
+        transfer: &sys::CNA_Texture3DTransfer,
+        data: &[sys::CNA_Color],
+    ) -> Result<()> {
+        let capacity = u64::try_from(data.len())
+            .map_err(|_| CnaError::InvalidInput("volume texture source is too large"))?;
+        let pointer = if data.is_empty() {
+            core::ptr::null()
+        } else {
+            data.as_ptr()
+        };
+        // SAFETY: CNA reads the complete Color slice synchronously and retains no pointer.
+        self.check(unsafe { (self.texture3d_set_data)(handle, transfer, pointer, capacity) })
+    }
+
+    pub(crate) fn get_texture3d_data(
+        &self,
+        handle: sys::CNA_Handle,
+        transfer: &sys::CNA_Texture3DTransfer,
+        data: &mut [sys::CNA_Color],
+        required: &mut u64,
+    ) -> Result<()> {
+        let capacity = u64::try_from(data.len())
+            .map_err(|_| CnaError::InvalidInput("volume texture destination is too large"))?;
+        let pointer = if data.is_empty() {
+            core::ptr::null_mut()
+        } else {
+            data.as_mut_ptr()
+        };
+        // SAFETY: CNA writes the caller-owned POD slice atomically and reports the exact count.
+        self.check(unsafe {
+            (self.texture3d_get_data)(handle, transfer, pointer, capacity, required)
+        })
     }
 
     pub(crate) fn destroy_texture_cube(&self, handle: sys::CNA_Handle) -> Result<()> {
@@ -1429,7 +2177,11 @@ impl Native {
         let mut value = T::default();
         // SAFETY: private callers pair the tagged identity with the exact POD T.
         self.check(unsafe {
-            (self.effect_parameter_get_value)(handle, value_type, (&mut value as *mut T).cast())
+            (self.effect_parameter_get_value)(
+                handle,
+                value_type,
+                core::ptr::addr_of_mut!(value).cast(),
+            )
         })?;
         Ok(value)
     }

@@ -22,7 +22,7 @@ concepts remain under `cna::extensions`.
 ## Native boundary and ABI evidence
 
 `cna-sys` contains the reviewed ABI-0.7 slice: fixed-width aliases, exact
-semantic handle typedefs, `repr(C)` structures, callbacks, constants, and 235
+semantic handle typedefs, `repr(C)` structures, callbacks, constants, and 347
 function-pointer declarations. The
 safe bridge is grouped by concern:
 
@@ -41,8 +41,8 @@ The ABI verifier derives full C prototypes from Clang's view of canonical CNA
 headers and compares them with every reviewed `cna-sys` function type. It
 measures return and parameter types, scalar width/signedness, pointer depth and
 constness, callback/struct pointers, and boolean/enum representations. The
-current pass checks 235 functions and 879 prototype type positions. Independent
-C and Rust probes make 805 measurements across 48 structures, three callback
+current pass checks 347 functions and 1,220 prototype type positions. Independent
+C and Rust probes make 840 measurements across 51 structures, three callback
 signatures, scalar representations, and 206 constants, with zero mismatches.
 
 ## Durable device identity
@@ -60,7 +60,7 @@ a deterministic error instead of extending the native borrow or fabricating a
 `'static` lifetime. No `transmute`, leak, public raw handle, or untracked
 integer identity is used.
 
-Textures, sprite objects, buffers, render targets, Effects, and bound
+Textures, sprite objects, buffers, render targets, Effects, Models, queries, and bound
 graphics-state descriptors retain a clone of the durable device wrapper. This
 supports same-device validation and shared invalidation without giving a child
 ownership of the native device. Stable shared slots also retain one logical
@@ -167,8 +167,9 @@ table and versions, root reader index, existing instances, shared fixups,
 external references, and trailing-data validation. The global registry stores
 typed descriptors rather than a general application `Any` loader. Custom
 readers follow the same activation/table path as built-ins. Primitive/value
-readers remain pure Rust; only Texture2D, SpriteFont, and Effect readers call
-the private native bridge to create a native resource.
+readers remain pure Rust. Texture, SpriteFont, buffer, stock-effect, and Model
+readers call the same private native bridge and ordinary resource constructors
+used outside Content.
 
 SpriteFont XNB ownership is one graph: the font retains the Texture2D atlas,
 ContentManager records the font disposable identity, and SpriteBatch only
@@ -176,6 +177,12 @@ borrows both during glyph submission. The atlas is not independently recorded
 for a second destruction. Effect XNB similarly uses the normal reader table;
 the current HEADLESS backend rejects compiled effect bytecode with explicit
 capability error 6, which is preserved as the inner `ContentLoadException`.
+Model XNB uses the normal shared-resource table for VertexBuffer, IndexBuffer,
+and Effect references. A private descriptor finalization hook publishes the
+graph only after shared fixups resolve; failure rolls back each resource
+recorded during the load. Model is registered last, so reverse unload
+invalidates retained graph facades before effects and buffers are destroyed.
+Texture3D and TextureCube readers admit only the reviewed exact Color encoding.
 LZX compression is not implemented.
 
 ## Graphics resource foundation
@@ -194,6 +201,13 @@ generic full/rectangle/mip transfers, PNG/JPEG encoding, and disposal. Data
 routes accept only layouts CNA ABI 0.7 can represent exactly; they validate
 dimensions, mip/rectangle/window bounds, format/type compatibility, disposed
 parents/children, bad streams, and construction rollback.
+
+`Texture3D` follows the same resource and typed-transfer model. It validates
+dimensions, complete mip counts, 3D boxes, start/count windows, exact element
+encodings, disposal, and device lifetime before CNA dispatch. The qualified
+HEADLESS renderer rejects volume storage at construction with error 6; the
+binding preserves this backend boundary and does not claim native transfer
+execution. `TextureCube` now also participates in the built-in XNB table.
 
 `VertexDeclaration` is managed and retains exact XNA stride/elements. Built-in
 vertices have verified C-compatible layouts; custom `VertexData` explicitly
@@ -226,6 +240,28 @@ default technique, and its manual-graph clone can return an empty native graph;
 extension-created Effects retain a typed blueprint and rebuild only for that
 exact observed fallback. Compiled Effects always use the native clone path.
 
+BasicEffect, AlphaTestEffect, DualTextureEffect, EnvironmentMapEffect, and
+SkinnedEffect each own their distinct CNA stock-effect handle; they are not
+modeled as an unrelated manual Effect graph. A private common wrapper shares
+only genuine resource/technique behavior. Texture properties retain safe
+tracked texture identities. DirectionalLight handles are stable parent-owned
+views that share the parent's ResourceState, are destroyed once by parent
+cleanup, and fail after parent disposal. IEffectFog, IEffectLights, and
+IEffectMatrices delegate directly to concrete stock-effect state.
+
+`Model` is a managed owner of stable bone, mesh, mesh-part, collection, and
+resource facades. Strong edges run from Model to its graph. Bone parent and
+mesh-part sibling back-links use `Weak`, and the shared lifetime has no facade
+back-link, so the graph is collectable. Shared buffers and effects retain one
+native owner. Model.Draw walks the public graph, sets matrices through the
+IEffectMatrices-capable stock-effect implementations, rejects an incompatible
+generic Effect, binds the part buffers, applies each pass, and calls the
+ordinary indexed GraphicsDevice route; there is no native Model shortcut.
+
+`OcclusionQuery` owns one query handle and enforces idle/active/ended/disposed
+transitions before using CNA create, begin, end, completion, pixel-count, and
+destroy operations. PixelCount is never synthesized by Rust.
+
 `SpriteFont` owns a native font handle and retains exactly one atlas. Its XNB
 reader validates parallel glyph/crop/character/kerning tables and constructs
 the native font. Measurement, spacing/default-character mutation, and glyph
@@ -254,12 +290,12 @@ and the allowlist are empty; the leak-only public-surface gate is zero.
 The XNA-derived managed corpus has 140 named observations plus a final count
 assertion (141 assertions total). New platform-neutral groups cover Content
 metadata/cache identity and vertex declaration/layout values. The native suite
-uses isolated child processes for 177 created game lifetimes and 283 owned
-child-resource constructions, including ten buffer binding cycles, ten
-SpriteFont atlas/content cycles, ten Effect parent/child cycles, repeated
+uses isolated child processes for 197 created game lifetimes and 893 owned
+child-handle constructions, including ten buffer binding cycles, ten
+SpriteFont atlas/content cycles, ten Effect parent/child cycles, ten complete
+Model/XNB cycles, ten stock-effect/Texture3D/OcclusionQuery cycles, repeated
 dispose/drop, live-child parent shutdown, stable identities, callback panic,
-transfer validation, and injected failures. Absence of a crash is not a leak
-proof.
+transfer validation, and injected failures. Absence of a crash is not a leak proof.
 `tools/native-stress/run-sanitized.sh` is an optional path requiring a
 separately instrumented exact ABI-0.7 CNA library. Sanitizer status is
 `not-run`; no sanitizer pass is claimed for the current run.
@@ -271,9 +307,10 @@ its unmodified C API build at `CnaCApiCoreExt.cpp:250`: the renderer identity
 assertion reduces to `49 == 50`. Runtime evidence therefore uses the clearly
 labelled experimental ABI-0.7 HEADLESS library.
 
-All three targeted types now have zero local diagnostics and every remaining
-strict diagnostic is a missing type. The next dependency-ready family is the
-Model graph, followed by Texture3D/stock effects and broader graphic XNB
-readers. Repeated frame hosting still needs a CNA callback-context rebinding
-route. Audio/XACT and media/storage follow the generated scoreboard; PNG
-decoding remains a texture route, not an alias for XNB content.
+Graphics has zero missing types and every remaining strict diagnostic is a
+whole missing type outside Graphics. XNA LZX remains a complete future slice,
+not a partial decoder. The next type work should prefer one complete small
+Framework/core, Input, Storage, or GamerServices family after regenerating the
+scoreboard; broad Audio/Media work remains lower priority. Repeated frame
+hosting still needs a CNA callback-context rebinding route. PNG decoding
+remains a texture route, not an alias for XNB content.

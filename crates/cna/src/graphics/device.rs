@@ -156,10 +156,12 @@ impl DeviceState {
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .contains(&handle),
             ResourceKind::Texture2D
+            | ResourceKind::Texture3D
             | ResourceKind::TextureCube
             | ResourceKind::SpriteBatch
             | ResourceKind::SpriteFont
-            | ResourceKind::Effect => false,
+            | ResourceKind::Effect
+            | ResourceKind::OcclusionQuery => false,
         }
     }
 
@@ -1696,6 +1698,26 @@ impl GraphicsDevice {
 
     pub(crate) fn unbind_all_buffers(&self) -> Result<()> {
         self.state.unbind_all_buffers()
+    }
+
+    pub(crate) fn has_bound_buffer_handle(
+        &self,
+        vertex_handles: &[sys::CNA_Handle],
+        index_handles: &[sys::CNA_Handle],
+    ) -> bool {
+        self.state
+            .bound_vertex_handles
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .any(|handle| vertex_handles.contains(handle))
+            || index_handles.contains(
+                &*self
+                    .state
+                    .bound_index_handle
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner),
+            )
     }
 
     pub(crate) fn unbind_all_render_targets(&self) -> Result<()> {

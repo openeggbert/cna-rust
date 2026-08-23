@@ -6,13 +6,18 @@ mod device_collections;
 mod display;
 mod effect;
 mod kinds;
+pub(crate) mod model;
+mod occlusion_query;
 mod presentation;
 mod render_target;
 pub(crate) mod resource;
 mod sprite_batch;
 mod sprite_font;
 mod states;
+mod stock_effect;
+mod support;
 mod texture2d;
+mod texture3d;
 mod texture_cube;
 mod vertex;
 mod viewport;
@@ -37,6 +42,12 @@ pub use kinds::{
     SpriteEffects, SpriteSortMode, StencilOperation, SurfaceFormat, TextureAddressMode,
     TextureFilter, VertexElementFormat, VertexElementUsage,
 };
+pub use model::{
+    Model, ModelBone, ModelBoneCollection, ModelBoneCollectionEnumerator, ModelEffectCollection,
+    ModelEffectCollectionEnumerator, ModelMesh, ModelMeshCollection, ModelMeshCollectionEnumerator,
+    ModelMeshPart, ModelMeshPartCollection, ModelMeshPartCollectionEnumerator,
+};
+pub use occlusion_query::OcclusionQuery;
 pub use presentation::{
     DisplayMode, PresentationParameters, ResourceCreatedEventArgs, ResourceDestroyedEventArgs,
 };
@@ -45,7 +56,16 @@ pub use resource::{GraphicsResource, Texture};
 pub use sprite_batch::SpriteBatch;
 pub use sprite_font::SpriteFont;
 pub use states::{BlendState, DepthStencilState, RasterizerState, SamplerState};
+pub use stock_effect::{
+    AlphaTestEffect, BasicEffect, DirectionalLight, DualTextureEffect, EnvironmentMapEffect,
+    IEffectFog, IEffectLights, IEffectMatrices, SkinnedEffect,
+};
+pub use support::{
+    DeviceLostException, DeviceNotResetException, IGraphicsDeviceService,
+    NoSuitableGraphicsDeviceException,
+};
 pub use texture2d::{Texture2D, Texture2DBase};
+pub use texture3d::{Texture3D, Texture3DData};
 pub use texture_cube::{CubeTextureData, TextureCube, TextureCubeBase};
 pub use vertex::{
     IVertexType, VertexDeclaration, VertexElement, VertexPositionColor, VertexPositionColorTexture,

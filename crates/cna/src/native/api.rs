@@ -133,6 +133,12 @@ pub(crate) struct Native {
         sys::cna_graphics_device_draw_user_primitives_fn,
     pub(super) graphics_device_draw_user_indexed_primitives:
         sys::cna_graphics_device_draw_user_indexed_primitives_fn,
+    pub(super) occlusion_query_create: sys::cna_occlusion_query_create_fn,
+    pub(super) occlusion_query_begin: sys::cna_occlusion_query_begin_fn,
+    pub(super) occlusion_query_end: sys::cna_occlusion_query_end_fn,
+    pub(super) occlusion_query_get_is_complete: sys::cna_occlusion_query_get_is_complete_fn,
+    pub(super) occlusion_query_get_pixel_count: sys::cna_occlusion_query_get_pixel_count_fn,
+    pub(super) occlusion_query_destroy: sys::cna_occlusion_query_destroy_fn,
     pub(super) graphics_device_set_render_targets: sys::cna_graphics_device_set_render_targets_fn,
     pub(super) graphics_device_get_render_target_count:
         sys::cna_graphics_device_get_render_target_count_fn,
@@ -150,6 +156,11 @@ pub(crate) struct Native {
     pub(super) texture2d_get_encoded_byte_count: sys::cna_texture2d_get_encoded_byte_count_fn,
     pub(super) texture2d_copy_encoded: sys::cna_texture2d_copy_encoded_fn,
     pub(super) texture2d_destroy: sys::cna_texture2d_destroy_fn,
+    pub(super) texture3d_create: sys::cna_texture3d_create_fn,
+    pub(super) texture3d_destroy: sys::cna_texture3d_destroy_fn,
+    pub(super) texture3d_get_info: sys::cna_texture3d_get_info_fn,
+    pub(super) texture3d_set_data: sys::cna_texture3d_set_data_fn,
+    pub(super) texture3d_get_data: sys::cna_texture3d_get_data_fn,
     pub(super) texturecube_create: sys::cna_texturecube_create_fn,
     pub(super) texturecube_destroy: sys::cna_texturecube_destroy_fn,
     pub(super) texturecube_get_info: sys::cna_texturecube_get_info_fn,
@@ -204,6 +215,134 @@ pub(crate) struct Native {
     pub(super) effect_get_techniques: sys::cna_effect_get_techniques_fn,
     pub(super) effect_get_current_technique: sys::cna_effect_get_current_technique_fn,
     pub(super) effect_set_current_technique: sys::cna_effect_set_current_technique_fn,
+    pub(super) directional_light_create: sys::cna_directional_light_create_fn,
+    pub(super) directional_light_destroy: sys::cna_directional_light_destroy_fn,
+    pub(super) directional_light_get_diffuse_color: sys::cna_directional_light_get_diffuse_color_fn,
+    pub(super) directional_light_set_diffuse_color: sys::cna_directional_light_set_diffuse_color_fn,
+    pub(super) directional_light_get_direction: sys::cna_directional_light_get_direction_fn,
+    pub(super) directional_light_set_direction: sys::cna_directional_light_set_direction_fn,
+    pub(super) directional_light_get_specular_color:
+        sys::cna_directional_light_get_specular_color_fn,
+    pub(super) directional_light_set_specular_color:
+        sys::cna_directional_light_set_specular_color_fn,
+    pub(super) directional_light_get_enabled: sys::cna_directional_light_get_enabled_fn,
+    pub(super) directional_light_set_enabled: sys::cna_directional_light_set_enabled_fn,
+    pub(super) basic_effect_create: sys::cna_basic_effect_create_fn,
+    pub(super) effect_matrices_get_world: sys::cna_effect_matrices_get_world_fn,
+    pub(super) effect_matrices_set_world: sys::cna_effect_matrices_set_world_fn,
+    pub(super) effect_matrices_get_view: sys::cna_effect_matrices_get_view_fn,
+    pub(super) effect_matrices_set_view: sys::cna_effect_matrices_set_view_fn,
+    pub(super) effect_matrices_get_projection: sys::cna_effect_matrices_get_projection_fn,
+    pub(super) effect_matrices_set_projection: sys::cna_effect_matrices_set_projection_fn,
+    pub(super) effect_fog_get_color: sys::cna_effect_fog_get_color_fn,
+    pub(super) effect_fog_set_color: sys::cna_effect_fog_set_color_fn,
+    pub(super) effect_fog_get_enabled: sys::cna_effect_fog_get_enabled_fn,
+    pub(super) effect_fog_set_enabled: sys::cna_effect_fog_set_enabled_fn,
+    pub(super) effect_fog_get_start: sys::cna_effect_fog_get_start_fn,
+    pub(super) effect_fog_set_start: sys::cna_effect_fog_set_start_fn,
+    pub(super) effect_fog_get_end: sys::cna_effect_fog_get_end_fn,
+    pub(super) effect_fog_set_end: sys::cna_effect_fog_set_end_fn,
+    pub(super) effect_lights_get_ambient_color: sys::cna_effect_lights_get_ambient_color_fn,
+    pub(super) effect_lights_set_ambient_color: sys::cna_effect_lights_set_ambient_color_fn,
+    pub(super) effect_lights_get_directional_light: sys::cna_effect_lights_get_directional_light_fn,
+    pub(super) effect_lights_get_enabled: sys::cna_effect_lights_get_enabled_fn,
+    pub(super) effect_lights_set_enabled: sys::cna_effect_lights_set_enabled_fn,
+    pub(super) effect_lights_enable_default: sys::cna_effect_lights_enable_default_fn,
+    pub(super) basic_effect_get_vertex_color_enabled:
+        sys::cna_basic_effect_get_vertex_color_enabled_fn,
+    pub(super) basic_effect_set_vertex_color_enabled:
+        sys::cna_basic_effect_set_vertex_color_enabled_fn,
+    pub(super) basic_effect_get_prefer_per_pixel_lighting:
+        sys::cna_basic_effect_get_prefer_per_pixel_lighting_fn,
+    pub(super) basic_effect_set_prefer_per_pixel_lighting:
+        sys::cna_basic_effect_set_prefer_per_pixel_lighting_fn,
+    pub(super) basic_effect_get_diffuse_color: sys::cna_basic_effect_get_diffuse_color_fn,
+    pub(super) basic_effect_set_diffuse_color: sys::cna_basic_effect_set_diffuse_color_fn,
+    pub(super) basic_effect_get_emissive_color: sys::cna_basic_effect_get_emissive_color_fn,
+    pub(super) basic_effect_set_emissive_color: sys::cna_basic_effect_set_emissive_color_fn,
+    pub(super) basic_effect_get_specular_color: sys::cna_basic_effect_get_specular_color_fn,
+    pub(super) basic_effect_set_specular_color: sys::cna_basic_effect_set_specular_color_fn,
+    pub(super) basic_effect_get_specular_power: sys::cna_basic_effect_get_specular_power_fn,
+    pub(super) basic_effect_set_specular_power: sys::cna_basic_effect_set_specular_power_fn,
+    pub(super) basic_effect_get_alpha: sys::cna_basic_effect_get_alpha_fn,
+    pub(super) basic_effect_set_alpha: sys::cna_basic_effect_set_alpha_fn,
+    pub(super) basic_effect_get_texture_enabled: sys::cna_basic_effect_get_texture_enabled_fn,
+    pub(super) basic_effect_set_texture_enabled: sys::cna_basic_effect_set_texture_enabled_fn,
+    pub(super) basic_effect_set_texture: sys::cna_basic_effect_set_texture_fn,
+    pub(super) alpha_test_effect_create: sys::cna_alpha_test_effect_create_fn,
+    pub(super) alpha_test_effect_get_diffuse_color: sys::cna_alpha_test_effect_get_diffuse_color_fn,
+    pub(super) alpha_test_effect_set_diffuse_color: sys::cna_alpha_test_effect_set_diffuse_color_fn,
+    pub(super) alpha_test_effect_get_alpha: sys::cna_alpha_test_effect_get_alpha_fn,
+    pub(super) alpha_test_effect_set_alpha: sys::cna_alpha_test_effect_set_alpha_fn,
+    pub(super) alpha_test_effect_set_texture: sys::cna_alpha_test_effect_set_texture_fn,
+    pub(super) alpha_test_effect_get_vertex_color_enabled:
+        sys::cna_alpha_test_effect_get_vertex_color_enabled_fn,
+    pub(super) alpha_test_effect_set_vertex_color_enabled:
+        sys::cna_alpha_test_effect_set_vertex_color_enabled_fn,
+    pub(super) alpha_test_effect_get_alpha_function:
+        sys::cna_alpha_test_effect_get_alpha_function_fn,
+    pub(super) alpha_test_effect_set_alpha_function:
+        sys::cna_alpha_test_effect_set_alpha_function_fn,
+    pub(super) alpha_test_effect_get_reference_alpha:
+        sys::cna_alpha_test_effect_get_reference_alpha_fn,
+    pub(super) alpha_test_effect_set_reference_alpha:
+        sys::cna_alpha_test_effect_set_reference_alpha_fn,
+    pub(super) dual_texture_effect_create: sys::cna_dual_texture_effect_create_fn,
+    pub(super) dual_texture_effect_get_diffuse_color:
+        sys::cna_dual_texture_effect_get_diffuse_color_fn,
+    pub(super) dual_texture_effect_set_diffuse_color:
+        sys::cna_dual_texture_effect_set_diffuse_color_fn,
+    pub(super) dual_texture_effect_get_alpha: sys::cna_dual_texture_effect_get_alpha_fn,
+    pub(super) dual_texture_effect_set_alpha: sys::cna_dual_texture_effect_set_alpha_fn,
+    pub(super) dual_texture_effect_set_texture: sys::cna_dual_texture_effect_set_texture_fn,
+    pub(super) dual_texture_effect_get_vertex_color_enabled:
+        sys::cna_dual_texture_effect_get_vertex_color_enabled_fn,
+    pub(super) dual_texture_effect_set_vertex_color_enabled:
+        sys::cna_dual_texture_effect_set_vertex_color_enabled_fn,
+    pub(super) environment_map_effect_create: sys::cna_environment_map_effect_create_fn,
+    pub(super) environment_map_effect_get_diffuse_color:
+        sys::cna_environment_map_effect_get_diffuse_color_fn,
+    pub(super) environment_map_effect_set_diffuse_color:
+        sys::cna_environment_map_effect_set_diffuse_color_fn,
+    pub(super) environment_map_effect_get_emissive_color:
+        sys::cna_environment_map_effect_get_emissive_color_fn,
+    pub(super) environment_map_effect_set_emissive_color:
+        sys::cna_environment_map_effect_set_emissive_color_fn,
+    pub(super) environment_map_effect_get_alpha: sys::cna_environment_map_effect_get_alpha_fn,
+    pub(super) environment_map_effect_set_alpha: sys::cna_environment_map_effect_set_alpha_fn,
+    pub(super) environment_map_effect_set_texture: sys::cna_environment_map_effect_set_texture_fn,
+    pub(super) environment_map_effect_set_environment_map:
+        sys::cna_environment_map_effect_set_environment_map_fn,
+    pub(super) environment_map_effect_get_amount: sys::cna_environment_map_effect_get_amount_fn,
+    pub(super) environment_map_effect_set_amount: sys::cna_environment_map_effect_set_amount_fn,
+    pub(super) environment_map_effect_get_specular: sys::cna_environment_map_effect_get_specular_fn,
+    pub(super) environment_map_effect_set_specular: sys::cna_environment_map_effect_set_specular_fn,
+    pub(super) environment_map_effect_get_fresnel_factor:
+        sys::cna_environment_map_effect_get_fresnel_factor_fn,
+    pub(super) environment_map_effect_set_fresnel_factor:
+        sys::cna_environment_map_effect_set_fresnel_factor_fn,
+    pub(super) skinned_effect_create: sys::cna_skinned_effect_create_fn,
+    pub(super) skinned_effect_get_diffuse_color: sys::cna_skinned_effect_get_diffuse_color_fn,
+    pub(super) skinned_effect_set_diffuse_color: sys::cna_skinned_effect_set_diffuse_color_fn,
+    pub(super) skinned_effect_get_emissive_color: sys::cna_skinned_effect_get_emissive_color_fn,
+    pub(super) skinned_effect_set_emissive_color: sys::cna_skinned_effect_set_emissive_color_fn,
+    pub(super) skinned_effect_get_specular_color: sys::cna_skinned_effect_get_specular_color_fn,
+    pub(super) skinned_effect_set_specular_color: sys::cna_skinned_effect_set_specular_color_fn,
+    pub(super) skinned_effect_get_specular_power: sys::cna_skinned_effect_get_specular_power_fn,
+    pub(super) skinned_effect_set_specular_power: sys::cna_skinned_effect_set_specular_power_fn,
+    pub(super) skinned_effect_get_alpha: sys::cna_skinned_effect_get_alpha_fn,
+    pub(super) skinned_effect_set_alpha: sys::cna_skinned_effect_set_alpha_fn,
+    pub(super) skinned_effect_get_prefer_per_pixel_lighting:
+        sys::cna_skinned_effect_get_prefer_per_pixel_lighting_fn,
+    pub(super) skinned_effect_set_prefer_per_pixel_lighting:
+        sys::cna_skinned_effect_set_prefer_per_pixel_lighting_fn,
+    pub(super) skinned_effect_set_texture: sys::cna_skinned_effect_set_texture_fn,
+    pub(super) skinned_effect_get_weights_per_vertex:
+        sys::cna_skinned_effect_get_weights_per_vertex_fn,
+    pub(super) skinned_effect_set_weights_per_vertex:
+        sys::cna_skinned_effect_set_weights_per_vertex_fn,
+    pub(super) skinned_effect_set_bone_transforms: sys::cna_skinned_effect_set_bone_transforms_fn,
+    pub(super) skinned_effect_copy_bone_transforms: sys::cna_skinned_effect_copy_bone_transforms_fn,
     pub(super) effect_annotation_create: sys::cna_effect_annotation_create_fn,
     pub(super) effect_annotation_destroy: sys::cna_effect_annotation_destroy_fn,
     pub(super) effect_annotation_get_info: sys::cna_effect_annotation_get_info_fn,
@@ -679,6 +818,30 @@ impl Native {
                 "cna_graphics_device_draw_user_indexed_primitives",
                 sys::cna_graphics_device_draw_user_indexed_primitives_fn
             ),
+            occlusion_query_create: symbol!(
+                "cna_occlusion_query_create",
+                sys::cna_occlusion_query_create_fn
+            ),
+            occlusion_query_begin: symbol!(
+                "cna_occlusion_query_begin",
+                sys::cna_occlusion_query_begin_fn
+            ),
+            occlusion_query_end: symbol!(
+                "cna_occlusion_query_end",
+                sys::cna_occlusion_query_end_fn
+            ),
+            occlusion_query_get_is_complete: symbol!(
+                "cna_occlusion_query_get_is_complete",
+                sys::cna_occlusion_query_get_is_complete_fn
+            ),
+            occlusion_query_get_pixel_count: symbol!(
+                "cna_occlusion_query_get_pixel_count",
+                sys::cna_occlusion_query_get_pixel_count_fn
+            ),
+            occlusion_query_destroy: symbol!(
+                "cna_occlusion_query_destroy",
+                sys::cna_occlusion_query_destroy_fn
+            ),
             graphics_device_set_render_targets: symbol!(
                 "cna_graphics_device_set_render_targets",
                 sys::cna_graphics_device_set_render_targets_fn
@@ -720,6 +883,11 @@ impl Native {
                 sys::cna_texture2d_copy_encoded_fn
             ),
             texture2d_destroy: symbol!("cna_texture2d_destroy", sys::cna_texture2d_destroy_fn),
+            texture3d_create: symbol!("cna_texture3d_create", sys::cna_texture3d_create_fn),
+            texture3d_destroy: symbol!("cna_texture3d_destroy", sys::cna_texture3d_destroy_fn),
+            texture3d_get_info: symbol!("cna_texture3d_get_info", sys::cna_texture3d_get_info_fn),
+            texture3d_set_data: symbol!("cna_texture3d_set_data", sys::cna_texture3d_set_data_fn),
+            texture3d_get_data: symbol!("cna_texture3d_get_data", sys::cna_texture3d_get_data_fn),
             texturecube_create: symbol!("cna_texturecube_create", sys::cna_texturecube_create_fn),
             texturecube_destroy: symbol!(
                 "cna_texturecube_destroy",
@@ -907,6 +1075,404 @@ impl Native {
             effect_set_current_technique: symbol!(
                 "cna_effect_set_current_technique",
                 sys::cna_effect_set_current_technique_fn
+            ),
+            directional_light_create: symbol!(
+                "cna_directional_light_create",
+                sys::cna_directional_light_create_fn
+            ),
+            directional_light_destroy: symbol!(
+                "cna_directional_light_destroy",
+                sys::cna_directional_light_destroy_fn
+            ),
+            directional_light_get_diffuse_color: symbol!(
+                "cna_directional_light_get_diffuse_color",
+                sys::cna_directional_light_get_diffuse_color_fn
+            ),
+            directional_light_set_diffuse_color: symbol!(
+                "cna_directional_light_set_diffuse_color",
+                sys::cna_directional_light_set_diffuse_color_fn
+            ),
+            directional_light_get_direction: symbol!(
+                "cna_directional_light_get_direction",
+                sys::cna_directional_light_get_direction_fn
+            ),
+            directional_light_set_direction: symbol!(
+                "cna_directional_light_set_direction",
+                sys::cna_directional_light_set_direction_fn
+            ),
+            directional_light_get_specular_color: symbol!(
+                "cna_directional_light_get_specular_color",
+                sys::cna_directional_light_get_specular_color_fn
+            ),
+            directional_light_set_specular_color: symbol!(
+                "cna_directional_light_set_specular_color",
+                sys::cna_directional_light_set_specular_color_fn
+            ),
+            directional_light_get_enabled: symbol!(
+                "cna_directional_light_get_enabled",
+                sys::cna_directional_light_get_enabled_fn
+            ),
+            directional_light_set_enabled: symbol!(
+                "cna_directional_light_set_enabled",
+                sys::cna_directional_light_set_enabled_fn
+            ),
+            basic_effect_create: symbol!(
+                "cna_basic_effect_create",
+                sys::cna_basic_effect_create_fn
+            ),
+            effect_matrices_get_world: symbol!(
+                "cna_effect_matrices_get_world",
+                sys::cna_effect_matrices_get_world_fn
+            ),
+            effect_matrices_set_world: symbol!(
+                "cna_effect_matrices_set_world",
+                sys::cna_effect_matrices_set_world_fn
+            ),
+            effect_matrices_get_view: symbol!(
+                "cna_effect_matrices_get_view",
+                sys::cna_effect_matrices_get_view_fn
+            ),
+            effect_matrices_set_view: symbol!(
+                "cna_effect_matrices_set_view",
+                sys::cna_effect_matrices_set_view_fn
+            ),
+            effect_matrices_get_projection: symbol!(
+                "cna_effect_matrices_get_projection",
+                sys::cna_effect_matrices_get_projection_fn
+            ),
+            effect_matrices_set_projection: symbol!(
+                "cna_effect_matrices_set_projection",
+                sys::cna_effect_matrices_set_projection_fn
+            ),
+            effect_fog_get_color: symbol!(
+                "cna_effect_fog_get_color",
+                sys::cna_effect_fog_get_color_fn
+            ),
+            effect_fog_set_color: symbol!(
+                "cna_effect_fog_set_color",
+                sys::cna_effect_fog_set_color_fn
+            ),
+            effect_fog_get_enabled: symbol!(
+                "cna_effect_fog_get_enabled",
+                sys::cna_effect_fog_get_enabled_fn
+            ),
+            effect_fog_set_enabled: symbol!(
+                "cna_effect_fog_set_enabled",
+                sys::cna_effect_fog_set_enabled_fn
+            ),
+            effect_fog_get_start: symbol!(
+                "cna_effect_fog_get_start",
+                sys::cna_effect_fog_get_start_fn
+            ),
+            effect_fog_set_start: symbol!(
+                "cna_effect_fog_set_start",
+                sys::cna_effect_fog_set_start_fn
+            ),
+            effect_fog_get_end: symbol!("cna_effect_fog_get_end", sys::cna_effect_fog_get_end_fn),
+            effect_fog_set_end: symbol!("cna_effect_fog_set_end", sys::cna_effect_fog_set_end_fn),
+            effect_lights_get_ambient_color: symbol!(
+                "cna_effect_lights_get_ambient_color",
+                sys::cna_effect_lights_get_ambient_color_fn
+            ),
+            effect_lights_set_ambient_color: symbol!(
+                "cna_effect_lights_set_ambient_color",
+                sys::cna_effect_lights_set_ambient_color_fn
+            ),
+            effect_lights_get_directional_light: symbol!(
+                "cna_effect_lights_get_directional_light",
+                sys::cna_effect_lights_get_directional_light_fn
+            ),
+            effect_lights_get_enabled: symbol!(
+                "cna_effect_lights_get_enabled",
+                sys::cna_effect_lights_get_enabled_fn
+            ),
+            effect_lights_set_enabled: symbol!(
+                "cna_effect_lights_set_enabled",
+                sys::cna_effect_lights_set_enabled_fn
+            ),
+            effect_lights_enable_default: symbol!(
+                "cna_effect_lights_enable_default",
+                sys::cna_effect_lights_enable_default_fn
+            ),
+            basic_effect_get_vertex_color_enabled: symbol!(
+                "cna_basic_effect_get_vertex_color_enabled",
+                sys::cna_basic_effect_get_vertex_color_enabled_fn
+            ),
+            basic_effect_set_vertex_color_enabled: symbol!(
+                "cna_basic_effect_set_vertex_color_enabled",
+                sys::cna_basic_effect_set_vertex_color_enabled_fn
+            ),
+            basic_effect_get_prefer_per_pixel_lighting: symbol!(
+                "cna_basic_effect_get_prefer_per_pixel_lighting",
+                sys::cna_basic_effect_get_prefer_per_pixel_lighting_fn
+            ),
+            basic_effect_set_prefer_per_pixel_lighting: symbol!(
+                "cna_basic_effect_set_prefer_per_pixel_lighting",
+                sys::cna_basic_effect_set_prefer_per_pixel_lighting_fn
+            ),
+            basic_effect_get_diffuse_color: symbol!(
+                "cna_basic_effect_get_diffuse_color",
+                sys::cna_basic_effect_get_diffuse_color_fn
+            ),
+            basic_effect_set_diffuse_color: symbol!(
+                "cna_basic_effect_set_diffuse_color",
+                sys::cna_basic_effect_set_diffuse_color_fn
+            ),
+            basic_effect_get_emissive_color: symbol!(
+                "cna_basic_effect_get_emissive_color",
+                sys::cna_basic_effect_get_emissive_color_fn
+            ),
+            basic_effect_set_emissive_color: symbol!(
+                "cna_basic_effect_set_emissive_color",
+                sys::cna_basic_effect_set_emissive_color_fn
+            ),
+            basic_effect_get_specular_color: symbol!(
+                "cna_basic_effect_get_specular_color",
+                sys::cna_basic_effect_get_specular_color_fn
+            ),
+            basic_effect_set_specular_color: symbol!(
+                "cna_basic_effect_set_specular_color",
+                sys::cna_basic_effect_set_specular_color_fn
+            ),
+            basic_effect_get_specular_power: symbol!(
+                "cna_basic_effect_get_specular_power",
+                sys::cna_basic_effect_get_specular_power_fn
+            ),
+            basic_effect_set_specular_power: symbol!(
+                "cna_basic_effect_set_specular_power",
+                sys::cna_basic_effect_set_specular_power_fn
+            ),
+            basic_effect_get_alpha: symbol!(
+                "cna_basic_effect_get_alpha",
+                sys::cna_basic_effect_get_alpha_fn
+            ),
+            basic_effect_set_alpha: symbol!(
+                "cna_basic_effect_set_alpha",
+                sys::cna_basic_effect_set_alpha_fn
+            ),
+            basic_effect_get_texture_enabled: symbol!(
+                "cna_basic_effect_get_texture_enabled",
+                sys::cna_basic_effect_get_texture_enabled_fn
+            ),
+            basic_effect_set_texture_enabled: symbol!(
+                "cna_basic_effect_set_texture_enabled",
+                sys::cna_basic_effect_set_texture_enabled_fn
+            ),
+            basic_effect_set_texture: symbol!(
+                "cna_basic_effect_set_texture",
+                sys::cna_basic_effect_set_texture_fn
+            ),
+            alpha_test_effect_create: symbol!(
+                "cna_alpha_test_effect_create",
+                sys::cna_alpha_test_effect_create_fn
+            ),
+            alpha_test_effect_get_diffuse_color: symbol!(
+                "cna_alpha_test_effect_get_diffuse_color",
+                sys::cna_alpha_test_effect_get_diffuse_color_fn
+            ),
+            alpha_test_effect_set_diffuse_color: symbol!(
+                "cna_alpha_test_effect_set_diffuse_color",
+                sys::cna_alpha_test_effect_set_diffuse_color_fn
+            ),
+            alpha_test_effect_get_alpha: symbol!(
+                "cna_alpha_test_effect_get_alpha",
+                sys::cna_alpha_test_effect_get_alpha_fn
+            ),
+            alpha_test_effect_set_alpha: symbol!(
+                "cna_alpha_test_effect_set_alpha",
+                sys::cna_alpha_test_effect_set_alpha_fn
+            ),
+            alpha_test_effect_set_texture: symbol!(
+                "cna_alpha_test_effect_set_texture",
+                sys::cna_alpha_test_effect_set_texture_fn
+            ),
+            alpha_test_effect_get_vertex_color_enabled: symbol!(
+                "cna_alpha_test_effect_get_vertex_color_enabled",
+                sys::cna_alpha_test_effect_get_vertex_color_enabled_fn
+            ),
+            alpha_test_effect_set_vertex_color_enabled: symbol!(
+                "cna_alpha_test_effect_set_vertex_color_enabled",
+                sys::cna_alpha_test_effect_set_vertex_color_enabled_fn
+            ),
+            alpha_test_effect_get_alpha_function: symbol!(
+                "cna_alpha_test_effect_get_alpha_function",
+                sys::cna_alpha_test_effect_get_alpha_function_fn
+            ),
+            alpha_test_effect_set_alpha_function: symbol!(
+                "cna_alpha_test_effect_set_alpha_function",
+                sys::cna_alpha_test_effect_set_alpha_function_fn
+            ),
+            alpha_test_effect_get_reference_alpha: symbol!(
+                "cna_alpha_test_effect_get_reference_alpha",
+                sys::cna_alpha_test_effect_get_reference_alpha_fn
+            ),
+            alpha_test_effect_set_reference_alpha: symbol!(
+                "cna_alpha_test_effect_set_reference_alpha",
+                sys::cna_alpha_test_effect_set_reference_alpha_fn
+            ),
+            dual_texture_effect_create: symbol!(
+                "cna_dual_texture_effect_create",
+                sys::cna_dual_texture_effect_create_fn
+            ),
+            dual_texture_effect_get_diffuse_color: symbol!(
+                "cna_dual_texture_effect_get_diffuse_color",
+                sys::cna_dual_texture_effect_get_diffuse_color_fn
+            ),
+            dual_texture_effect_set_diffuse_color: symbol!(
+                "cna_dual_texture_effect_set_diffuse_color",
+                sys::cna_dual_texture_effect_set_diffuse_color_fn
+            ),
+            dual_texture_effect_get_alpha: symbol!(
+                "cna_dual_texture_effect_get_alpha",
+                sys::cna_dual_texture_effect_get_alpha_fn
+            ),
+            dual_texture_effect_set_alpha: symbol!(
+                "cna_dual_texture_effect_set_alpha",
+                sys::cna_dual_texture_effect_set_alpha_fn
+            ),
+            dual_texture_effect_set_texture: symbol!(
+                "cna_dual_texture_effect_set_texture",
+                sys::cna_dual_texture_effect_set_texture_fn
+            ),
+            dual_texture_effect_get_vertex_color_enabled: symbol!(
+                "cna_dual_texture_effect_get_vertex_color_enabled",
+                sys::cna_dual_texture_effect_get_vertex_color_enabled_fn
+            ),
+            dual_texture_effect_set_vertex_color_enabled: symbol!(
+                "cna_dual_texture_effect_set_vertex_color_enabled",
+                sys::cna_dual_texture_effect_set_vertex_color_enabled_fn
+            ),
+            environment_map_effect_create: symbol!(
+                "cna_environment_map_effect_create",
+                sys::cna_environment_map_effect_create_fn
+            ),
+            environment_map_effect_get_diffuse_color: symbol!(
+                "cna_environment_map_effect_get_diffuse_color",
+                sys::cna_environment_map_effect_get_diffuse_color_fn
+            ),
+            environment_map_effect_set_diffuse_color: symbol!(
+                "cna_environment_map_effect_set_diffuse_color",
+                sys::cna_environment_map_effect_set_diffuse_color_fn
+            ),
+            environment_map_effect_get_emissive_color: symbol!(
+                "cna_environment_map_effect_get_emissive_color",
+                sys::cna_environment_map_effect_get_emissive_color_fn
+            ),
+            environment_map_effect_set_emissive_color: symbol!(
+                "cna_environment_map_effect_set_emissive_color",
+                sys::cna_environment_map_effect_set_emissive_color_fn
+            ),
+            environment_map_effect_get_alpha: symbol!(
+                "cna_environment_map_effect_get_alpha",
+                sys::cna_environment_map_effect_get_alpha_fn
+            ),
+            environment_map_effect_set_alpha: symbol!(
+                "cna_environment_map_effect_set_alpha",
+                sys::cna_environment_map_effect_set_alpha_fn
+            ),
+            environment_map_effect_set_texture: symbol!(
+                "cna_environment_map_effect_set_texture",
+                sys::cna_environment_map_effect_set_texture_fn
+            ),
+            environment_map_effect_set_environment_map: symbol!(
+                "cna_environment_map_effect_set_environment_map",
+                sys::cna_environment_map_effect_set_environment_map_fn
+            ),
+            environment_map_effect_get_amount: symbol!(
+                "cna_environment_map_effect_get_amount",
+                sys::cna_environment_map_effect_get_amount_fn
+            ),
+            environment_map_effect_set_amount: symbol!(
+                "cna_environment_map_effect_set_amount",
+                sys::cna_environment_map_effect_set_amount_fn
+            ),
+            environment_map_effect_get_specular: symbol!(
+                "cna_environment_map_effect_get_specular",
+                sys::cna_environment_map_effect_get_specular_fn
+            ),
+            environment_map_effect_set_specular: symbol!(
+                "cna_environment_map_effect_set_specular",
+                sys::cna_environment_map_effect_set_specular_fn
+            ),
+            environment_map_effect_get_fresnel_factor: symbol!(
+                "cna_environment_map_effect_get_fresnel_factor",
+                sys::cna_environment_map_effect_get_fresnel_factor_fn
+            ),
+            environment_map_effect_set_fresnel_factor: symbol!(
+                "cna_environment_map_effect_set_fresnel_factor",
+                sys::cna_environment_map_effect_set_fresnel_factor_fn
+            ),
+            skinned_effect_create: symbol!(
+                "cna_skinned_effect_create",
+                sys::cna_skinned_effect_create_fn
+            ),
+            skinned_effect_get_diffuse_color: symbol!(
+                "cna_skinned_effect_get_diffuse_color",
+                sys::cna_skinned_effect_get_diffuse_color_fn
+            ),
+            skinned_effect_set_diffuse_color: symbol!(
+                "cna_skinned_effect_set_diffuse_color",
+                sys::cna_skinned_effect_set_diffuse_color_fn
+            ),
+            skinned_effect_get_emissive_color: symbol!(
+                "cna_skinned_effect_get_emissive_color",
+                sys::cna_skinned_effect_get_emissive_color_fn
+            ),
+            skinned_effect_set_emissive_color: symbol!(
+                "cna_skinned_effect_set_emissive_color",
+                sys::cna_skinned_effect_set_emissive_color_fn
+            ),
+            skinned_effect_get_specular_color: symbol!(
+                "cna_skinned_effect_get_specular_color",
+                sys::cna_skinned_effect_get_specular_color_fn
+            ),
+            skinned_effect_set_specular_color: symbol!(
+                "cna_skinned_effect_set_specular_color",
+                sys::cna_skinned_effect_set_specular_color_fn
+            ),
+            skinned_effect_get_specular_power: symbol!(
+                "cna_skinned_effect_get_specular_power",
+                sys::cna_skinned_effect_get_specular_power_fn
+            ),
+            skinned_effect_set_specular_power: symbol!(
+                "cna_skinned_effect_set_specular_power",
+                sys::cna_skinned_effect_set_specular_power_fn
+            ),
+            skinned_effect_get_alpha: symbol!(
+                "cna_skinned_effect_get_alpha",
+                sys::cna_skinned_effect_get_alpha_fn
+            ),
+            skinned_effect_set_alpha: symbol!(
+                "cna_skinned_effect_set_alpha",
+                sys::cna_skinned_effect_set_alpha_fn
+            ),
+            skinned_effect_get_prefer_per_pixel_lighting: symbol!(
+                "cna_skinned_effect_get_prefer_per_pixel_lighting",
+                sys::cna_skinned_effect_get_prefer_per_pixel_lighting_fn
+            ),
+            skinned_effect_set_prefer_per_pixel_lighting: symbol!(
+                "cna_skinned_effect_set_prefer_per_pixel_lighting",
+                sys::cna_skinned_effect_set_prefer_per_pixel_lighting_fn
+            ),
+            skinned_effect_set_texture: symbol!(
+                "cna_skinned_effect_set_texture",
+                sys::cna_skinned_effect_set_texture_fn
+            ),
+            skinned_effect_get_weights_per_vertex: symbol!(
+                "cna_skinned_effect_get_weights_per_vertex",
+                sys::cna_skinned_effect_get_weights_per_vertex_fn
+            ),
+            skinned_effect_set_weights_per_vertex: symbol!(
+                "cna_skinned_effect_set_weights_per_vertex",
+                sys::cna_skinned_effect_set_weights_per_vertex_fn
+            ),
+            skinned_effect_set_bone_transforms: symbol!(
+                "cna_skinned_effect_set_bone_transforms",
+                sys::cna_skinned_effect_set_bone_transforms_fn
+            ),
+            skinned_effect_copy_bone_transforms: symbol!(
+                "cna_skinned_effect_copy_bone_transforms",
+                sys::cna_skinned_effect_copy_bone_transforms_fn
             ),
             effect_annotation_create: symbol!(
                 "cna_effect_annotation_create",
