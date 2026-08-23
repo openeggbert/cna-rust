@@ -10,6 +10,7 @@ use std::sync::Arc;
 use cna_sys as sys;
 
 use crate::error::Result;
+use crate::audio::AudioRuntime;
 use crate::graphics::GraphicsDevice;
 use crate::native::Native;
 
@@ -22,6 +23,7 @@ pub struct GameContext<'callback> {
     pub(crate) native: &'callback Arc<Native>,
     pub(crate) handle: sys::CNA_Handle,
     pub(crate) device: &'callback GraphicsDevice,
+    pub(crate) audio: &'callback Arc<AudioRuntime>,
 }
 
 #[allow(non_snake_case)]
@@ -38,5 +40,13 @@ impl GameContext<'_> {
 
     pub fn Exit(&self) -> Result<()> {
         self.native.request_game_exit(self.handle)
+    }
+
+    pub(crate) fn audio_runtime(&self) -> &Arc<AudioRuntime> {
+        self.audio
+    }
+
+    pub(crate) fn native_game(&self) -> (&Arc<Native>, sys::CNA_Handle) {
+        (self.native, self.handle)
     }
 }

@@ -68,7 +68,10 @@ def generate_rustdoc(temporary: Path) -> Path:
 
 
 def inner_kind(item: dict) -> str:
-    return next(iter(item.get("inner", {})), "unknown")
+    kind = next(iter(item.get("inner", {})), "unknown")
+    # Rust 1.85 renamed the rustdoc JSON item tag from `import` to `use`.
+    # Keep the verifier's internal vocabulary stable across both formats.
+    return "import" if kind == "use" else kind
 
 
 def rust_kind(item: dict) -> str:
@@ -113,6 +116,12 @@ def rust_resolved_path(value: dict, owner: str, paths: dict[str, str], index: di
     else:
         name = value.get("name") or "?"
     arguments = rust_generic_arguments(value, owner, paths, index)
+    # Newer rustdoc omits the implicit `Self` argument on operator trait
+    # implementations.  The verifier's contract vocabulary keeps it explicit
+    # because that is how the mapping rules distinguish `Mul<Self>` from
+    # `Mul<f32>`.
+    if not arguments and name in {"Add", "Sub", "Mul", "Div", "Neg"}:
+        arguments = ["Self"]
     return name + ("<" + ",".join(arguments) + ">" if arguments else "")
 
 
@@ -127,11 +136,11 @@ def rust_type_name(value: dict | None, owner: str, paths: dict[str, str], index:
         return rust_resolved_path(value["resolved_path"], owner, paths, index)
     if "borrowed_ref" in value:
         reference = value["borrowed_ref"]
-        prefix = "&mut " if reference.get("mutable") else "&"
+        prefix = "&mut " if reference.get("mutable", reference.get("is_mutable", False)) else "&"
         return prefix + rust_type_name(reference["type"], owner, paths, index)
     if "raw_pointer" in value:
         pointer = value["raw_pointer"]
-        prefix = "*mut " if pointer.get("mutable") else "*const "
+        prefix = "*mut " if pointer.get("mutable", pointer.get("is_mutable", False)) else "*const "
         return prefix + rust_type_name(pointer["type"], owner, paths, index)
     if "slice" in value:
         return "[" + rust_type_name(value["slice"], owner, paths, index) + "]"
@@ -181,14 +190,16 @@ def rust_member(identifier: str, item: dict, owner: str, paths: dict[str, str], 
     descriptor = {"name": item.get("name"), "kind": kind}
     if kind == "function":
         function = item["inner"]["function"]
+        declaration = function.get("decl") or function.get("sig", {})
+        header = function.get("header", {})
         descriptor.update({
             "parameters": [
                 {"name": name, "type": rust_type_name(type_value, owner, paths, index)}
-                for name, type_value in function["decl"].get("inputs", [])
+                for name, type_value in declaration.get("inputs", [])
             ],
-            "returnType": rust_type_name(function["decl"].get("output"), owner, paths, index),
+            "returnType": rust_type_name(declaration.get("output"), owner, paths, index),
             "generics": rust_generics(function.get("generics", {}), owner, paths, index),
-            "unsafe": bool(function["header"].get("unsafe")),
+            "unsafe": bool(header.get("unsafe", header.get("is_unsafe", False))),
         })
     elif kind == "assoc_const":
         constant = item["inner"]["assoc_const"]
@@ -214,7 +225,12 @@ def trait_name(value: dict, owner: str, paths: dict[str, str], index: dict[str, 
 
 
 def actual_contract(rustdoc: dict) -> dict[str, dict]:
-    index = rustdoc["index"]
+    # rustdoc JSON has emitted integer item references since the original
+    # format, but the JSON object keys are strings after deserialization.  A
+    # newer rustdoc made this visible in paths that previously happened to be
+    # traversed through string keys.  Normalize once so item references are
+    # handled consistently across supported toolchains.
+    index = {int(identifier): item for identifier, item in rustdoc["index"].items()}
     located: dict[str, tuple[str, dict, str]] = {}
 
     def walk(module_id: str, path: str) -> None:
@@ -225,7 +241,7 @@ def actual_contract(rustdoc: dict) -> dict[str, dict]:
             if kind == "module":
                 walk(child_id, f"{path}::{child['name']}")
             elif kind == "import":
-                imported = child["inner"]["import"]
+                imported = child["inner"].get("import") or child["inner"]["use"]
                 target_id = imported.get("id")
                 if target_id and target_id in index:
                     target = index[target_id]
@@ -295,7 +311,7 @@ def read_rust_type(
             traits.update({name, name.split("<", 1)[0]})
             for member_id in implementation_body.get("items", []):
                 member = index.get(member_id)
-                if member and member.get("name"):
+                if member and member.get("name") and member.get("name") != "clone_to_uninit":
                     descriptor = rust_member(member_id, member, identifier, paths, index)
                     trait_members[member["name"]] = descriptor
                     public_items.append(member)
@@ -304,7 +320,7 @@ def read_rust_type(
             continue
         for member_id in implementation_body.get("items", []):
             member = index.get(member_id)
-            if not member or not member.get("name"):
+            if not member or not member.get("name") or member.get("name") == "clone_to_uninit":
                 continue
             member_kind = inner_kind(member)
             if member_kind in {"function", "assoc_const", "assoc_type"}:

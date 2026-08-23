@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use cna_sys as sys;
 
+use crate::audio::AudioRuntime;
 use crate::content::ContentManager;
 use crate::error::{CnaError, Result};
 use crate::extensions::events::{EventArgs, EventHandler};
@@ -48,6 +49,7 @@ pub struct GameState {
     exiting: EventHandlers<EventArgs>,
     disposed: EventHandlers<EventArgs>,
     disposed_once: AtomicBool,
+    audio: Arc<AudioRuntime>,
 }
 
 impl GameState {
@@ -74,6 +76,7 @@ impl GameState {
             exiting: EventHandlers::new(),
             disposed: EventHandlers::new(),
             disposed_once: AtomicBool::new(false),
+            audio: AudioRuntime::new(),
         }
     }
 
@@ -100,6 +103,7 @@ impl GameState {
         let target_elapsed_time_ticks = self.target_elapsed_time_ticks.load(Ordering::Acquire);
         let inactive_sleep_time_ticks = self.inactive_sleep_time_ticks.load(Ordering::Acquire);
         self.window.attach(native, handle)?;
+        self.audio.attach(native, handle)?;
         *self
             .binding
             .lock()
@@ -206,6 +210,7 @@ impl GameState {
     }
 
     pub(crate) fn detach(&self) {
+        self.audio.detach();
         self.window.detach();
         self.binding
             .lock()
@@ -263,6 +268,14 @@ impl GameState {
 
     pub(crate) fn cleanup_content(&self) -> Result<()> {
         self.Content().cleanup_for_game_shutdown()
+    }
+
+    pub(crate) fn audio_runtime(&self) -> &Arc<AudioRuntime> {
+        &self.audio
+    }
+
+    pub(crate) fn cleanup_audio(&self) -> Result<()> {
+        self.audio.cleanup()
     }
 
     #[must_use]

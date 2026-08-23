@@ -15,6 +15,25 @@ RULES = json.loads((ROOT / "tools/api-compat/mapping-rules.json").read_text(enco
 
 
 class VerifierMappingTests(unittest.TestCase):
+    def test_actual_contract_normalizes_rustdoc_string_index_keys(self):
+        rustdoc = {
+            "index": {
+                "1": {
+                    "name": "Framework",
+                    "span": {"filename": "crates/cna/src/lib.rs"},
+                    "inner": {"module": {"items": [2]}},
+                },
+                "2": {
+                    "name": "AudioChannels",
+                    "inner": {"enum": {"variants": []}},
+                },
+            }
+        }
+        actual = VERIFY.actual_contract(rustdoc)
+        self.assertIn(
+            "cna::Microsoft::Xna::Framework::AudioChannels", actual
+        )
+
     @staticmethod
     def _empty_actual(kind, members, *, traits=(), drop=False):
         return {
@@ -222,6 +241,40 @@ class VerifierMappingTests(unittest.TestCase):
             {"name": "game", "type": "&GameContext"},
         ])
         self.assertEqual(members["IsGestureAvailable"]["returnType"], "Result<bool>")
+
+    def test_audio_native_roots_use_explicit_game_context_and_results(self):
+        effect = {
+            "name": "Microsoft.Xna.Framework.Audio.SoundEffect", "kind": "class",
+            "genericParameters": [], "members": [
+                {"kind": "constructor", "name": ".ctor", "parameters": [
+                    {"name": "buffer", "type": "System.Byte[]"},
+                    {"name": "sampleRate", "type": "System.Int32"},
+                    {"name": "channels", "type": "Microsoft.Xna.Framework.Audio.AudioChannels"},
+                ]},
+                {"kind": "property", "name": "MasterVolume", "static": True,
+                 "type": "System.Single", "get": True, "set": True, "parameters": []},
+                {"kind": "method", "name": "GetSampleDuration", "static": True,
+                 "returnType": "System.TimeSpan", "genericParameters": [], "parameters": [
+                    {"name": "sizeInBytes", "type": "System.Int32"},
+                    {"name": "sampleRate", "type": "System.Int32"},
+                    {"name": "channels", "type": "Microsoft.Xna.Framework.Audio.AudioChannels"},
+                 ]},
+            ],
+        }
+        channels = {
+            "name": "Microsoft.Xna.Framework.Audio.AudioChannels", "kind": "enum",
+        }
+        members = VERIFY.mapped_members(
+            effect, RULES, {effect["name"]: effect, channels["name"]: channels}
+        )
+        self.assertEqual(members["new"]["parameters"][0],
+                         {"name": "game", "type": "&GameContext"})
+        self.assertEqual(members["new"]["returnType"], "Result<Self>")
+        self.assertEqual(members["MasterVolume"]["parameters"],
+                         [{"name": "game", "type": "&GameContext"}])
+        self.assertEqual(members["MasterVolume"]["returnType"], "Result<f32>")
+        self.assertEqual(members["SetMasterVolume"]["returnType"], "Result<()>")
+        self.assertEqual(members["GetSampleDuration"]["returnType"], "TimeSpan")
 
     def test_storage_begin_end_and_stream_projection_is_concrete(self):
         device = {

@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "scope": "Microsoft XNA 4.0 Windows Audio/XACT projection",
+  "qualifiedArtifactSha256": "6dcefcadb7aa0233da98682bdbc343581a9f1e754a09c641078d1bef97afd7ca",
+  "abiVersion": "0.7",
+  "rows": [
+    {
+      "capability": "SoundEffect",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE"],
+      "evidence": "PCM16 construction, deterministic PCM WAV FromStream, duration/name caching, Play/CreateInstance, explicit Dispose/Drop, and 25+ ownership cycles."
+    },
+    {
+      "capability": "SoundEffect process-global state",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE", "UPSTREAM_CNA_BLOCKED"],
+      "evidence": "Set/get routes are native-verified. XNA process-static values persist, while the qualified CNA artifact resets them when Game is recreated."
+    },
+    {
+      "capability": "SoundEffectInstance",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE"],
+      "evidence": "Cached properties, playback state routes, loop/pan/3D ordering, disposal, parent-child lifetime, and 25+ cycles are verified."
+    },
+    {
+      "capability": "Apply3D single listener",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE"],
+      "evidence": "Exact listener/emitter value copy and canonical cna_sound_effect_instance_apply_3d route verified."
+    },
+    {
+      "capability": "Apply3D multiple listeners",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "UPSTREAM_CNA_BLOCKED"],
+      "evidence": "The overload is present, but CNA ABI 0.7's canonical implementation refuses every listener count except one; Rust returns UnsupportedRuntime without silently reducing the input."
+    },
+    {
+      "capability": "DynamicSoundEffectInstance",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE"],
+      "evidence": "PCM16 queue copying, ranges, pending count, transport, disposal, and 25+ dynamic cycles verified."
+    },
+    {
+      "capability": "Dynamic BufferNeeded delivery",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE"],
+      "evidence": "Native trampoline only enqueues work; Game/FrameworkDispatcher owner-thread delivery, 50+ handlers, duplicate order, self-removal, reentrant submit, panic containment, unsubscribe, shutdown, and recreation verified."
+    },
+    {
+      "capability": "Microphone enumeration",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE"],
+      "evidence": "Read-only All shape, stable facade identity, Default reconciliation, no-device shape, callback registration lifetime, and 20+ cycles verified against the qualified backend."
+    },
+    {
+      "capability": "Microphone capture and BufferReady delivery",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "HARDWARE_PENDING"],
+      "evidence": "Exact validation and native routes are implemented; real physical-device sample capture and event timing were not qualified. No synthetic device or samples are used."
+    },
+    {
+      "capability": "AudioEngine",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE"],
+      "evidence": "XGS signature validation, native construction/update/renderers, category graph, disposal, wrong-thread retry, and 20+ cycles verified with a deterministic parser fixture."
+    },
+    {
+      "capability": "AudioEngine renderer and look-ahead semantics",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "UPSTREAM_CNA_BLOCKED"],
+      "evidence": "Constructor shape and XNA validation are preserved, but CNA ABI 0.7 ignores rendererId and lookAheadTime."
+    },
+    {
+      "capability": "AudioCategory",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE"],
+      "evidence": "Stable same-engine identity, equality/hash, volume, pause/resume/stop, parent invalidation, and native category ownership verified."
+    },
+    {
+      "capability": "RendererDetail",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE"],
+      "evidence": "XNA value equality/hash/string behavior and real renderer collection enumeration are verified; an empty backend collection is valid."
+    },
+    {
+      "capability": "WaveBank",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE", "UPSTREAM_CNA_BLOCKED", "ASSET_PENDING"],
+      "evidence": "Signature checks, native handles, disposal, parent lifetime, and malformed parser paths are exercised. CNA logs malformed XWB parse failure but still publishes a handle; no legal XNA-authored bank is shipped."
+    },
+    {
+      "capability": "SoundBank",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE", "UPSTREAM_CNA_BLOCKED", "ASSET_PENDING"],
+      "evidence": "Signature checks, native handles, failed cue lookup, disposal, and parent lifetime are exercised. CNA logs malformed XSB parse failure but still publishes a handle; no legal XNA-authored bank is shipped."
+    },
+    {
+      "capability": "Cue",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "ASSET_PENDING"],
+      "evidence": "Complete state/transport/variable/Apply3D/disposal projection and failed native lookup are verified; successful Cue handle behavior requires an authored bank."
+    },
+    {
+      "capability": "Authored XACT playback",
+      "strictComplete": true,
+      "statuses": ["ASSET_PENDING"],
+      "evidence": "No Microsoft-authored or otherwise legally redistributable XGS/XSB/XWB success fixture is committed. Parser/error/ownership paths do not constitute authored playback qualification."
+    },
+    {
+      "capability": "Host audio backend",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_NATIVE", "BACKEND_BLOCKED"],
+      "evidence": "The qualified artifact is stable with SDL's dummy driver. This sandbox's default PulseAudio route cannot wake its mainloop and is not used as playback evidence."
+    },
+    {
+      "capability": "Native ABI platform coverage",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_NATIVE", "PLATFORM_PENDING"],
+      "evidence": "ABI 0.7 compiler/export probes pass on Linux x86-64; other operating-system/architecture binaries were not measured in this run."
+    },
+    {
+      "capability": "CLR Audio exception delivery",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "LANGUAGE_MAPPING_LIMITATION"],
+      "evidence": "The three public exception identities are projected as marker/error values; ordinary Rust operations use Result<T, CnaError> per the established mapping instead of CLR throw semantics."
+    }
+  ]
+}

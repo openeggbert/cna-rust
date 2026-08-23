@@ -4,7 +4,8 @@ CNA-Rust is an early, measurable safe Rust projection of Microsoft XNA
 Framework 4.0 backed by CNA C++. Its Graphics projection, compressed and
 uncompressed XNB pipeline, Framework device management, Touch/Gesture,
 Storage, GamerServicesComponent, managed Design converters, 2D sprite/font,
-Model graph, stock effects, and typed device/buffer foundations are functional;
+Model graph, stock effects, typed device/buffer foundations, and Audio/XACT
+projection are functional;
 it is **not** yet an XNA-complete binding and does not compile XNA C# source as
 Rust.
 
@@ -45,14 +46,15 @@ hierarchy and deliberate CNA extensions.
 
 ## Verified status (2026-08-23)
 
-- Rust 1.74 workspace format, check, all-feature tests, Clippy, and docs exit
-  zero. Clippy still reports audited compatibility warnings; they are not
-  globally hidden.
+- Rust 1.85 check, all-feature tests, and docs exit zero. This source-tarball
+  toolchain has neither `cargo-fmt` nor `cargo-clippy`, so this run records
+  `RUSTFMT_STATUS=NOT_AVAILABLE` and `CLIPPY_STATUS=NOT_AVAILABLE` rather than
+  claiming either gate passed.
 - XNA 4.0 Windows runtime inventory remains 257 CLR types and 2,964 members;
-  259 Rust types are expected and 216 strict types now exist.
-- Strict diagnostics are 43, all of them missing types. Graphics,
-  Framework/core, Input, Storage, GamerServices, and Design have zero missing
-  types. Only Audio (19) and Media (24) remain. Missing members and
+  259 Rust types are expected and 235 strict types now exist.
+- Strict diagnostics are 24, all of them whole Media types. Graphics,
+  Framework/core, Input, Storage, GamerServices, Design, and Audio have zero
+  missing types. Missing members and
   constructor/overload/property/event mapping mismatches are zero.
   `Game`, `GraphicsDevice`, and `SpriteBatch` each have zero local diagnostics.
   Parameter/signature, disposal, type-kind, base/trait/interface, return,
@@ -87,6 +89,13 @@ hierarchy and deliberate CNA extensions.
   descriptors. No fake ComponentModel hierarchy, arbitrary reflection, or CNA
   ABI route is exposed. Six converters accept XNA component strings; six
   deliberately reject string input while retaining value-string output.
+- All nineteen Audio types are complete. SoundEffect, instances, dynamic PCM,
+  microphone facades, and XACT use reviewed ABI-0.7 routes with explicit
+  ownership and the existing owner-thread FrameworkDispatcher. True
+  multi-listener mixing, renderer/look-ahead fidelity, cross-Game global audio
+  persistence, and malformed-bank failure propagation are recorded CNA
+  blockers; physical capture is hardware pending and authored XACT playback is
+  asset pending. No device, sample, bank, or callback delivery is fabricated.
 - Typed vertex declarations and vertex/index buffers, device binding/draw/
   reset/back-buffer routes, TextureCube, and render targets are complete. CNA
   calls are never replaced by no-ops; HEADLESS limitations are explicit.
@@ -106,18 +115,21 @@ hierarchy and deliberate CNA extensions.
   error 6. OcclusionQuery's real native state machine is verified.
 - `SpriteFont` loads through XNB with one atlas owner, measures strings, and all
   six `DrawString` projections submit native glyph commands.
-- The XNA-derived corpus passes 185 named observations and 186 assertions,
-  including a focused 40-observation Design group.
-- The reviewed ABI slice is 431 functions. It has 1,509 full prototype type
-  positions and 936 independent C/Rust measurements across 56 layouts, five
-  callback signatures, scalar representations, and 243 constants, all with
+- The XNA-derived corpus passes 205 named observations and 206 assertions,
+  including 20 deterministic Audio observations.
+- The reviewed ABI slice is 528 functions. It has 1,862 full prototype type
+  positions and 1,004 independent C/Rust measurements across 61 layouts, six
+  callback signatures, scalar representations, and 253 constants, all with
   zero mismatches.
-- Linux x86-64 HEADLESS validation covers 209 created native game lifetimes,
+- Pre-Audio Linux x86-64 HEADLESS validation covers 209 created native game lifetimes,
   ten buffer-binding cycles, ten SpriteFont/content cycles, ten Effect
   parent/child cycles, ten Model/XNB cycles, and ten stock-effect/Texture3D/
   OcclusionQuery cycles, plus ten Framework/Touch/Storage/GamerServices cycles
-  and isolated callback failure/recreation. The unchanged template remains the
-  native consumer canary.
+  and isolated callback failure/recreation. Dedicated Audio stress adds seven
+  Game lifetimes, at least 75 effect/instance/dynamic cycles, 50 callback
+  deliveries, 60 microphone iterations, 21 engine cycles, and 60 malformed
+  bank constructions. The unchanged template remains the native consumer
+  canary.
 
 `GraphicsDevice` has durable shared identity while its private CNA handle
 remains callback-scoped. Resources retain device association without owning
@@ -200,7 +212,10 @@ See the [normative mapping](docs/xna-rust-mapping.md),
 [Framework evidence](docs/framework-evidence.md),
 [Touch evidence](docs/input-touch-evidence.md),
 [Storage evidence](docs/storage-evidence.md),
-[Design evidence](docs/design-evidence.md), and [measured roadmap](plan.md).
+[Design evidence](docs/design-evidence.md),
+[Audio/XACT evidence](docs/audio-xact-evidence.md),
+[runtime capabilities](docs/runtime-capabilities.md), and
+[measured roadmap](plan.md).
 
 ## Packaging
 

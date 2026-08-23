@@ -178,6 +178,16 @@ pub const CNA_TEXTURE_ADDRESS_MIRROR: CNA_TextureAddressMode = 2;
 pub const CNA_TEXTURE_FILTER_LINEAR: CNA_TextureFilter = 0;
 pub const CNA_TEXTURE_FILTER_POINT: CNA_TextureFilter = 1;
 pub const CNA_TEXTURE_FILTER_ANISOTROPIC: CNA_TextureFilter = 2;
+pub const CNA_AUDIO_CHANNELS_MONO: CNA_AudioChannels = 1;
+pub const CNA_AUDIO_CHANNELS_STEREO: CNA_AudioChannels = 2;
+pub const CNA_SOUND_STATE_PLAYING: CNA_SoundState = 0;
+pub const CNA_SOUND_STATE_PAUSED: CNA_SoundState = 1;
+pub const CNA_SOUND_STATE_STOPPED: CNA_SoundState = 2;
+pub const CNA_AUDIO_STOP_OPTIONS_AS_AUTHORED: CNA_AudioStopOptions = 0;
+pub const CNA_AUDIO_STOP_OPTIONS_IMMEDIATE: CNA_AudioStopOptions = 1;
+pub const CNA_MICROPHONE_STATE_STARTED: CNA_MicrophoneState = 0;
+pub const CNA_MICROPHONE_STATE_STOPPED: CNA_MicrophoneState = 1;
+pub const CNA_AUDIO_ENGINE_CONTENT_VERSION: i32 = 46;
 pub const CNA_TEXTURE_FILTER_LINEAR_MIP_POINT: CNA_TextureFilter = 3;
 pub const CNA_TEXTURE_FILTER_POINT_MIP_LINEAR: CNA_TextureFilter = 4;
 pub const CNA_TEXTURE_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR: CNA_TextureFilter = 5;
@@ -385,6 +395,12 @@ pub type CNA_EffectParameterClass = u32;
 pub type CNA_EffectParameterType = u32;
 pub type CNA_EffectValueType = u32;
 pub type CNA_EffectTextureType = u32;
+pub type CNA_AudioChannels = u32;
+pub type CNA_SoundState = u32;
+pub type CNA_AudioStopOptions = u32;
+pub type CNA_MicrophoneState = u32;
+pub type CNA_AudioEventRegistrationHandle = CNA_Handle;
+pub type CNA_AudioEventCallback = Option<unsafe extern "C" fn(*mut c_void)>;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -1306,6 +1322,69 @@ pub struct CNA_GestureSample {
     pub position2: CNA_Vector2,
     pub delta: CNA_Vector2,
     pub delta2: CNA_Vector2,
+}
+
+#[repr(C)]
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_SoundEffectCreateInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub sample_rate: u32,
+    pub channels: CNA_AudioChannels,
+    pub reserved: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_SoundEffectInstanceInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub state: CNA_SoundState,
+    pub is_looped: CNA_Bool,
+    pub reserved0: [u8; 3],
+    pub volume: f32,
+    pub pitch: f32,
+    pub pan: f32,
+    pub reserved1: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_AudioEmitter {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub doppler_scale: f32,
+    pub forward: CNA_Vector3,
+    pub position: CNA_Vector3,
+    pub up: CNA_Vector3,
+    pub velocity: CNA_Vector3,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_AudioListener {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub forward: CNA_Vector3,
+    pub position: CNA_Vector3,
+    pub up: CNA_Vector3,
+    pub velocity: CNA_Vector3,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_CueInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub is_created: CNA_Bool,
+    pub is_disposed: CNA_Bool,
+    pub is_paused: CNA_Bool,
+    pub is_playing: CNA_Bool,
+    pub is_prepared: CNA_Bool,
+    pub is_preparing: CNA_Bool,
+    pub is_stopped: CNA_Bool,
+    pub is_stopping: CNA_Bool,
 }
 
 pub type cna_get_abi_version_fn = unsafe extern "C" fn() -> u32;
@@ -2425,6 +2504,225 @@ pub type cna_storage_stream_get_can_seek_fn =
     unsafe extern "C" fn(CNA_StorageStreamHandle, *mut CNA_Bool) -> CNA_Result;
 pub type cna_storage_stream_flush_fn = unsafe extern "C" fn(CNA_StorageStreamHandle) -> CNA_Result;
 pub type cna_storage_stream_close_fn = unsafe extern "C" fn(CNA_StorageStreamHandle) -> CNA_Result;
+
+pub type cna_framework_dispatcher_update_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_sound_effect_create_pcm16_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    *const CNA_SoundEffectCreateInfo,
+    *const u8,
+    u64,
+    *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_sound_effect_create_pcm16_range_ext_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    *const CNA_SoundEffectCreateInfo,
+    *const u8,
+    u64,
+    i32,
+    i32,
+    i32,
+    i32,
+    *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_sound_effect_create_from_encoded_ext_fn =
+    unsafe extern "C" fn(CNA_Handle, *const u8, u64, *mut CNA_Handle) -> CNA_Result;
+pub type cna_sound_effect_get_duration_ticks_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut i64) -> CNA_Result;
+pub type cna_sound_effect_create_instance_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Handle) -> CNA_Result;
+pub type cna_sound_effect_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_sound_effect_get_name_size_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut u64) -> CNA_Result;
+pub type cna_sound_effect_copy_name_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_sound_effect_set_name_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_StringView) -> CNA_Result;
+pub type cna_sound_effect_get_master_volume_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut f32) -> CNA_Result;
+pub type cna_sound_effect_set_master_volume_fn =
+    unsafe extern "C" fn(CNA_Handle, f32) -> CNA_Result;
+pub type cna_sound_effect_get_distance_scale_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut f32) -> CNA_Result;
+pub type cna_sound_effect_set_distance_scale_fn =
+    unsafe extern "C" fn(CNA_Handle, f32) -> CNA_Result;
+pub type cna_sound_effect_get_doppler_scale_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut f32) -> CNA_Result;
+pub type cna_sound_effect_set_doppler_scale_fn =
+    unsafe extern "C" fn(CNA_Handle, f32) -> CNA_Result;
+pub type cna_sound_effect_get_speed_of_sound_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut f32) -> CNA_Result;
+pub type cna_sound_effect_set_speed_of_sound_fn =
+    unsafe extern "C" fn(CNA_Handle, f32) -> CNA_Result;
+pub type cna_sound_effect_play_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_sound_effect_play_with_settings_fn =
+    unsafe extern "C" fn(CNA_Handle, f32, f32, f32, *mut CNA_Bool) -> CNA_Result;
+pub type cna_sound_effect_instance_play_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_sound_effect_instance_pause_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_sound_effect_instance_resume_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_sound_effect_instance_stop_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_Bool) -> CNA_Result;
+pub type cna_sound_effect_instance_get_info_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_SoundEffectInstanceInfo) -> CNA_Result;
+pub type cna_sound_effect_instance_set_volume_fn =
+    unsafe extern "C" fn(CNA_Handle, f32) -> CNA_Result;
+pub type cna_sound_effect_instance_set_pitch_fn =
+    unsafe extern "C" fn(CNA_Handle, f32) -> CNA_Result;
+pub type cna_sound_effect_instance_set_pan_fn =
+    unsafe extern "C" fn(CNA_Handle, f32) -> CNA_Result;
+pub type cna_sound_effect_instance_set_is_looped_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_Bool) -> CNA_Result;
+pub type cna_sound_effect_instance_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_sound_effect_instance_apply_3d_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    *const CNA_AudioListener,
+    *const CNA_AudioEmitter,
+) -> CNA_Result;
+pub type cna_sound_effect_instance_apply_3d_multi_ext_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    *const CNA_AudioListener,
+    u64,
+    *const CNA_AudioEmitter,
+) -> CNA_Result;
+pub type cna_dynamic_sound_effect_instance_create_fn =
+    unsafe extern "C" fn(CNA_Handle, i32, CNA_AudioChannels, *mut CNA_Handle) -> CNA_Result;
+pub type cna_dynamic_sound_effect_instance_get_pending_buffer_count_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut i32) -> CNA_Result;
+pub type cna_dynamic_sound_effect_instance_submit_buffer_fn =
+    unsafe extern "C" fn(CNA_Handle, *const u8, u64, i32, i32) -> CNA_Result;
+pub type cna_dynamic_sound_effect_instance_get_sample_duration_ticks_fn =
+    unsafe extern "C" fn(CNA_Handle, i32, *mut i64) -> CNA_Result;
+pub type cna_dynamic_sound_effect_instance_get_sample_size_in_bytes_fn =
+    unsafe extern "C" fn(CNA_Handle, i64, *mut i32) -> CNA_Result;
+pub type cna_dynamic_sound_effect_instance_subscribe_buffer_needed_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    CNA_AudioEventCallback,
+    *mut c_void,
+    *mut CNA_AudioEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_audio_unsubscribe_ext_fn =
+    unsafe extern "C" fn(CNA_AudioEventRegistrationHandle) -> CNA_Result;
+pub type cna_microphone_get_count_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut u64) -> CNA_Result;
+pub type cna_microphone_get_default_index_ext_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut u64, *mut CNA_Bool) -> CNA_Result;
+pub type cna_microphone_get_name_size_at_fn =
+    unsafe extern "C" fn(CNA_Handle, u64, *mut u64) -> CNA_Result;
+pub type cna_microphone_copy_name_at_fn =
+    unsafe extern "C" fn(CNA_Handle, u64, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_microphone_get_buffer_duration_ticks_at_fn =
+    unsafe extern "C" fn(CNA_Handle, u64, *mut i64) -> CNA_Result;
+pub type cna_microphone_set_buffer_duration_ticks_at_fn =
+    unsafe extern "C" fn(CNA_Handle, u64, i64) -> CNA_Result;
+pub type cna_microphone_get_is_headset_at_fn =
+    unsafe extern "C" fn(CNA_Handle, u64, *mut CNA_Bool) -> CNA_Result;
+pub type cna_microphone_get_sample_rate_at_fn =
+    unsafe extern "C" fn(CNA_Handle, u64, *mut i32) -> CNA_Result;
+pub type cna_microphone_get_state_at_fn =
+    unsafe extern "C" fn(CNA_Handle, u64, *mut CNA_MicrophoneState) -> CNA_Result;
+pub type cna_microphone_start_at_fn = unsafe extern "C" fn(CNA_Handle, u64) -> CNA_Result;
+pub type cna_microphone_stop_at_fn = unsafe extern "C" fn(CNA_Handle, u64) -> CNA_Result;
+pub type cna_microphone_get_data_at_fn =
+    unsafe extern "C" fn(CNA_Handle, u64, *mut u8, u64, *mut u64) -> CNA_Result;
+pub type cna_microphone_get_sample_duration_ticks_at_fn =
+    unsafe extern "C" fn(CNA_Handle, u64, i32, *mut i64) -> CNA_Result;
+pub type cna_microphone_get_sample_size_in_bytes_at_fn =
+    unsafe extern "C" fn(CNA_Handle, u64, i64, *mut i32) -> CNA_Result;
+pub type cna_microphone_subscribe_buffer_ready_at_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    u64,
+    CNA_AudioEventCallback,
+    *mut c_void,
+    *mut CNA_AudioEventRegistrationHandle,
+) -> CNA_Result;
+
+pub type cna_audio_engine_create_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_StringView, *mut CNA_Handle) -> CNA_Result;
+pub type cna_audio_engine_create_with_renderer_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    CNA_StringView,
+    i64,
+    CNA_StringView,
+    *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_audio_engine_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_audio_engine_get_renderer_count_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut u64) -> CNA_Result;
+pub type cna_audio_engine_get_renderer_friendly_name_size_fn =
+    unsafe extern "C" fn(CNA_Handle, u64, *mut u64) -> CNA_Result;
+pub type cna_audio_engine_copy_renderer_friendly_name_fn =
+    unsafe extern "C" fn(CNA_Handle, u64, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_audio_engine_get_renderer_id_size_fn =
+    unsafe extern "C" fn(CNA_Handle, u64, *mut u64) -> CNA_Result;
+pub type cna_audio_engine_copy_renderer_id_fn =
+    unsafe extern "C" fn(CNA_Handle, u64, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_audio_engine_get_global_variable_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_StringView, *mut f32) -> CNA_Result;
+pub type cna_audio_engine_set_global_variable_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_StringView, f32) -> CNA_Result;
+pub type cna_audio_engine_update_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_audio_engine_get_category_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_StringView, *mut CNA_Handle) -> CNA_Result;
+pub type cna_audio_category_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_audio_category_get_name_size_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut u64) -> CNA_Result;
+pub type cna_audio_category_copy_name_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_audio_category_pause_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_audio_category_resume_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_audio_category_set_volume_fn =
+    unsafe extern "C" fn(CNA_Handle, f32) -> CNA_Result;
+pub type cna_audio_category_stop_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_AudioStopOptions) -> CNA_Result;
+pub type cna_audio_category_equals_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_Handle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_audio_category_get_hash_code_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut i32) -> CNA_Result;
+pub type cna_wave_bank_create_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_StringView, *mut CNA_Handle) -> CNA_Result;
+pub type cna_wave_bank_create_streaming_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_StringView, i32, i16, *mut CNA_Handle) -> CNA_Result;
+pub type cna_wave_bank_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_wave_bank_get_is_prepared_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_wave_bank_get_is_in_use_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_sound_bank_create_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_StringView, *mut CNA_Handle) -> CNA_Result;
+pub type cna_sound_bank_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_sound_bank_get_is_in_use_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_sound_bank_get_cue_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_StringView, *mut CNA_Handle) -> CNA_Result;
+pub type cna_sound_bank_play_cue_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_StringView) -> CNA_Result;
+pub type cna_sound_bank_play_cue_3d_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    CNA_StringView,
+    *const CNA_AudioListener,
+    *const CNA_AudioEmitter,
+) -> CNA_Result;
+pub type cna_cue_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_cue_get_info_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_CueInfo) -> CNA_Result;
+pub type cna_cue_get_name_size_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut u64) -> CNA_Result;
+pub type cna_cue_copy_name_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_cue_apply_3d_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    *const CNA_AudioListener,
+    *const CNA_AudioEmitter,
+) -> CNA_Result;
+pub type cna_cue_get_variable_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_StringView, *mut f32) -> CNA_Result;
+pub type cna_cue_set_variable_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_StringView, f32) -> CNA_Result;
+pub type cna_cue_play_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_cue_pause_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_cue_resume_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_cue_stop_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_AudioStopOptions) -> CNA_Result;
 
 #[cfg(test)]
 mod layout_tests {

@@ -5,7 +5,7 @@
 ```text
 Rust game
   -> cna::Microsoft::Xna::Framework::*   strict XNA projection
-  -> private family modules              value/input/game/content/graphics
+  -> private family modules              value/input/game/content/graphics/audio
   -> crate-private native bridge         typed safe calls over dynamic symbols
   -> cna_sys                             raw ABI 0.7 declarations
   -> CNA stable C ABI                    cna_* only
@@ -22,14 +22,14 @@ concepts remain under `cna::extensions`.
 ## Native boundary and ABI evidence
 
 `cna-sys` contains the reviewed ABI-0.7 slice: fixed-width aliases, exact
-semantic handle typedefs, `repr(C)` structures, callbacks, constants, and 431
+semantic handle typedefs, `repr(C)` structures, callbacks, constants, and 528
 function-pointer declarations. The
 safe bridge is grouped by concern:
 
 - `native/api.rs`: exact version gate and symbol inventory;
 - `native/loader.rs`: dynamic-library ownership and Unix loading;
 - `native/game.rs`, `graphics.rs`, `display.rs`, `window.rs`, `input.rs`,
-  `device_manager.rs`, and `storage.rs`: typed facade calls;
+  `device_manager.rs`, `storage.rs`, and `audio.rs`: typed facade calls;
 - `native/fault.rs`: feature-gated, test-only failure injection;
 - `native/error.rs`: CNA error extraction.
 
@@ -41,9 +41,9 @@ The ABI verifier derives full C prototypes from Clang's view of canonical CNA
 headers and compares them with every reviewed `cna-sys` function type. It
 measures return and parameter types, scalar width/signedness, pointer depth and
 constness, callback/struct pointers, and boolean/enum representations. The
-current pass checks 431 functions and 1,509 prototype type positions.
-Independent C and Rust probes make 936 measurements across 56 structures, five
-callback signatures, scalar representations, and 243 constants, with zero
+current pass checks 528 functions and 1,862 prototype type positions.
+Independent C and Rust probes make 1,004 measurements across 61 structures,
+six callback signatures, scalar representations, and 253 constants, with zero
 mismatches.
 
 ## Durable device identity
@@ -353,6 +353,38 @@ states, resource behavior, and real CNA application routes. CNA and XNA assign
 opposite C numeric identities to `BlendFunction.Min`/`Max`; the private bridge
 performs an explicit translation while the public XNA enum values remain exact.
 
+## Audio/XACT ownership and dispatch
+
+Audio uses one per-Game generation registry for native cleanup and callback
+invalidation; it does not introduce ambient Game state. SoundEffect owns one
+native root, and every SoundEffectInstance owns one native instance while
+strongly retaining its effect state. DynamicSoundEffectInstance composes that
+same instance state instead of wrapping the native handle a second time.
+
+AudioEngine owns the XACT root. AudioCategory is a parent-owned stable facade;
+WaveBank and SoundBank are owned children retaining the engine, and Cue retains
+the SoundBank plus engine/native dependency state. Explicit disposal and Drop
+are idempotent. If CNA refuses wrong-thread destruction, the state keeps the
+handle intact for a later owner-thread retry. Shutdown releases live Audio
+children before destroying their Game parent.
+
+Native BufferNeeded and microphone notification trampolines catch panic and
+enqueue only weakly referenced work. Arbitrary handlers execute through the
+existing owner-thread FrameworkDispatcher pump after a successful Game Update;
+there is no Audio-specific worker or second event pump. Subscription snapshots
+preserve order, duplicates, self-removal, and reentrant submission. Native
+registrations are detached before invalidation, so queued work cannot
+resurrect disposed objects or a previous Game generation.
+
+SoundEffect's four process-static values still call real CNA routes. The
+qualified CNA artifact resets them on Game recreation unlike XNA's persistent
+process state, which is reported as an upstream blocker rather than masked by
+a Rust shadow global. Likewise, multiple-listener Apply3D returns
+UnsupportedRuntime because CNA only accepts one listener; AudioEngine
+renderer/look-ahead values are validated and forwarded even though CNA ignores
+them. Physical microphone capture and authored XACT playback remain
+hardware/asset qualification gaps, not structural gaps.
+
 ## Verification and fault evidence
 
 The API verifier hashes all seven XNA 4.0 Windows runtime assemblies, extracts
@@ -361,20 +393,22 @@ compiler-produced rustdoc JSON. Schema 2 measures every declared structural
 category and emits the deterministic type scoreboard. `unmeasuredCategories`
 and the allowlist are empty; the leak-only public-surface gate is zero.
 
-The XNA-derived managed corpus has 185 named observations plus a final count
-assertion (186 assertions total). The 40-observation Design group covers
-capabilities, ordered metadata/extraction, component cultures, malformed and
-wrong inputs, creation, Matrix's Translation asymmetry, nested snapshots, and
-all reconstruction identities. The earlier platform-neutral groups cover
-Gesture flags/samples and device-information default/reference/clone behavior. The
-native suite uses isolated child processes for 209 created game lifetimes and
+The XNA-derived managed corpus has 205 named observations plus a final count
+assertion (206 assertions total). Twenty Audio observations cover enums,
+listener/emitter values, binary32 sample arithmetic, instance defaults and
+cached disposal behavior, and microphone sample arithmetic. Backend/hardware
+state and callback timing remain native qualification. The pre-Audio native
+suite uses isolated child processes for 209 created game lifetimes and
 1,012 owned child-handle constructions, including ten buffer binding cycles,
 ten SpriteFont atlas/content cycles, ten Effect parent/child cycles, ten
 complete compressed Model/XNB cycles, ten stock-effect/Texture3D/
 OcclusionQuery cycles, ten combined Framework/Touch/Storage/GamerServices
 cycles, repeated dispose/drop, live-child parent shutdown, stable identities,
 callback self-removal/panic/recreation, transfer validation, and injected
-failures. Absence of a crash is not a leak proof.
+failures. Dedicated Audio stress adds at least 75 effect, 75 instance, 75
+dynamic, 50 callback, 60 microphone, 21 engine, and 60 malformed-bank cycles,
+including wrong-thread refusal and owner-thread retry. Absence of a crash is
+not a leak proof.
 `tools/native-stress/run-sanitized.sh` is an optional path requiring a
 separately instrumented exact ABI-0.7 CNA library. Sanitizer status is
 `not-run`; no sanitizer pass is claimed for the current run.
@@ -386,10 +420,9 @@ its unmodified C API build at `CnaCApiCoreExt.cpp:250`: the renderer identity
 assertion reduces to `49 == 50`. Runtime evidence therefore uses the clearly
 labelled experimental ABI-0.7 HEADLESS library.
 
-Graphics, Framework/core, Input, Storage, GamerServices, and Design have zero
-missing types. Every remaining strict diagnostic is a whole missing type in
-Audio (19) or Media (24); each is a separate future milestone requiring its
-own regenerated dependency/ownership review. LZX is complete for XNA 4.0
-Windows framing. Repeated frame hosting still needs a CNA core-callback-context
-rebinding route. PNG decoding remains a texture route, not an alias for XNB
-content.
+Graphics, Framework/core, Input, Storage, GamerServices, Design, and Audio have
+zero missing types. Every remaining strict diagnostic is one of the 24 whole
+Media types; Media is the final separate milestone. LZX is complete for XNA
+4.0 Windows framing. Repeated frame hosting still needs a CNA
+core-callback-context rebinding route. PNG decoding remains a texture route,
+not an alias for XNB content.

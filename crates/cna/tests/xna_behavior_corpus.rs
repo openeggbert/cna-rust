@@ -20,6 +20,10 @@ use cna::Microsoft::Xna::Framework::Design::{
     MatrixConverter, PlaneConverter, PointConverter, QuaternionConverter, RayConverter,
     RectangleConverter, Vector2Converter, Vector3Converter, Vector4Converter,
 };
+use cna::Microsoft::Xna::Framework::Audio::{
+    AudioChannels, AudioEmitter, AudioListener, AudioStopOptions, MicrophoneState, SoundEffect,
+    SoundState,
+};
 use cna::Microsoft::Xna::Framework::Graphics::PackedVector::{
     Alpha8, Bgra5551, Byte4, HalfSingle, NormalizedByte2, Short2,
 };
@@ -2012,5 +2016,90 @@ fn pinned_xna_math_observations() {
         ("{X:0 Y:0}".to_owned(), true, true)
     );
 
-    assert_eq!(observations, 185);
+    observe!(
+        (
+            AudioChannels::Mono as i32,
+            AudioChannels::Stereo as i32,
+            AudioStopOptions::AsAuthored as i32,
+            AudioStopOptions::Immediate as i32,
+            SoundState::Playing as i32,
+            SoundState::Paused as i32,
+            SoundState::Stopped as i32,
+            MicrophoneState::Started as i32,
+            MicrophoneState::Stopped as i32,
+        ),
+        (1, 2, 0, 1, 0, 1, 2, 0, 1)
+    );
+    let listener = AudioListener::new();
+    observe!(listener.Position(), Vector3::Zero);
+    observe!(listener.Velocity(), Vector3::Zero);
+    observe!(listener.Forward(), Vector3::Forward);
+    observe!(listener.Up(), Vector3::Up);
+    let mut emitter = AudioEmitter::new();
+    observe!(emitter.Position(), Vector3::Zero);
+    observe!(emitter.Velocity(), Vector3::Zero);
+    observe!(emitter.Forward(), Vector3::Forward);
+    observe!(emitter.Up(), Vector3::Up);
+    observe!(bits(emitter.DopplerScale()), 0x3f80_0000);
+    observe!(
+        catch_unwind(AssertUnwindSafe(|| emitter.SetDopplerScale(-1.0))).is_err(),
+        true
+    );
+    emitter.SetDopplerScale(f32::NAN);
+    observe!(emitter.DopplerScale().is_nan(), true);
+    emitter.SetDopplerScale(-0.0);
+    observe!(bits(emitter.DopplerScale()), 0x8000_0000);
+    observe!(
+        SoundEffect::GetSampleDuration(88_200, 44_100, AudioChannels::Mono),
+        TimeSpan::FromSeconds(1.0)
+    );
+    observe!(
+        SoundEffect::GetSampleSizeInBytes(
+            TimeSpan::FromSeconds(1.0),
+            44_100,
+            AudioChannels::Mono,
+        ),
+        88_198
+    );
+    observe!(
+        SoundEffect::GetSampleSizeInBytes(
+            TimeSpan::FromSeconds(1.0),
+            44_100,
+            AudioChannels::Stereo,
+        ),
+        176_400
+    );
+    observe!(
+        SoundEffect::GetSampleDuration(1, 44_100, AudioChannels::Mono),
+        TimeSpan::Zero
+    );
+    observe!(
+        SoundEffect::GetSampleSizeInBytes(TimeSpan::Zero, 8_000, AudioChannels::Mono),
+        0
+    );
+    observe!(
+        SoundEffect::GetSampleSizeInBytes(
+            TimeSpan::FromMilliseconds(10.0),
+            8_000,
+            AudioChannels::Mono,
+        ),
+        160
+    );
+    observe!(
+        (
+            catch_unwind(|| {
+                SoundEffect::GetSampleSizeInBytes(
+                    TimeSpan::from_ticks(-1),
+                    8_000,
+                    AudioChannels::Mono,
+                )
+            })
+            .is_err(),
+            catch_unwind(|| SoundEffect::GetSampleDuration(2, 7_999, AudioChannels::Mono))
+                .is_err(),
+        ),
+        (true, true)
+    );
+
+    assert_eq!(observations, 205);
 }

@@ -5,6 +5,7 @@
 mod content;
 mod design;
 mod error;
+mod audio;
 mod game;
 mod graphics;
 mod input;
@@ -17,6 +18,12 @@ pub use content::{
     ContentDisposable, ContentDisposableRecorder, ContentLoadable, ContentManagerBase,
     ContentReaderBase, ContentReaderExt, ContentResourceProvider, ContentTypeReaderBase,
     ContentTypeReaderRegistration, ContentTypeReaderRegistry, SerializationInfo, StreamingContext,
+};
+pub use audio::{
+    AudioCategory, AudioChannels, AudioEmitter, AudioEngine, AudioListener, AudioStopOptions, Cue,
+    DynamicSoundEffectInstance, InstancePlayLimitException, Microphone, MicrophoneState,
+    NoAudioHardwareException, NoMicrophoneConnectedException, RendererDetail, SoundBank,
+    SoundEffect, SoundEffectInstance, SoundEffectInstanceBase, SoundState, WaveBank,
 };
 pub use design::{
     DesignConstructor, DesignConversion, DesignCulture, DesignInstanceDescriptor,
@@ -149,6 +156,17 @@ pub mod Microsoft {
             pub mod Storage {
                 pub use crate::storage::{
                     StorageContainer, StorageDevice, StorageDeviceNotConnectedException,
+                };
+            }
+
+            #[allow(non_snake_case)]
+            pub mod Audio {
+                pub use crate::audio::{
+                    AudioCategory, AudioChannels, AudioEmitter, AudioEngine, AudioListener,
+                    AudioStopOptions, Cue, DynamicSoundEffectInstance,
+                    InstancePlayLimitException, Microphone, MicrophoneState,
+                    NoAudioHardwareException, NoMicrophoneConnectedException, RendererDetail,
+                    SoundBank, SoundEffect, SoundEffectInstance, SoundState, WaveBank,
                 };
             }
         }

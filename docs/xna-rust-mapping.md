@@ -42,6 +42,10 @@ would collide after Rust removes CLR arity notation, the generic name gains
 `OfT`, `OfT1T2`, and so on. The two current profile collisions are encoded in
 `mapping-rules.json`, not an allowlist.
 
+`Audio.RendererDetail` is an XNA value type whose public identity contains two
+runtime-owned strings. It therefore maps to a non-`Copy` Rust value with copied
+string properties; this ownership rule is explicit in `mapping-rules.json`.
+
 CLR structs map to Rust structs. A nested CLR type whose enclosing type occupies
 Rust's type namespace is flattened into the same XNA namespace using the
 deterministic concatenation `OuterInner` (for example,
@@ -87,6 +91,16 @@ mapping injects `graphicsDevice: &GraphicsDevice` as an explicit context
 parameter. This applies to `GraphicsAdapter` static adapter/preference
 properties and is encoded in `mapping-rules.json`. It does not authorize an
 untracked handle or implicit global device.
+
+Audio uses the same explicit-context rule. `SoundEffect` and
+`DynamicSoundEffectInstance` constructors, `SoundEffect.FromStream`, the four
+process-global `SoundEffect` settings, microphone enumeration/default lookup,
+`AudioEngine` constructors, and `FrameworkDispatcher.Update` receive
+`game: &GameContext`. CNA ABI 0.7 requires a game handle for ownership or thread
+affinity, while CNA-Rust intentionally has no ambient current-game singleton.
+Calls that can reach native Audio/XACT state return `Result`; the pure
+binary32 sample arithmetic and cached disposed/value properties remain
+infallible.
 
 A read-only instance property `Foo` maps to `Foo(&self)`. A read/write property
 maps to `Foo(&self)` and `SetFoo(&mut self, value)`. A natural borrowed result is
@@ -137,6 +151,14 @@ The verifier checks each reference base/interface edge against
 the corresponding trait implementation or declared composition relation.
 Borrowed reflected children retain their parent with a borrow or shared owner;
 they never destroy a parent-owned handle.
+
+`DynamicSoundEffectInstance : SoundEffectInstance` is projected through the
+crate-root `SoundEffectInstanceBase` contract and one composed instance state;
+there is never a second native owner. `AudioCategory` is a CLR value type, but
+its ABI-0.7 representation is an owned category handle tied to an engine. Its
+Rust value is consequently non-`Copy`; `Clone`/equality preserve category value
+semantics by sharing the one safe facade rather than duplicating native
+ownership.
 
 ## Game
 
@@ -210,6 +232,14 @@ only when XNA exposes array semantics. Named XNA collections receive wrapper
 types preserving mutation and read-only rules, with `IntoIterator`, `Index`,
 and `AsRef<[T]>` added only when behavior remains equivalent. Native array
 storage is never exposed directly.
+
+The two selected read-only Audio collections have no separately selected CLR
+collection type. `AudioEngine.RendererDetails` therefore returns an owned
+`Vec<RendererDetail>`, and `Microphone.All` returns
+`Vec<Arc<Self>>` (that is, `Vec<Arc<Microphone>>`). `Microphone.Default`
+returns `Option<Arc<Self>>`; an empty native enumeration is not an error and no
+synthetic device is inserted. Repeated enumeration reuses each game
+generation's stable microphone facade identity.
 
 ## Design-time math converters
 

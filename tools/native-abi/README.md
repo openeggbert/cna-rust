@@ -2,10 +2,10 @@
 
 `bindings.json` inventories the reviewed declarations used by the implemented
 Rust projection in `cna-rust-sys`, including the qualified Framework device
-management, Touch, and Storage routes. The verifier uses canonical CNA headers
-plus Clang's AST as the C prototype authority and compares every reviewed
-function with its Rust function-pointer alias. It checks return and parameter
-types, count, scalar width/signedness, pointer depth/constness where
+management, Touch, Storage, and Audio/XACT routes. The verifier uses canonical
+CNA headers plus Clang's AST as the C prototype authority and compares every
+reviewed function with its Rust function-pointer alias. It checks return and
+parameter types, count, scalar width/signedness, pointer depth/constness where
 representable, callback and structure pointer types, and boolean/enum/flag
 representation.
 
@@ -23,17 +23,17 @@ python3 tools/native-abi/verify.py \
 Current reviewed ABI-0.7 evidence is:
 
 ```text
-reviewed functions                   431
-prototype functions checked          431
-prototype type measurements         1509
-layout types                          56
-callback signatures                    5
-constants                            243
-all C/Rust measurements              936
+reviewed functions                   528
+prototype functions checked          528
+prototype type measurements         1862
+layout types                          61
+callback signatures                    6
+constants                            253
+all C/Rust measurements             1004
 mismatches                             0
 ```
 
-The 431-function slice is intentionally smaller than CNA's 2,861 exported C
+The 528-function slice is intentionally smaller than CNA's 2,861 exported C
 functions. It is a reviewed foundation, not a completeness claim. Every new
 safe native facade route must add its raw declaration and enter this manifest.
 The checked library must report exactly ABI `0x00000700`; ABI 0.8 is not

@@ -4,14 +4,16 @@ use std::fs::File;
 use std::io::Read;
 
 use crate::error::{CnaError, Result};
+use super::GameContext;
 
 /// Pumps framework services that have a managed Rust dispatcher.
 pub struct FrameworkDispatcher;
 
 impl FrameworkDispatcher {
-    pub fn Update() {
-        // Audio, media and gamer-services dispatchers are not yet present.
-        // With no registered framework dispatcher, XNA has no work to do.
+    pub fn Update(game: &GameContext<'_>) -> Result<()> {
+        let (native, handle) = game.native_game();
+        native.framework_dispatcher_update(handle)?;
+        game.audio_runtime().dispatch_pending()
     }
 }
 

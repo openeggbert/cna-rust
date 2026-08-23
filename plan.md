@@ -25,9 +25,9 @@ MSRV: Rust 1.74
 | XNA reference types | 257 | 257 |
 | XNA reference members | 2,964 | 2,964 |
 | expected mapped Rust types | 259 | 259 |
-| actual strict Rust types | 203 | 216 |
-| total diagnostics | 56 | 43 |
-| missing types | 56 | 43 |
+| actual strict Rust types | 226 | 235 |
+| total diagnostics | 33 | 24 |
+| missing types | 33 | 24 |
 | missing members | 0 | 0 |
 
 Constructor, overload, property, event, base projection, trait, interface,
@@ -36,7 +36,7 @@ delegate, disposal, unexpected type/member, type-kind, internal-type leak,
 raw-handle leak, public unsafe API, allowlist, and unmeasured-category counts
 are all zero.
 
-The 43 diagnostics are only whole missing types:
+The 24 diagnostics are only whole missing types:
 
 ```text
 Graphics           0
@@ -45,7 +45,7 @@ Input               0
 Storage             0
 GamerServices       0
 Design              0
-Audio              19
+Audio               0
 Media              24
 ```
 
@@ -89,10 +89,22 @@ Media              24
   and template source are unchanged.
 - [x] Rechecked repeated RunOneFrame/Tick and canonical CNA HEAD without
   weakening the milestone. Both external blockers remain documented below.
+- [x] Completed all nineteen Audio types, including real SoundEffect/instance,
+  dynamic PCM, microphone, and XACT routes. All ownership is explicit and no
+  native-backed public shell, fake device, sample, bank, or playback result is
+  used.
+- [x] Integrated BufferNeeded and microphone notification lifetimes with the
+  existing Game/FrameworkDispatcher owner-thread pump. Native trampolines only
+  enqueue weakly referenced work and contain panic at FFI boundaries.
+- [x] Added compiler-verified Audio ABI declarations, crash-isolated ownership
+  stress, deterministic WAV/XGS parser fixtures, and a machine-readable
+  capability inventory that separates CNA, backend, hardware, asset, language,
+  and platform limits.
 
 Focused evidence lives in `docs/lzx-xnb-evidence.md`,
 `docs/framework-evidence.md`, `docs/input-touch-evidence.md`,
-`docs/storage-evidence.md`, and `docs/design-evidence.md`.
+`docs/storage-evidence.md`, `docs/design-evidence.md`, and
+`docs/audio-xact-evidence.md`.
 
 ## Ownership and callback model
 
@@ -129,37 +141,53 @@ abstractions replace the observable TypeConverter vocabulary without exposing
 pointers. Property order is immutable, creation performs explicit name lookup,
 and nested values are snapshots.
 
+Audio resource ownership is `SoundEffect -> SoundEffectInstance`, with a
+dynamic instance composing the same single native-instance state. Instances
+strongly retain their effect dependency. AudioEngine is an owned XACT root;
+AudioCategory is a parent-owned facade, while WaveBank and SoundBank are owned
+children retaining the engine and Cue retains the engine/bank dependencies CNA
+requires. Explicit Dispose and Drop are idempotent; wrong-thread refusal keeps
+the native handle for owner-thread retry.
+
+Dynamic BufferNeeded and microphone registrations never execute arbitrary
+Rust on a native worker. Their FFI trampolines catch panic and enqueue weakly
+owned work into the existing FrameworkDispatcher pump. Shutdown unregisters
+native callbacks before invalidation, and the queue cannot resurrect a dead
+Game or Audio object.
+
 ## Measured evidence
 
 | Measurement | Previous | Current |
 |---|---:|---:|
-| named XNA-derived observations | 145 | 185 |
-| assertions including final count | 146 | 186 |
+| named XNA-derived observations | 185 | 205 |
+| assertions including final count | 186 | 206 |
 | behavior failures | 0 | 0 |
-| reviewed ABI functions | 431 | 431 |
-| prototype type positions | 1,509 | 1,509 |
-| independent C/Rust ABI measurements | 936 | 936 |
-| layouts / callbacks / constants | 56 / 5 / 243 | 56 / 5 / 243 |
+| reviewed ABI functions | 431 | 528 |
+| prototype type positions | 1,509 | 1,862 |
+| independent C/Rust ABI measurements | 936 | 1,004 |
+| layouts / callbacks / constants | 56 / 5 / 243 | 61 / 6 / 253 |
 | ABI mismatches | 0 | 0 |
 | native game lifetimes with a created game | 209 | 209 |
 | owned native child-handle constructions | 1,012 | 1,012 |
 | native crashes / observed double-free or UAF | 0 / 0 | 0 / 0 |
 
-The 40 new Design observations cover capability support, every property shape,
-string culture and error behavior, creation, Matrix asymmetry, nested snapshot
-semantics, constructor identities, descriptor execution, and deterministic
-base/map failures. Storage filesystem, hardware Touch, and native lifecycle
-transitions stay in native qualification rather than being mislabeled as
-neutral golden data.
+The 20 new Audio observations cover exact enum/value behavior, listener and
+emitter defaults, binary32 sample arithmetic, instance validation/caching, and
+microphone sample arithmetic. NULL-backend behavior, hardware absence,
+playback timing, callbacks, and XACT fixture failures remain native
+qualification rather than neutral golden data.
 
 The native handle total is derived from explicit constructors: each of ten
 small-family cycles adds one manager, six manager registrations, one storage
 device, one container, one container registration, and one stream (110); the
 process-wide DeviceChanged registration adds one; the isolated callback-panic
 case adds one manager plus six registrations and one selector device (8).
-Thus `893 + 110 + 1 + 8 = 1,012`. Design creates no handles, so the suite
-remains at 209 created Game lifetimes and 1,012 child constructions. Sanitizer
-status remains `not-run`; crash absence is not a leak proof.
+Thus `893 + 110 + 1 + 8 = 1,012` for the pre-Audio suite. Dedicated Audio
+stress additionally covers at least 75 effects, 75 instances, 75 dynamics, 50
+callback deliveries, 60 microphone iterations, 21 engines, and 60 malformed
+bank constructions across crash-isolated Game lifetimes. Native crashes and
+observed double-free/UAF remain zero. Sanitizer status remains `not-run`;
+crash absence is not a leak proof.
 
 ## External blockers
 
@@ -181,15 +209,10 @@ or unsupported mutation is used.
 
 ## Next dependency-ordered work
 
-This milestone stops here. The only remaining selected families are separate
-future milestones:
-
-1. Audio (19)
-2. Media (24)
-
-Each requires its own regenerated native dependency/ownership/callback review.
-Do not reopen completed Graphics, Framework/core, Input, Storage,
-GamerServices, Design, or LZX merely to begin one of them.
+Audio stops here at zero. The only remaining selected family is Media (24), a
+separate final milestone. Do not reopen completed Graphics, Framework/core,
+Input, Storage, GamerServices, Design, Audio, Content/XNB, or LZX without a
+concrete regression.
 
 ## Definition of complete compatibility
 

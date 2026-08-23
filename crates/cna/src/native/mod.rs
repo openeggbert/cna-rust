@@ -1,6 +1,7 @@
 //! Audited dynamic C ABI boundary, partitioned by native concern.
 
 mod api;
+mod audio;
 mod device_manager;
 mod display;
 mod error;

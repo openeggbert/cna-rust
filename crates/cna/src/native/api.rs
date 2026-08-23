@@ -7,11 +7,13 @@ use cna_sys as sys;
 use crate::error::{CnaError, Result};
 
 use super::loader::{library_candidates, Library};
+use super::audio::AudioApi;
 
 #[derive(Debug)]
 pub(crate) struct Native {
     #[cfg(unix)]
     pub(super) _library: Library,
+    pub(super) audio: AudioApi,
     pub(super) error_get_last_message_size: sys::cna_error_get_last_message_size_fn,
     pub(super) error_copy_last_message: sys::cna_error_copy_last_message_fn,
     pub(super) game_create: sys::cna_game_create_fn,
@@ -2206,6 +2208,7 @@ impl Native {
                 "cna_storage_stream_close",
                 sys::cna_storage_stream_close_fn
             ),
+            audio: AudioApi::load(&library)?,
             _library: library,
         })
     }

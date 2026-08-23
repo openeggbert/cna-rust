@@ -70,6 +70,7 @@
     "Microsoft.Xna.Framework.Graphics.DynamicIndexBuffer": "IndexBufferBase",
     "Microsoft.Xna.Framework.Graphics.RenderTarget2D": "Texture2DBase",
     "Microsoft.Xna.Framework.Graphics.RenderTargetCube": "TextureCubeBase"
+    ,"Microsoft.Xna.Framework.Audio.DynamicSoundEffectInstance": "SoundEffectInstanceBase"
     ,"Microsoft.Xna.Framework.Graphics.EffectMaterial": "EffectBase"
     ,"Microsoft.Xna.Framework.Graphics.BasicEffect": "EffectBase"
     ,"Microsoft.Xna.Framework.Graphics.AlphaTestEffect": "EffectBase"
@@ -230,7 +231,17 @@
     "Microsoft.Xna.Framework.Input.Touch.TouchPanel::*",
     "Microsoft.Xna.Framework.GraphicsDeviceManager::*",
     "Microsoft.Xna.Framework.Storage.StorageDevice::*",
-    "Microsoft.Xna.Framework.Storage.StorageContainer::*"
+    "Microsoft.Xna.Framework.Storage.StorageContainer::*",
+    "Microsoft.Xna.Framework.FrameworkDispatcher::Update",
+    "Microsoft.Xna.Framework.Audio.SoundEffect::*",
+    "Microsoft.Xna.Framework.Audio.SoundEffectInstance::*",
+    "Microsoft.Xna.Framework.Audio.DynamicSoundEffectInstance::*",
+    "Microsoft.Xna.Framework.Audio.Microphone::*",
+    "Microsoft.Xna.Framework.Audio.AudioEngine::*",
+    "Microsoft.Xna.Framework.Audio.AudioCategory::*",
+    "Microsoft.Xna.Framework.Audio.WaveBank::*",
+    "Microsoft.Xna.Framework.Audio.SoundBank::*",
+    "Microsoft.Xna.Framework.Audio.Cue::*"
   ],
   "fallibleExclusions": [
     "Microsoft.Xna.Framework.Content.ContentReader::ContentManager",
@@ -239,7 +250,29 @@
     "Microsoft.Xna.Framework.Graphics.GraphicsDevice::Finalize",
     "Microsoft.Xna.Framework.GraphicsDeviceManager::.ctor",
     "Microsoft.Xna.Framework.Storage.StorageContainer::IsDisposed",
-    "Microsoft.Xna.Framework.Storage.StorageContainer::Finalize"
+    "Microsoft.Xna.Framework.Storage.StorageContainer::Finalize",
+    "Microsoft.Xna.Framework.Audio.SoundEffect::IsDisposed",
+    "Microsoft.Xna.Framework.Audio.SoundEffect::Finalize",
+    "Microsoft.Xna.Framework.Audio.SoundEffect::GetSampleDuration",
+    "Microsoft.Xna.Framework.Audio.SoundEffect::GetSampleSizeInBytes",
+    "Microsoft.Xna.Framework.Audio.SoundEffectInstance::IsDisposed",
+    "Microsoft.Xna.Framework.Audio.SoundEffectInstance::Volume",
+    "Microsoft.Xna.Framework.Audio.SoundEffectInstance::Pitch",
+    "Microsoft.Xna.Framework.Audio.SoundEffectInstance::Pan",
+    "Microsoft.Xna.Framework.Audio.SoundEffectInstance::IsLooped",
+    "Microsoft.Xna.Framework.Audio.SoundEffectInstance::Finalize",
+    "Microsoft.Xna.Framework.Audio.Microphone::Finalize",
+    "Microsoft.Xna.Framework.Audio.AudioEngine::IsDisposed",
+    "Microsoft.Xna.Framework.Audio.AudioEngine::Finalize",
+    "Microsoft.Xna.Framework.Audio.AudioCategory::Name",
+    "Microsoft.Xna.Framework.Audio.AudioCategory::ToString",
+    "Microsoft.Xna.Framework.Audio.AudioCategory::Equals",
+    "Microsoft.Xna.Framework.Audio.WaveBank::IsDisposed",
+    "Microsoft.Xna.Framework.Audio.WaveBank::Finalize",
+    "Microsoft.Xna.Framework.Audio.SoundBank::IsDisposed",
+    "Microsoft.Xna.Framework.Audio.SoundBank::Finalize",
+    "Microsoft.Xna.Framework.Audio.Cue::IsDisposed",
+    "Microsoft.Xna.Framework.Audio.Cue::Finalize"
   ],
   "mutableReceiverMembers": [
     "*::Dispose",
@@ -272,6 +305,7 @@
     "Microsoft.Xna.Framework.Graphics.SamplerStateCollection::*",
     "Microsoft.Xna.Framework.Graphics.TextureCollection::*"
     ,"Microsoft.Xna.Framework.Graphics.DirectionalLight::*"
+    ,"Microsoft.Xna.Framework.Audio.Microphone::*"
   ],
   "parameterTypeOverrides": {
     "Microsoft.Xna.Framework.Content.ContentManager::.ctor::serviceProvider": "Arc<dyn ServiceProvider>",
@@ -388,6 +422,9 @@
     ,"Microsoft.Xna.Framework.Graphics.ModelMeshPart::Tag": "Option<Arc<dyn Any+Send+Sync>>"
     ,"Microsoft.Xna.Framework.Graphics.ModelMeshPart::Effect": "Option<Arc<dyn EffectBase>>"
     ,"Microsoft.Xna.Framework.Graphics.ModelEffectCollection+Enumerator::Current": "Arc<dyn EffectBase>"
+    ,"Microsoft.Xna.Framework.Audio.AudioEngine::RendererDetails": "Vec<Audio::RendererDetail>"
+    ,"Microsoft.Xna.Framework.Audio.Microphone::All": "Vec<Arc<Self>>"
+    ,"Microsoft.Xna.Framework.Audio.Microphone::Default": "Option<Arc<Self>>"
   },
   "contextInjectedMembers": {
     "Microsoft.Xna.Framework.Graphics.GraphicsAdapter::UseReferenceDevice": [
@@ -433,6 +470,96 @@
       }
     ],
     "Microsoft.Xna.Framework.Input.Touch.TouchPanel::*": [
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
+    ],
+    "Microsoft.Xna.Framework.FrameworkDispatcher::Update": [
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
+    ],
+    "Microsoft.Xna.Framework.Audio.SoundEffect::.ctor": [
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
+    ],
+    "Microsoft.Xna.Framework.Audio.SoundEffect::FromStream": [
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
+    ],
+    "Microsoft.Xna.Framework.Audio.SoundEffect::MasterVolume": [
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
+    ],
+    "Microsoft.Xna.Framework.Audio.SoundEffect::SetMasterVolume": [
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
+    ],
+    "Microsoft.Xna.Framework.Audio.SoundEffect::SpeedOfSound": [
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
+    ],
+    "Microsoft.Xna.Framework.Audio.SoundEffect::SetSpeedOfSound": [
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
+    ],
+    "Microsoft.Xna.Framework.Audio.SoundEffect::DopplerScale": [
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
+    ],
+    "Microsoft.Xna.Framework.Audio.SoundEffect::SetDopplerScale": [
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
+    ],
+    "Microsoft.Xna.Framework.Audio.SoundEffect::DistanceScale": [
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
+    ],
+    "Microsoft.Xna.Framework.Audio.SoundEffect::SetDistanceScale": [
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
+    ],
+    "Microsoft.Xna.Framework.Audio.DynamicSoundEffectInstance::.ctor": [
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
+    ],
+    "Microsoft.Xna.Framework.Audio.Microphone::All": [
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
+    ],
+    "Microsoft.Xna.Framework.Audio.Microphone::Default": [
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
+    ],
+    "Microsoft.Xna.Framework.Audio.AudioEngine::.ctor": [
       {
         "name": "game",
         "type": "&GameContext"
@@ -792,6 +919,8 @@
     "Microsoft.Xna.Framework.Graphics.Texture": "trait"
   },
   "nonCopyStructProjections": [
+    "Microsoft.Xna.Framework.Audio.RendererDetail",
+    "Microsoft.Xna.Framework.Audio.AudioCategory",
     "Microsoft.Xna.Framework.Graphics.VertexBufferBinding",
     "Microsoft.Xna.Framework.Graphics.RenderTargetBinding",
     "Microsoft.Xna.Framework.Graphics.ModelBoneCollection+Enumerator",
