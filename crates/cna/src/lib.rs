@@ -9,6 +9,7 @@ mod graphics;
 mod input;
 mod native;
 mod packed;
+mod storage;
 mod value;
 
 pub use content::{
@@ -26,6 +27,10 @@ pub use graphics::{
     EffectParameterDescriptor, EffectTechniqueDescriptor, IndexBufferBase, IndexData,
     Texture2DBase, Texture3DData, TextureCubeBase, TextureRuntime, VertexBufferBase, VertexData,
 };
+pub use storage::{
+    FileAccess, FileMode, FileShare, StorageAsyncCallback, StorageAsyncResult, StorageAsyncState,
+    StorageStream,
+};
 
 /// XNA 4.0 compatibility hierarchy. Casing intentionally follows XNA.
 #[allow(non_snake_case)]
@@ -35,8 +40,10 @@ pub mod Microsoft {
             pub use crate::game::{
                 DisplayOrientation, DrawableGameComponent, FrameworkDispatcher, Game,
                 GameComponent, GameComponentCollection, GameComponentCollectionEventArgs,
-                GameContext, GameServiceContainer, GameTime, GameWindow, IDrawable, IGameComponent,
-                IUpdateable, LaunchParameters, TimeSpan, TitleContainer,
+                GameContext, GameServiceContainer, GameTime, GameWindow, GraphicsDeviceInformation,
+                GraphicsDeviceManager, IDrawable, IGameComponent, IGraphicsDeviceManager,
+                IUpdateable, LaunchParameters, PreparingDeviceSettingsEventArgs, TimeSpan,
+                TitleContainer,
             };
             pub use crate::input::PlayerIndex;
             pub use crate::value::{
@@ -100,8 +107,8 @@ pub mod Microsoft {
                 #[allow(non_snake_case)]
                 pub mod Touch {
                     pub use crate::input::{
-                        TouchCollection, TouchCollectionEnumerator, TouchLocation,
-                        TouchLocationState, TouchPanelCapabilities,
+                        GestureSample, GestureType, TouchCollection, TouchCollectionEnumerator,
+                        TouchLocation, TouchLocationState, TouchPanel, TouchPanelCapabilities,
                     };
                 }
             }
@@ -115,6 +122,18 @@ pub mod Microsoft {
                     ContentSerializerIgnoreAttribute, ContentSerializerRuntimeTypeAttribute,
                     ContentSerializerTypeVersionAttribute, ContentTypeReader,
                     ContentTypeReaderManager, ContentTypeReaderOfT, ResourceContentManager,
+                };
+            }
+
+            #[allow(non_snake_case)]
+            pub mod GamerServices {
+                pub use crate::game::GamerServicesComponent;
+            }
+
+            #[allow(non_snake_case)]
+            pub mod Storage {
+                pub use crate::storage::{
+                    StorageContainer, StorageDevice, StorageDeviceNotConnectedException,
                 };
             }
         }

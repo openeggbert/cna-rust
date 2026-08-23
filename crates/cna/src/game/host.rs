@@ -133,6 +133,7 @@ fn run_inner<G: Game>(game: &mut G, mode: RunMode) -> Result<()> {
     }
     if let Err(error) = subscribe_events(&mut state, handle, context) {
         let _ = unsubscribe_events(&mut state);
+        let _ = state.game.game_state().dispose_graphics_device_manager();
         state.game.game_state().detach();
         device.invalidate();
         let _ = native.destroy_game(handle);
@@ -150,6 +151,7 @@ fn run_inner<G: Game>(game: &mut G, mode: RunMode) -> Result<()> {
         context,
     };
     if let Err(error) = native.set_game_frame_hooks(handle, &hooks) {
+        let _ = state.game.game_state().dispose_graphics_device_manager();
         state.game.game_state().detach();
         device.invalidate();
         let _ = native.destroy_game(handle);
@@ -164,6 +166,7 @@ fn run_inner<G: Game>(game: &mut G, mode: RunMode) -> Result<()> {
     // The registrations borrow `CallbackState`; detach them before native
     // destruction can invalidate the owned handles or the boxed context.
     let unsubscribe_result = unsubscribe_events(&mut state);
+    let manager_cleanup_result = state.game.game_state().dispose_graphics_device_manager();
 
     // ABI 0.7 checks for owned children before native Shutdown sends the
     // user's Exiting/UnloadContent lifecycle callbacks. Release registered
@@ -195,6 +198,7 @@ fn run_inner<G: Game>(game: &mut G, mode: RunMode) -> Result<()> {
     }
     run_result?;
     unsubscribe_result?;
+    manager_cleanup_result?;
     content_cleanup_result?;
     cleanup_result?;
     destroy_result

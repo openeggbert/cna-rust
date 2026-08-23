@@ -20,14 +20,14 @@ use cna::Microsoft::Xna::Framework::Graphics::PackedVector::{
 };
 use cna::Microsoft::Xna::Framework::Graphics::{
     Blend, BlendState, BufferUsage, CompareFunction, CullMode, DepthFormat, DepthStencilState,
-    IndexElementSize, PresentInterval, PresentationParameters, PrimitiveType, RasterizerState,
-    RenderTargetUsage, SamplerState, SetDataOptions, SurfaceFormat, TextureAddressMode,
-    TextureFilter, VertexDeclaration, VertexElement, VertexElementFormat, VertexElementUsage,
-    VertexPositionColor, VertexPositionColorTexture, VertexPositionNormalTexture,
-    VertexPositionTexture, Viewport,
+    GraphicsProfile, IndexElementSize, PresentInterval, PresentationParameters, PrimitiveType,
+    RasterizerState, RenderTargetUsage, SamplerState, SetDataOptions, SurfaceFormat,
+    TextureAddressMode, TextureFilter, VertexDeclaration, VertexElement, VertexElementFormat,
+    VertexElementUsage, VertexPositionColor, VertexPositionColorTexture,
+    VertexPositionNormalTexture, VertexPositionTexture, Viewport,
 };
 use cna::Microsoft::Xna::Framework::Input::Touch::{
-    TouchCollection, TouchLocation, TouchLocationState,
+    GestureSample, GestureType, TouchCollection, TouchLocation, TouchLocationState,
 };
 use cna::Microsoft::Xna::Framework::Input::{
     ButtonState, Buttons, GamePadButtons, GamePadDPad, GamePadState, GamePadThumbSticks,
@@ -37,7 +37,8 @@ use cna::Microsoft::Xna::Framework::{
     BoundingBox, BoundingFrustum, BoundingSphere, Color, Curve, CurveContinuity, CurveKey,
     CurveLoopType, CurveTangent, DisplayOrientation, DrawableGameComponent, Game, GameComponent,
     GameComponentCollection, GameComponentCollectionEventArgs, GameServiceContainer,
-    IGameComponent, MathHelper, Matrix, Plane, Point, Quaternion, Ray, Rectangle, Vector2, Vector3,
+    GraphicsDeviceInformation, IGameComponent, MathHelper, Matrix, Plane, Point,
+    PreparingDeviceSettingsEventArgs, Quaternion, Ray, Rectangle, TimeSpan, Vector2, Vector3,
     Vector4,
 };
 use cna::{GameComponentCollectionExt, GameState, GameStateAccess};
@@ -1318,5 +1319,77 @@ fn pinned_xna_math_observations() {
         (16, 24, 32, 20)
     );
 
-    assert_eq!(observations, 140);
+    observe!(
+        (
+            GestureType::None | GestureType::Tap,
+            (GestureType::HorizontalDrag | GestureType::VerticalDrag) & GestureType::VerticalDrag,
+        ),
+        (GestureType::Tap, GestureType::VerticalDrag)
+    );
+    let gesture = GestureSample::new(
+        GestureType::Pinch,
+        TimeSpan::from_ticks(123_456),
+        Vector2::from_x_and_y(1.0, 2.0),
+        Vector2::from_x_and_y(3.0, 4.0),
+        Vector2::from_x_and_y(5.0, 6.0),
+        Vector2::from_x_and_y(7.0, 8.0),
+    );
+    observe!(
+        (
+            gesture.GestureType(),
+            gesture.Timestamp().Ticks(),
+            gesture.Position(),
+            gesture.Position2(),
+            gesture.Delta(),
+            gesture.Delta2(),
+        ),
+        (
+            GestureType::Pinch,
+            123_456,
+            Vector2::from_x_and_y(1.0, 2.0),
+            Vector2::from_x_and_y(3.0, 4.0),
+            Vector2::from_x_and_y(5.0, 6.0),
+            Vector2::from_x_and_y(7.0, 8.0),
+        )
+    );
+
+    let information = GraphicsDeviceInformation::new();
+    observe!(
+        (
+            information.GraphicsProfile(),
+            information.PresentationParameters().BackBufferWidth(),
+            information.PresentationParameters().BackBufferHeight(),
+            information.PresentationParameters().BackBufferFormat(),
+            information.PresentationParameters().DepthStencilFormat(),
+            information.PresentationParameters().IsFullScreen(),
+        ),
+        (
+            GraphicsProfile::Reach,
+            0,
+            0,
+            SurfaceFormat::Color,
+            DepthFormat::None,
+            true,
+        )
+    );
+    let shared_information = information.clone();
+    shared_information.SetGraphicsProfile(GraphicsProfile::HiDef);
+    observe!(information.GraphicsProfile(), GraphicsProfile::HiDef);
+    let explicit_clone = information.Clone();
+    explicit_clone
+        .PresentationParameters()
+        .SetBackBufferWidth(321);
+    let args = PreparingDeviceSettingsEventArgs::new(Arc::new(information));
+    observe!(
+        (
+            args.GraphicsDeviceInformation()
+                .PresentationParameters()
+                .BackBufferWidth(),
+            explicit_clone.PresentationParameters().BackBufferWidth(),
+            explicit_clone.Equals(args.GraphicsDeviceInformation().as_ref() as &dyn Any),
+        ),
+        (0, 321, false)
+    );
+
+    assert_eq!(observations, 145);
 }

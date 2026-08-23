@@ -73,6 +73,14 @@ constant `Type::Foo`. It preserves XNA casing even though ordinary Rust uses
 upper snake case. A non-const static property maps to `Foo()`. There are no
 method-shaped aliases for const properties.
 
+A metadata read-only static property is not treated as a constant when its
+value is runtime state. Such a property maps to a zero-argument function (plus
+any normal explicit runtime context) even when its CLR value type could be a
+Rust constant. `TouchPanel.IsGestureAvailable` is the current profile example:
+it observes a queue and can fail when no active callback-scoped Game exists.
+The exception is named in the machine mapping rather than inferred from its
+`bool` return type.
+
 When a CLR static graphics property requires the process-global current device
 but the safe Rust projection intentionally has no global native runtime, the
 mapping injects `graphicsDevice: &GraphicsDevice` as an explicit context
@@ -202,6 +210,27 @@ only when XNA exposes array semantics. Named XNA collections receive wrapper
 types preserving mutation and read-only rules, with `IntoIterator`, `Index`,
 and `AsRef<[T]>` added only when behavior remains equivalent. Native array
 storage is never exposed directly.
+
+## Begin/End asynchronous operations and storage streams
+
+The XNA Storage `Begin*`/`End*` pattern maps to a concrete crate-root
+`StorageAsyncResult`, not CLR `IAsyncResult`, a thread pool, or a fabricated
+pending task. A Begin method returns `Result<StorageAsyncResult>`, receives an
+optional one-shot `StorageAsyncCallback`, and retains an optional
+`StorageAsyncState` (`Arc<dyn Any + Send + Sync>`). CNA 0.7 completes these
+operations synchronously, so the callback runs exactly once before Begin
+returns. The result still records completion and enforces the observable CLR
+End rules: End is one-shot, a result is valid only for its originating
+operation, and container-open results additionally belong to their originating
+device. A callback panic is caught at the Rust boundary and returned as a
+callback error; it never crosses C.
+
+Returned `System.IO.Stream` values from `StorageContainer` map to the concrete
+crate-root `StorageStream`. It owns one CNA storage-stream handle, retains its
+container, implements `Read`, `Write`, and `Seek`, and closes idempotently.
+Storage file modes/access/share values map to safe crate-root enums with the
+fixed XNA identities. Storage I/O, selector, filesystem, and disposal members
+return `Result`; no Storage operation bypasses CNA through `std::fs`.
 
 ## Generics and content
 
@@ -388,6 +417,20 @@ Native refresh updates that retained object in place; explicit `Clone` of
 `PresentationParameters` creates an independent managed value. A device
 collection may return a tracked safe resource wrapper, but it must never create
 an unrelated owner merely because CNA reports the same raw handle.
+
+Mutable CLR reference graphs delivered through events follow the same shared
+identity rule. `GraphicsDeviceInformation` retains its `GraphicsAdapter` and
+`PresentationParameters` as `Arc<T>` values, and
+`PreparingDeviceSettingsEventArgs` retains the information object as an
+`Arc<T>`. The information object's property setters use a shared receiver and
+interior mutability. Consequently one event handler's edits are visible to
+later handlers and to native device selection after the event returns; an
+owned Rust clone would incorrectly sever CLR reference identity.
+
+Protected methods that mutate a caller-owned CLR `List<T>` use
+`&mut Vec<T>`. In particular, `GraphicsDeviceManager.RankDevices` receives a
+mutable vector; consuming the vector would lose the observable in-place
+ranking contract.
 
 Render-target bindings use the same retained-resource rule as buffer bindings.
 The device stores stable logical bindings only after native `SetRenderTargets`

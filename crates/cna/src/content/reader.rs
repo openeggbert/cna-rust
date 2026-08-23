@@ -26,6 +26,7 @@ use crate::value::{
     BoundingSphere, Color, Matrix, Quaternion, Rectangle, Vector2, Vector3, Vector4,
 };
 
+use super::lzx::decompress_xnb_lzx;
 use super::manager::{
     content_error, content_error_with_inner, ContentDisposable, ContentDisposableRecorder,
 };
@@ -255,12 +256,6 @@ impl ContentReader {
             ));
         }
         let flags = bytes[5];
-        if flags & 0x80 != 0 {
-            return Err(xnb_error(
-                asset_name,
-                "LZX-compressed XNB is not yet supported",
-            ));
-        }
         if flags & 0x40 != 0 {
             return Err(xnb_error(
                 asset_name,
@@ -280,13 +275,25 @@ impl ContentReader {
                 ),
             ));
         }
+        let (bytes, position) = if flags & 0x80 != 0 {
+            if bytes.len() < 14 {
+                return Err(xnb_error(asset_name, "truncated LZX payload header"));
+            }
+            let decompressed_size =
+                u32::from_le_bytes([bytes[10], bytes[11], bytes[12], bytes[13]]);
+            let decompressed_size = usize::try_from(decompressed_size)
+                .map_err(|_| xnb_error(asset_name, "invalid LZX decompressed size"))?;
+            (
+                decompress_xnb_lzx(&bytes[14..], decompressed_size, asset_name)?,
+                0,
+            )
+        } else {
+            (bytes, 10)
+        };
         Ok(Self {
             content_manager,
             asset_name: asset_name.to_owned(),
-            cursor: Mutex::new(BinaryCursor {
-                bytes,
-                position: 10,
-            }),
+            cursor: Mutex::new(BinaryCursor { bytes, position }),
             type_readers: Mutex::new(Vec::new()),
             type_reader_versions: Mutex::new(Vec::new()),
             shared_resource_fixups: Mutex::new(None),

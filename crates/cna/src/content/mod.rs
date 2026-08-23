@@ -1,8 +1,9 @@
-//! Managed XNA content cache and uncompressed XNB reader infrastructure.
+//! Managed XNA content cache and XNB reader infrastructure.
 
 #![allow(clippy::module_name_repetitions)]
 
 mod error;
+mod lzx;
 mod manager;
 mod reader;
 mod serializer;

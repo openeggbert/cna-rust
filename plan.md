@@ -11,136 +11,165 @@ MSRV: Rust 1.74
 - Preserve authoritative XNA identifiers and casing below
   `cna::Microsoft::Xna::Framework`.
 - Keep private implementation modules idiomatic, the compatibility allowlist
-  empty, and every structural/safety zero as a permanent gate.
+  empty, and every structural/safety category at zero.
 - Add complete ownership/dependency families with real managed or reviewed CNA
   behavior; never add signature-only placeholders.
 - Treat the generated `typeScoreboard` as the only authoritative work queue.
+- Keep CNA ABI 0.7 and the canonical C ABI as the native boundary. Do not bind
+  the C++ ABI, accept ABI 0.8, or add unrelated symbols.
 
 ## Current strict measurement
 
-| Measurement | Graphics-run baseline | Current |
+| Measurement | Milestone baseline | Current |
 |---|---:|---:|
 | XNA reference types | 257 | 257 |
 | XNA reference members | 2,964 | 2,964 |
 | expected mapped Rust types | 259 | 259 |
-| actual strict Rust types | 165 | 192 |
-| total diagnostics | 94 | 67 |
-| missing types | 94 | 67 |
+| actual strict Rust types | 192 | 203 |
+| total diagnostics | 67 | 56 |
+| missing types | 67 | 56 |
 | missing members | 0 | 0 |
-| Graphics missing types | 27 | 0 |
 
 Constructor, overload, property, event, base projection, trait, interface,
 parameter, return, generic, generic-bound, ref/out, enum value, flags,
-delegate, and disposal mismatch counts are all zero. Unexpected types and
-members, type-kind mismatches, internal-type leaks, raw-handle leaks, public
-unsafe APIs, allowlist entries, and unmeasured categories are also all zero.
+delegate, disposal, unexpected type/member, type-kind, internal-type leak,
+raw-handle leak, public unsafe API, allowlist, and unmeasured-category counts
+are all zero.
 
-The 67 remaining diagnostics are only whole missing types:
+The 56 diagnostics are only whole missing types:
 
 ```text
 Graphics           0
-Media             24
-Audio             19
-Design            13
-Framework/core     4
-Input               3
-Storage             3
-GamerServices       1
+Framework/core     0
+Input               0
+Storage             0
+GamerServices       0
+Design             13
+Audio              19
+Media              24
 ```
 
-## Completed dependency chain
+## Completed milestone
 
-- [x] Completed the Model graph: Model, bones, meshes, mesh parts, collections,
-  enumerators, effects, transforms, tags, stable identity, validation, and
-  parent invalidation.
-- [x] Implemented Model.Draw through ordinary VertexBuffer, IndexBuffer,
-  EffectPass.Apply, and GraphicsDevice indexed-draw routes. No second native
-  Model renderer exists.
-- [x] Added the ordinary managed Model XNB reader with shared-resource fixups,
-  rollback, cache/unload/reload, and legal synthetic graph evidence.
-- [x] Completed BasicEffect, AlphaTestEffect, DualTextureEffect,
-  EnvironmentMapEffect, and SkinnedEffect through their distinct CNA stock
-  effect APIs, including clone, pass application, texture retention, defaults,
-  validation, and XNB readers.
-- [x] Completed IEffectFog, IEffectLights, IEffectMatrices, and stable
-  parent-owned DirectionalLight views without duplicate public state.
-- [x] Completed Texture3D with typed Color transfers, mips/boxes/windows,
-  validation, disposal, and a built-in XNB reader. The reviewed native route is
-  bound; qualified HEADLESS construction remains explicitly backend-blocked by
-  CNA error 6.
-- [x] Completed OcclusionQuery with real create/begin/end/completion/result/
-  destroy routes and state-machine validation.
-- [x] Completed IGraphicsDeviceService and the three mapped graphics exception
-  support types under the normative Rust error policy.
-- [x] Audited all new Graphics content readers. TextureCube now also has its
-  missing built-in reader; legal Texture3D/TextureCube fixtures exercise normal
-  construction or explicit backend failure and rollback.
-- [x] Kept XNA LZX explicitly unimplemented rather than landing a partial or
-  MonoGame-specific decoder.
-- [x] Rechecked repeated RunOneFrame/Tick and canonical CNA HEAD. Neither
-  unrelated blocker was allowed to weaken Graphics completion.
+- [x] Implemented complete XNA 4.0 Windows compressed-XNB framing: compressed
+  flag/header, exact declared output, short and extended frame headers,
+  persistent 64 KiB LZX state, exact termination, and full legal LZX block/
+  Huffman decoding.
+- [x] Kept the uncompressed pipeline unchanged and ran primitive, shared
+  fixup, external-reference, rollback, cache/unload/reload, and complete Model
+  graphs through compressed framing. Fourteen malformed framing cases fail
+  deterministically before publication.
+- [x] Regenerated and recorded the exact eleven-type queue in
+  `docs/small-family-queue.md` before implementation.
+- [x] Completed Framework/core:
+  `GraphicsDeviceInformation`, `GraphicsDeviceManager`,
+  `IGraphicsDeviceManager`, and `PreparingDeviceSettingsEventArgs`.
+  The manager integrates with Game state/services and CNA's Game-owned device;
+  it does not fabricate a second device.
+- [x] Completed Input: `GestureSample`, `GestureType`, and `TouchPanel` through
+  reviewed raw-touch/gesture/panel routes. HEADLESS legitimately reports no
+  hardware and no gesture.
+- [x] Completed Storage: `StorageDevice`, `StorageContainer`, and
+  `StorageDeviceNotConnectedException`, including deterministic Begin/End
+  mapping, one-shot/origin checks, CNA-only filesystem/stream routing,
+  containment, events, and nested ownership.
+- [x] Completed `GamerServicesComponent` as a real GameComponent lifecycle
+  bridge without expanding into the separate Gamer/Guide/Avatar/network
+  profile.
+- [x] Rechecked repeated RunOneFrame/Tick and canonical CNA HEAD without
+  weakening the milestone. Both external blockers remain documented below.
 
-## Ownership model
+Focused evidence lives in `docs/lzx-xnb-evidence.md`,
+`docs/framework-evidence.md`, `docs/input-touch-evidence.md`, and
+`docs/storage-evidence.md`.
 
-Model owns the complete graph. Child facades use stable `Arc` identity; bone
-parents and mesh-part back-links are `Weak`, and the shared lifetime contains
-no facade back-link, so there is no strong cycle. Buffers and Effects retain
-their existing single native owners. Shared mesh parts refer to those owners
-without constructing aliases that can destroy the same handle.
+## Ownership and callback model
 
-DirectionalLight objects are parent-owned stock-effect views. They retain the
-parent ResourceState, never own the Effect, and are invalidated after parent
-disposal. ContentManager records the Model last so reverse unload invalidates
-the graph before releasing effects and buffers. Parent shutdown, retained
-children, repeated disposal, partial XNB failure, and shared resources are all
-covered by crash-isolated stress.
+`GraphicsDeviceManager` has one managed state per Game. It publishes the
+manager/device services, owns one native manager plus six registrations only
+while the Game runs, and releases them before native Game destruction. Native
+event sender identity is the public manager. Event dispatch snapshots handlers
+for safe self-removal, catches panic, records it, and returns it at a safe Rust
+boundary. `RankDevices` is explicitly CNA/backend blocked because ABI 0.7 has
+no candidate-ranking route.
 
-See `docs/graphics-evidence.md` for the capability table and exact graph/XNB
-evidence boundaries.
+Touch has no owned native handle. Every static panel access requires the
+active callback-scoped `GameContext`, and touch/gesture data is copied into
+managed snapshots.
+
+Storage ownership nests `StorageDevice -> StorageContainer -> StorageStream`.
+Streams retain containers and are closed before container disposal; containers
+retain devices. Native `Disposing` is required synchronously and delivered
+exactly once. Static `DeviceChanged` registration is verified, while an actual
+OS-originated transition remains platform pending. Off-owner notification is
+queued until the next owner-thread Storage boundary. Rust validates XNA path
+containment before CNA because the qualified ABI-0.7 `RelativePath` helper
+still accepts strings without enforcing every child-path containment rule.
+Wrong-thread stream/container release is refused by CNA and preserves the
+handle for a successful owner-thread retry.
+
+`GamerServicesComponent` composes the existing `GameComponent`; it owns no
+native GamerServices handle and fabricates no unavailable service.
 
 ## Measured evidence
 
 | Measurement | Previous | Current |
 |---|---:|---:|
-| named XNA-derived observations | 140 | 140 |
-| assertions including final count | 141 | 141 |
+| named XNA-derived observations | 140 | 145 |
+| assertions including final count | 141 | 146 |
 | behavior failures | 0 | 0 |
-| reviewed ABI functions | 235 | 347 |
-| prototype type positions | 879 | 1,220 |
-| independent C/Rust ABI measurements | 805 | 840 |
-| layouts / callbacks / constants | 48 / 3 / 206 | 51 / 3 / 206 |
+| reviewed ABI functions | 347 | 431 |
+| prototype type positions | 1,220 | 1,509 |
+| independent C/Rust ABI measurements | 840 | 936 |
+| layouts / callbacks / constants | 51 / 3 / 206 | 56 / 5 / 243 |
 | ABI mismatches | 0 | 0 |
-| native game lifetimes with a created game | 177 | 197 |
-| owned native child-handle constructions | 283 | 893 |
+| native game lifetimes with a created game | 197 | 209 |
+| owned native child-handle constructions | 893 | 1,012 |
 | native crashes / observed double-free or UAF | 0 / 0 | 0 / 0 |
 
-The behavior count deliberately did not grow: Model/stock-effect/query
-construction and application require a native device and remain in native
-stress instead of being described as platform-neutral XNA observations.
-HEADLESS verifies native command paths, not visible 3D or shader output.
+The five new platform-neutral observations cover Gesture flags/sample values
+and Framework device-information defaults/reference/explicit-clone behavior.
+Storage filesystem, hardware Touch, and native lifecycle transitions stay in
+native qualification rather than being mislabeled as neutral golden data.
+
+The native handle total is derived from explicit constructors: each of ten
+small-family cycles adds one manager, six manager registrations, one storage
+device, one container, one container registration, and one stream (110); the
+process-wide DeviceChanged registration adds one; the isolated callback-panic
+case adds one manager plus six registrations and one selector device (8).
+Thus `893 + 110 + 1 + 8 = 1,012`. The suite now has 209 created Game
+lifetimes. Sanitizer status remains `not-run`; crash absence is not a leak
+proof.
+
+## External blockers
 
 Canonical read-only CNA HEAD remains
-`1bb2145d99ed572dd4eb15009c34e2e5f410fcf0`; its unmodified C API build blocker
-at `CnaCApiCoreExt.cpp:250` remains renderer identity `49 == 50`. Runtime
-evidence therefore continues to use the labelled experimental exact ABI-0.7
-HEADLESS artifact. No exact ABI-0.7 sanitizer artifact was available;
-sanitizer status is `not-run`, and crash absence is not leak proof.
+`1bb2145d99ed572dd4eb15009c34e2e5f410fcf0`. Its tracked source still contains
+the C API build blocker at `CnaCApiCoreExt.cpp:250`, where the renderer identity
+assertion reduces to `49 == 50`. Runtime evidence therefore continues to use
+the labelled qualified exact ABI-0.7 HEADLESS artifact. The Rust loader rejects
+ABI 0.8.
+
+Arbitrary repeated borrowed-game `RunOneFrame`/`Tick` remains blocked. CNA
+retains `CNA_GameCallbacks::context` from creation; the later frame-hook table
+has a separate mutable context but does not rebind Update/Draw/content callback
+context. The minimal safe ABI addition is an owner-thread-only operation that
+atomically replaces the complete core callback table/context while the Game is
+idle, with an explicit guarantee that the prior context is no longer retained.
+No `transmute`, fake `'static`, leaked allocation, mutable global raw pointer,
+or unsupported mutation is used.
 
 ## Next dependency-ordered work
 
-1. Preserve Graphics zero and all structural/safety zeros on every subsequent
-   change.
-2. Consider XNA LZX only as a complete framed decoder with malformed-input,
-   cleanup, cache, and unload evidence; do not land half a decoder.
-3. Regenerate the scoreboard and prefer one complete small family among
-   Framework/core, Input, Storage, or GamerServices. Do not start broad Audio
-   or Media merely to reduce the type count.
-4. Resolve repeated frame hosting only through a durable CNA callback context
-   or a reviewed ABI user-data rebinding route.
-5. Run ASan/UBSan only when an exact unmodified ABI-0.7 CNA artifact is
-   available.
+This milestone stops here. The only remaining selected families are separate
+future milestones:
 
-No post-Graphics small family was started in this run.
+1. Design (13)
+2. Audio (19)
+3. Media (24)
+
+Each requires its own regenerated dependency/ownership review. Do not reopen
+completed Graphics or small families merely to begin one of them.
 
 ## Definition of complete compatibility
 

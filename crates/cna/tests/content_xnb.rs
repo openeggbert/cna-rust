@@ -87,6 +87,104 @@ fn xnb(readers: &[(&str, i32)], shared_count: usize, body: &[u8]) -> Vec<u8> {
     bytes
 }
 
+fn lzx_uncompressed_block(payload: &[u8], first: bool) -> Vec<u8> {
+    assert!(!payload.is_empty() && payload.len() <= 0x8000);
+    let header_bits = if first {
+        (3_u32 << 28) | (u32::try_from(payload.len()).expect("LZX payload length") << 4)
+    } else {
+        (3_u32 << 29) | (u32::try_from(payload.len()).expect("LZX payload length") << 5)
+    };
+    let mut block = vec![0; 16 + payload.len()];
+    block[0] = u8::try_from((header_bits >> 16) & 0xff).expect("header byte");
+    block[1] = u8::try_from((header_bits >> 24) & 0xff).expect("header byte");
+    block[2] = u8::try_from(header_bits & 0xff).expect("header byte");
+    block[3] = u8::try_from((header_bits >> 8) & 0xff).expect("header byte");
+    block[4] = 1;
+    block[8] = 1;
+    block[12] = 1;
+    block[16..].copy_from_slice(payload);
+    block
+}
+
+fn extended_lzx_frame(payload: &[u8], first: bool) -> Vec<u8> {
+    let block = lzx_uncompressed_block(payload, first);
+    let mut frame = vec![
+        0xff,
+        u8::try_from(payload.len() >> 8).expect("frame size"),
+        u8::try_from(payload.len() & 0xff).expect("frame size"),
+        u8::try_from(block.len() >> 8).expect("block size"),
+        u8::try_from(block.len() & 0xff).expect("block size"),
+    ];
+    frame.extend_from_slice(&block);
+    frame
+}
+
+fn compressed_xnb(uncompressed: &[u8], split_at: Option<usize>) -> Vec<u8> {
+    let payload = &uncompressed[10..];
+    let mut framed = Vec::new();
+    if let Some(split_at) = split_at {
+        assert!(split_at > 0 && split_at < payload.len() && split_at & 1 == 0);
+        framed.extend_from_slice(&extended_lzx_frame(&payload[..split_at], true));
+        framed.extend_from_slice(&extended_lzx_frame(&payload[split_at..], false));
+    } else {
+        framed.extend_from_slice(&extended_lzx_frame(payload, true));
+    }
+
+    let mut result = b"XNBw\x05\x80".to_vec();
+    let total_size = u32::try_from(14 + framed.len()).expect("compressed XNB size");
+    result.extend_from_slice(&total_size.to_le_bytes());
+    result.extend_from_slice(
+        &u32::try_from(payload.len())
+            .expect("decompressed XNB size")
+            .to_le_bytes(),
+    );
+    result.extend_from_slice(&framed);
+    result
+}
+
+#[test]
+fn lzx_single_multi_cache_unload_and_reload_use_the_ordinary_reader() {
+    let root = FixtureRoot::new();
+    let mut single_body = vec![1];
+    write_string(&mut single_body, "single compressed frame");
+    let single = xnb(
+        &[("Microsoft.Xna.Framework.Content.StringReader", 0)],
+        0,
+        &single_body,
+    );
+    root.write("single-lzx", &compressed_xnb(&single, None));
+
+    let mut multi_body = vec![1];
+    write_string(&mut multi_body, "two persistent LZX frames");
+    let multi = xnb(
+        &[("Microsoft.Xna.Framework.Content.StringReader", 0)],
+        0,
+        &multi_body,
+    );
+    root.write("multi-lzx", &compressed_xnb(&multi, Some(20)));
+
+    let manager = root.manager();
+    let single_value = manager
+        .Load::<String>("single-lzx")
+        .expect("single-frame compressed XNB");
+    assert_eq!(single_value.as_str(), "single compressed frame");
+    let first = manager
+        .Load::<String>("multi-lzx")
+        .expect("multi-frame compressed XNB");
+    let cached = manager
+        .Load::<String>("MULTI-LZX")
+        .expect("compressed cache hit");
+    assert_eq!(first.as_str(), "two persistent LZX frames");
+    assert!(Arc::ptr_eq(&first, &cached));
+
+    manager.Unload().expect("unload compressed assets");
+    let reloaded = manager
+        .Load::<String>("multi-lzx")
+        .expect("reload compressed XNB after unload");
+    assert_eq!(reloaded.as_str(), first.as_str());
+    assert!(!Arc::ptr_eq(&first, &reloaded));
+}
+
 #[derive(Debug, Eq, PartialEq)]
 struct CustomAsset {
     name: String,
@@ -248,11 +346,14 @@ fn reader_table_preserves_existing_instance_and_external_reference() {
     write_string(&mut external_body, "child");
     root.write(
         "folder/root",
-        &xnb(&[(EXTERNAL_READER, 0)], 0, &external_body),
+        &compressed_xnb(&xnb(&[(EXTERNAL_READER, 0)], 0, &external_body), None),
     );
     let mut child_body = vec![1];
     write_string(&mut child_body, "external object");
-    root.write("folder/child", &xnb(&[(CHILD_READER, 0)], 0, &child_body));
+    root.write(
+        "folder/child",
+        &compressed_xnb(&xnb(&[(CHILD_READER, 0)], 0, &child_body), None),
+    );
 
     let manager = root.manager();
     let existing = manager
@@ -345,7 +446,10 @@ fn shared_resources_are_identical_and_disposed_once() {
     // root reader, two references to shared slot 1, then shared object reader
     root.write(
         "shared",
-        &xnb(&[(OWNER_READER, 0), (TRACKED_READER, 0)], 1, &[1, 1, 1, 2]),
+        &compressed_xnb(
+            &xnb(&[(OWNER_READER, 0), (TRACKED_READER, 0)], 1, &[1, 1, 1, 2]),
+            None,
+        ),
     );
     let manager = root.manager();
     let owner = manager
@@ -404,9 +508,15 @@ fn partial_failures_clean_resources_and_failed_unload_remains_disposable() {
     let root = FixtureRoot::new();
     root.write(
         "partial",
-        &xnb(&[(FAIL_READER, 0), (TRACKED_READER, 0)], 0, &[1, 2]),
+        &compressed_xnb(
+            &xnb(&[(FAIL_READER, 0), (TRACKED_READER, 0)], 0, &[1, 2]),
+            None,
+        ),
     );
-    root.write("unload", &xnb(&[(UNLOAD_READER, 0)], 0, &[1]));
+    root.write(
+        "unload",
+        &compressed_xnb(&xnb(&[(UNLOAD_READER, 0)], 0, &[1]), None),
+    );
     let manager = root.manager();
 
     let error = manager
@@ -442,7 +552,9 @@ fn malformed_xnb_headers_are_rejected_before_reader_activation() {
     bad_magic[0] = b'Z';
     root.write("magic", &bad_magic);
     let mut compressed = valid.clone();
+    compressed.truncate(10);
     compressed[5] = 0x80;
+    compressed[6..10].copy_from_slice(&10_u32.to_le_bytes());
     root.write("compressed", &compressed);
     let mut bad_size = valid;
     bad_size[6..10].copy_from_slice(&11_u32.to_le_bytes());
@@ -451,7 +563,7 @@ fn malformed_xnb_headers_are_rejected_before_reader_activation() {
     let manager = root.manager();
     for (asset, detail) in [
         ("magic", "invalid XNB magic"),
-        ("compressed", "LZX-compressed"),
+        ("compressed", "truncated LZX payload header"),
         ("size", "does not match stream size"),
     ] {
         let error = manager.Load::<String>(asset).expect_err("malformed XNB");

@@ -4,6 +4,7 @@
     clippy::module_name_repetitions
 )]
 
+use std::any::Any;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -17,7 +18,8 @@ use crate::graphics::GraphicsDevice;
 use crate::native::Native;
 
 use super::{
-    GameComponentCollection, GameServiceContainer, GameWindow, LaunchParameters, TimeSpan,
+    manager_service_type_ids, GameComponentCollection, GameServiceContainer, GameWindow,
+    GraphicsDeviceManagerState, LaunchParameters, TimeSpan,
 };
 
 #[derive(Clone)]
@@ -40,6 +42,7 @@ pub struct GameState {
     inactive_sleep_time_ticks: AtomicI64,
     binding: Mutex<Option<ActiveGame>>,
     graphics_device: OnceLock<GraphicsDevice>,
+    graphics_device_manager: Mutex<Option<Arc<GraphicsDeviceManagerState>>>,
     activated: EventHandlers<EventArgs>,
     deactivated: EventHandlers<EventArgs>,
     exiting: EventHandlers<EventArgs>,
@@ -65,6 +68,7 @@ impl GameState {
             inactive_sleep_time_ticks: AtomicI64::new(200_000),
             binding: Mutex::new(None),
             graphics_device: OnceLock::new(),
+            graphics_device_manager: Mutex::new(None),
             activated: EventHandlers::new(),
             deactivated: EventHandlers::new(),
             exiting: EventHandlers::new(),
@@ -113,7 +117,92 @@ impl GameState {
             self.detach();
             return Err(error);
         }
+        let manager = self
+            .graphics_device_manager
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if let Some(manager) = manager {
+            if let Err(error) = manager.attach(native, handle, device) {
+                self.detach();
+                return Err(error);
+            }
+        }
         Ok(())
+    }
+
+    pub(crate) fn register_graphics_device_manager(
+        &self,
+        manager: Arc<GraphicsDeviceManagerState>,
+    ) -> Result<()> {
+        let mut slot = self
+            .graphics_device_manager
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if slot.is_some() {
+            return Err(CnaError::InvalidInput(
+                "an XNA Game accepts exactly one GraphicsDeviceManager",
+            ));
+        }
+        *slot = Some(Arc::clone(&manager));
+        drop(slot);
+
+        let (manager_type, service_type) = manager_service_type_ids();
+        let provider: Arc<dyn Any + Send + Sync> = manager.clone();
+        if let Err(error) = self.services.AddService(manager_type, provider) {
+            self.graphics_device_manager
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .take();
+            return Err(error);
+        }
+        let provider: Arc<dyn Any + Send + Sync> = manager.clone();
+        if let Err(error) = self.services.AddService(service_type, provider) {
+            self.services.RemoveService(manager_type);
+            self.graphics_device_manager
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .take();
+            return Err(error);
+        }
+
+        if let Ok(active) = self.active() {
+            if let Err(error) =
+                manager.attach(&active.native, active.handle, self.GraphicsDevice()?)
+            {
+                self.unregister_graphics_device_manager(&manager);
+                return Err(error);
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn unregister_graphics_device_manager(&self, manager: &GraphicsDeviceManagerState) {
+        let mut slot = self
+            .graphics_device_manager
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let remove = slot
+            .as_ref()
+            .is_some_and(|current| core::ptr::eq(Arc::as_ptr(current), manager));
+        if remove {
+            slot.take();
+        }
+        drop(slot);
+        if remove {
+            let (manager_type, service_type) = manager_service_type_ids();
+            self.services.RemoveService(service_type);
+            self.services.RemoveService(manager_type);
+        }
+    }
+
+    pub(crate) fn dispose_graphics_device_manager(&self) -> Result<()> {
+        let manager = self
+            .graphics_device_manager
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        manager.map_or(Ok(()), |manager| manager.dispose(true))
     }
 
     pub(crate) fn detach(&self) {

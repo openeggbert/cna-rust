@@ -325,6 +325,10 @@ impl GraphicsDevice {
             })
     }
 
+    pub(crate) fn proposal_adapter_index_for(&self, adapter: &GraphicsAdapter) -> Result<i32> {
+        adapter.proposal_index_for(&self.state)
+    }
+
     pub fn GraphicsProfile(&self) -> Result<GraphicsProfile> {
         let mut value = sys::CNA_GRAPHICS_PROFILE_REACH;
         self.state

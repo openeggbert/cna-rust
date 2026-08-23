@@ -2,6 +2,8 @@
 
 mod components;
 mod context;
+mod device_manager;
+mod gamer_services;
 mod host;
 mod lifecycle;
 mod misc;
@@ -16,6 +18,12 @@ pub use components::{
 };
 pub use components::{GameComponentCollectionExt, GameComponentRuntime};
 pub use context::GameContext;
+pub(crate) use device_manager::{manager_service_type_ids, GraphicsDeviceManagerState};
+pub use device_manager::{
+    GraphicsDeviceInformation, GraphicsDeviceManager, IGraphicsDeviceManager,
+    PreparingDeviceSettingsEventArgs,
+};
+pub use gamer_services::GamerServicesComponent;
 pub use host::{run, run_for_frames};
 pub use lifecycle::Game;
 pub use misc::{FrameworkDispatcher, TitleContainer};

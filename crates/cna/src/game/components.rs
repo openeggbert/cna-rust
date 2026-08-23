@@ -345,7 +345,9 @@ impl GameComponentRuntime for DrawableGameComponent {
 }
 
 /// Marker used by the verifier for the composed CLR base-class relationship.
-pub trait GameComponentBase {}
+pub trait GameComponentBase {
+    fn Dispose(&mut self) {}
+}
 impl GameComponentBase for DrawableGameComponent {}
 
 impl Drop for DrawableGameComponent {

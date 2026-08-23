@@ -1,0 +1,381 @@
+//! Native qualification for the Framework, Touch, Storage, and `GamerServices` milestone.
+
+#![allow(clippy::too_many_lines)]
+
+use std::any::TypeId;
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+
+use cna::Microsoft::Xna::Framework::GamerServices::GamerServicesComponent;
+use cna::Microsoft::Xna::Framework::Graphics::IGraphicsDeviceService;
+use cna::Microsoft::Xna::Framework::Input::Touch::{GestureType, TouchPanel};
+use cna::Microsoft::Xna::Framework::Storage::{StorageContainer, StorageDevice};
+use cna::Microsoft::Xna::Framework::{
+    Game, GameContext, GraphicsDeviceManager, IGameComponent, IGraphicsDeviceManager,
+    PreparingDeviceSettingsEventArgs,
+};
+use cna::{
+    run_for_frames, CnaError, FileMode, GameComponentCollectionExt, GameState, GameStateAccess,
+    Result, StorageAsyncState,
+};
+
+#[derive(Default)]
+struct FrameworkEvidence {
+    preparing: AtomicUsize,
+    resetting: AtomicUsize,
+    reset: AtomicUsize,
+    disposed: AtomicUsize,
+    self_removed: AtomicUsize,
+    touch_checked: AtomicUsize,
+}
+
+struct SmallFamilyGame {
+    state: Arc<GameState>,
+    manager: Option<GraphicsDeviceManager>,
+    evidence: Arc<FrameworkEvidence>,
+}
+
+#[derive(Default)]
+struct EmptyQualificationGame {
+    state: Arc<GameState>,
+}
+
+impl GameStateAccess for EmptyQualificationGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for EmptyQualificationGame {}
+
+struct PanicPreparingGame {
+    state: Arc<GameState>,
+    manager: Option<GraphicsDeviceManager>,
+}
+
+impl GameStateAccess for PanicPreparingGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for PanicPreparingGame {
+    fn Initialize(&mut self, _: &mut GameContext<'_>) -> Result<()> {
+        self.manager
+            .as_ref()
+            .expect("manager constructed before Run")
+            .ApplyChanges()
+    }
+}
+
+impl GameStateAccess for SmallFamilyGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for SmallFamilyGame {
+    fn Initialize(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let manager = self
+            .manager
+            .as_ref()
+            .expect("manager constructed before Run");
+        assert!(!manager.GraphicsDevice()?.IsDisposed()?);
+        assert_eq!(
+            manager.GraphicsDevice()?.GraphicsProfile()?,
+            manager.GraphicsProfile()?
+        );
+
+        let capabilities = TouchPanel::GetCapabilities(game)?;
+        let touches = TouchPanel::GetState(game)?;
+        if !capabilities.IsConnected() {
+            assert_eq!(touches.Count(), 0);
+            assert!(!touches.IsConnected());
+        }
+        TouchPanel::SetEnabledGestures(game, GestureType::Tap | GestureType::DoubleTap)?;
+        assert_eq!(
+            TouchPanel::EnabledGestures(game)?,
+            GestureType::Tap | GestureType::DoubleTap
+        );
+        assert!(!TouchPanel::IsGestureAvailable(game)?);
+        assert!(TouchPanel::ReadGesture(game).is_err());
+        self.evidence.touch_checked.fetch_add(1, Ordering::SeqCst);
+
+        manager.ApplyChanges()?;
+        Ok(())
+    }
+}
+
+fn native_enabled() -> bool {
+    std::env::var_os("CNA_NATIVE_LIBRARY").is_some()
+}
+
+fn native_game_guard() -> MutexGuard<'static, ()> {
+    static NATIVE_GAME: OnceLock<Mutex<()>> = OnceLock::new();
+    NATIVE_GAME
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+#[test]
+fn framework_touch_and_gamer_services_use_the_game_owned_runtime() {
+    if !native_enabled() {
+        return;
+    }
+    let _native_game = native_game_guard();
+
+    let evidence = Arc::new(FrameworkEvidence::default());
+    let mut game = SmallFamilyGame {
+        state: Arc::new(GameState::new()),
+        manager: None,
+        evidence: Arc::clone(&evidence),
+    };
+    let mut manager = GraphicsDeviceManager::new(&game);
+    assert_eq!(manager.PreferredBackBufferWidth().unwrap(), 800);
+    assert_eq!(manager.PreferredBackBufferHeight().unwrap(), 480);
+    manager.SetPreferredBackBufferWidth(640).unwrap();
+    manager.SetPreferredBackBufferHeight(360).unwrap();
+    assert!(matches!(
+        manager.ApplyChanges(),
+        Err(CnaError::UnsupportedRuntime(_))
+    ));
+
+    let preparing = Arc::clone(&evidence);
+    manager.AddPreparingDeviceSettingsHandler(Box::new(
+        move |sender: &dyn std::any::Any, args: PreparingDeviceSettingsEventArgs| {
+            assert!(sender.downcast_ref::<GraphicsDeviceManager>().is_some());
+            preparing.preparing.fetch_add(1, Ordering::SeqCst);
+            let information = args.GraphicsDeviceInformation();
+            information.PresentationParameters().SetBackBufferWidth(640);
+        },
+    ));
+    let self_removal_token = Arc::new(AtomicU64::new(0));
+    let token_for_callback = Arc::clone(&self_removal_token);
+    let self_removed = Arc::clone(&evidence);
+    let registration = manager.AddPreparingDeviceSettingsHandler(Box::new(
+        move |sender: &dyn std::any::Any, _: PreparingDeviceSettingsEventArgs| {
+            let manager = sender
+                .downcast_ref::<GraphicsDeviceManager>()
+                .expect("GraphicsDeviceManager event sender");
+            assert!(manager
+                .RemovePreparingDeviceSettingsHandler(token_for_callback.load(Ordering::SeqCst)));
+            self_removed.self_removed.fetch_add(1, Ordering::SeqCst);
+        },
+    ));
+    self_removal_token.store(registration, Ordering::SeqCst);
+    let resetting = Arc::clone(&evidence);
+    manager.AddDeviceResettingHandler(Box::new(
+        move |_: &dyn std::any::Any, _: cna::extensions::events::EventArgs| {
+            resetting.resetting.fetch_add(1, Ordering::SeqCst);
+        },
+    ));
+    let reset = Arc::clone(&evidence);
+    manager.AddDeviceResetHandler(Box::new(
+        move |_: &dyn std::any::Any, _: cna::extensions::events::EventArgs| {
+            reset.reset.fetch_add(1, Ordering::SeqCst);
+        },
+    ));
+    let disposed = Arc::clone(&evidence);
+    manager.AddDisposedHandler(Box::new(
+        move |sender: &dyn std::any::Any, _: cna::extensions::events::EventArgs| {
+            assert!(sender.downcast_ref::<GraphicsDeviceManager>().is_some());
+            disposed.disposed.fetch_add(1, Ordering::SeqCst);
+        },
+    ));
+    manager
+        .OnDeviceResetting(&(), cna::extensions::events::EventArgs)
+        .unwrap();
+    manager
+        .OnDeviceReset(&(), cna::extensions::events::EventArgs)
+        .unwrap();
+
+    let proposal = manager.FindBestDevice(false).unwrap();
+    assert_eq!(proposal.PresentationParameters().BackBufferWidth(), 640);
+    assert!(proposal.Clone().Equals(&proposal as &dyn std::any::Any));
+    let mut candidates = vec![proposal];
+    assert!(matches!(
+        manager.RankDevices(&mut candidates),
+        Err(CnaError::UnsupportedRuntime(_))
+    ));
+
+    assert!(game
+        .state
+        .Services()
+        .GetService(TypeId::of::<dyn IGraphicsDeviceManager>())
+        .is_some());
+    assert!(game
+        .state
+        .Services()
+        .GetService(TypeId::of::<dyn IGraphicsDeviceService>())
+        .is_some());
+
+    let gamer: Arc<dyn IGameComponent> = Arc::new(GamerServicesComponent::new(&game));
+    game.state.Components().Add(gamer);
+    game.manager = Some(manager);
+    run_for_frames(game, 1).expect("Framework manager, Touch, and GamerServices lifecycle");
+
+    assert_eq!(evidence.touch_checked.load(Ordering::SeqCst), 1);
+    assert!(evidence.preparing.load(Ordering::SeqCst) >= 1);
+    assert!(evidence.resetting.load(Ordering::SeqCst) >= 1);
+    assert!(evidence.reset.load(Ordering::SeqCst) >= 1);
+    assert_eq!(evidence.self_removed.load(Ordering::SeqCst), 1);
+    assert_eq!(evidence.disposed.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn framework_callback_panic_is_contained_and_game_recreation_succeeds() {
+    if !native_enabled() {
+        return;
+    }
+    let _native_game = native_game_guard();
+
+    let mut game = PanicPreparingGame {
+        state: Arc::new(GameState::new()),
+        manager: None,
+    };
+    let mut manager = GraphicsDeviceManager::new(&game);
+    manager.SetPreferredBackBufferWidth(641).unwrap();
+    manager.AddPreparingDeviceSettingsHandler(Box::new(
+        |_: &dyn std::any::Any, _: PreparingDeviceSettingsEventArgs| {
+            panic!("intentional PreparingDeviceSettings panic");
+        },
+    ));
+    game.manager = Some(manager);
+    assert!(matches!(
+        run_for_frames(game, 1),
+        Err(CnaError::Callback(_))
+    ));
+    run_for_frames(EmptyQualificationGame::default(), 1)
+        .expect("Game recreation after contained framework callback panic");
+}
+
+#[test]
+fn storage_async_containment_streams_and_disposal_use_cna() {
+    if !native_enabled() {
+        return;
+    }
+    let _native_game = native_game_guard();
+
+    let device_changed = StorageDevice::AddDeviceChangedHandler(Box::new(
+        |_: &dyn std::any::Any, _: cna::extensions::events::EventArgs| {},
+    ));
+    assert!(StorageDevice::RemoveDeviceChangedHandler(device_changed));
+    assert!(!StorageDevice::RemoveDeviceChangedHandler(device_changed));
+
+    assert!(matches!(
+        StorageDevice::BeginShowSelectorWithCallbackAndState(
+            Some(Box::new(|_| panic!("intentional selector callback panic"))),
+            None,
+        ),
+        Err(CnaError::Callback(_))
+    ));
+
+    let callbacks = Arc::new(AtomicUsize::new(0));
+    let callback_count = Arc::clone(&callbacks);
+    let state_value = Arc::new(String::from("selector-state"));
+    let state: StorageAsyncState = Some(state_value.clone());
+    let selector = StorageDevice::BeginShowSelectorWithCallbackAndState(
+        Some(Box::new(move |result| {
+            callback_count.fetch_add(1, Ordering::SeqCst);
+            assert!(result.CompletedSynchronously());
+            assert!(result.IsCompleted());
+            assert_eq!(
+                result
+                    .AsyncState()
+                    .and_then(|value| value.downcast::<String>().ok())
+                    .as_deref()
+                    .map(String::as_str),
+                Some("selector-state")
+            );
+        })),
+        state,
+    )
+    .expect("native storage selector");
+    assert_eq!(callbacks.load(Ordering::SeqCst), 1);
+    let device = StorageDevice::EndShowSelector(&selector).expect("selector End");
+    assert!(StorageDevice::EndShowSelector(&selector).is_err());
+    assert!(device.IsConnected().expect("storage connection"));
+    assert!(device.TotalSpace().expect("total space") >= 0);
+    assert!(device.FreeSpace().expect("free space") >= 0);
+
+    let other = StorageDevice::EndShowSelector(
+        &StorageDevice::BeginShowSelectorWithCallbackAndState(None, None)
+            .expect("second storage selector"),
+    )
+    .expect("second selector End");
+    let name = format!("cna-rust-small-family-{}", std::process::id());
+    let open = device
+        .BeginOpenContainer(&name, None, None)
+        .expect("open storage container");
+    assert!(other.EndOpenContainer(&open).is_err());
+    let mut container = device.EndOpenContainer(&open).expect("container End");
+    assert_eq!(container.DisplayName().expect("display name"), name);
+    assert!(container
+        .StorageDevice()
+        .expect("parent device")
+        .IsConnected()
+        .unwrap());
+
+    for invalid in ["../escape", "/absolute", "C:\\escape", "a/../../escape"] {
+        assert!(container.CreateDirectory(invalid).is_err(), "{invalid}");
+        assert!(container.CreateFile(invalid).is_err(), "{invalid}");
+    }
+    container
+        .CreateDirectory("nested")
+        .expect("nested directory");
+    assert!(container.DirectoryExists("nested").unwrap());
+    let mut stream = container
+        .CreateFile("nested/data.bin")
+        .expect("create native storage stream");
+    stream.write_all(b"CNA storage").expect("write stream");
+    stream.flush().expect("flush stream");
+    stream.seek(SeekFrom::Start(0)).expect("seek stream");
+    let mut bytes = Vec::new();
+    stream.read_to_end(&mut bytes).expect("read stream");
+    assert_eq!(bytes, b"CNA storage");
+    assert!(container.FileExists("nested/data.bin").unwrap());
+    drop(stream);
+
+    let mut reopened = container
+        .OpenFile("nested/data.bin", FileMode::Open)
+        .expect("reopen native storage stream");
+    assert_eq!(reopened.Length().unwrap(), 11);
+    let disposal_count = Arc::new(AtomicUsize::new(0));
+    let observed = Arc::clone(&disposal_count);
+    container.AddDisposingHandler(Box::new(
+        move |sender: &dyn std::any::Any, _: cna::extensions::events::EventArgs| {
+            let container = sender
+                .downcast_ref::<StorageContainer>()
+                .expect("StorageContainer event sender");
+            assert!(container.IsDisposed());
+            observed.fetch_add(1, Ordering::SeqCst);
+        },
+    ));
+    container.Dispose().expect("container Dispose");
+    container.Dispose().expect("idempotent container Dispose");
+    assert_eq!(disposal_count.load(Ordering::SeqCst), 1);
+    let mut byte = [0_u8; 1];
+    assert!(reopened.read(&mut byte).is_err());
+    device
+        .DeleteContainer(&name)
+        .expect("delete test container");
+
+    let panic_name = format!("cna-rust-dispose-panic-{}", std::process::id());
+    let result = device
+        .BeginOpenContainer(&panic_name, None, None)
+        .expect("open callback-panic container");
+    let mut panic_container = device.EndOpenContainer(&result).unwrap();
+    panic_container.AddDisposingHandler(Box::new(
+        |_: &dyn std::any::Any, _: cna::extensions::events::EventArgs| {
+            panic!("intentional StorageContainer.Disposing panic");
+        },
+    ));
+    assert!(matches!(
+        panic_container.Dispose(),
+        Err(CnaError::Callback(_))
+    ));
+    assert!(panic_container.IsDisposed());
+    device.DeleteContainer(&panic_name).unwrap();
+}

@@ -10,7 +10,7 @@
 
 use std::any::TypeId;
 use std::fs;
-use std::io::Cursor;
+use std::io::{Cursor, Write};
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -20,6 +20,7 @@ use cna::extensions::graphics::{
     EffectAnnotationCollectionExt, EffectFactoryExt, EffectParameterCollectionExt,
     EffectPassCollectionExt, EffectTechniqueCollectionExt, ModelCollectionExt,
 };
+use cna::Microsoft::Xna::Framework::GamerServices::GamerServicesComponent;
 use cna::Microsoft::Xna::Framework::Graphics::{
     AlphaTestEffect, BasicEffect, BlendState, BufferUsage, CompareFunction, CubeMapFace,
     DepthStencilState, DualTextureEffect, DynamicIndexBuffer, DynamicVertexBuffer, Effect,
@@ -31,9 +32,11 @@ use cna::Microsoft::Xna::Framework::Graphics::{
     Texture2D, Texture3D, TextureCube, VertexBuffer, VertexBufferBinding, VertexDeclaration,
     VertexElement, VertexElementFormat, VertexElementUsage, VertexPositionColor,
 };
+use cna::Microsoft::Xna::Framework::Input::Touch::{GestureType, TouchPanel};
+use cna::Microsoft::Xna::Framework::Storage::StorageDevice;
 use cna::Microsoft::Xna::Framework::{
-    Color, Game, GameContext, GameTime, IDrawable, IGameComponent, IUpdateable, Matrix, Rectangle,
-    Vector2, Vector3, Vector4,
+    Color, Game, GameContext, GameTime, GraphicsDeviceManager, IDrawable, IGameComponent,
+    IUpdateable, Matrix, PreparingDeviceSettingsEventArgs, Rectangle, Vector2, Vector3, Vector4,
 };
 use cna::{
     run_for_frames, CnaError, EffectAnnotationDescriptor, EffectParameterDescriptor,
@@ -55,6 +58,130 @@ impl GameStateAccess for EmptyGame {
 }
 
 impl Game for EmptyGame {}
+
+struct SmallFamilyStressGame {
+    state: Arc<GameState>,
+    manager: Option<GraphicsDeviceManager>,
+}
+
+impl GameStateAccess for SmallFamilyStressGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for SmallFamilyStressGame {
+    fn Initialize(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let _ = TouchPanel::GetCapabilities(game)?;
+        let touches = TouchPanel::GetState(game)?;
+        TouchPanel::SetEnabledGestures(game, GestureType::Tap | GestureType::DoubleTap)?;
+        assert!(touches.Count() <= 8);
+        self.manager
+            .as_ref()
+            .expect("small-family manager")
+            .ApplyChanges()
+    }
+}
+
+fn small_family_stress_game() -> SmallFamilyStressGame {
+    let mut game = SmallFamilyStressGame {
+        state: Arc::new(GameState::new()),
+        manager: None,
+    };
+    let mut manager = GraphicsDeviceManager::new(&game);
+    manager.SetPreferredBackBufferWidth(640).unwrap();
+    manager.SetPreferredBackBufferHeight(360).unwrap();
+    manager.AddPreparingDeviceSettingsHandler(Box::new(
+        |sender: &dyn std::any::Any, args: PreparingDeviceSettingsEventArgs| {
+            assert!(sender.downcast_ref::<GraphicsDeviceManager>().is_some());
+            args.GraphicsDeviceInformation()
+                .PresentationParameters()
+                .SetBackBufferWidth(640);
+        },
+    ));
+    let gamer: Arc<dyn IGameComponent> = Arc::new(GamerServicesComponent::new(&game));
+    game.state.Components().Add(gamer);
+    game.manager = Some(manager);
+    game
+}
+
+struct PanicPreparingStressGame {
+    state: Arc<GameState>,
+    manager: Option<GraphicsDeviceManager>,
+}
+
+impl GameStateAccess for PanicPreparingStressGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for PanicPreparingStressGame {
+    fn Initialize(&mut self, _: &mut GameContext<'_>) -> Result<()> {
+        self.manager
+            .as_ref()
+            .expect("panic-stress manager")
+            .ApplyChanges()
+    }
+}
+
+fn panic_preparing_stress_game() -> PanicPreparingStressGame {
+    let mut game = PanicPreparingStressGame {
+        state: Arc::new(GameState::new()),
+        manager: None,
+    };
+    let mut manager = GraphicsDeviceManager::new(&game);
+    manager.SetPreferredBackBufferWidth(641).unwrap();
+    manager.AddPreparingDeviceSettingsHandler(Box::new(
+        |_: &dyn std::any::Any, _: PreparingDeviceSettingsEventArgs| {
+            panic!("intentional crash-isolated PreparingDeviceSettings panic");
+        },
+    ));
+    game.manager = Some(manager);
+    game
+}
+
+fn storage_stress_cycle(index: usize) {
+    let result = StorageDevice::BeginShowSelectorWithCallbackAndState(None, None)
+        .expect("storage selector stress");
+    let device = StorageDevice::EndShowSelector(&result).expect("storage selector End stress");
+    let name = format!("cna-rust-native-stress-{}-{index}", std::process::id());
+    let open = device
+        .BeginOpenContainer(&name, None, None)
+        .expect("storage container stress");
+    let mut container = device
+        .EndOpenContainer(&open)
+        .expect("storage container End stress");
+    let retained_device = container
+        .StorageDevice()
+        .expect("retained storage device")
+        .clone();
+    container.CreateDirectory("nested").unwrap();
+    let mut stream = container.CreateFile("nested/value.bin").unwrap();
+    stream.write_all(b"storage stress").unwrap();
+    if index == 0 {
+        stream = std::thread::spawn(move || {
+            assert!(stream.Close().is_err());
+            stream
+        })
+        .join()
+        .expect("wrong-thread stream close is contained");
+        stream.Close().expect("owner-thread stream close retry");
+        container = std::thread::spawn(move || {
+            assert!(container.Dispose().is_err());
+            container
+        })
+        .join()
+        .expect("wrong-thread container Dispose is contained");
+    }
+    drop(device);
+    container
+        .Dispose()
+        .expect("container-before-stream shutdown");
+    assert!(stream.write_all(b"closed").is_err());
+    container.Dispose().expect("double container Dispose");
+    retained_device.DeleteContainer(&name).unwrap();
+}
 
 #[derive(Default)]
 struct PanicGame {
@@ -1520,7 +1647,8 @@ impl ModelFixture {
     fn new() -> Self {
         let path = std::env::temp_dir().join(format!("cna-rust-model-xnb-{}", std::process::id()));
         fs::create_dir_all(&path).expect("create Model XNB fixture directory");
-        fs::write(path.join("model.xnb"), model_xnb(1, 3)).expect("write valid Model XNB fixture");
+        fs::write(path.join("model.xnb"), compressed_xnb(&model_xnb(1, 3)))
+            .expect("write valid compressed Model XNB fixture");
         fs::write(path.join("bad-root.xnb"), model_xnb(3, 3))
             .expect("write malformed-root Model XNB fixture");
         fs::write(path.join("missing-effect.xnb"), model_xnb(1, 0))
@@ -1635,6 +1763,45 @@ fn model_xnb(root_reference: u8, effect_shared_reference: u8) -> Vec<u8> {
             .to_le_bytes(),
     );
     bytes.extend_from_slice(&payload);
+    bytes
+}
+
+fn compressed_xnb(uncompressed: &[u8]) -> Vec<u8> {
+    let payload = &uncompressed[10..];
+    assert!(!payload.is_empty() && payload.len() <= 0x8000);
+    let header_bits =
+        (3_u32 << 28) | (u32::try_from(payload.len()).expect("LZX payload size") << 4);
+    let mut block = vec![0; 16 + payload.len()];
+    block[0] = u8::try_from((header_bits >> 16) & 0xff).expect("LZX header byte");
+    block[1] = u8::try_from((header_bits >> 24) & 0xff).expect("LZX header byte");
+    block[2] = u8::try_from(header_bits & 0xff).expect("LZX header byte");
+    block[3] = u8::try_from((header_bits >> 8) & 0xff).expect("LZX header byte");
+    block[4] = 1;
+    block[8] = 1;
+    block[12] = 1;
+    block[16..].copy_from_slice(payload);
+
+    let mut framed = vec![
+        0xff,
+        u8::try_from(payload.len() >> 8).expect("LZX frame size"),
+        u8::try_from(payload.len() & 0xff).expect("LZX frame size"),
+        u8::try_from(block.len() >> 8).expect("LZX block size"),
+        u8::try_from(block.len() & 0xff).expect("LZX block size"),
+    ];
+    framed.extend_from_slice(&block);
+
+    let mut bytes = b"XNBw\x05\x80".to_vec();
+    bytes.extend_from_slice(
+        &u32::try_from(14 + framed.len())
+            .expect("compressed XNB size")
+            .to_le_bytes(),
+    );
+    bytes.extend_from_slice(
+        &u32::try_from(payload.len())
+            .expect("decompressed XNB size")
+            .to_le_bytes(),
+    );
+    bytes.extend_from_slice(&framed);
     bytes
 }
 
@@ -2321,6 +2488,8 @@ fn native_stress_isolated() {
         "model-xnb-10",
         "remaining-graphics-10",
         "effect-graph-10",
+        "small-families-10",
+        "small-family-callback-panic",
         "lifecycle-order-and-identity",
         "component-order-and-mutation",
         "callback-panic",
@@ -2441,6 +2610,32 @@ fn run_child_case(case: &str) {
                 run_for_frames(EffectStressGame::default(), 1)
                     .expect("Effect reflection/parameter/pass/SpriteBatch ownership cycle");
             }
+        }
+        "small-families-10" => {
+            let changed = StorageDevice::AddDeviceChangedHandler(Box::new(
+                |_: &dyn std::any::Any, _: cna::extensions::events::EventArgs| {},
+            ));
+            assert!(StorageDevice::RemoveDeviceChangedHandler(changed));
+            for index in 0..10 {
+                run_for_frames(small_family_stress_game(), 1)
+                    .expect("Framework/Touch/GamerServices ownership cycle");
+                storage_stress_cycle(index);
+            }
+        }
+        "small-family-callback-panic" => {
+            assert!(matches!(
+                run_for_frames(panic_preparing_stress_game(), 1),
+                Err(CnaError::Callback(_))
+            ));
+            assert!(matches!(
+                StorageDevice::BeginShowSelectorWithCallbackAndState(
+                    Some(Box::new(|_| panic!("intentional storage completion panic"))),
+                    None,
+                ),
+                Err(CnaError::Callback(_))
+            ));
+            run_for_frames(EmptyGame::default(), 1)
+                .expect("game recreation after small-family callback panic");
         }
         "lifecycle-order-and-identity" => {
             let evidence = Arc::new(Mutex::new(LifecycleEvidence::default()));

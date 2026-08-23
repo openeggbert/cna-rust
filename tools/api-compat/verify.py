@@ -731,7 +731,12 @@ def mapped_members(contract_type: dict, rules: dict, reference_types: dict[str, 
                 contract_type["name"] + "::" + name
             )
             if member.get("get"):
-                if member.get("static") and not member.get("set") and const_representable(member["type"], reference_types, rules):
+                dynamic_static = any(
+                    rule_matches(pattern, contract_type["name"], name)
+                    for pattern in rules.get("dynamicStaticProperties", [])
+                )
+                if (member.get("static") and not member.get("set") and not dynamic_static
+                        and const_representable(member["type"], reference_types, rules)):
                     result[name] = {
                         "name": name, "kind": "assoc_const", "origin": "property-getter",
                         "type": clr_value_type(member["type"], rules, contract_type, reference_types, []),

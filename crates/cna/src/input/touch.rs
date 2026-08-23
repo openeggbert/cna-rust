@@ -1,8 +1,142 @@
-#![allow(non_snake_case)]
+#![allow(non_snake_case, non_upper_case_globals)]
 
-use core::any::Any;
+use core::{
+    any::Any,
+    mem::size_of,
+    ops::{BitAnd, BitOr, BitOrAssign},
+};
 
+use cna_sys as sys;
+
+use crate::error::{CnaError, Result};
+use crate::extensions::window::WindowHandle;
+use crate::game::{DisplayOrientation, GameContext, TimeSpan};
 use crate::value::{vector_support::xna_f32_hash, Vector2};
+
+/// Open flags representation of XNA's gesture selection.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub struct GestureType(i32);
+
+impl GestureType {
+    pub const None: Self = Self(0);
+    pub const Tap: Self = Self(1);
+    pub const DoubleTap: Self = Self(2);
+    pub const Hold: Self = Self(4);
+    pub const HorizontalDrag: Self = Self(8);
+    pub const VerticalDrag: Self = Self(16);
+    pub const FreeDrag: Self = Self(32);
+    pub const Pinch: Self = Self(64);
+    pub const Flick: Self = Self(128);
+    pub const DragComplete: Self = Self(256);
+    pub const PinchComplete: Self = Self(512);
+
+    const ALL_BITS: i32 = 0x3ff;
+
+    const fn from_bits(value: i32) -> Self {
+        Self(value)
+    }
+
+    const fn bits(self) -> i32 {
+        self.0
+    }
+}
+
+impl BitOr for GestureType {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self(self.0 | rhs.0)
+    }
+}
+
+impl BitOrAssign for GestureType {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.0 |= rhs.0;
+    }
+}
+
+impl BitAnd for GestureType {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Self(self.0 & rhs.0)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct GestureSample {
+    gesture_type: GestureType,
+    timestamp: TimeSpan,
+    position: Vector2,
+    position2: Vector2,
+    delta: Vector2,
+    delta2: Vector2,
+}
+
+impl GestureSample {
+    #[must_use]
+    pub const fn new(
+        gestureType: GestureType,
+        timestamp: TimeSpan,
+        position: Vector2,
+        position2: Vector2,
+        delta: Vector2,
+        delta2: Vector2,
+    ) -> Self {
+        Self {
+            gesture_type: gestureType,
+            timestamp,
+            position,
+            position2,
+            delta,
+            delta2,
+        }
+    }
+
+    #[must_use]
+    pub const fn GestureType(&self) -> GestureType {
+        self.gesture_type
+    }
+    #[must_use]
+    pub const fn Timestamp(&self) -> TimeSpan {
+        self.timestamp
+    }
+    #[must_use]
+    pub const fn Position(&self) -> Vector2 {
+        self.position
+    }
+    #[must_use]
+    pub const fn Position2(&self) -> Vector2 {
+        self.position2
+    }
+    #[must_use]
+    pub const fn Delta(&self) -> Vector2 {
+        self.delta
+    }
+    #[must_use]
+    pub const fn Delta2(&self) -> Vector2 {
+        self.delta2
+    }
+
+    fn from_native(value: &sys::CNA_GestureSample) -> Result<Self> {
+        let bits = i32::try_from(value.gesture_type)
+            .map_err(|_| CnaError::InvalidInput("gesture flags exceed i32"))?;
+        if bits & !GestureType::ALL_BITS != 0 {
+            return Err(CnaError::InvalidInput(
+                "CNA returned undefined gesture flags",
+            ));
+        }
+        Ok(Self::new(
+            GestureType::from_bits(bits),
+            TimeSpan::from_ticks(value.timestamp_ticks),
+            vector(value.position),
+            vector(value.position2),
+            vector(value.delta),
+            vector(value.delta2),
+        ))
+    }
+}
 
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -149,6 +283,20 @@ impl TouchLocation {
             .wrapping_add(xna_f32_hash(self.x))
             .wrapping_add(xna_f32_hash(self.y))
     }
+
+    fn from_native(value: &sys::CNA_TouchLocation) -> Result<Self> {
+        let state = touch_state(value.state)?;
+        let previous_state = touch_state(value.previous_state)?;
+        Ok(
+            Self::from_id_and_state_and_position_and_previous_state_and_previous_position(
+                value.id,
+                state,
+                vector(value.position),
+                previous_state,
+                vector(value.previous_position),
+            ),
+        )
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -282,6 +430,25 @@ impl TouchCollection {
         );
         index as usize
     }
+
+    fn from_native(value: &sys::CNA_TouchState) -> Result<Self> {
+        let count = usize::try_from(value.touch_count)
+            .map_err(|_| CnaError::InvalidInput("touch count exceeds usize"))?;
+        if count > value.touches.len() {
+            return Err(CnaError::InvalidInput(
+                "CNA returned too many touch locations",
+            ));
+        }
+        let mut result = Self {
+            is_connected: value.is_connected != sys::CNA_FALSE,
+            ..Self::default()
+        };
+        for (destination, source) in result.locations.iter_mut().zip(&value.touches).take(count) {
+            *destination = TouchLocation::from_native(source)?;
+        }
+        result.count = count;
+        Ok(result)
+    }
 }
 
 impl AsRef<[TouchLocation]> for TouchCollection {
@@ -338,6 +505,125 @@ impl TouchPanelCapabilities {
     #[must_use]
     pub const fn MaximumTouchCount(&self) -> i32 {
         self.maximum_touch_count
+    }
+
+    fn from_native(value: &sys::CNA_TouchCapabilities) -> Result<Self> {
+        Ok(Self {
+            is_connected: value.is_connected != sys::CNA_FALSE,
+            maximum_touch_count: i32::try_from(value.maximum_touch_count)
+                .map_err(|_| CnaError::InvalidInput("touch count exceeds i32"))?,
+        })
+    }
+}
+
+pub struct TouchPanel;
+
+impl TouchPanel {
+    pub fn EnabledGestures(game: &GameContext<'_>) -> Result<GestureType> {
+        let value = game.native.enabled_gestures(game.handle)?;
+        let bits =
+            i32::try_from(value).map_err(|_| CnaError::InvalidInput("gesture flags exceed i32"))?;
+        if bits & !GestureType::ALL_BITS != 0 {
+            return Err(CnaError::InvalidInput(
+                "CNA returned undefined gesture flags",
+            ));
+        }
+        Ok(GestureType::from_bits(bits))
+    }
+
+    pub fn SetEnabledGestures(game: &GameContext<'_>, value: GestureType) -> Result<()> {
+        if value.bits() & !GestureType::ALL_BITS != 0 {
+            return Err(CnaError::InvalidInput(
+                "gesture flags contain undefined bits",
+            ));
+        }
+        game.native
+            .set_enabled_gestures(game.handle, value.bits() as u32)
+    }
+
+    pub fn IsGestureAvailable(game: &GameContext<'_>) -> Result<bool> {
+        game.native.is_gesture_available(game.handle)
+    }
+
+    pub fn WindowHandle(game: &GameContext<'_>) -> Result<WindowHandle> {
+        Ok(WindowHandle(game.native.touch_window_handle(game.handle)?))
+    }
+
+    pub fn SetWindowHandle(game: &GameContext<'_>, value: WindowHandle) -> Result<()> {
+        game.native.set_touch_window_handle(game.handle, value.0)
+    }
+
+    pub fn DisplayOrientation(game: &GameContext<'_>) -> Result<DisplayOrientation> {
+        let value = i32::try_from(game.native.touch_display_orientation(game.handle)?)
+            .map_err(|_| CnaError::InvalidInput("display orientation exceeds i32"))?;
+        Ok(DisplayOrientation::from_bits(value))
+    }
+
+    pub fn SetDisplayOrientation(game: &GameContext<'_>, value: DisplayOrientation) -> Result<()> {
+        game.native
+            .set_touch_display_orientation(game.handle, value.bits() as u32)
+    }
+
+    pub fn DisplayWidth(game: &GameContext<'_>) -> Result<i32> {
+        game.native.touch_display_width(game.handle)
+    }
+
+    pub fn SetDisplayWidth(game: &GameContext<'_>, value: i32) -> Result<()> {
+        game.native.set_touch_display_width(game.handle, value)
+    }
+
+    pub fn DisplayHeight(game: &GameContext<'_>) -> Result<i32> {
+        game.native.touch_display_height(game.handle)
+    }
+
+    pub fn SetDisplayHeight(game: &GameContext<'_>, value: i32) -> Result<()> {
+        game.native.set_touch_display_height(game.handle, value)
+    }
+
+    pub fn GetCapabilities(game: &GameContext<'_>) -> Result<TouchPanelCapabilities> {
+        let mut value = sys::CNA_TouchCapabilities {
+            struct_size: size_of::<sys::CNA_TouchCapabilities>() as u32,
+            struct_version: 1,
+            ..sys::CNA_TouchCapabilities::default()
+        };
+        game.native.touch_capabilities(game.handle, &mut value)?;
+        TouchPanelCapabilities::from_native(&value)
+    }
+
+    pub fn ReadGesture(game: &GameContext<'_>) -> Result<GestureSample> {
+        let mut value = sys::CNA_GestureSample {
+            struct_size: size_of::<sys::CNA_GestureSample>() as u32,
+            struct_version: 1,
+            ..sys::CNA_GestureSample::default()
+        };
+        game.native.read_gesture(game.handle, &mut value)?;
+        GestureSample::from_native(&value)
+    }
+
+    pub fn GetState(game: &GameContext<'_>) -> Result<TouchCollection> {
+        let mut value = sys::CNA_TouchState {
+            struct_size: size_of::<sys::CNA_TouchState>() as u32,
+            struct_version: 1,
+            ..sys::CNA_TouchState::default()
+        };
+        game.native.touch_state(game.handle, &mut value)?;
+        TouchCollection::from_native(&value)
+    }
+}
+
+const fn vector(value: sys::CNA_Vector2) -> Vector2 {
+    Vector2::from_x_and_y(value.x, value.y)
+}
+
+fn touch_state(value: sys::CNA_TouchLocationState) -> Result<TouchLocationState> {
+    match value {
+        0 => Ok(TouchLocationState::Invalid),
+        1 => Ok(TouchLocationState::Released),
+        2 => Ok(TouchLocationState::Pressed),
+        3 => Ok(TouchLocationState::Moved),
+        _ => Err(CnaError::InvalidInput(
+            "CNA returned an undefined touch state",
+        )),
     }
 }
 

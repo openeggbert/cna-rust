@@ -113,7 +113,7 @@ impl PresentationParameters {
         }
     }
 
-    pub(super) fn update_from_native(
+    pub(crate) fn update_from_native(
         &self,
         value: sys::CNA_PresentationParameters,
         window_handle: WindowHandle,
@@ -154,7 +154,7 @@ impl PresentationParameters {
         true
     }
 
-    pub(super) fn to_native(&self, headless_ext: bool) -> sys::CNA_PresentationParameters {
+    pub(crate) fn to_native(&self, headless_ext: bool) -> sys::CNA_PresentationParameters {
         let value = self.read();
         sys::CNA_PresentationParameters {
             struct_size: core::mem::size_of::<sys::CNA_PresentationParameters>() as u32,

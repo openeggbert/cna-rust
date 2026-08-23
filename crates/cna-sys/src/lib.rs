@@ -38,6 +38,13 @@ pub const CNA_GAME_EVENT_ACTIVATED: CNA_GameEvent = 0;
 pub const CNA_GAME_EVENT_DEACTIVATED: CNA_GameEvent = 1;
 pub const CNA_GAME_EVENT_DISPOSED: CNA_GameEvent = 2;
 pub const CNA_GAME_EVENT_EXITING: CNA_GameEvent = 3;
+pub const CNA_GRAPHICS_DEVICE_MANAGER_EVENT_DISPOSED: CNA_GraphicsDeviceManagerEvent = 0;
+pub const CNA_GRAPHICS_DEVICE_MANAGER_EVENT_DEVICE_CREATED: CNA_GraphicsDeviceManagerEvent = 1;
+pub const CNA_GRAPHICS_DEVICE_MANAGER_EVENT_DEVICE_DISPOSING: CNA_GraphicsDeviceManagerEvent = 2;
+pub const CNA_GRAPHICS_DEVICE_MANAGER_EVENT_DEVICE_RESET: CNA_GraphicsDeviceManagerEvent = 3;
+pub const CNA_GRAPHICS_DEVICE_MANAGER_EVENT_DEVICE_RESETTING: CNA_GraphicsDeviceManagerEvent = 4;
+pub const CNA_GRAPHICS_DEVICE_MANAGER_DEFAULT_BACK_BUFFER_WIDTH: i32 = 800;
+pub const CNA_GRAPHICS_DEVICE_MANAGER_DEFAULT_BACK_BUFFER_HEIGHT: i32 = 480;
 pub const CNA_GAME_WINDOW_EVENT_CLIENT_SIZE_CHANGED: CNA_GameWindowEvent = 0;
 pub const CNA_GAME_WINDOW_EVENT_ORIENTATION_CHANGED: CNA_GameWindowEvent = 1;
 pub const CNA_GAME_WINDOW_EVENT_SCREEN_DEVICE_NAME_CHANGED: CNA_GameWindowEvent = 2;
@@ -265,6 +272,36 @@ pub const CNA_GAMEPAD_BUTTON_A: CNA_GamePadButtonFlags = 0x0000_1000;
 pub const CNA_GAMEPAD_BUTTON_LEFT_TRIGGER: CNA_GamePadButtonFlags = 0x0080_0000;
 pub const CNA_GAMEPAD_BUTTON_LEFT_THUMBSTICK_RIGHT: CNA_GamePadButtonFlags = 0x4000_0000;
 pub const CNA_GAMEPAD_BUTTON_ALL: CNA_GamePadButtonFlags = 0x7fff_ffff;
+pub const CNA_GESTURE_TYPE_NONE: CNA_GestureType = 0;
+pub const CNA_GESTURE_TYPE_TAP: CNA_GestureType = 1;
+pub const CNA_GESTURE_TYPE_DOUBLE_TAP: CNA_GestureType = 2;
+pub const CNA_GESTURE_TYPE_HOLD: CNA_GestureType = 4;
+pub const CNA_GESTURE_TYPE_HORIZONTAL_DRAG: CNA_GestureType = 8;
+pub const CNA_GESTURE_TYPE_VERTICAL_DRAG: CNA_GestureType = 16;
+pub const CNA_GESTURE_TYPE_FREE_DRAG: CNA_GestureType = 32;
+pub const CNA_GESTURE_TYPE_PINCH: CNA_GestureType = 64;
+pub const CNA_GESTURE_TYPE_FLICK: CNA_GestureType = 128;
+pub const CNA_GESTURE_TYPE_DRAG_COMPLETE: CNA_GestureType = 256;
+pub const CNA_GESTURE_TYPE_PINCH_COMPLETE: CNA_GestureType = 512;
+pub const CNA_GESTURE_TYPE_ALL: CNA_GestureType = 0x0000_03ff;
+pub const CNA_FILE_MODE_CREATE_NEW: CNA_FileMode = 1;
+pub const CNA_FILE_MODE_CREATE: CNA_FileMode = 2;
+pub const CNA_FILE_MODE_OPEN: CNA_FileMode = 3;
+pub const CNA_FILE_MODE_OPEN_OR_CREATE: CNA_FileMode = 4;
+pub const CNA_FILE_MODE_TRUNCATE: CNA_FileMode = 5;
+pub const CNA_FILE_MODE_APPEND: CNA_FileMode = 6;
+pub const CNA_FILE_ACCESS_READ: CNA_FileAccess = 1;
+pub const CNA_FILE_ACCESS_WRITE: CNA_FileAccess = 2;
+pub const CNA_FILE_ACCESS_READ_WRITE: CNA_FileAccess = 3;
+pub const CNA_FILE_SHARE_NONE: CNA_FileShare = 0;
+pub const CNA_FILE_SHARE_READ: CNA_FileShare = 1;
+pub const CNA_FILE_SHARE_WRITE: CNA_FileShare = 2;
+pub const CNA_FILE_SHARE_READ_WRITE: CNA_FileShare = 3;
+pub const CNA_FILE_SHARE_DELETE: CNA_FileShare = 4;
+pub const CNA_FILE_SHARE_INHERITABLE: CNA_FileShare = 16;
+pub const CNA_SEEK_ORIGIN_BEGIN: CNA_SeekOrigin = 0;
+pub const CNA_SEEK_ORIGIN_CURRENT: CNA_SeekOrigin = 1;
+pub const CNA_SEEK_ORIGIN_END: CNA_SeekOrigin = 2;
 
 pub type CNA_Result = u32;
 pub type CNA_Bool = u8;
@@ -273,6 +310,7 @@ pub type CNA_GameEvent = u32;
 pub type CNA_GameWindowEvent = u32;
 pub type CNA_GraphicsDeviceStatus = u32;
 pub type CNA_GraphicsProfile = u32;
+pub type CNA_GraphicsDeviceManagerEvent = u32;
 pub type CNA_PresentInterval = u32;
 pub type CNA_DepthFormat = u32;
 pub type CNA_RenderTargetUsage = u32;
@@ -281,6 +319,7 @@ pub type CNA_RenderTargetKind = u32;
 pub type CNA_ShaderStage = u32;
 pub type CNA_NativeHandleValue = u64;
 pub type CNA_Handle = u64;
+pub type CNA_GraphicsDeviceManagerHandle = CNA_Handle;
 pub type CNA_GameEventRegistrationHandle = CNA_Handle;
 pub type CNA_VertexDeclarationHandle = CNA_Handle;
 pub type CNA_VertexBufferHandle = CNA_Handle;
@@ -333,6 +372,15 @@ pub type CNA_PlayerIndex = u32;
 pub type CNA_GamePadDeadZone = u32;
 pub type CNA_GamePadButtonFlags = u32;
 pub type CNA_GamePadType = u32;
+pub type CNA_TouchLocationState = u32;
+pub type CNA_GestureType = u32;
+pub type CNA_StorageDeviceHandle = CNA_Handle;
+pub type CNA_StorageContainerHandle = CNA_Handle;
+pub type CNA_StorageStreamHandle = CNA_Handle;
+pub type CNA_FileMode = u32;
+pub type CNA_FileAccess = u32;
+pub type CNA_FileShare = u32;
+pub type CNA_SeekOrigin = u32;
 pub type CNA_EffectParameterClass = u32;
 pub type CNA_EffectParameterType = u32;
 pub type CNA_EffectValueType = u32;
@@ -768,6 +816,16 @@ pub struct CNA_PresentationParameters {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_GraphicsDeviceInformation {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub adapter_index: i32,
+    pub graphics_profile: CNA_GraphicsProfile,
+    pub presentation_parameters: CNA_PresentationParameters,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct CNA_TextureSlotInfo {
     pub struct_size: u32,
     pub struct_version: u32,
@@ -842,6 +900,9 @@ pub type CNA_GameLifecycleCallback = Option<
     ) -> CNA_Result,
 >;
 pub type CNA_GameEventCallback = Option<unsafe extern "C" fn(*mut c_void)>;
+pub type CNA_PreparingDeviceSettingsMutatorEXT =
+    Option<unsafe extern "C" fn(*mut CNA_GraphicsDeviceInformation, *mut c_void)>;
+pub type CNA_StorageCompletionCallback = Option<unsafe extern "C" fn(*mut c_void)>;
 
 pub type CNA_GameBeginDrawCallback = Option<
     unsafe extern "C" fn(
@@ -1197,6 +1258,54 @@ pub struct CNA_GamePadCapabilities {
     pub has_gyro_ext: CNA_Bool,
     pub has_accelerometer_ext: CNA_Bool,
     pub reserved: [u8; 1],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_TouchLocation {
+    pub id: i32,
+    pub state: CNA_TouchLocationState,
+    pub position: CNA_Vector2,
+    pub previous_state: CNA_TouchLocationState,
+    pub previous_position: CNA_Vector2,
+    pub pressure: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_TouchCapabilities {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub is_connected: CNA_Bool,
+    pub reserved: [u8; 3],
+    pub maximum_touch_count: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_TouchState {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub is_connected: CNA_Bool,
+    pub reserved: [u8; 3],
+    pub touch_count: u32,
+    pub touches: [CNA_TouchLocation; 8],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_GestureSample {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub gesture_type: CNA_GestureType,
+    pub finger_id_ext: i32,
+    pub finger_id2_ext: i32,
+    pub reserved: u32,
+    pub timestamp_ticks: i64,
+    pub position: CNA_Vector2,
+    pub position2: CNA_Vector2,
+    pub delta: CNA_Vector2,
+    pub delta2: CNA_Vector2,
 }
 
 pub type cna_get_abi_version_fn = unsafe extern "C" fn() -> u32;
@@ -2081,6 +2190,241 @@ pub type cna_gamepad_get_capabilities_fn =
     unsafe extern "C" fn(CNA_Handle, CNA_PlayerIndex, *mut CNA_GamePadCapabilities) -> CNA_Result;
 pub type cna_gamepad_set_vibration_fn =
     unsafe extern "C" fn(CNA_Handle, CNA_PlayerIndex, f32, f32, *mut CNA_Bool) -> CNA_Result;
+pub type cna_touch_get_capabilities_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_TouchCapabilities) -> CNA_Result;
+pub type cna_touch_get_state_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_TouchState) -> CNA_Result;
+pub type cna_touch_panel_get_display_width_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut i32) -> CNA_Result;
+pub type cna_touch_panel_set_display_width_fn = unsafe extern "C" fn(CNA_Handle, i32) -> CNA_Result;
+pub type cna_touch_panel_get_display_height_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut i32) -> CNA_Result;
+pub type cna_touch_panel_set_display_height_fn =
+    unsafe extern "C" fn(CNA_Handle, i32) -> CNA_Result;
+pub type cna_touch_panel_get_display_orientation_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_DisplayOrientation) -> CNA_Result;
+pub type cna_touch_panel_set_display_orientation_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_DisplayOrientation) -> CNA_Result;
+pub type cna_touch_panel_get_enabled_gestures_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_GestureType) -> CNA_Result;
+pub type cna_touch_panel_set_enabled_gestures_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_GestureType) -> CNA_Result;
+pub type cna_touch_panel_get_is_gesture_available_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_touch_panel_get_window_handle_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut u64) -> CNA_Result;
+pub type cna_touch_panel_set_window_handle_fn = unsafe extern "C" fn(CNA_Handle, u64) -> CNA_Result;
+pub type cna_touch_panel_read_gesture_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_GestureSample) -> CNA_Result;
+pub type cna_graphics_device_manager_create_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_GraphicsDeviceManagerHandle) -> CNA_Result;
+pub type cna_graphics_device_manager_get_graphics_profile_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle, *mut CNA_GraphicsProfile) -> CNA_Result;
+pub type cna_graphics_device_manager_set_graphics_profile_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle, CNA_GraphicsProfile) -> CNA_Result;
+pub type cna_graphics_device_manager_get_is_full_screen_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_graphics_device_manager_set_is_full_screen_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle, CNA_Bool) -> CNA_Result;
+pub type cna_graphics_device_manager_get_prefer_multi_sampling_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_graphics_device_manager_set_prefer_multi_sampling_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle, CNA_Bool) -> CNA_Result;
+pub type cna_graphics_device_manager_get_preferred_back_buffer_format_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle, *mut CNA_SurfaceFormat) -> CNA_Result;
+pub type cna_graphics_device_manager_set_preferred_back_buffer_format_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle, CNA_SurfaceFormat) -> CNA_Result;
+pub type cna_graphics_device_manager_get_preferred_back_buffer_width_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle, *mut i32) -> CNA_Result;
+pub type cna_graphics_device_manager_set_preferred_back_buffer_width_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle, i32) -> CNA_Result;
+pub type cna_graphics_device_manager_get_preferred_back_buffer_height_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle, *mut i32) -> CNA_Result;
+pub type cna_graphics_device_manager_set_preferred_back_buffer_height_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle, i32) -> CNA_Result;
+pub type cna_graphics_device_manager_get_preferred_depth_stencil_format_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle, *mut CNA_DepthFormat) -> CNA_Result;
+pub type cna_graphics_device_manager_set_preferred_depth_stencil_format_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle, CNA_DepthFormat) -> CNA_Result;
+pub type cna_graphics_device_manager_get_synchronize_with_vertical_retrace_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_graphics_device_manager_set_synchronize_with_vertical_retrace_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle, CNA_Bool) -> CNA_Result;
+pub type cna_graphics_device_manager_get_supported_orientations_fn =
+    unsafe extern "C" fn(
+        CNA_GraphicsDeviceManagerHandle,
+        *mut CNA_DisplayOrientation,
+    ) -> CNA_Result;
+pub type cna_graphics_device_manager_set_supported_orientations_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle, CNA_DisplayOrientation) -> CNA_Result;
+pub type cna_graphics_device_manager_apply_changes_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle) -> CNA_Result;
+pub type cna_graphics_device_manager_toggle_full_screen_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle) -> CNA_Result;
+pub type cna_graphics_device_manager_create_device_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle) -> CNA_Result;
+pub type cna_graphics_device_manager_begin_draw_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_graphics_device_manager_end_draw_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle) -> CNA_Result;
+pub type cna_graphics_device_manager_dispose_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle) -> CNA_Result;
+pub type cna_graphics_device_manager_subscribe_fn = unsafe extern "C" fn(
+    CNA_GraphicsDeviceManagerHandle,
+    CNA_GraphicsDeviceManagerEvent,
+    CNA_GameEventCallback,
+    *mut c_void,
+    *mut CNA_GameEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_graphics_device_manager_subscribe_preparing_device_settings_ext_fn =
+    unsafe extern "C" fn(
+        CNA_GraphicsDeviceManagerHandle,
+        CNA_PreparingDeviceSettingsMutatorEXT,
+        *mut c_void,
+        *mut CNA_GameEventRegistrationHandle,
+    ) -> CNA_Result;
+pub type cna_graphics_device_manager_destroy_fn =
+    unsafe extern "C" fn(CNA_GraphicsDeviceManagerHandle) -> CNA_Result;
+pub type cna_storage_device_show_selector_fn = unsafe extern "C" fn(
+    CNA_StorageCompletionCallback,
+    *mut c_void,
+    *mut CNA_StorageDeviceHandle,
+) -> CNA_Result;
+pub type cna_storage_device_show_selector_for_player_fn = unsafe extern "C" fn(
+    CNA_PlayerIndex,
+    CNA_StorageCompletionCallback,
+    *mut c_void,
+    *mut CNA_StorageDeviceHandle,
+) -> CNA_Result;
+pub type cna_storage_device_show_selector_with_space_fn = unsafe extern "C" fn(
+    i32,
+    i32,
+    CNA_StorageCompletionCallback,
+    *mut c_void,
+    *mut CNA_StorageDeviceHandle,
+) -> CNA_Result;
+pub type cna_storage_device_show_selector_for_player_with_space_fn =
+    unsafe extern "C" fn(
+        CNA_PlayerIndex,
+        i32,
+        i32,
+        CNA_StorageCompletionCallback,
+        *mut c_void,
+        *mut CNA_StorageDeviceHandle,
+    ) -> CNA_Result;
+pub type cna_storage_device_get_free_space_fn =
+    unsafe extern "C" fn(CNA_StorageDeviceHandle, *mut i64) -> CNA_Result;
+pub type cna_storage_device_get_is_connected_fn =
+    unsafe extern "C" fn(CNA_StorageDeviceHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_storage_device_get_total_space_fn =
+    unsafe extern "C" fn(CNA_StorageDeviceHandle, *mut i64) -> CNA_Result;
+pub type cna_storage_device_delete_container_fn =
+    unsafe extern "C" fn(CNA_StorageDeviceHandle, CNA_StringView) -> CNA_Result;
+pub type cna_storage_device_subscribe_device_changed_fn =
+    unsafe extern "C" fn(CNA_StorageCompletionCallback, *mut c_void, *mut CNA_Handle) -> CNA_Result;
+pub type cna_storage_device_unsubscribe_device_changed_fn =
+    unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_storage_device_destroy_fn =
+    unsafe extern "C" fn(CNA_StorageDeviceHandle) -> CNA_Result;
+pub type cna_storage_container_open_fn = unsafe extern "C" fn(
+    CNA_StorageDeviceHandle,
+    CNA_StringView,
+    CNA_StorageCompletionCallback,
+    *mut c_void,
+    *mut CNA_StorageContainerHandle,
+) -> CNA_Result;
+pub type cna_storage_container_get_display_name_size_fn =
+    unsafe extern "C" fn(CNA_StorageContainerHandle, *mut u64) -> CNA_Result;
+pub type cna_storage_container_copy_display_name_fn =
+    unsafe extern "C" fn(CNA_StorageContainerHandle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_storage_container_dispose_fn =
+    unsafe extern "C" fn(CNA_StorageContainerHandle) -> CNA_Result;
+pub type cna_storage_container_subscribe_disposing_fn = unsafe extern "C" fn(
+    CNA_StorageContainerHandle,
+    CNA_StorageCompletionCallback,
+    *mut c_void,
+    *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_storage_container_unsubscribe_disposing_fn =
+    unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_storage_container_create_directory_fn =
+    unsafe extern "C" fn(CNA_StorageContainerHandle, CNA_StringView) -> CNA_Result;
+pub type cna_storage_container_directory_exists_fn =
+    unsafe extern "C" fn(CNA_StorageContainerHandle, CNA_StringView, *mut CNA_Bool) -> CNA_Result;
+pub type cna_storage_container_delete_directory_fn =
+    unsafe extern "C" fn(CNA_StorageContainerHandle, CNA_StringView) -> CNA_Result;
+pub type cna_storage_container_file_exists_fn =
+    unsafe extern "C" fn(CNA_StorageContainerHandle, CNA_StringView, *mut CNA_Bool) -> CNA_Result;
+pub type cna_storage_container_delete_file_fn =
+    unsafe extern "C" fn(CNA_StorageContainerHandle, CNA_StringView) -> CNA_Result;
+pub type cna_storage_container_get_directory_name_count_fn =
+    unsafe extern "C" fn(CNA_StorageContainerHandle, CNA_StringView, *mut u64) -> CNA_Result;
+pub type cna_storage_container_copy_directory_name_fn = unsafe extern "C" fn(
+    CNA_StorageContainerHandle,
+    CNA_StringView,
+    u64,
+    *mut c_char,
+    u64,
+    *mut u64,
+) -> CNA_Result;
+pub type cna_storage_container_get_file_name_count_fn =
+    unsafe extern "C" fn(CNA_StorageContainerHandle, CNA_StringView, *mut u64) -> CNA_Result;
+pub type cna_storage_container_copy_file_name_fn = unsafe extern "C" fn(
+    CNA_StorageContainerHandle,
+    CNA_StringView,
+    u64,
+    *mut c_char,
+    u64,
+    *mut u64,
+) -> CNA_Result;
+pub type cna_storage_container_create_file_fn = unsafe extern "C" fn(
+    CNA_StorageContainerHandle,
+    CNA_StringView,
+    *mut CNA_StorageStreamHandle,
+) -> CNA_Result;
+pub type cna_storage_container_open_file_fn = unsafe extern "C" fn(
+    CNA_StorageContainerHandle,
+    CNA_StringView,
+    CNA_FileMode,
+    *mut CNA_StorageStreamHandle,
+) -> CNA_Result;
+pub type cna_storage_container_open_file_access_fn = unsafe extern "C" fn(
+    CNA_StorageContainerHandle,
+    CNA_StringView,
+    CNA_FileMode,
+    CNA_FileAccess,
+    *mut CNA_StorageStreamHandle,
+) -> CNA_Result;
+pub type cna_storage_container_open_file_share_fn = unsafe extern "C" fn(
+    CNA_StorageContainerHandle,
+    CNA_StringView,
+    CNA_FileMode,
+    CNA_FileAccess,
+    CNA_FileShare,
+    *mut CNA_StorageStreamHandle,
+) -> CNA_Result;
+pub type cna_storage_container_destroy_fn =
+    unsafe extern "C" fn(CNA_StorageContainerHandle) -> CNA_Result;
+pub type cna_storage_stream_read_fn =
+    unsafe extern "C" fn(CNA_StorageStreamHandle, *mut u8, u64, *mut u64) -> CNA_Result;
+pub type cna_storage_stream_write_fn =
+    unsafe extern "C" fn(CNA_StorageStreamHandle, *const u8, u64) -> CNA_Result;
+pub type cna_storage_stream_seek_fn =
+    unsafe extern "C" fn(CNA_StorageStreamHandle, i64, CNA_SeekOrigin, *mut i64) -> CNA_Result;
+pub type cna_storage_stream_get_position_fn =
+    unsafe extern "C" fn(CNA_StorageStreamHandle, *mut i64) -> CNA_Result;
+pub type cna_storage_stream_get_length_fn =
+    unsafe extern "C" fn(CNA_StorageStreamHandle, *mut i64) -> CNA_Result;
+pub type cna_storage_stream_set_length_fn =
+    unsafe extern "C" fn(CNA_StorageStreamHandle, i64) -> CNA_Result;
+pub type cna_storage_stream_get_can_read_fn =
+    unsafe extern "C" fn(CNA_StorageStreamHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_storage_stream_get_can_write_fn =
+    unsafe extern "C" fn(CNA_StorageStreamHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_storage_stream_get_can_seek_fn =
+    unsafe extern "C" fn(CNA_StorageStreamHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_storage_stream_flush_fn = unsafe extern "C" fn(CNA_StorageStreamHandle) -> CNA_Result;
+pub type cna_storage_stream_close_fn = unsafe extern "C" fn(CNA_StorageStreamHandle) -> CNA_Result;
 
 #[cfg(test)]
 mod layout_tests {
@@ -2420,6 +2764,38 @@ mod layout_tests {
                 align_of::<CNA_GamePadCapabilities>()
             ),
             (48, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_TouchLocation>(),
+                align_of::<CNA_TouchLocation>()
+            ),
+            (32, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_TouchCapabilities>(),
+                align_of::<CNA_TouchCapabilities>()
+            ),
+            (16, 4)
+        );
+        assert_eq!(
+            (size_of::<CNA_TouchState>(), align_of::<CNA_TouchState>()),
+            (272, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_GestureSample>(),
+                align_of::<CNA_GestureSample>()
+            ),
+            (64, 8)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_GraphicsDeviceInformation>(),
+                align_of::<CNA_GraphicsDeviceInformation>()
+            ),
+            (60, 4)
         );
     }
 }

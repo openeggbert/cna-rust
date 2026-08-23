@@ -53,11 +53,54 @@ impl IntoIterator for DisplayModeCollection {
 pub struct GraphicsAdapter {
     device: Weak<DeviceState>,
     index: u32,
+    placeholder: bool,
     current_display_mode: OnceLock<DisplayMode>,
     supported_display_modes: OnceLock<DisplayModeCollection>,
 }
 
+impl Clone for GraphicsAdapter {
+    fn clone(&self) -> Self {
+        Self {
+            device: self.device.clone(),
+            index: self.index,
+            placeholder: self.placeholder,
+            current_display_mode: OnceLock::new(),
+            supported_display_modes: OnceLock::new(),
+        }
+    }
+}
+
 impl GraphicsAdapter {
+    pub(crate) fn default_placeholder() -> Self {
+        Self::proposal_placeholder(0)
+    }
+
+    pub(crate) fn proposal_placeholder(index: u32) -> Self {
+        Self {
+            device: Weak::new(),
+            index,
+            placeholder: true,
+            current_display_mode: OnceLock::new(),
+            supported_display_modes: OnceLock::new(),
+        }
+    }
+
+    pub(crate) fn same_identity(&self, other: &Self) -> bool {
+        (self.placeholder && other.placeholder && self.index == other.index)
+            || (!self.placeholder
+                && !other.placeholder
+                && self.index == other.index
+                && self.device.as_ptr() == other.device.as_ptr())
+    }
+
+    pub(crate) fn identity_hash(&self) -> i32 {
+        if self.placeholder {
+            return self.index as i32;
+        }
+        let pointer = self.device.as_ptr() as usize;
+        (pointer as u64 ^ (pointer as u64 >> 32) ^ u64::from(self.index)) as i32
+    }
+
     pub(super) fn all(device: &GraphicsDevice) -> Result<&[Self]> {
         if device.state.adapters.get().is_none() {
             let count = device
@@ -70,6 +113,7 @@ impl GraphicsAdapter {
                 .map(|index| Self {
                     device: Arc::downgrade(&device.state),
                     index,
+                    placeholder: false,
                     current_display_mode: OnceLock::new(),
                     supported_display_modes: OnceLock::new(),
                 })
@@ -349,5 +393,15 @@ impl GraphicsAdapter {
             ));
         }
         Ok(self.index)
+    }
+
+    pub(super) fn proposal_index_for(&self, expected: &Arc<DeviceState>) -> Result<i32> {
+        if self.placeholder {
+            i32::try_from(self.index)
+                .map_err(|_| CnaError::InvalidInput("graphics adapter index exceeds i32"))
+        } else {
+            i32::try_from(self.index_for(expected)?)
+                .map_err(|_| CnaError::InvalidInput("graphics adapter index exceeds i32"))
+        }
     }
 }

@@ -17,8 +17,8 @@ pub use gamepad::{
 };
 pub use mouse::{Mouse, MouseState};
 pub use touch::{
-    TouchCollection, TouchCollectionEnumerator, TouchLocation, TouchLocationState,
-    TouchPanelCapabilities,
+    GestureSample, GestureType, TouchCollection, TouchCollectionEnumerator, TouchLocation,
+    TouchLocationState, TouchPanel, TouchPanelCapabilities,
 };
 
 // Generated from enum constants in the pinned Microsoft.Xna.Framework.dll

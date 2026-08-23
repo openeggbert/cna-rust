@@ -205,6 +205,64 @@ class VerifierMappingTests(unittest.TestCase):
         self.assertEqual(members["White"]["kind"], "assoc_const")
         self.assertEqual(members["White"]["type"], "Self")
 
+    def test_dynamic_static_value_property_maps_to_fallible_context_function(self):
+        panel = {
+            "name": "Microsoft.Xna.Framework.Input.Touch.TouchPanel", "kind": "class",
+            "genericParameters": [], "members": [
+                {
+                    "kind": "property", "name": "IsGestureAvailable",
+                    "type": "System.Boolean", "static": True,
+                    "get": True, "set": False, "parameters": [],
+                }
+            ],
+        }
+        members = VERIFY.mapped_members(panel, RULES, {panel["name"]: panel})
+        self.assertEqual(members["IsGestureAvailable"]["kind"], "function")
+        self.assertEqual(members["IsGestureAvailable"]["parameters"], [
+            {"name": "game", "type": "&GameContext"},
+        ])
+        self.assertEqual(members["IsGestureAvailable"]["returnType"], "Result<bool>")
+
+    def test_storage_begin_end_and_stream_projection_is_concrete(self):
+        device = {
+            "name": "Microsoft.Xna.Framework.Storage.StorageDevice", "kind": "class",
+            "genericParameters": [], "members": [
+                {"kind": "method", "name": "BeginOpenContainer", "static": False,
+                 "returnType": "System.IAsyncResult", "genericParameters": [], "parameters": [
+                     {"name": "displayName", "type": "System.String"},
+                     {"name": "callback", "type": "System.AsyncCallback"},
+                     {"name": "state", "type": "System.Object"},
+                 ]},
+                {"kind": "method", "name": "EndOpenContainer", "static": False,
+                 "returnType": "Microsoft.Xna.Framework.Storage.StorageContainer",
+                 "genericParameters": [], "parameters": [
+                     {"name": "result", "type": "System.IAsyncResult"},
+                 ]},
+            ],
+        }
+        container = {
+            "name": "Microsoft.Xna.Framework.Storage.StorageContainer", "kind": "class",
+            "genericParameters": [], "members": [
+                {"kind": "method", "name": "CreateFile", "static": False,
+                 "returnType": "System.IO.Stream", "genericParameters": [], "parameters": [
+                     {"name": "file", "type": "System.String"},
+                 ]},
+            ],
+        }
+        types = {device["name"]: device, container["name"]: container}
+        device_members = VERIFY.mapped_members(device, RULES, types)
+        self.assertEqual(device_members["BeginOpenContainer"]["returnType"],
+                         "Result<StorageAsyncResult>")
+        self.assertEqual(device_members["BeginOpenContainer"]["parameters"][-2:], [
+            {"name": "callback", "type": "Option<StorageAsyncCallback>"},
+            {"name": "state", "type": "StorageAsyncState"},
+        ])
+        self.assertEqual(device_members["EndOpenContainer"]["parameters"][-1],
+                         {"name": "result", "type": "&StorageAsyncResult"})
+        container_members = VERIFY.mapped_members(container, RULES, types)
+        self.assertEqual(container_members["CreateFile"]["returnType"],
+                         "Result<StorageStream>")
+
     def test_curve_collection_returns_shared_key_handle_and_owned_iterator(self):
         key = {"name": "Microsoft.Xna.Framework.CurveKey", "kind": "class"}
         collection = {
@@ -299,6 +357,62 @@ class VerifierMappingTests(unittest.TestCase):
             {"name": "self", "type": "&Self"},
             {"name": "registration", "type": "u64"},
         ])
+
+    def test_preparing_device_settings_retains_shared_reference_graph(self):
+        adapter = {
+            "name": "Microsoft.Xna.Framework.Graphics.GraphicsAdapter", "kind": "class",
+        }
+        parameters = {
+            "name": "Microsoft.Xna.Framework.Graphics.PresentationParameters", "kind": "class",
+        }
+        information = {
+            "name": "Microsoft.Xna.Framework.GraphicsDeviceInformation", "kind": "class",
+            "genericParameters": [], "members": [
+                {"kind": "property", "name": "Adapter", "static": False,
+                 "type": adapter["name"], "get": True, "set": True, "parameters": []},
+                {"kind": "property", "name": "PresentationParameters", "static": False,
+                 "type": parameters["name"], "get": True, "set": True, "parameters": []},
+            ],
+        }
+        event_args = {
+            "name": "Microsoft.Xna.Framework.PreparingDeviceSettingsEventArgs", "kind": "class",
+            "genericParameters": [], "members": [
+                {"kind": "constructor", "name": ".ctor", "static": False,
+                 "returnType": None, "genericParameters": [], "parameters": [
+                     {"name": "graphicsDeviceInformation", "type": information["name"]},
+                 ]},
+                {"kind": "property", "name": "GraphicsDeviceInformation", "static": False,
+                 "type": information["name"], "get": True, "set": False, "parameters": []},
+            ],
+        }
+        manager = {
+            "name": "Microsoft.Xna.Framework.GraphicsDeviceManager", "kind": "class",
+            "genericParameters": [], "members": [
+                {"kind": "method", "name": "RankDevices", "static": False,
+                 "returnType": "System.Void", "genericParameters": [], "parameters": [
+                     {"name": "foundDevices",
+                      "type": "System.Collections.Generic.List`1[Microsoft.Xna.Framework.GraphicsDeviceInformation]"},
+                 ]},
+            ],
+        }
+        index = {value["name"]: value for value in [
+            adapter, parameters, information, event_args, manager,
+        ]}
+        info_members = VERIFY.mapped_members(information, RULES, index)
+        self.assertEqual(info_members["Adapter"]["returnType"], "Arc<Graphics::GraphicsAdapter>")
+        self.assertEqual(info_members["SetAdapter"]["parameters"], [
+            {"name": "self", "type": "&Self"},
+            {"name": "value", "type": "Arc<Graphics::GraphicsAdapter>"},
+        ])
+        args_members = VERIFY.mapped_members(event_args, RULES, index)
+        self.assertEqual(args_members["new"]["parameters"][-1]["type"],
+                         "Arc<GraphicsDeviceInformation>")
+        self.assertEqual(args_members["GraphicsDeviceInformation"]["returnType"],
+                         "Arc<GraphicsDeviceInformation>")
+        manager_members = VERIFY.mapped_members(manager, RULES, index)
+        self.assertEqual(manager_members["RankDevices"]["parameters"][-1],
+                         {"name": "foundDevices",
+                          "type": "&mut Vec<GraphicsDeviceInformation>"})
 
     def test_interface_parameter_projects_as_trait_object(self):
         component = {

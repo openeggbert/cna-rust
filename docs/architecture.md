@@ -22,14 +22,14 @@ concepts remain under `cna::extensions`.
 ## Native boundary and ABI evidence
 
 `cna-sys` contains the reviewed ABI-0.7 slice: fixed-width aliases, exact
-semantic handle typedefs, `repr(C)` structures, callbacks, constants, and 347
+semantic handle typedefs, `repr(C)` structures, callbacks, constants, and 431
 function-pointer declarations. The
 safe bridge is grouped by concern:
 
 - `native/api.rs`: exact version gate and symbol inventory;
 - `native/loader.rs`: dynamic-library ownership and Unix loading;
-- `native/game.rs`, `graphics.rs`, `display.rs`, `window.rs`, and `input.rs`:
-  typed facade calls;
+- `native/game.rs`, `graphics.rs`, `display.rs`, `window.rs`, `input.rs`,
+  `device_manager.rs`, and `storage.rs`: typed facade calls;
 - `native/fault.rs`: feature-gated, test-only failure injection;
 - `native/error.rs`: CNA error extraction.
 
@@ -41,9 +41,10 @@ The ABI verifier derives full C prototypes from Clang's view of canonical CNA
 headers and compares them with every reviewed `cna-sys` function type. It
 measures return and parameter types, scalar width/signedness, pointer depth and
 constness, callback/struct pointers, and boolean/enum representations. The
-current pass checks 347 functions and 1,220 prototype type positions. Independent
-C and Rust probes make 840 measurements across 51 structures, three callback
-signatures, scalar representations, and 206 constants, with zero mismatches.
+current pass checks 431 functions and 1,509 prototype type positions.
+Independent C and Rust probes make 936 measurements across 56 structures, five
+callback signatures, scalar representations, and 243 constants, with zero
+mismatches.
 
 ## Durable device identity
 
@@ -147,9 +148,46 @@ transition or a stable safe wrapper for the reported native resource handle.
 
 The current `RunOneFrame` entry executes one owned host session. Arbitrary
 repeated XNA-style ticking remains blocked by CNA retaining the creation-time
-callback context: the safe binding cannot let that pointer outlive a borrowed
-Rust game or rebind it through the current ABI. It reports this limitation
-instead of manufacturing a `'static` borrow.
+core callback context. The later frame-hook table has an independently mutable
+context but cannot rebind Update/Draw/content callbacks. The safe binding
+cannot let that pointer outlive a borrowed Rust game and reports the limitation
+instead of manufacturing a `'static` borrow. A safe CNA route must atomically
+replace the full core callback table/context while idle and guarantee release
+of the prior context.
+
+## Device management, Touch, Storage, and GamerServices
+
+One optional `GraphicsDeviceManagerState` is registered with each Game. It is
+published under manager and device-service `TypeId`s, retains the durable
+Game-owned device wrapper, caches pre-run preferences, and owns a CNA manager
+plus six event registrations only during the native session. It never owns or
+constructs a second device. Native callbacks use a non-owning public manager
+wrapper as sender; callback panic is recorded and returned after CNA reaches a
+safe Rust operation boundary. Shared `GraphicsDeviceInformation` proposals
+preserve CLR reference identity, while explicit XNA Clone deep-copies mutable
+presentation state. CNA lacks candidate ranking, so that protected operation
+is an explicit backend error.
+
+`TouchPanel` is static at the XNA surface but takes the active
+`GameContext<'_>` under the normative mapping. The bridge borrows the current
+Game handle only for the call and copies capabilities, touch locations, and
+gesture samples into managed values. It neither owns a registration nor
+recognizes gestures in Rust.
+
+Storage is independent of Game and has strict native ownership:
+`StorageDevice -> StorageContainer -> StorageStream`. Begin operations invoke
+CNA synchronously and return a concrete one-shot result retaining state and
+origin identity. Every filesystem and stream operation remains behind CNA;
+`std::fs` is not a backend. Rust validates XNA child-path containment before
+native dispatch because ABI 0.7's `RelativePath` copies valid UTF-8 but does
+not enforce all traversal rules. Container Dispose closes streams, observes
+CNA's synchronous Disposing event exactly once, then unregisters/destroys in
+child-first order.
+
+`GamerServicesComponent` composes the existing `GameComponent` state and
+participates in ordinary initialize/update/order/enabled/dispose behavior. No
+Gamer, Guide, Avatar, network, achievement, or leaderboard service is in the
+selected profile or fabricated by the component.
 
 ## Content and XNB
 
@@ -162,7 +200,7 @@ after a failure and retains failed disposables so later `Dispose` can retry.
 Partial reader failures roll back only resources recorded by that load.
 
 `ContentReader` implements XNA's managed XNB layer: Windows header/version/
-flags/size validation, uncompressed payload framing, seven-bit values, reader
+flags/size validation, compressed and uncompressed payload framing, seven-bit values, reader
 table and versions, root reader index, existing instances, shared fixups,
 external references, and trailing-data validation. The global registry stores
 typed descriptors rather than a general application `Any` loader. Custom
@@ -183,7 +221,17 @@ graph only after shared fixups resolve; failure rolls back each resource
 recorded during the load. Model is registered last, so reverse unload
 invalidates retained graph facades before effects and buffers are destroyed.
 Texture3D and TextureCube readers admit only the reviewed exact Color encoding.
-LZX compression is not implemented.
+
+For compressed XNB v5, the 14-byte header supplies the exact decompressed
+payload size. The frame layer accepts XNA's two-byte short header and
+`0xff`-selected extended header, retains one 64 KiB LZX decoder across frames,
+and requires exact frame output, exact total output, and an exact end or legal
+zero marker/padding. The decoder implements verbatim, aligned, and
+uncompressed blocks plus the complete XNA Huffman/repeated-offset/window
+behavior; it does not apply CAB's optional Intel transform. Decompression
+finishes before the ordinary reader graph begins, so fixups, external
+references, rollback, cache identity, Unload, and reload use one unchanged
+pipeline.
 
 ## Graphics resource foundation
 
@@ -287,15 +335,17 @@ compiler-produced rustdoc JSON. Schema 2 measures every declared structural
 category and emits the deterministic type scoreboard. `unmeasuredCategories`
 and the allowlist are empty; the leak-only public-surface gate is zero.
 
-The XNA-derived managed corpus has 140 named observations plus a final count
-assertion (141 assertions total). New platform-neutral groups cover Content
-metadata/cache identity and vertex declaration/layout values. The native suite
-uses isolated child processes for 197 created game lifetimes and 893 owned
-child-handle constructions, including ten buffer binding cycles, ten
-SpriteFont atlas/content cycles, ten Effect parent/child cycles, ten complete
-Model/XNB cycles, ten stock-effect/Texture3D/OcclusionQuery cycles, repeated
-dispose/drop, live-child parent shutdown, stable identities, callback panic,
-transfer validation, and injected failures. Absence of a crash is not a leak proof.
+The XNA-derived managed corpus has 145 named observations plus a final count
+assertion (146 assertions total). New platform-neutral groups cover Gesture
+flags/samples and device-information default/reference/clone behavior. The
+native suite uses isolated child processes for 209 created game lifetimes and
+1,012 owned child-handle constructions, including ten buffer binding cycles,
+ten SpriteFont atlas/content cycles, ten Effect parent/child cycles, ten
+complete compressed Model/XNB cycles, ten stock-effect/Texture3D/
+OcclusionQuery cycles, ten combined Framework/Touch/Storage/GamerServices
+cycles, repeated dispose/drop, live-child parent shutdown, stable identities,
+callback self-removal/panic/recreation, transfer validation, and injected
+failures. Absence of a crash is not a leak proof.
 `tools/native-stress/run-sanitized.sh` is an optional path requiring a
 separately instrumented exact ABI-0.7 CNA library. Sanitizer status is
 `not-run`; no sanitizer pass is claimed for the current run.
@@ -307,10 +357,10 @@ its unmodified C API build at `CnaCApiCoreExt.cpp:250`: the renderer identity
 assertion reduces to `49 == 50`. Runtime evidence therefore uses the clearly
 labelled experimental ABI-0.7 HEADLESS library.
 
-Graphics has zero missing types and every remaining strict diagnostic is a
-whole missing type outside Graphics. XNA LZX remains a complete future slice,
-not a partial decoder. The next type work should prefer one complete small
-Framework/core, Input, Storage, or GamerServices family after regenerating the
-scoreboard; broad Audio/Media work remains lower priority. Repeated frame
-hosting still needs a CNA callback-context rebinding route. PNG decoding
-remains a texture route, not an alias for XNB content.
+Graphics, Framework/core, Input, Storage, and GamerServices have zero missing
+types. Every remaining strict diagnostic is a whole missing type in Design
+(13), Audio (19), or Media (24); each is a separate future milestone requiring
+its own regenerated dependency/ownership review. LZX is complete for XNA 4.0
+Windows framing. Repeated frame hosting still needs a CNA core-callback-context
+rebinding route. PNG decoding remains a texture route, not an alias for XNB
+content.

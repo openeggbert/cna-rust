@@ -433,6 +433,124 @@ pub(crate) struct Native {
     pub(super) gamepad_get_state_with_dead_zone: sys::cna_gamepad_get_state_with_dead_zone_fn,
     pub(super) gamepad_get_capabilities: sys::cna_gamepad_get_capabilities_fn,
     pub(super) gamepad_set_vibration: sys::cna_gamepad_set_vibration_fn,
+    pub(super) touch_get_capabilities: sys::cna_touch_get_capabilities_fn,
+    pub(super) touch_get_state: sys::cna_touch_get_state_fn,
+    pub(super) touch_panel_get_display_width: sys::cna_touch_panel_get_display_width_fn,
+    pub(super) touch_panel_set_display_width: sys::cna_touch_panel_set_display_width_fn,
+    pub(super) touch_panel_get_display_height: sys::cna_touch_panel_get_display_height_fn,
+    pub(super) touch_panel_set_display_height: sys::cna_touch_panel_set_display_height_fn,
+    pub(super) touch_panel_get_display_orientation: sys::cna_touch_panel_get_display_orientation_fn,
+    pub(super) touch_panel_set_display_orientation: sys::cna_touch_panel_set_display_orientation_fn,
+    pub(super) touch_panel_get_enabled_gestures: sys::cna_touch_panel_get_enabled_gestures_fn,
+    pub(super) touch_panel_set_enabled_gestures: sys::cna_touch_panel_set_enabled_gestures_fn,
+    pub(super) touch_panel_get_is_gesture_available:
+        sys::cna_touch_panel_get_is_gesture_available_fn,
+    pub(super) touch_panel_get_window_handle: sys::cna_touch_panel_get_window_handle_fn,
+    pub(super) touch_panel_set_window_handle: sys::cna_touch_panel_set_window_handle_fn,
+    pub(super) touch_panel_read_gesture: sys::cna_touch_panel_read_gesture_fn,
+    pub(super) graphics_device_manager_create: sys::cna_graphics_device_manager_create_fn,
+    pub(super) graphics_device_manager_get_graphics_profile:
+        sys::cna_graphics_device_manager_get_graphics_profile_fn,
+    pub(super) graphics_device_manager_set_graphics_profile:
+        sys::cna_graphics_device_manager_set_graphics_profile_fn,
+    pub(super) graphics_device_manager_get_is_full_screen:
+        sys::cna_graphics_device_manager_get_is_full_screen_fn,
+    pub(super) graphics_device_manager_set_is_full_screen:
+        sys::cna_graphics_device_manager_set_is_full_screen_fn,
+    pub(super) graphics_device_manager_get_prefer_multi_sampling:
+        sys::cna_graphics_device_manager_get_prefer_multi_sampling_fn,
+    pub(super) graphics_device_manager_set_prefer_multi_sampling:
+        sys::cna_graphics_device_manager_set_prefer_multi_sampling_fn,
+    pub(super) graphics_device_manager_get_preferred_back_buffer_format:
+        sys::cna_graphics_device_manager_get_preferred_back_buffer_format_fn,
+    pub(super) graphics_device_manager_set_preferred_back_buffer_format:
+        sys::cna_graphics_device_manager_set_preferred_back_buffer_format_fn,
+    pub(super) graphics_device_manager_get_preferred_back_buffer_width:
+        sys::cna_graphics_device_manager_get_preferred_back_buffer_width_fn,
+    pub(super) graphics_device_manager_set_preferred_back_buffer_width:
+        sys::cna_graphics_device_manager_set_preferred_back_buffer_width_fn,
+    pub(super) graphics_device_manager_get_preferred_back_buffer_height:
+        sys::cna_graphics_device_manager_get_preferred_back_buffer_height_fn,
+    pub(super) graphics_device_manager_set_preferred_back_buffer_height:
+        sys::cna_graphics_device_manager_set_preferred_back_buffer_height_fn,
+    pub(super) graphics_device_manager_get_preferred_depth_stencil_format:
+        sys::cna_graphics_device_manager_get_preferred_depth_stencil_format_fn,
+    pub(super) graphics_device_manager_set_preferred_depth_stencil_format:
+        sys::cna_graphics_device_manager_set_preferred_depth_stencil_format_fn,
+    pub(super) graphics_device_manager_get_synchronize_with_vertical_retrace:
+        sys::cna_graphics_device_manager_get_synchronize_with_vertical_retrace_fn,
+    pub(super) graphics_device_manager_set_synchronize_with_vertical_retrace:
+        sys::cna_graphics_device_manager_set_synchronize_with_vertical_retrace_fn,
+    pub(super) graphics_device_manager_get_supported_orientations:
+        sys::cna_graphics_device_manager_get_supported_orientations_fn,
+    pub(super) graphics_device_manager_set_supported_orientations:
+        sys::cna_graphics_device_manager_set_supported_orientations_fn,
+    pub(super) graphics_device_manager_apply_changes:
+        sys::cna_graphics_device_manager_apply_changes_fn,
+    pub(super) graphics_device_manager_toggle_full_screen:
+        sys::cna_graphics_device_manager_toggle_full_screen_fn,
+    pub(super) graphics_device_manager_create_device:
+        sys::cna_graphics_device_manager_create_device_fn,
+    pub(super) graphics_device_manager_begin_draw: sys::cna_graphics_device_manager_begin_draw_fn,
+    pub(super) graphics_device_manager_end_draw: sys::cna_graphics_device_manager_end_draw_fn,
+    pub(super) graphics_device_manager_dispose: sys::cna_graphics_device_manager_dispose_fn,
+    pub(super) graphics_device_manager_subscribe: sys::cna_graphics_device_manager_subscribe_fn,
+    pub(super) graphics_device_manager_subscribe_preparing_device_settings_ext:
+        sys::cna_graphics_device_manager_subscribe_preparing_device_settings_ext_fn,
+    pub(super) graphics_device_manager_destroy: sys::cna_graphics_device_manager_destroy_fn,
+    pub(super) storage_device_show_selector: sys::cna_storage_device_show_selector_fn,
+    pub(super) storage_device_show_selector_for_player:
+        sys::cna_storage_device_show_selector_for_player_fn,
+    pub(super) storage_device_show_selector_with_space:
+        sys::cna_storage_device_show_selector_with_space_fn,
+    pub(super) storage_device_show_selector_for_player_with_space:
+        sys::cna_storage_device_show_selector_for_player_with_space_fn,
+    pub(super) storage_device_get_free_space: sys::cna_storage_device_get_free_space_fn,
+    pub(super) storage_device_get_is_connected: sys::cna_storage_device_get_is_connected_fn,
+    pub(super) storage_device_get_total_space: sys::cna_storage_device_get_total_space_fn,
+    pub(super) storage_device_delete_container: sys::cna_storage_device_delete_container_fn,
+    pub(super) storage_device_subscribe_device_changed:
+        sys::cna_storage_device_subscribe_device_changed_fn,
+    pub(super) storage_device_unsubscribe_device_changed:
+        sys::cna_storage_device_unsubscribe_device_changed_fn,
+    pub(super) storage_device_destroy: sys::cna_storage_device_destroy_fn,
+    pub(super) storage_container_open: sys::cna_storage_container_open_fn,
+    pub(super) storage_container_get_display_name_size:
+        sys::cna_storage_container_get_display_name_size_fn,
+    pub(super) storage_container_copy_display_name: sys::cna_storage_container_copy_display_name_fn,
+    pub(super) storage_container_dispose: sys::cna_storage_container_dispose_fn,
+    pub(super) storage_container_subscribe_disposing:
+        sys::cna_storage_container_subscribe_disposing_fn,
+    pub(super) storage_container_unsubscribe_disposing:
+        sys::cna_storage_container_unsubscribe_disposing_fn,
+    pub(super) storage_container_create_directory: sys::cna_storage_container_create_directory_fn,
+    pub(super) storage_container_directory_exists: sys::cna_storage_container_directory_exists_fn,
+    pub(super) storage_container_delete_directory: sys::cna_storage_container_delete_directory_fn,
+    pub(super) storage_container_file_exists: sys::cna_storage_container_file_exists_fn,
+    pub(super) storage_container_delete_file: sys::cna_storage_container_delete_file_fn,
+    pub(super) storage_container_get_directory_name_count:
+        sys::cna_storage_container_get_directory_name_count_fn,
+    pub(super) storage_container_copy_directory_name:
+        sys::cna_storage_container_copy_directory_name_fn,
+    pub(super) storage_container_get_file_name_count:
+        sys::cna_storage_container_get_file_name_count_fn,
+    pub(super) storage_container_copy_file_name: sys::cna_storage_container_copy_file_name_fn,
+    pub(super) storage_container_create_file: sys::cna_storage_container_create_file_fn,
+    pub(super) storage_container_open_file: sys::cna_storage_container_open_file_fn,
+    pub(super) storage_container_open_file_access: sys::cna_storage_container_open_file_access_fn,
+    pub(super) storage_container_open_file_share: sys::cna_storage_container_open_file_share_fn,
+    pub(super) storage_container_destroy: sys::cna_storage_container_destroy_fn,
+    pub(super) storage_stream_read: sys::cna_storage_stream_read_fn,
+    pub(super) storage_stream_write: sys::cna_storage_stream_write_fn,
+    pub(super) storage_stream_seek: sys::cna_storage_stream_seek_fn,
+    pub(super) storage_stream_get_position: sys::cna_storage_stream_get_position_fn,
+    pub(super) storage_stream_get_length: sys::cna_storage_stream_get_length_fn,
+    pub(super) storage_stream_set_length: sys::cna_storage_stream_set_length_fn,
+    pub(super) storage_stream_get_can_read: sys::cna_storage_stream_get_can_read_fn,
+    pub(super) storage_stream_get_can_write: sys::cna_storage_stream_get_can_write_fn,
+    pub(super) storage_stream_get_can_seek: sys::cna_storage_stream_get_can_seek_fn,
+    pub(super) storage_stream_flush: sys::cna_storage_stream_flush_fn,
+    pub(super) storage_stream_close: sys::cna_storage_stream_close_fn,
 }
 
 impl Native {
@@ -1754,6 +1872,339 @@ impl Native {
             gamepad_set_vibration: symbol!(
                 "cna_gamepad_set_vibration",
                 sys::cna_gamepad_set_vibration_fn
+            ),
+            touch_get_capabilities: symbol!(
+                "cna_touch_get_capabilities",
+                sys::cna_touch_get_capabilities_fn
+            ),
+            touch_get_state: symbol!("cna_touch_get_state", sys::cna_touch_get_state_fn),
+            touch_panel_get_display_width: symbol!(
+                "cna_touch_panel_get_display_width",
+                sys::cna_touch_panel_get_display_width_fn
+            ),
+            touch_panel_set_display_width: symbol!(
+                "cna_touch_panel_set_display_width",
+                sys::cna_touch_panel_set_display_width_fn
+            ),
+            touch_panel_get_display_height: symbol!(
+                "cna_touch_panel_get_display_height",
+                sys::cna_touch_panel_get_display_height_fn
+            ),
+            touch_panel_set_display_height: symbol!(
+                "cna_touch_panel_set_display_height",
+                sys::cna_touch_panel_set_display_height_fn
+            ),
+            touch_panel_get_display_orientation: symbol!(
+                "cna_touch_panel_get_display_orientation",
+                sys::cna_touch_panel_get_display_orientation_fn
+            ),
+            touch_panel_set_display_orientation: symbol!(
+                "cna_touch_panel_set_display_orientation",
+                sys::cna_touch_panel_set_display_orientation_fn
+            ),
+            touch_panel_get_enabled_gestures: symbol!(
+                "cna_touch_panel_get_enabled_gestures",
+                sys::cna_touch_panel_get_enabled_gestures_fn
+            ),
+            touch_panel_set_enabled_gestures: symbol!(
+                "cna_touch_panel_set_enabled_gestures",
+                sys::cna_touch_panel_set_enabled_gestures_fn
+            ),
+            touch_panel_get_is_gesture_available: symbol!(
+                "cna_touch_panel_get_is_gesture_available",
+                sys::cna_touch_panel_get_is_gesture_available_fn
+            ),
+            touch_panel_get_window_handle: symbol!(
+                "cna_touch_panel_get_window_handle",
+                sys::cna_touch_panel_get_window_handle_fn
+            ),
+            touch_panel_set_window_handle: symbol!(
+                "cna_touch_panel_set_window_handle",
+                sys::cna_touch_panel_set_window_handle_fn
+            ),
+            touch_panel_read_gesture: symbol!(
+                "cna_touch_panel_read_gesture",
+                sys::cna_touch_panel_read_gesture_fn
+            ),
+            graphics_device_manager_create: symbol!(
+                "cna_graphics_device_manager_create",
+                sys::cna_graphics_device_manager_create_fn
+            ),
+            graphics_device_manager_get_graphics_profile: symbol!(
+                "cna_graphics_device_manager_get_graphics_profile",
+                sys::cna_graphics_device_manager_get_graphics_profile_fn
+            ),
+            graphics_device_manager_set_graphics_profile: symbol!(
+                "cna_graphics_device_manager_set_graphics_profile",
+                sys::cna_graphics_device_manager_set_graphics_profile_fn
+            ),
+            graphics_device_manager_get_is_full_screen: symbol!(
+                "cna_graphics_device_manager_get_is_full_screen",
+                sys::cna_graphics_device_manager_get_is_full_screen_fn
+            ),
+            graphics_device_manager_set_is_full_screen: symbol!(
+                "cna_graphics_device_manager_set_is_full_screen",
+                sys::cna_graphics_device_manager_set_is_full_screen_fn
+            ),
+            graphics_device_manager_get_prefer_multi_sampling: symbol!(
+                "cna_graphics_device_manager_get_prefer_multi_sampling",
+                sys::cna_graphics_device_manager_get_prefer_multi_sampling_fn
+            ),
+            graphics_device_manager_set_prefer_multi_sampling: symbol!(
+                "cna_graphics_device_manager_set_prefer_multi_sampling",
+                sys::cna_graphics_device_manager_set_prefer_multi_sampling_fn
+            ),
+            graphics_device_manager_get_preferred_back_buffer_format: symbol!(
+                "cna_graphics_device_manager_get_preferred_back_buffer_format",
+                sys::cna_graphics_device_manager_get_preferred_back_buffer_format_fn
+            ),
+            graphics_device_manager_set_preferred_back_buffer_format: symbol!(
+                "cna_graphics_device_manager_set_preferred_back_buffer_format",
+                sys::cna_graphics_device_manager_set_preferred_back_buffer_format_fn
+            ),
+            graphics_device_manager_get_preferred_back_buffer_width: symbol!(
+                "cna_graphics_device_manager_get_preferred_back_buffer_width",
+                sys::cna_graphics_device_manager_get_preferred_back_buffer_width_fn
+            ),
+            graphics_device_manager_set_preferred_back_buffer_width: symbol!(
+                "cna_graphics_device_manager_set_preferred_back_buffer_width",
+                sys::cna_graphics_device_manager_set_preferred_back_buffer_width_fn
+            ),
+            graphics_device_manager_get_preferred_back_buffer_height: symbol!(
+                "cna_graphics_device_manager_get_preferred_back_buffer_height",
+                sys::cna_graphics_device_manager_get_preferred_back_buffer_height_fn
+            ),
+            graphics_device_manager_set_preferred_back_buffer_height: symbol!(
+                "cna_graphics_device_manager_set_preferred_back_buffer_height",
+                sys::cna_graphics_device_manager_set_preferred_back_buffer_height_fn
+            ),
+            graphics_device_manager_get_preferred_depth_stencil_format: symbol!(
+                "cna_graphics_device_manager_get_preferred_depth_stencil_format",
+                sys::cna_graphics_device_manager_get_preferred_depth_stencil_format_fn
+            ),
+            graphics_device_manager_set_preferred_depth_stencil_format: symbol!(
+                "cna_graphics_device_manager_set_preferred_depth_stencil_format",
+                sys::cna_graphics_device_manager_set_preferred_depth_stencil_format_fn
+            ),
+            graphics_device_manager_get_synchronize_with_vertical_retrace: symbol!(
+                "cna_graphics_device_manager_get_synchronize_with_vertical_retrace",
+                sys::cna_graphics_device_manager_get_synchronize_with_vertical_retrace_fn
+            ),
+            graphics_device_manager_set_synchronize_with_vertical_retrace: symbol!(
+                "cna_graphics_device_manager_set_synchronize_with_vertical_retrace",
+                sys::cna_graphics_device_manager_set_synchronize_with_vertical_retrace_fn
+            ),
+            graphics_device_manager_get_supported_orientations: symbol!(
+                "cna_graphics_device_manager_get_supported_orientations",
+                sys::cna_graphics_device_manager_get_supported_orientations_fn
+            ),
+            graphics_device_manager_set_supported_orientations: symbol!(
+                "cna_graphics_device_manager_set_supported_orientations",
+                sys::cna_graphics_device_manager_set_supported_orientations_fn
+            ),
+            graphics_device_manager_apply_changes: symbol!(
+                "cna_graphics_device_manager_apply_changes",
+                sys::cna_graphics_device_manager_apply_changes_fn
+            ),
+            graphics_device_manager_toggle_full_screen: symbol!(
+                "cna_graphics_device_manager_toggle_full_screen",
+                sys::cna_graphics_device_manager_toggle_full_screen_fn
+            ),
+            graphics_device_manager_create_device: symbol!(
+                "cna_graphics_device_manager_create_device",
+                sys::cna_graphics_device_manager_create_device_fn
+            ),
+            graphics_device_manager_begin_draw: symbol!(
+                "cna_graphics_device_manager_begin_draw",
+                sys::cna_graphics_device_manager_begin_draw_fn
+            ),
+            graphics_device_manager_end_draw: symbol!(
+                "cna_graphics_device_manager_end_draw",
+                sys::cna_graphics_device_manager_end_draw_fn
+            ),
+            graphics_device_manager_dispose: symbol!(
+                "cna_graphics_device_manager_dispose",
+                sys::cna_graphics_device_manager_dispose_fn
+            ),
+            graphics_device_manager_subscribe: symbol!(
+                "cna_graphics_device_manager_subscribe",
+                sys::cna_graphics_device_manager_subscribe_fn
+            ),
+            graphics_device_manager_subscribe_preparing_device_settings_ext: symbol!(
+                "cna_graphics_device_manager_subscribe_preparing_device_settings_ext",
+                sys::cna_graphics_device_manager_subscribe_preparing_device_settings_ext_fn
+            ),
+            graphics_device_manager_destroy: symbol!(
+                "cna_graphics_device_manager_destroy",
+                sys::cna_graphics_device_manager_destroy_fn
+            ),
+            storage_device_show_selector: symbol!(
+                "cna_storage_device_show_selector",
+                sys::cna_storage_device_show_selector_fn
+            ),
+            storage_device_show_selector_for_player: symbol!(
+                "cna_storage_device_show_selector_for_player",
+                sys::cna_storage_device_show_selector_for_player_fn
+            ),
+            storage_device_show_selector_with_space: symbol!(
+                "cna_storage_device_show_selector_with_space",
+                sys::cna_storage_device_show_selector_with_space_fn
+            ),
+            storage_device_show_selector_for_player_with_space: symbol!(
+                "cna_storage_device_show_selector_for_player_with_space",
+                sys::cna_storage_device_show_selector_for_player_with_space_fn
+            ),
+            storage_device_get_free_space: symbol!(
+                "cna_storage_device_get_free_space",
+                sys::cna_storage_device_get_free_space_fn
+            ),
+            storage_device_get_is_connected: symbol!(
+                "cna_storage_device_get_is_connected",
+                sys::cna_storage_device_get_is_connected_fn
+            ),
+            storage_device_get_total_space: symbol!(
+                "cna_storage_device_get_total_space",
+                sys::cna_storage_device_get_total_space_fn
+            ),
+            storage_device_delete_container: symbol!(
+                "cna_storage_device_delete_container",
+                sys::cna_storage_device_delete_container_fn
+            ),
+            storage_device_subscribe_device_changed: symbol!(
+                "cna_storage_device_subscribe_device_changed",
+                sys::cna_storage_device_subscribe_device_changed_fn
+            ),
+            storage_device_unsubscribe_device_changed: symbol!(
+                "cna_storage_device_unsubscribe_device_changed",
+                sys::cna_storage_device_unsubscribe_device_changed_fn
+            ),
+            storage_device_destroy: symbol!(
+                "cna_storage_device_destroy",
+                sys::cna_storage_device_destroy_fn
+            ),
+            storage_container_open: symbol!(
+                "cna_storage_container_open",
+                sys::cna_storage_container_open_fn
+            ),
+            storage_container_get_display_name_size: symbol!(
+                "cna_storage_container_get_display_name_size",
+                sys::cna_storage_container_get_display_name_size_fn
+            ),
+            storage_container_copy_display_name: symbol!(
+                "cna_storage_container_copy_display_name",
+                sys::cna_storage_container_copy_display_name_fn
+            ),
+            storage_container_dispose: symbol!(
+                "cna_storage_container_dispose",
+                sys::cna_storage_container_dispose_fn
+            ),
+            storage_container_subscribe_disposing: symbol!(
+                "cna_storage_container_subscribe_disposing",
+                sys::cna_storage_container_subscribe_disposing_fn
+            ),
+            storage_container_unsubscribe_disposing: symbol!(
+                "cna_storage_container_unsubscribe_disposing",
+                sys::cna_storage_container_unsubscribe_disposing_fn
+            ),
+            storage_container_create_directory: symbol!(
+                "cna_storage_container_create_directory",
+                sys::cna_storage_container_create_directory_fn
+            ),
+            storage_container_directory_exists: symbol!(
+                "cna_storage_container_directory_exists",
+                sys::cna_storage_container_directory_exists_fn
+            ),
+            storage_container_delete_directory: symbol!(
+                "cna_storage_container_delete_directory",
+                sys::cna_storage_container_delete_directory_fn
+            ),
+            storage_container_file_exists: symbol!(
+                "cna_storage_container_file_exists",
+                sys::cna_storage_container_file_exists_fn
+            ),
+            storage_container_delete_file: symbol!(
+                "cna_storage_container_delete_file",
+                sys::cna_storage_container_delete_file_fn
+            ),
+            storage_container_get_directory_name_count: symbol!(
+                "cna_storage_container_get_directory_name_count",
+                sys::cna_storage_container_get_directory_name_count_fn
+            ),
+            storage_container_copy_directory_name: symbol!(
+                "cna_storage_container_copy_directory_name",
+                sys::cna_storage_container_copy_directory_name_fn
+            ),
+            storage_container_get_file_name_count: symbol!(
+                "cna_storage_container_get_file_name_count",
+                sys::cna_storage_container_get_file_name_count_fn
+            ),
+            storage_container_copy_file_name: symbol!(
+                "cna_storage_container_copy_file_name",
+                sys::cna_storage_container_copy_file_name_fn
+            ),
+            storage_container_create_file: symbol!(
+                "cna_storage_container_create_file",
+                sys::cna_storage_container_create_file_fn
+            ),
+            storage_container_open_file: symbol!(
+                "cna_storage_container_open_file",
+                sys::cna_storage_container_open_file_fn
+            ),
+            storage_container_open_file_access: symbol!(
+                "cna_storage_container_open_file_access",
+                sys::cna_storage_container_open_file_access_fn
+            ),
+            storage_container_open_file_share: symbol!(
+                "cna_storage_container_open_file_share",
+                sys::cna_storage_container_open_file_share_fn
+            ),
+            storage_container_destroy: symbol!(
+                "cna_storage_container_destroy",
+                sys::cna_storage_container_destroy_fn
+            ),
+            storage_stream_read: symbol!(
+                "cna_storage_stream_read",
+                sys::cna_storage_stream_read_fn
+            ),
+            storage_stream_write: symbol!(
+                "cna_storage_stream_write",
+                sys::cna_storage_stream_write_fn
+            ),
+            storage_stream_seek: symbol!(
+                "cna_storage_stream_seek",
+                sys::cna_storage_stream_seek_fn
+            ),
+            storage_stream_get_position: symbol!(
+                "cna_storage_stream_get_position",
+                sys::cna_storage_stream_get_position_fn
+            ),
+            storage_stream_get_length: symbol!(
+                "cna_storage_stream_get_length",
+                sys::cna_storage_stream_get_length_fn
+            ),
+            storage_stream_set_length: symbol!(
+                "cna_storage_stream_set_length",
+                sys::cna_storage_stream_set_length_fn
+            ),
+            storage_stream_get_can_read: symbol!(
+                "cna_storage_stream_get_can_read",
+                sys::cna_storage_stream_get_can_read_fn
+            ),
+            storage_stream_get_can_write: symbol!(
+                "cna_storage_stream_get_can_write",
+                sys::cna_storage_stream_get_can_write_fn
+            ),
+            storage_stream_get_can_seek: symbol!(
+                "cna_storage_stream_get_can_seek",
+                sys::cna_storage_stream_get_can_seek_fn
+            ),
+            storage_stream_flush: symbol!(
+                "cna_storage_stream_flush",
+                sys::cna_storage_stream_flush_fn
+            ),
+            storage_stream_close: symbol!(
+                "cna_storage_stream_close",
+                sys::cna_storage_stream_close_fn
             ),
             _library: library,
         })

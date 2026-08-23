@@ -90,6 +90,14 @@ impl<T> EventHandlers<T> {
         length != state.entries.len()
     }
 
+    pub(crate) fn is_empty(&self) -> bool {
+        self.state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .entries
+            .is_empty()
+    }
+
     pub(crate) fn emit(&self, sender: &dyn Any, args: T) -> bool
     where
         T: Clone,

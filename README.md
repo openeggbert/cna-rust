@@ -1,10 +1,11 @@
 # CNA-Rust
 
 CNA-Rust is an early, measurable safe Rust projection of Microsoft XNA
-Framework 4.0 backed by CNA C++. Its Graphics projection, uncompressed
-Graphics XNB pipeline, 2D sprite/font, Model graph, stock effects, and typed
-device/buffer foundations are functional; it is **not** yet an XNA-complete
-binding and does not compile XNA C# source as Rust.
+Framework 4.0 backed by CNA C++. Its Graphics projection, compressed and
+uncompressed XNB pipeline, Framework device management, Touch/Gesture,
+Storage, GamerServicesComponent, 2D sprite/font, Model graph, stock effects,
+and typed device/buffer foundations are functional; it is **not** yet an
+XNA-complete binding and does not compile XNA C# source as Rust.
 
 ```text
 cna::Microsoft::Xna::Framework::*
@@ -47,9 +48,10 @@ hierarchy and deliberate CNA extensions.
   zero. Clippy still reports audited compatibility warnings; they are not
   globally hidden.
 - XNA 4.0 Windows runtime inventory remains 257 CLR types and 2,964 members;
-  259 Rust types are expected and 192 strict types now exist.
-- Strict diagnostics are 67, all of them missing types. Graphics has zero
-  missing types. Missing members and
+  259 Rust types are expected and 203 strict types now exist.
+- Strict diagnostics are 56, all of them missing types. Graphics,
+  Framework/core, Input, Storage, and GamerServices have zero missing types.
+  Only Design (13), Audio (19), and Media (24) remain. Missing members and
   constructor/overload/property/event mapping mismatches are zero.
   `Game`, `GraphicsDevice`, and `SpriteBatch` each have zero local diagnostics.
   Parameter/signature, disposal, type-kind, base/trait/interface, return,
@@ -57,11 +59,27 @@ hierarchy and deliberate CNA extensions.
   zero.
 - Unexpected types/members, internal leaks, raw-handle leaks, public unsafe
   APIs, allowlist entries, and unmeasured categories remain zero.
-- `ContentManager` and the managed uncompressed XNB reader pipeline are real:
+- `ContentManager` and the managed XNB reader pipeline are real:
   typed cache/disposal, custom readers, existing/shared/external resources,
   primitive readers, textures, SpriteFont, Effect, all five stock effects, and
-  the complete Model graph are covered. Raw PNG `Texture2D::FromStream`
-  remains a separate route. XNA LZX remains explicitly unimplemented.
+  the complete Model graph are covered. XNA 4.0 LZX framing supports short and
+  extended headers, single/multi-frame persistent decoder state, exact output
+  and termination, fourteen negative cases, and compressed Model ownership.
+  Raw PNG `Texture2D::FromStream` remains a separate route.
+- `GraphicsDeviceManager` is Game-associated, publishes the manager/device
+  services, retains CNA's Game-owned device, synchronizes preferences, and
+  bridges preparing/device lifecycle events without constructing a second
+  device. CNA ABI 0.7 has no candidate-ranking route, so `RankDevices` is an
+  explicit backend blocker.
+- Touch/Gesture uses reviewed CNA state, capability, panel, and gesture routes.
+  HEADLESS reports no touch hardware and no queued gesture; none is fabricated.
+- Storage maps synchronous CNA selectors into deterministic one-shot Begin/End
+  results and routes all container/filesystem/stream work through CNA. Managed
+  path containment closes a qualified ABI-0.7 traversal gap; device/container/
+  stream ownership and disposing callbacks are tested.
+- `GamerServicesComponent` participates in normal GameComponent lifecycle
+  without expanding the selected profile into Gamer, Guide, Avatar, or network
+  services.
 - Typed vertex declarations and vertex/index buffers, device binding/draw/
   reset/back-buffer routes, TextureCube, and render targets are complete. CNA
   calls are never replaced by no-ops; HEADLESS limitations are explicit.
@@ -81,17 +99,17 @@ hierarchy and deliberate CNA extensions.
   error 6. OcclusionQuery's real native state machine is verified.
 - `SpriteFont` loads through XNB with one atlas owner, measures strings, and all
   six `DrawString` projections submit native glyph commands.
-- The XNA-derived corpus passes 140 named observations and 141 assertions.
-- The reviewed ABI slice is 347 functions. It has 1,220 full prototype type
-  positions and 840 independent C/Rust measurements across 51 layouts, three
-  callback signatures, scalar representations, and 206 constants, all with
+- The XNA-derived corpus passes 145 named observations and 146 assertions.
+- The reviewed ABI slice is 431 functions. It has 1,509 full prototype type
+  positions and 936 independent C/Rust measurements across 56 layouts, five
+  callback signatures, scalar representations, and 243 constants, all with
   zero mismatches.
-- Linux x86-64 HEADLESS validation covers 197 created native game lifetimes,
+- Linux x86-64 HEADLESS validation covers 209 created native game lifetimes,
   ten buffer-binding cycles, ten SpriteFont/content cycles, ten Effect
   parent/child cycles, ten Model/XNB cycles, and ten stock-effect/Texture3D/
-  OcclusionQuery cycles. The unchanged template freshly passes 60 and 600
-  frames; a generated vendored consumer passes workspace tests, a 60-frame
-  native smoke, and the developer/sibling path audit.
+  OcclusionQuery cycles, plus ten Framework/Touch/Storage/GamerServices cycles
+  and isolated callback failure/recreation. The unchanged template remains the
+  native consumer canary.
 
 `GraphicsDevice` has durable shared identity while its private CNA handle
 remains callback-scoped. Resources retain device association without owning
@@ -170,7 +188,10 @@ run is `not-run`; native crash absence is not allocator-level leak proof.
 
 See the [normative mapping](docs/xna-rust-mapping.md),
 [architecture](docs/architecture.md), [Graphics evidence](docs/graphics-evidence.md),
-and [measured roadmap](plan.md).
+[LZX evidence](docs/lzx-xnb-evidence.md),
+[Framework evidence](docs/framework-evidence.md),
+[Touch evidence](docs/input-touch-evidence.md),
+[Storage evidence](docs/storage-evidence.md), and [measured roadmap](plan.md).
 
 ## Packaging
 

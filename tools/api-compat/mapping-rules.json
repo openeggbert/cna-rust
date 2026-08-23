@@ -51,6 +51,7 @@
   },
   "baseProjectionOverrides": {
     "Microsoft.Xna.Framework.DrawableGameComponent": "GameComponentBase",
+    "Microsoft.Xna.Framework.GamerServices.GamerServicesComponent": "GameComponentBase",
     "Microsoft.Xna.Framework.Content.ContentTypeReader`1": "ContentTypeReaderBase",
     "Microsoft.Xna.Framework.Content.ResourceContentManager": "ContentManagerBase",
     "Microsoft.Xna.Framework.Graphics.DynamicVertexBuffer": "VertexBufferBase",
@@ -187,13 +188,20 @@
     "Microsoft.Xna.Framework.Graphics.IEffectMatrices::*",
     "Microsoft.Xna.Framework.Input.Keyboard::GetState",
     "Microsoft.Xna.Framework.Input.Mouse::*",
-    "Microsoft.Xna.Framework.Input.GamePad::*"
+    "Microsoft.Xna.Framework.Input.GamePad::*",
+    "Microsoft.Xna.Framework.Input.Touch.TouchPanel::*",
+    "Microsoft.Xna.Framework.GraphicsDeviceManager::*",
+    "Microsoft.Xna.Framework.Storage.StorageDevice::*",
+    "Microsoft.Xna.Framework.Storage.StorageContainer::*"
   ],
   "fallibleExclusions": [
     "Microsoft.Xna.Framework.Content.ContentReader::ContentManager",
     "Microsoft.Xna.Framework.Content.ContentReader::AssetName",
     "Microsoft.Xna.Framework.Graphics.GraphicsDevice::ToString",
-    "Microsoft.Xna.Framework.Graphics.GraphicsDevice::Finalize"
+    "Microsoft.Xna.Framework.Graphics.GraphicsDevice::Finalize",
+    "Microsoft.Xna.Framework.GraphicsDeviceManager::.ctor",
+    "Microsoft.Xna.Framework.Storage.StorageContainer::IsDisposed",
+    "Microsoft.Xna.Framework.Storage.StorageContainer::Finalize"
   ],
   "mutableReceiverMembers": [
     "*::Dispose",
@@ -222,6 +230,7 @@
     "Microsoft.Xna.Framework.Graphics.EffectTechniqueCollection::*",
     "Microsoft.Xna.Framework.GameWindow::AllowUserResizing",
     "Microsoft.Xna.Framework.Graphics.PresentationParameters::*",
+    "Microsoft.Xna.Framework.GraphicsDeviceInformation::*",
     "Microsoft.Xna.Framework.Graphics.SamplerStateCollection::*",
     "Microsoft.Xna.Framework.Graphics.TextureCollection::*"
     ,"Microsoft.Xna.Framework.Graphics.DirectionalLight::*"
@@ -234,6 +243,12 @@
     "Microsoft.Xna.Framework.GameComponentCollection::InsertItem::item": "Arc<dyn IGameComponent>",
     "Microsoft.Xna.Framework.GameComponentCollection::SetItem::item": "Arc<dyn IGameComponent>",
     "Microsoft.Xna.Framework.GameComponentCollectionEventArgs::.ctor::gameComponent": "Arc<dyn IGameComponent>",
+    "Microsoft.Xna.Framework.Storage.StorageDevice::BeginShowSelector::callback": "Option<StorageAsyncCallback>",
+    "Microsoft.Xna.Framework.Storage.StorageDevice::BeginShowSelector::state": "StorageAsyncState",
+    "Microsoft.Xna.Framework.Storage.StorageDevice::EndShowSelector::result": "&StorageAsyncResult",
+    "Microsoft.Xna.Framework.Storage.StorageDevice::BeginOpenContainer::callback": "Option<StorageAsyncCallback>",
+    "Microsoft.Xna.Framework.Storage.StorageDevice::BeginOpenContainer::state": "StorageAsyncState",
+    "Microsoft.Xna.Framework.Storage.StorageDevice::EndOpenContainer::result": "&StorageAsyncResult",
     "Microsoft.Xna.Framework.GameServiceContainer::AddService::provider": "Arc<dyn Any+Send+Sync>",
     "Microsoft.Xna.Framework.Graphics.GraphicsDevice::BlendState::value": "Arc<Graphics::BlendState>",
     "Microsoft.Xna.Framework.Graphics.GraphicsDevice::DepthStencilState::value": "Arc<Graphics::DepthStencilState>",
@@ -279,6 +294,15 @@
     "Microsoft.Xna.Framework.DrawableGameComponent::GraphicsDevice": "Graphics::GraphicsDevice",
     "Microsoft.Xna.Framework.GameComponentCollectionEventArgs::GameComponent": "Arc<dyn IGameComponent>",
     "Microsoft.Xna.Framework.GameServiceContainer::GetService": "Option<Arc<dyn Any+Send+Sync>>",
+    "Microsoft.Xna.Framework.Storage.StorageDevice::BeginShowSelector": "StorageAsyncResult",
+    "Microsoft.Xna.Framework.Storage.StorageDevice::BeginShowSelectorWithPlayerAndSizeInBytesAndDirectoryCountAndCallbackAndState": "StorageAsyncResult",
+    "Microsoft.Xna.Framework.Storage.StorageDevice::BeginShowSelectorWithCallbackAndState": "StorageAsyncResult",
+    "Microsoft.Xna.Framework.Storage.StorageDevice::BeginShowSelectorWithSizeInBytesAndDirectoryCountAndCallbackAndState": "StorageAsyncResult",
+    "Microsoft.Xna.Framework.Storage.StorageDevice::BeginOpenContainer": "StorageAsyncResult",
+    "Microsoft.Xna.Framework.Storage.StorageContainer::CreateFile": "StorageStream",
+    "Microsoft.Xna.Framework.Storage.StorageContainer::OpenFile": "StorageStream",
+    "Microsoft.Xna.Framework.Storage.StorageContainer::OpenFileWithFileAndFileModeAndFileAccess": "StorageStream",
+    "Microsoft.Xna.Framework.Storage.StorageContainer::OpenFileWithFileAndFileModeAndFileAccessAndFileShare": "StorageStream",
     "Microsoft.Xna.Framework.TitleContainer::OpenStream": "Box<dyn Read>",
     "Microsoft.Xna.Framework.Graphics.ResourceCreatedEventArgs::Resource": "Arc<dyn Any+Send+Sync>",
     "Microsoft.Xna.Framework.Graphics.ResourceDestroyedEventArgs::Tag": "Option<Arc<dyn Any+Send+Sync>>",
@@ -369,8 +393,17 @@
         "name": "game",
         "type": "&GameContext"
       }
+    ],
+    "Microsoft.Xna.Framework.Input.Touch.TouchPanel::*": [
+      {
+        "name": "game",
+        "type": "&GameContext"
+      }
     ]
   },
+  "dynamicStaticProperties": [
+    "Microsoft.Xna.Framework.Input.Touch.TouchPanel::IsGestureAvailable"
+  ],
   "genericConstraintProjection": {
     "struct": [
       "Copy"
@@ -406,7 +439,10 @@
   ],
   "retainedObjectProperties": {
     "Microsoft.Xna.Framework.Game::Content": "Arc<Content::ContentManager>",
-    "Microsoft.Xna.Framework.Graphics.GraphicsResource::Tag": "Option<Arc<dyn Any+Send+Sync>>"
+    "Microsoft.Xna.Framework.Graphics.GraphicsResource::Tag": "Option<Arc<dyn Any+Send+Sync>>",
+    "Microsoft.Xna.Framework.GraphicsDeviceInformation::Adapter": "Arc<Graphics::GraphicsAdapter>",
+    "Microsoft.Xna.Framework.GraphicsDeviceInformation::PresentationParameters": "Arc<Graphics::PresentationParameters>",
+    "Microsoft.Xna.Framework.PreparingDeviceSettingsEventArgs::GraphicsDeviceInformation": "Arc<GraphicsDeviceInformation>"
   },
   "staticFieldGetterOverrides": {
     "Microsoft.Xna.Framework.Graphics.VertexPositionColor::VertexDeclaration": "&Graphics::VertexDeclaration",
@@ -569,6 +605,8 @@
     }
   },
   "projectedParameterTypeOverrides": {
+    "Microsoft.Xna.Framework.PreparingDeviceSettingsEventArgs::new::graphicsDeviceInformation": "Arc<GraphicsDeviceInformation>",
+    "Microsoft.Xna.Framework.GraphicsDeviceManager::RankDevices::foundDevices": "&mut Vec<GraphicsDeviceInformation>",
     "Microsoft.Xna.Framework.Graphics.ModelBoneCollection::TryGetValue::value": "&mut Option<Arc<Graphics::ModelBone>>",
     "Microsoft.Xna.Framework.Graphics.ModelMeshCollection::TryGetValue::value": "&mut Option<Arc<Graphics::ModelMesh>>",
     "Microsoft.Xna.Framework.Graphics.ModelMeshPart::SetEffect::value": "Option<Arc<dyn EffectBase>>",
