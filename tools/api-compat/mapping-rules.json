@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "modulePrefix": "cna::",
   "methodCasing": "preserve",
   "propertyGetter": "Foo",
@@ -15,19 +15,135 @@
   "refOut": "&mut T unless an explicit multi-output result rule applies",
   "nullable": "Option<T>",
   "disposal": "Dispose plus idempotent Drop",
+  "primitiveTypes": {
+    "System.Boolean": "bool",
+    "System.Byte": "u8",
+    "System.SByte": "i8",
+    "System.Int16": "i16",
+    "System.UInt16": "u16",
+    "System.Int32": "i32",
+    "System.UInt32": "u32",
+    "System.Int64": "i64",
+    "System.UInt64": "u64",
+    "System.Single": "f32",
+    "System.Double": "f64",
+    "System.Char": "char",
+    "System.String": "String",
+    "System.Void": "()",
+    "System.IntPtr": "WindowHandle"
+  },
+  "systemInterfaceTraits": {
+    "System.IComparable`1": "PartialOrd",
+    "System.IEquatable`1": "PartialEq",
+    "System.Collections.Generic.ICollection`1": "AsRef<[{T}]>",
+    "System.Collections.Generic.IList`1": "AsRef<[{T}]>",
+    "System.Collections.Generic.IEnumerator`1": "Iterator"
+  },
+  "interfaceProjectionOverrides": {
+    "Microsoft.Xna.Framework.CurveKeyCollection::System.Collections.Generic.ICollection`1": "IntoIterator"
+  },
+  "ignoredClrInterfaces": [
+    "System.IComparable",
+    "System.IConvertible",
+    "System.IFormattable"
+  ],
+  "fallibleMembers": [
+    "Microsoft.Xna.Framework.Game::Initialize",
+    "Microsoft.Xna.Framework.Game::LoadContent",
+    "Microsoft.Xna.Framework.Game::Update",
+    "Microsoft.Xna.Framework.Game::Draw",
+    "Microsoft.Xna.Framework.Game::UnloadContent",
+    "Microsoft.Xna.Framework.Game::OnExiting",
+    "Microsoft.Xna.Framework.Graphics.GraphicsDevice::*",
+    "Microsoft.Xna.Framework.Graphics.GraphicsResource::Dispose",
+    "Microsoft.Xna.Framework.Graphics.SpriteBatch::*",
+    "Microsoft.Xna.Framework.Graphics.Texture2D::.ctor",
+    "Microsoft.Xna.Framework.Graphics.Texture2D::FromStream",
+    "Microsoft.Xna.Framework.Graphics.Texture2D::Dispose",
+    "Microsoft.Xna.Framework.Graphics.Texture2D::SaveAsJpeg",
+    "Microsoft.Xna.Framework.Graphics.Texture2D::SaveAsPng",
+    "Microsoft.Xna.Framework.Graphics.Texture2D::SetData",
+    "Microsoft.Xna.Framework.Graphics.Texture2D::GetData",
+    "Microsoft.Xna.Framework.Input.Keyboard::GetState",
+    "Microsoft.Xna.Framework.Input.Mouse::*",
+    "Microsoft.Xna.Framework.Input.GamePad::*"
+  ],
+  "fallibleExclusions": [
+    "Microsoft.Xna.Framework.Graphics.GraphicsDevice::ToString"
+  ],
+  "mutableReceiverMembers": [
+    "*::Dispose",
+    "*::MoveNext",
+    "Microsoft.Xna.Framework.Graphics.PackedVector.IPackedVector::PackFromVector4",
+    "Microsoft.Xna.Framework.Graphics.SpriteBatch::Begin",
+    "Microsoft.Xna.Framework.Graphics.SpriteBatch::Draw",
+    "Microsoft.Xna.Framework.Graphics.SpriteBatch::End",
+    "Microsoft.Xna.Framework.Game::BeginRun",
+    "Microsoft.Xna.Framework.Game::EndRun",
+    "Microsoft.Xna.Framework.Game::BeginDraw",
+    "Microsoft.Xna.Framework.Game::EndDraw"
+  ],
+  "contextInjectedMembers": {
+    "Microsoft.Xna.Framework.Input.Keyboard::GetState": [
+      {"name": "game", "type": "&GameContext"}
+    ],
+    "Microsoft.Xna.Framework.Input.Mouse::*": [
+      {"name": "game", "type": "&GameContext"}
+    ],
+    "Microsoft.Xna.Framework.Input.GamePad::*": [
+      {"name": "game", "type": "&GameContext"}
+    ]
+  },
+  "genericConstraintProjection": {
+    "struct": ["Copy"],
+    "class": [],
+    "new": []
+  },
+  "streamProjection": {"genericName": "R", "bound": "Read", "type": "&mut R"},
+  "outputStreamProjection": {"genericName": "W", "bound": "Write", "type": "&mut W"},
+  "outputStreamMembers": [
+    "Microsoft.Xna.Framework.Graphics.Texture2D::SaveAsJpeg",
+    "Microsoft.Xna.Framework.Graphics.Texture2D::SaveAsPng"
+  ],
+  "collectionProjections": {"System.Collections.Generic.IEnumerable`1": "&[T]"},
+  "ownedCollectionProjections": {"System.Collections.Generic.IEnumerator`1": "IntoIter<T>"},
+  "ownedClassPropertyResults": [
+    "Microsoft.Xna.Framework.CurveKeyCollection::Item"
+  ],
+  "optionalClassPropertyResults": [
+    "Microsoft.Xna.Framework.Graphics.GraphicsResource::GraphicsDevice"
+  ],
+  "retainedObjectProperties": {
+    "Microsoft.Xna.Framework.Graphics.GraphicsResource::Tag": "Option<Arc<dyn Any+Send+Sync>>"
+  },
+  "eventProjection": {"addReturn": "u64", "removeParameter": "u64"},
   "syntheticTypes": [
     {
       "name": "Microsoft.Xna.Framework.GameContext",
       "kind": "struct",
-      "members": ["Exit", "GraphicsDevice"]
+      "members": [
+        {"name": "Exit", "kind": "method", "receiver": "&Self", "parameters": [], "returnType": "Result<()>"},
+        {"name": "GraphicsDevice", "kind": "method", "receiver": "&Self", "parameters": [], "returnType": "Result<Graphics::GraphicsDevice>"}
+      ]
     },
     {
       "name": "Microsoft.Xna.Framework.TimeSpan",
       "kind": "struct",
       "members": [
-        "FromMilliseconds", "FromSeconds", "MaxValue", "MinValue", "Ticks",
-        "TicksPerDay", "TicksPerHour", "TicksPerMillisecond", "TicksPerMinute",
-        "TicksPerSecond", "TotalMilliseconds", "TotalSeconds", "Zero", "from_ticks"
+        {"name": "FromMilliseconds", "kind": "method", "parameters": [{"name": "milliseconds", "type": "f64"}], "returnType": "Self"},
+        {"name": "FromSeconds", "kind": "method", "parameters": [{"name": "seconds", "type": "f64"}], "returnType": "Self"},
+        {"name": "MaxValue", "kind": "assoc_const", "type": "Self"},
+        {"name": "MinValue", "kind": "assoc_const", "type": "Self"},
+        {"name": "Ticks", "kind": "method", "receiver": "&Self", "parameters": [], "returnType": "i64"},
+        {"name": "TicksPerDay", "kind": "assoc_const", "type": "i64"},
+        {"name": "TicksPerHour", "kind": "assoc_const", "type": "i64"},
+        {"name": "TicksPerMillisecond", "kind": "assoc_const", "type": "i64"},
+        {"name": "TicksPerMinute", "kind": "assoc_const", "type": "i64"},
+        {"name": "TicksPerSecond", "kind": "assoc_const", "type": "i64"},
+        {"name": "TotalMilliseconds", "kind": "method", "receiver": "&Self", "parameters": [], "returnType": "f64"},
+        {"name": "TotalSeconds", "kind": "method", "receiver": "&Self", "parameters": [], "returnType": "f64"},
+        {"name": "Zero", "kind": "assoc_const", "type": "Self"},
+        {"name": "from_ticks", "kind": "method", "parameters": [{"name": "ticks", "type": "i64"}], "returnType": "Self"}
       ]
     }
   ],
@@ -37,6 +153,7 @@
     "Microsoft.Xna.Framework.Graphics.Texture": "trait"
   },
   "genericTypeRenames": {
+    "Microsoft.Xna.Framework.Input.Touch.TouchCollection+Enumerator": "Microsoft.Xna.Framework.Input.Touch.TouchCollectionEnumerator",
     "Microsoft.Xna.Framework.Content.ContentTypeReader`1": "Microsoft.Xna.Framework.Content.ContentTypeReaderOfT",
     "Microsoft.Xna.Framework.Graphics.PackedVector.IPackedVector`1": "Microsoft.Xna.Framework.Graphics.PackedVector.IPackedVectorOfT"
   },

@@ -35,25 +35,46 @@ let clear = Color::CornflowerBlue;
 Rust host helpers such as `cna::run` live outside the strict hierarchy. CNA-only
 features live under `cna::extensions`.
 
-## Verified status (2026-08-22)
+Implementation files are private and organized by coherent value, geometry,
+input, lifecycle, graphics-resource, and native-ABI concerns. Those modules do
+not create public namespaces: consumers continue to see only the mapped XNA
+hierarchy and deliberate CNA extensions.
 
-- Rust 1.74 workspace check, tests, Clippy, and docs pass.
-- XNA 4.0 Windows runtime reference inventory: 257 CLR types and 2,964 members.
-- Expected mapped Rust types: 259; actual strict types: 26.
-- Strict diagnostics: 1,066 (233 missing types, 833 missing members); zero
-  unexpected type/member names and an empty allowlist. Several signature/base/
-  enum categories are explicitly not measured yet.
-- Raw reviewed slice: 26 declarations; all exist with matching arity among
-  2,861 canonical CNA ABI 0.7 header exports.
-- Linux headless native validation completed 60 and 600 real draw frames using
-  game lifecycle, texture decode, clear, SpriteBatch, keyboard capture, and
-  clean disposal.
+## Verified status (2026-08-23)
 
-The native test library required two temporary build-only corrections for an
-upstream CNA mismatch: C++ added `NanoVg`, while the ABI 0.7 renderer identity
-table/header still stop at `PixiJs`. The checked-out CNA repository was not
-modified. This is meaningful Linux/headless integration evidence, but release
-runtime support remains experimental until canonical CNA builds unmodified.
+- Rust 1.74 workspace format, check, all-feature tests, Clippy, and docs exit
+  zero. Clippy still reports audited compatibility warnings; they are not
+  globally hidden.
+- XNA 4.0 Windows runtime inventory remains 257 CLR types and 2,964 members;
+  259 Rust types are expected and 91 strict types now exist.
+- Strict diagnostics are 263: 168 missing types and 95 missing members.
+  Parameter/signature and disposal mismatches are now zero. Type kind,
+  base/trait/interface, return, generic/bound, ref/out, enum/value, flags, and
+  delegate mismatches remain zero.
+- Unexpected types/members, internal leaks, raw-handle leaks, public unsafe
+  APIs, allowlist entries, and unmeasured categories remain zero.
+- Curves and all remaining packed vectors are real. `GraphicsResource`,
+  `Texture`, and `Texture2D` have zero local diagnostics. Managed graphics
+  states are complete and `SpriteBatch` implements all texture draw overloads.
+- The XNA-derived corpus passes 105 named observations and 106 assertions.
+- The reviewed ABI slice is 53 functions. Full compiler-derived prototypes are
+  checked for all 53, and all 313 independent C/Rust prototype/layout/callback/
+  constant measurements match.
+- Linux x86-64 HEADLESS validation freshly passes 60 and 600 template frames,
+  143 isolated successful native game lifetimes, and a generated vendored
+  consumer build/test plus 60 frames.
+
+`GraphicsDevice` now has durable shared identity while its private CNA handle
+remains callback-scoped. Resources retain device association without owning
+the native device, share deterministic invalidation, and are released before
+parent destruction. User `UnloadContent` remains exactly once and is separate
+from internal pre-destroy child cleanup.
+
+Canonical CNA HEAD `1bb2145d99ed572dd4eb15009c34e2e5f410fcf0` still fails an
+unmodified C API build at `CnaCApiCoreExt.cpp:250`: the renderer identity
+assertion reduces to `49 == 50`. The CNA checkout was not modified. Runtime
+evidence therefore uses the labelled experimental ABI-0.7 HEADLESS artifact;
+the Rust loader continues to reject ABI 0.8.
 
 | Platform | Status | Evidence |
 |---|---|---|
@@ -92,14 +113,27 @@ cargo doc --workspace --no-deps
 XNA_REFERENCE_PATH=/path/to/xna4/windows \
   python3 tools/api-compat/verify.py
 
+# Records the intentionally incomplete strict scoreboard without hiding it.
+XNA_REFERENCE_PATH=/path/to/xna4/windows \
+  python3 tools/api-compat/verify.py --report-only \
+  --output target/xna-api-report.json
+
 python3 tools/native-abi/verify.py \
   --cna-root /path/to/cna \
   --library /path/to/libcna_c_api.so
+
+CNA_NATIVE_LIBRARY=/path/to/libcna_c_api.so \
+  cargo test --workspace --all-features --test native_stress -- --nocapture
 ```
 
 The normal API verifier intentionally exits nonzero while genuine gaps remain.
 It uses Mono for neutral CLR extraction and compiler rustdoc JSON for Rust API
-inspection.
+inspection. The mapping transforms CLR concepts before comparison; it does not
+compare raw C# syntax to Rust syntax.
+
+`tools/native-stress/run-sanitized.sh` is an optional ASan/UBSan path for a
+separately instrumented exact ABI-0.7 CNA library. No sanitizer run is part of
+the current evidence.
 
 See the [normative mapping](docs/xna-rust-mapping.md),
 [architecture](docs/architecture.md), and [measured roadmap](plan.md).

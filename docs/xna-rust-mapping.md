@@ -1,6 +1,6 @@
 # Normative XNA 4.0 to Rust mapping
 
-Status: normative, version 1
+Status: normative, version 2
 
 Profile: XNA 4.0 Windows runtime
 
@@ -42,7 +42,11 @@ would collide after Rust removes CLR arity notation, the generic name gains
 `OfT`, `OfT1T2`, and so on. The two current profile collisions are encoded in
 `mapping-rules.json`, not an allowlist.
 
-CLR structs map to Rust structs. CLR enums map to `#[repr(...)]` Rust enums when
+CLR structs map to Rust structs. A nested CLR type whose enclosing type occupies
+Rust's type namespace is flattened into the same XNA namespace using the
+deterministic concatenation `OuterInner` (for example,
+`TouchCollection.Enumerator` becomes `TouchCollectionEnumerator`); Rust cannot
+declare a module and a struct with the same name. CLR enums map to `#[repr(...)]` Rust enums when
 all bit patterns are invalid except declared values, or to a transparent
 newtype with associated constants for flags/open native values. CLR interfaces
 map to traits. CLR delegates map to callback traits or typed closure aliases as
@@ -114,7 +118,7 @@ contracts. It never uses pointer casts. For example, `GraphicsResource` and
 `Texture` are traits, and `Texture2D: Texture` expresses the important
 `Texture2D : Texture : GraphicsResource` relationship.
 
-The verifier must eventually check each reference base/interface edge against
+The verifier checks each reference base/interface edge against
 the corresponding trait implementation or declared composition relation.
 Borrowed reflected children retain their parent with a borrow or shared owner;
 they never destroy a parent-owned handle.
@@ -124,15 +128,26 @@ they never destroy a parent-owned handle.
 XNA `Game` is projected as a user-implemented `Game` lifecycle trait composed
 with a callback-scoped `GameContext`. The context provides access to the
 host-owned state whose lifetime CNA controls. This avoids pretending that a
-stateless callback trait is the CLR base class and prevents a borrowed device
-from escaping its native callback.
+stateless callback trait is the CLR base class. `GraphicsDevice` is a durable,
+safe shared identity rather than a callback lifetime: only its private native
+borrow is callback-scoped, and safe operations fail once the host invalidates
+the identity.
 
-Lifecycle virtuals retain XNA names (`Initialize`, `LoadContent`, `Update`,
-`Draw`, `UnloadContent`, and `OnExiting`). Properties, events, components,
-services, window/device state, and run/exit behavior remain required work in the
+Lifecycle virtuals retain XNA names (`Initialize`, `LoadContent`, `BeginRun`,
+`Update`, `BeginDraw`, `Draw`, `EndDraw`, `OnExiting`, `EndRun`,
+`UnloadContent`, and `Dispose`). `BeginDraw` returns `bool`; CNA skips the draw
+callback when it is false. Properties, public events, components, services,
+window state, and the remaining run/exit behavior remain required work in the
 strict contract. Crate-root `run` is the Rust host entry point; it is explicitly
 outside the strict hierarchy. `GameContext` is a mapped support type with
 machine-declared `GraphicsDevice` and `Exit` members.
+
+User `UnloadContent` and host resource teardown are distinct. The host may
+dispose registered native children before asking CNA to destroy the game, but
+that internal action must not synthesize `UnloadContent` or public resource
+events. CNA supplies the one user lifecycle notification during native
+shutdown. Ordinary user cleanup is not required to be idempotent merely to
+accommodate host teardown.
 
 ## Parameters, ref/out, and null
 
@@ -147,6 +162,9 @@ Nullable references map to `Option<T>`, `Option<&T>`, or `Option<&mut T>` based
 on ownership. Nullable values map to `Option<T>`. Optional arguments remain
 ordinary arguments or projected overloads; they are not conflated with null.
 Safe APIs never represent a null native handle with integer zero.
+Opaque `System.IntPtr` window identities map to the safe, non-dereferenceable
+`cna::extensions::window::WindowHandle` value. Its integer representation is
+private and no raw-pointer constructor or accessor is part of the safe API.
 
 ## Strings, arrays, and collections
 
@@ -172,16 +190,21 @@ reported as `ContentManager` support.
 ## Events and delegates
 
 An event `Foo` maps to `AddFooHandler` and `RemoveFooHandler`. The returned
-registration token owns removal when token semantics are necessary for safe
-teardown. Handlers are typed callbacks; panic is caught at the FFI boundary and
-converted to a callback error. A closure must be `Send`/`Sync` only when CNA can
-invoke it from the corresponding threads. Delegate signatures follow the same
-parameter, null, and ref/out mappings as methods.
+registration token identifies removal when token semantics are necessary for
+safe teardown. Handlers are typed callbacks; panic is caught before it can
+unwind into native code and is converted to a callback error. Handler order and
+self-removal follow the registration snapshot taken for that event emission. A
+closure must be `Send`/`Sync` only when CNA can invoke it from the corresponding
+threads. Delegate signatures follow the same parameter, null, and ref/out
+mappings as methods.
 
 ## Disposal, ownership, and unsafe code
 
-`IDisposable.Dispose()` maps to explicit `Dispose(&mut self) -> cna::Result<()>`
-and idempotent `Drop`. Successful disposal first destroys the exactly-once
+An owning `IDisposable.Dispose()` maps to explicit
+`Dispose(&mut self) -> cna::Result<()>` and idempotent `Drop`. A CLR value type
+whose `Dispose` is a no-op (notably a collection enumerator) retains the
+explicit no-op method but does not gain Rust `Drop`; this preserves its `Copy`
+value semantics. Successful resource disposal first destroys the exactly-once
 owned native handle and then marks the wrapper disposed. Repeated `Dispose` and
 `Dispose` followed by `Drop` do not call CNA twice. A failed destroy preserves
 the handle so the caller or `Drop` can retry according to the native contract.
@@ -197,6 +220,21 @@ Internal handle states are:
 Only `cna-sys` and the crate-private bridge contain unsafe operations.
 `unsafe_op_in_unsafe_fn` is denied. No raw pointer, integer handle, `cna_sys`
 type, or public unsafe function may leak into the strict safe API.
+
+Game-owned `GraphicsDevice` uses shared identity, not shared native ownership.
+Resources retain that identity so `GraphicsResource.GraphicsDevice` aliases the
+same logical device and same-device checks remain meaningful. The game remains
+the sole native device owner. When shutdown begins, registered owned children
+are released in reverse registration order, the parent destroy is attempted,
+and the shared device identity is invalidated even when CNA reports a destroy
+error. Access after invalidation fails safely; disposing an already released
+child remains idempotent.
+
+Managed graphics-state resources may be constructed without a device, so the
+base `GraphicsResource.GraphicsDevice` result is `Option<&GraphicsDevice>`.
+Their first real application binds them to one durable device identity.
+Const-representable XNA stock-state properties are associated constants; their
+descriptors are immutable and use the same first-bind rule.
 
 ## TimeSpan and errors
 
@@ -219,9 +257,11 @@ strict expected XNA surface. Raw handles and internal types are forbidden in
 both surfaces.
 
 `tools/api-compat/mapping-rules.json` is the executable subset of this document.
-The strict verifier compares every current public strict type/member name with
-the authoritative transformed contract. It exits nonzero for missing,
-unexpected, or mismatched items. Categories not yet implemented are reported as
-unmeasured rather than printed as zero. The allowlist starts empty and must stay
-empty unless a difference is individually justified and cannot be expressed as
-a general language rule.
+The strict verifier compares every current public strict type/member contract
+with the authoritative transformed contract. It measures bases/traits,
+interfaces, parameters/returns, generics/bounds, ref/out, enum/flags,
+delegates/events, disposal, constructors, overloads, and properties, and emits
+a per-type scoreboard. A future category must enter `unmeasuredCategories`
+until it has an executable comparison; it may not be printed as a false zero.
+The allowlist starts empty and must stay empty unless a difference is
+individually justified and cannot be expressed as a general language rule.

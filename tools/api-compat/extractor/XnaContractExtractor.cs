@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Web.Script.Serialization;
@@ -28,7 +29,7 @@ internal static class XnaContractExtractor
         }
         var contract = types.Values.OrderBy(t => t.FullName, StringComparer.Ordinal).Select(ReadType).ToList();
         var root = new Dictionary<string, object> {
-            ["schemaVersion"] = 1, ["profile"] = "XNA 4.0 Windows runtime", ["types"] = contract
+            ["schemaVersion"] = 2, ["profile"] = "XNA 4.0 Windows runtime", ["types"] = contract
         };
         var serializer = new JavaScriptSerializer { MaxJsonLength = Int32.MaxValue, RecursionLimit = 256 };
         File.WriteAllText(args[1], serializer.Serialize(root));
@@ -72,6 +73,8 @@ internal static class XnaContractExtractor
                     ["kind"] = "property", ["name"] = value.Name, ["type"] = TypeName(value.PropertyType),
                     ["static"] = (getter ?? setter).IsStatic,
                     ["get"] = getter != null && Visible(getter), ["set"] = setter != null && Visible(setter),
+                    ["getAccess"] = getter != null && Visible(getter) ? Access(getter) : null,
+                    ["setAccess"] = setter != null && Visible(setter) ? Access(setter) : null,
                     ["parameters"] = value.GetIndexParameters().Select(Parameter).ToList()
                 });
         }
@@ -79,17 +82,29 @@ internal static class XnaContractExtractor
         {
             MethodInfo adder = value.GetAddMethod(true), remover = value.GetRemoveMethod(true);
             if ((adder != null && Visible(adder)) || (remover != null && Visible(remover)))
-                members.Add(new Dictionary<string, object> { ["kind"] = "event", ["name"] = value.Name, ["type"] = TypeName(value.EventHandlerType) });
+                members.Add(new Dictionary<string, object> {
+                    ["kind"] = "event", ["name"] = value.Name,
+                    ["type"] = TypeName(value.EventHandlerType),
+                    ["static"] = (adder ?? remover).IsStatic,
+                    ["add"] = adder != null && Visible(adder),
+                    ["remove"] = remover != null && Visible(remover)
+                });
         }
         foreach (FieldInfo value in type.GetFields(Declared).Where(Visible))
             members.Add(new Dictionary<string, object> {
                 ["kind"] = "field", ["name"] = value.Name, ["type"] = TypeName(value.FieldType),
-                ["static"] = value.IsStatic, ["constant"] = value.IsLiteral
+                ["static"] = value.IsStatic, ["constant"] = value.IsLiteral,
+                ["value"] = value.IsLiteral ? ConstantValue(value) : null
             });
         return new Dictionary<string, object> {
             ["name"] = type.FullName, ["kind"] = Kind(type),
             ["flags"] = type.IsEnum && type.IsDefined(typeof(FlagsAttribute), false),
-            ["baseType"] = TypeName(type.BaseType), ["interfaces"] = type.GetInterfaces().Select(TypeName).ToList(),
+            ["sealed"] = type.IsSealed,
+            ["underlyingType"] = type.IsEnum ? TypeName(Enum.GetUnderlyingType(type)) : null,
+            ["baseType"] = TypeName(type.BaseType),
+            ["interfaces"] = type.GetInterfaces().Select(TypeName).OrderBy(x => x, StringComparer.Ordinal).ToList(),
+            ["directInterfaces"] = DirectInterfaces(type).Select(TypeName).OrderBy(x => x, StringComparer.Ordinal).ToList(),
+            ["genericParameters"] = GenericParameters(type.GetGenericArguments().Where(x => x.IsGenericParameter)),
             ["members"] = members
         };
     }
@@ -99,7 +114,11 @@ internal static class XnaContractExtractor
         var method = value as MethodInfo;
         return new Dictionary<string, object> {
             ["kind"] = kind, ["name"] = name, ["static"] = value.IsStatic,
+            ["access"] = Access(value),
             ["returnType"] = method == null ? null : TypeName(method.ReturnType),
+            ["genericParameters"] = method == null
+                ? new List<object>()
+                : GenericParameters(method.GetGenericArguments().Where(x => x.IsGenericParameter)),
             ["parameters"] = value.GetParameters().Select(Parameter).ToList()
         };
     }
@@ -108,8 +127,50 @@ internal static class XnaContractExtractor
     {
         return new Dictionary<string, object> {
             ["name"] = value.Name ?? "", ["type"] = TypeName(value.ParameterType),
-            ["out"] = value.IsOut, ["optional"] = value.IsOptional
+            ["ref"] = value.ParameterType.IsByRef,
+            ["out"] = value.IsOut, ["in"] = value.IsIn, ["optional"] = value.IsOptional
         };
+    }
+
+    private static List<object> GenericParameters(IEnumerable<Type> parameters)
+    {
+        return parameters.OrderBy(value => value.GenericParameterPosition).Select(value => {
+            GenericParameterAttributes attributes = value.GenericParameterAttributes;
+            var special = new List<string>();
+            if ((attributes & GenericParameterAttributes.ReferenceTypeConstraint) != 0) special.Add("class");
+            if ((attributes & GenericParameterAttributes.NotNullableValueTypeConstraint) != 0) special.Add("struct");
+            if ((attributes & GenericParameterAttributes.DefaultConstructorConstraint) != 0) special.Add("new");
+            return (object)new Dictionary<string, object> {
+                ["name"] = value.Name,
+                ["position"] = value.GenericParameterPosition,
+                ["specialConstraints"] = special,
+                ["typeConstraints"] = value.GetGenericParameterConstraints().Select(TypeName).OrderBy(x => x, StringComparer.Ordinal).ToList()
+            };
+        }).ToList();
+    }
+
+    private static IEnumerable<Type> DirectInterfaces(Type type)
+    {
+        var interfaces = new HashSet<Type>(type.GetInterfaces());
+        if (type.BaseType != null)
+            interfaces.ExceptWith(type.BaseType.GetInterfaces());
+        foreach (Type candidate in interfaces.ToArray())
+            foreach (Type inherited in candidate.GetInterfaces())
+                interfaces.Remove(inherited);
+        return interfaces;
+    }
+
+    private static string ConstantValue(FieldInfo value)
+    {
+        object raw = value.GetRawConstantValue();
+        return raw == null ? null : Convert.ToString(raw, CultureInfo.InvariantCulture);
+    }
+
+    private static string Access(MethodBase value)
+    {
+        if (value.IsPublic) return "public";
+        if (value.IsFamilyOrAssembly) return "protected-internal";
+        return "protected";
     }
 
     private static string Kind(Type type)
@@ -129,7 +190,8 @@ internal static class XnaContractExtractor
         if (type == null) return null;
         if (type.IsByRef) return TypeName(type.GetElementType()) + "&";
         if (type.IsArray) return TypeName(type.GetElementType()) + "[]";
-        if (type.IsGenericParameter) return "!" + type.GenericParameterPosition;
+        if (type.IsGenericParameter)
+            return (type.DeclaringMethod == null ? "!" : "!!") + type.GenericParameterPosition;
         if (type.IsGenericType)
             return type.GetGenericTypeDefinition().FullName + "[" + String.Join(",", type.GetGenericArguments().Select(TypeName)) + "]";
         return type.FullName ?? type.Name;

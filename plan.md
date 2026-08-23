@@ -1,240 +1,158 @@
 # CNA-Rust measured implementation plan
 
-Status date: 2026-08-22
+Status date: 2026-08-23
 
 Strict target: XNA 4.0 Windows runtime Rust API projection
 
 MSRV: Rust 1.74
 
-## Current verified state
+## Governing constraints
 
-The supplied workspace began with 321 lines of Rust. Its Cargo dependency did
-not resolve because package `cna-rust-sys` was requested as `cna-sys` without
-an explicit package rename. The only raw declaration was
-`BINDINGS_AVAILABLE = false`; `run` always returned `NativeUnavailable`; math,
-graphics, input, and content contained apparent placeholder implementations.
+- Preserve authoritative XNA identifiers and casing under
+  `cna::Microsoft::Xna::Framework`.
+- Keep filesystem modules private and the compatibility allowlist empty.
+- Treat every measured zero as a permanent gate; do not reclassify real gaps.
+- Complete coherent behavior/ownership families before broad shallow types.
+- Expose only safe facades over reviewed, exact ABI-0.7 CNA routes.
 
-The package/crate identities now are deliberate:
+The generated `typeScoreboard` remains the detailed work queue. This plan
+records measured truth and dependency order rather than duplicating metadata.
 
-- package `cna-rust`, library `cna`;
-- package `cna-rust-sys`, library `cna_sys`;
-- dependency key `cna-sys` explicitly names package `cna-rust-sys`.
+## Current strict API measurement
 
-The workspace now has a real, safe native 2D slice and measured incomplete XNA
-surface. It must not be described as XNA-complete.
+| Measurement | Requested-run baseline | Current |
+|---|---:|---:|
+| XNA reference types | 257 | 257 |
+| XNA reference members | 2,964 | 2,964 |
+| expected mapped Rust types | 259 | 259 |
+| actual strict Rust types | 51 | 91 |
+| total diagnostics | 364 | 263 |
+| missing types | 208 | 168 |
+| missing members | 151 | 95 |
+| parameter/signature mismatches | 3 | 0 |
+| disposal mismatches | 2 | 0 |
+| unexpected types/members | 0 / 0 | 0 / 0 |
+| type-kind mismatches | 0 | 0 |
+| internal/raw-handle/public-unsafe leaks | 0 / 0 / 0 | 0 / 0 / 0 |
+| allowlist entries | 0 | 0 |
+| unmeasured categories | 0 | 0 |
 
-## Compatibility definition and XNA to Rust mapping
+All other structural mismatches remain zero: base, trait, interface, return,
+generic, generic-bound, ref/out, enum/value, flags, and delegate. Current
+overlapping missing-category counts are two constructors, 18 overloads, 30
+properties, and 20 events.
 
-- [x] Preserve authoritative XNA namespace/type/member/field casing wherever
-  Rust permits it; Rust style is subordinate in the strict hierarchy.
-- [x] Define the normative language mapping in `docs/xna-rust-mapping.md` and
-  its executable subset in `tools/api-compat/mapping-rules.json`.
-- [x] Keep crate-root host functions and `cna::extensions` out of the strict
-  member comparison.
-- [x] Keep the allowlist empty.
-- [ ] Extend compiler comparison to every signature, generic, enum value,
-  event/delegate, base/trait, ref/out, and disposal relation.
+### Six-type core scoreboard
 
-## Definition of done
+| Strict type | Before | Current |
+|---|---:|---:|
+| `Game` | 42 | 36 |
+| `GraphicsDevice` | 72 | 51 |
+| `GraphicsResource` | 11 | 0 |
+| `Texture` | 1 | 0 |
+| `Texture2D` | 14 | 0 |
+| `SpriteBatch` | 16 | 8 |
 
-The selected profile is complete only when all mapped types/members and all
-currently unmeasured structural categories reach zero, raw/internal leaks stay
-zero, ABI and behavior corpora pass, lifetime stress passes, the canonical CNA
-library builds unmodified, 60/600-frame tests pass on every claimed platform,
-and a freshly generated independent template builds and runs.
+`SpriteBatch` waits only for two effect-bearing begin overloads and six
+`SpriteFont` draw-string overloads. `Game` and `GraphicsDevice` remain the
+nonzero lifecycle/graphics foundation types; their missing component/window,
+event, presentation, collection, buffer, and draw dependencies are not hidden.
 
-## Strict API verifier baseline
+## Completed in this run
 
-Authoritative reference assemblies: the seven exact SHA-256-pinned Windows
-runtime assemblies in `tools/api-compat/profiles/xna40-windows-runtime.json`.
+- [x] Fixed all three generated signature and both disposal mismatches, with
+  verifier regression tests and no mapping relaxation.
+- [x] Completed `Curve`, `CurveKey`, `CurveKeyCollection`, loop/continuity and
+  tangent behavior with exact declarations and XNA-derived observations.
+- [x] Completed all 17 selected-profile packed-vector formats, typed/untyped
+  contracts, exact packing behavior, and differential tests.
+- [x] Replaced callback-lifetime `GraphicsDevice` identity with a durable
+  shared state whose native handle borrow remains callback-scoped.
+- [x] Added resource registration, deterministic pre-parent child release,
+  same-device validation, shared invalidation, and post-shutdown safety tests.
+- [x] Completed `GraphicsResource`, its normative `Disposing` event, and the
+  `Texture`/`Texture2D` base relationships at zero local diagnostics.
+- [x] Completed all mapped `Texture2D` constructors, stream overloads,
+  metadata, transfers, encoders, validation, rollback, and lifetime behavior.
+- [x] Implemented every texture `SpriteBatch.Draw` overload and both
+  non-effect state-bearing `Begin` routes with invalid-state tests.
+- [x] Completed the managed blend/depth/rasterizer/sampler state families and
+  exact enums/flags, stock defaults, resource semantics, and real CNA apply
+  routes.
+- [x] Deepened `GraphicsDevice` with viewport/scissor, blend factor,
+  multisample mask, reference stencil, state setters, and no-argument present.
+- [x] Added real `BeginRun`, `BeginDraw`, `EndDraw`, and `EndRun` frame hooks.
+- [x] Separated one user `UnloadContent` from internal pre-destroy child
+  cleanup and measured the callback order explicitly.
+- [x] Expanded every reviewed function from symbol/arity checks to compiler-
+  derived full C prototype comparison.
+- [x] Added isolated test-bridge faults for create, texture information and
+  reported destroy failure, plus an opt-in ASan/UBSan runner.
 
-| Measurement | Current |
-|---|---:|
-| XNA reference types | 257 |
-| XNA reference members | 2,964 |
-| expected mapped Rust types (including 2 support types) | 259 |
-| actual strict Rust types | 26 |
-| total reviewed diagnostics | 1,066 |
-| missing types | 233 |
-| missing members | 833 |
-| unexpected types | 0 |
-| unexpected members | 0 |
-| type-kind mismatches | 0 |
-| internal type leaks | 0 |
-| public unsafe APIs | 0 |
-| allowlist entries | 0 |
+## Behavior and native evidence
 
-Base/trait, parameter, return, generic, ref/out, enum, delegate/event, and
-disposal comparisons are explicitly unmeasured, not zero. The normal verifier
-exits nonzero while the 1,066 real findings remain.
+| Measurement | Baseline | Current |
+|---|---:|---:|
+| named XNA-derived observations | 82 | 105 |
+| corpus assertions including count | 83 | 106 |
+| reviewed ABI functions | 34 | 53 |
+| C/Rust ABI measurements | 135 | 313 |
+| prototype functions/type positions | unmeasured | 53 / 188 |
+| prototype/layout/callback/constant mismatches | 0 | 0 |
+| successful native game lifetimes | 127 | 143 |
+| native child handles constructed | not separately recorded | 93 |
+| native crashes observed | 0 | 0 |
 
-## Workspace and package architecture
+New managed groups are curve (10 observations), packed vectors (7), and
+graphics-state defaults (6). The implementation work found and fixed XNA
+behavior differences in half conversion, tie-to-even packing, curve loop/
+tangent semantics, and the private XNA-to-CNA `BlendFunction.Min/Max`
+translation. The corpus now passes with zero failures.
 
-- [x] Fix Cargo identities and retain Rust 1.74.
-- [x] Split raw declarations and safe projection at the existing two-crate
-  boundary; avoid aesthetic crates.
-- [x] Keep XNA and CNA-extension surfaces distinct.
-- [ ] Complete `cargo package` contents, per-crate README/NOTICE review,
-  docs.rs policy, versions, and release dependency versions.
+The native suite covers 100 minimal lifetimes, 25 double-dispose/drop resource
+games, ten transfer/event games, lifecycle/device identity, a suppressed draw,
+callback panic plus recreation, create failure, texture-info rollback plus
+recreation, and reported destroy failure plus recreation. No sanitizer was
+actually executed, so the run does not claim leak freedom from crash absence.
 
-## Native C ABI status and cna-sys
+## Runtime and template evidence
 
-Canonical source: CNA `modules/c-api/include/CNA/C`, ABI 0.7.0. It contains 55
-headers and 2,861 function declarations. `cna-sys` currently reviews 26
-function-pointer declarations plus the required constants/structures/callbacks.
+- [x] Linux x86-64 experimental CNA ABI-0.7 HEADLESS template tests pass.
+- [x] Fresh template runs complete 60 and 600 successful draw frames.
+- [x] The canary uses real PNG decoding, `Texture2D`, state-bearing
+  `SpriteBatch`, clear, keyboard/mouse/gamepad, and deterministic shutdown.
+- [x] A fresh generated consumer vendors both crates, has no developer or
+  sibling paths, builds/tests, and completes 60 HEADLESS frames.
 
-- [x] Verify all 26 names and arities against all headers.
-- [x] Verify all 26 against a Linux ELF library and exact ABI version.
-- [x] Add 14 `repr(C)` structure layout tests.
-- [ ] Bind and audit the remaining ABI by coherent facade group.
-- [ ] Add C-side generated layout/enum/bool/callback probes; current layout
-  tests only assert the reviewed Rust expectations.
-- [ ] Add PE and Mach-O export verification when those platforms exist.
+Canonical CNA HEAD `1bb2145d99ed572dd4eb15009c34e2e5f410fcf0` still fails an
+unmodified C API build at `CnaCApiCoreExt.cpp:250`; the renderer identity
+assertion reduces to `49 == 50`. The Rust loader remains pinned to exactly ABI
+0.7. Runtime evidence therefore remains experimental and does not imply an ABI
+0.8 migration.
 
-The matching test library reports 2,861 ELF `cna_*` exports; zero bound symbols
-are missing and zero arities mismatch. An available prebuilt ABI 0.8 library is
-correctly rejected by the loader.
+## Next dependency-ordered work
 
-## Unsafe boundary and ownership/lifetime
+1. Implement the authoritative component/service/window group: `IGameComponent`,
+   `IUpdateable`, `IDrawable`, component base types/collection/events,
+   `GameServiceContainer`, `LaunchParameters`, and `GameWindow`.
+2. Complete remaining `Game` properties, events, run-one-frame/tick/reset/
+   suppress/exit semantics over that object model.
+3. Resolve stable wrapper identity for device state collections,
+   `PresentationParameters`, and adapter/profile/status before adding buffers.
+4. Complete graphics device events and the buffer/vertex declaration group,
+   then render targets and drawing routes using reviewed CNA prototypes.
+5. Implement `Effect` coherently, then clear the two remaining state-bearing
+   `SpriteBatch.Begin` overloads; implement real `SpriteFont` before the six
+   draw-string overloads.
+6. Produce and run an exact ABI-0.7 ASan/UBSan CNA artifact when the upstream
+   build blocker permits it; keep sanitizer tooling optional for Rust 1.74.
+7. Begin models and XNB/content only after the lifetime/identity graph above is
+   complete. PNG decoding is never content-pipeline support.
 
-- [x] Confine unsafe operations to `native.rs` and `game.rs` callback/FFI
-  trampolines with stated invariants.
-- [x] Deny `unsafe_op_in_unsafe_fn`.
-- [x] Prevent raw pointer, native handle, and `cna_sys` leaks in safe public API.
-- [x] Implement callback-borrowed `GraphicsDevice` and owned
-  `Texture2D`/`SpriteBatch`.
-- [x] Make explicit `Dispose` plus `Drop` idempotent.
-- [x] Exercise explicit disposal followed by drop and double unload in native
-  60/600-frame runs.
-- [ ] Add isolated ownership-state types (`Owned`, `Borrowed`, `ParentOwned`,
-  `Adopted`) as more resource families require them.
-- [ ] Add failure-injection, parent/child order, repeated create/destroy,
-  teardown callback, game shutdown, and process shutdown stress tests.
+## Definition of complete compatibility
 
-## Core and value API
-
-- [x] Add signed tick-based `TimeSpan` and correct `GameTime` property names.
-- [x] Replace identity/no-op matrix placeholders with real initial
-  multiplication and common creation operations.
-- [x] Establish Copy/value semantics and operator traits for the initial vector,
-  quaternion, matrix, color, point/rectangle, plane/ray, and bounding subset.
-- [ ] Complete the authoritative members for MathHelper, Vector2/3/4, Matrix,
-  Quaternion, Color, Point/Rectangle, Plane/Ray, bounds/frustum, curves, and
-  packed vectors.
-- [ ] Build and pass the neutral XNA differential corpus including NaN,
-  infinity, signed zero, rounding, and exception cases.
-
-## Game, device, and window
-
-- [x] Establish `Game` lifecycle trait plus callback-scoped `GameContext`.
-- [x] Run actual CNA initialization, callbacks, update/draw, exit, cleanup, and
-  shutdown.
-- [ ] Complete the strict `Game` contract: services, content, window,
-  components, properties, events, and `Run` mapping.
-- [ ] Implement GameWindow, components/collections/services,
-  GraphicsDeviceManager, GraphicsAdapter, and PresentationParameters as one
-  lifecycle-tested group.
-
-## Graphics
-
-- [x] Implement real clear, viewport, encoded `Texture2D`, SpriteBatch begin /
-  draw / end, and renderer-query extension paths.
-- [x] Model `GraphicsResource` and `Texture` base relationships as traits.
-- [ ] Complete Texture variants, render targets, buffers, declarations,
-  effects/BasicEffect, states, sprite overloads, and parent-borrowed reflected
-  objects.
-- [ ] Verify resize/window behavior with a non-headless backend.
-
-## Input and touch
-
-- [x] Implement real native keyboard capture and pure `KeyboardState` queries.
-- [ ] Complete authoritative `Keys`, keyboard constructors/queries, mouse,
-  gamepad, player index, and touch with transitions and enum tests.
-
-## Content
-
-- [x] Remove the fake `ContentManager::Load<T>() -> Err(())` implementation;
-  the namespace is visibly unimplemented.
-- [x] Keep raw encoded image loading distinct from XNB.
-- [ ] Define `ContentLoadable`, implement manager caching/unload and XNB reader
-  tables, versions, shared resources, built-in/custom readers, and normalized
-  lookup.
-
-## Models
-
-- [ ] Implement Model and collections using stable indices/parent ownership,
-  with no self-referential structures or parent handle leaks.
-
-## Audio and XACT
-
-- [ ] Implement the measured profile using actual CNA ABI, with safe callback
-  and dynamic-buffer lifetimes. Record native multi-listener or other blockers
-  rather than faking behavior.
-
-## Media, storage, and GamerServices
-
-- [ ] Project the full selected profile. Historical external services may use
-  deterministic unsupported errors, but types/members remain verifier
-  requirements.
-
-## CNA extensions
-
-- [x] Put actual renderer facts under `cna::extensions::graphics`.
-- [x] Remove inferred/fake renderer name and capability data.
-- [ ] Add further extensions only when they correspond to real CNA concepts.
-
-## Template
-
-- [x] Replace the Rust-only three-frame loop with real `--smoke-test` (60),
-  `--stability-test` (600), and `--frames N` CNA runs.
-- [x] Exercise lifecycle, game time, native device, real PNG decode,
-  Texture2D, SpriteBatch, clear/draw, keyboard, movement, capability query,
-  explicit dispose, and shutdown.
-- [x] Remove fake cube/3D and renderer claims.
-- [ ] Add window resize and non-headless renderer evidence.
-- [ ] Make project naming/package metadata parameterized through a tested
-  cargo-generate-compatible or equivalently standard generation path.
-- [ ] Replace the local path dependency with a released crate version when one
-  exists.
-
-## Platform matrix
-
-| Platform | Classification |
-|---|---|
-| Linux x86-64 HEADLESS | experimental; 60/600 native frames passed with two temporary CNA compile-gate corrections |
-| Linux windowed/GPU | planned; no CNA-Rust runtime evidence |
-| Windows | planned; loader and runtime unverified |
-| macOS | planned; runtime unverified |
-| WebAssembly | unsupported; no compatible upstream CNA C ABI build verified |
-| Android | unsupported; no native lifecycle/window/input integration verified |
-
-## CI and quality gates
-
-- [x] Rust 1.74 `fmt`, check, Clippy, tests, and docs.
-- [x] Strict API report, leak guard, header/library ABI report.
-- [x] Template build and 60/600 Linux headless runtime tests.
-- [ ] Add CI-owned XNA reference acquisition policy and native artifact.
-- [ ] Add canonical unmodified CNA build gate and sanitizers.
-- [ ] Test the declared MSRV in CI, not only locally.
-
-## Upstream CNA blockers
-
-The checked-out CNA source does not build `cna_c_api` unmodified: C++ added the
-50th `NanoVg` renderer, but ABI 0.7 `graphics.h` and both C mapping tables still
-end at the 49th `PixiJs` identity. The compile-time guards correctly fail. The
-runtime test library used two equivalent temporary `/tmp` corrections: preserve
-the ABI 0.7 table size and map the post-ABI C++ `NanoVg` value to unknown. These
-must be fixed and versioned upstream before release runtime support is claimed.
-
-CNA ABI 0.7 teardown also checks for C-owned children before its shutdown path
-invokes `unload_content`. CNA-Rust supplies a pre-destroy cleanup call and keeps
-cleanup idempotent; the upstream ordering should be reviewed.
-
-## Later profiles
-
-- [ ] Separately inventory GamerServices/network assemblies not in the first
-  seven-assembly runtime set, Xbox, Windows Phone, and content-pipeline/build
-  assemblies.
-- [ ] Consider FNA, MonoGame, and CNA extension profiles only after the strict
-  XNA Windows runtime structure is healthy. Never merge them into a random
-  union under the strict namespace.
+The selected profile is complete only when all mapped types/members and every
+structural category reach zero, all public-surface safety gates remain zero,
+behavior is XNA-derived, native prototypes/layouts are compiler-verified,
+ownership plus sanitizer evidence passes, canonical CNA builds unmodified, and
+every claimed platform has fresh runtime evidence.

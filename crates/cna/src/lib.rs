@@ -7,6 +7,7 @@ mod game;
 mod graphics;
 mod input;
 mod native;
+mod packed;
 mod value;
 
 pub use error::{CnaError, Result};
@@ -18,21 +19,51 @@ pub mod Microsoft {
     pub mod Xna {
         pub mod Framework {
             pub use crate::game::{Game, GameContext, GameTime, TimeSpan};
+            pub use crate::input::PlayerIndex;
             pub use crate::value::{
-                BoundingBox, BoundingSphere, Color, MathHelper, Matrix, Plane, Point, Quaternion,
-                Ray, Rectangle, Vector2, Vector3, Vector4,
+                BoundingBox, BoundingFrustum, BoundingSphere, Color, ContainmentType, Curve,
+                CurveContinuity, CurveKey, CurveKeyCollection, CurveLoopType, CurveTangent,
+                MathHelper, Matrix, Plane, PlaneIntersectionType, Point, Quaternion, Ray,
+                Rectangle, Vector2, Vector3, Vector4,
             };
 
             #[allow(non_snake_case, clippy::module_name_repetitions)]
             pub mod Graphics {
                 pub use crate::graphics::{
-                    GraphicsDevice, GraphicsResource, SpriteBatch, Texture, Texture2D, Viewport,
+                    Blend, BlendFunction, BlendState, ClearOptions, ColorWriteChannels,
+                    CompareFunction, CullMode, DepthStencilState, FillMode, GraphicsDevice,
+                    GraphicsResource, RasterizerState, SamplerState, SpriteBatch, SpriteEffects,
+                    SpriteSortMode, StencilOperation, SurfaceFormat, Texture, Texture2D,
+                    TextureAddressMode, TextureFilter, Viewport,
                 };
+
+                #[allow(non_snake_case)]
+                pub mod PackedVector {
+                    pub use crate::packed::{
+                        Alpha8, Bgr565, Bgra4444, Bgra5551, Byte4, HalfSingle, HalfVector2,
+                        HalfVector4, IPackedVector, IPackedVectorOfT, NormalizedByte2,
+                        NormalizedByte4, NormalizedShort2, NormalizedShort4, Rg32, Rgba1010102,
+                        Rgba64, Short2, Short4,
+                    };
+                }
             }
 
             #[allow(non_snake_case)]
             pub mod Input {
-                pub use crate::input::{Keyboard, KeyboardState, Keys};
+                pub use crate::input::{
+                    ButtonState, Buttons, GamePad, GamePadButtons, GamePadCapabilities,
+                    GamePadDPad, GamePadDeadZone, GamePadState, GamePadThumbSticks,
+                    GamePadTriggers, GamePadType, KeyState, Keyboard, KeyboardState, Keys, Mouse,
+                    MouseState,
+                };
+
+                #[allow(non_snake_case)]
+                pub mod Touch {
+                    pub use crate::input::{
+                        TouchCollection, TouchCollectionEnumerator, TouchLocation,
+                        TouchLocationState, TouchPanelCapabilities,
+                    };
+                }
             }
 
             /// Reserved strict namespace for the not-yet-implemented XNB facade.
@@ -44,6 +75,35 @@ pub mod Microsoft {
 
 /// CNA-specific functionality kept outside the strict XNA projection.
 pub mod extensions {
+    pub mod events {
+        use std::any::Any;
+
+        /// Rust value used for CLR's stateless `EventArgs` payload.
+        #[derive(Clone, Copy, Debug, Default)]
+        pub struct EventArgs;
+
+        /// Type-erased XNA event callback.
+        pub trait EventHandler: Send {
+            fn invoke(&mut self, sender: &dyn Any, args: EventArgs);
+        }
+
+        impl<F> EventHandler for F
+        where
+            F: FnMut(&dyn Any, EventArgs) + Send,
+        {
+            fn invoke(&mut self, sender: &dyn Any, args: EventArgs) {
+                self(sender, args);
+            }
+        }
+    }
+
+    pub mod window {
+        /// Opaque native window identity. It cannot be dereferenced or forged
+        /// through CNA-Rust's safe public API.
+        #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+        pub struct WindowHandle(pub(crate) u64);
+    }
+
     pub mod graphics {
         use crate::error::Result;
         use crate::graphics::GraphicsDevice;
@@ -67,7 +127,7 @@ pub mod extensions {
             fn renderer_info(&self) -> Result<RendererInfo>;
         }
 
-        impl RendererInfoExt for GraphicsDevice<'_> {
+        impl RendererInfoExt for GraphicsDevice {
             fn renderer_info(&self) -> Result<RendererInfo> {
                 let (name, supports_3d, supports_depth_stencil, max_texture_dimension) =
                     self.renderer_info()?;

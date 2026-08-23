@@ -25,6 +25,8 @@ pub enum CnaError {
     InvalidInput(&'static str),
     /// A platform has no implemented dynamic-library loader yet.
     UnsupportedPlatform,
+    /// CNA's selected ABI does not expose the requested runtime route.
+    UnsupportedRuntime(&'static str),
 }
 
 impl fmt::Display for CnaError {
@@ -41,7 +43,9 @@ impl fmt::Display for CnaError {
             Self::MissingSymbol(symbol) => write!(formatter, "CNA library is missing required symbol {symbol}"),
             Self::Native { code, message } => write!(formatter, "CNA error {code}: {message}"),
             Self::Callback(message) => write!(formatter, "game callback failed: {message}"),
-            Self::InvalidInput(message) => formatter.write_str(message),
+            Self::InvalidInput(message) | Self::UnsupportedRuntime(message) => {
+                formatter.write_str(message)
+            }
             Self::UnsupportedPlatform => formatter.write_str("CNA dynamic loading is not implemented on this platform"),
         }
     }

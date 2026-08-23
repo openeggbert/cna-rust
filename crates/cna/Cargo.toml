@@ -11,6 +11,12 @@ readme = "../../README.md"
 [dependencies]
 cna-sys = { package = "cna-rust-sys", path = "../cna-sys", version = "0.0.0" }
 
+[features]
+default = []
+# Test-only bridge fault points. They remain inert unless the deliberately
+# named CNA_RUST_TEST_FAULT environment variable is also set.
+native-fault-injection = []
+
 [lib]
 name = "cna"
 path = "src/lib.rs"

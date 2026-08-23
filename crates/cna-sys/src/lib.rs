@@ -34,7 +34,129 @@ pub const CNA_GRAPHICS_CAPABILITY_THREE_D: CNA_GraphicsCapability = 0;
 pub const CNA_GRAPHICS_CAPABILITY_DEPTH_STENCIL_BUFFER: CNA_GraphicsCapability = 1;
 pub const CNA_SPRITE_SORT_MODE_DEFERRED: CNA_SpriteSortMode = 0;
 pub const CNA_SPRITE_EFFECT_NONE: CNA_SpriteEffects = 0;
+pub const CNA_BLEND_STATE_PRESET_DEFAULT: CNA_BlendStatePreset = 0;
+pub const CNA_BLEND_STATE_PRESET_ADDITIVE: CNA_BlendStatePreset = 1;
+pub const CNA_BLEND_STATE_PRESET_ALPHA_BLEND: CNA_BlendStatePreset = 2;
+pub const CNA_BLEND_STATE_PRESET_NON_PREMULTIPLIED: CNA_BlendStatePreset = 3;
+pub const CNA_BLEND_STATE_PRESET_OPAQUE: CNA_BlendStatePreset = 4;
+pub const CNA_DEPTH_STENCIL_STATE_PRESET_DEFAULT: CNA_DepthStencilStatePreset = 0;
+pub const CNA_DEPTH_STENCIL_STATE_PRESET_DEPTH_READ: CNA_DepthStencilStatePreset = 1;
+pub const CNA_DEPTH_STENCIL_STATE_PRESET_NONE: CNA_DepthStencilStatePreset = 2;
+pub const CNA_RASTERIZER_STATE_PRESET_DEFAULT: CNA_RasterizerStatePreset = 0;
+pub const CNA_RASTERIZER_STATE_PRESET_CULL_CLOCKWISE: CNA_RasterizerStatePreset = 1;
+pub const CNA_RASTERIZER_STATE_PRESET_CULL_COUNTER_CLOCKWISE: CNA_RasterizerStatePreset = 2;
+pub const CNA_RASTERIZER_STATE_PRESET_CULL_NONE: CNA_RasterizerStatePreset = 3;
+pub const CNA_SAMPLER_STATE_PRESET_DEFAULT: CNA_SamplerStatePreset = 0;
+pub const CNA_SAMPLER_STATE_PRESET_ANISOTROPIC_CLAMP: CNA_SamplerStatePreset = 1;
+pub const CNA_SAMPLER_STATE_PRESET_ANISOTROPIC_WRAP: CNA_SamplerStatePreset = 2;
+pub const CNA_SAMPLER_STATE_PRESET_LINEAR_CLAMP: CNA_SamplerStatePreset = 3;
+pub const CNA_SAMPLER_STATE_PRESET_LINEAR_WRAP: CNA_SamplerStatePreset = 4;
+pub const CNA_SAMPLER_STATE_PRESET_POINT_CLAMP: CNA_SamplerStatePreset = 5;
+pub const CNA_SAMPLER_STATE_PRESET_POINT_WRAP: CNA_SamplerStatePreset = 6;
+pub const CNA_BLEND_ONE: CNA_Blend = 0;
+pub const CNA_BLEND_ZERO: CNA_Blend = 1;
+pub const CNA_BLEND_SOURCE_COLOR: CNA_Blend = 2;
+pub const CNA_BLEND_INVERSE_SOURCE_COLOR: CNA_Blend = 3;
+pub const CNA_BLEND_SOURCE_ALPHA: CNA_Blend = 4;
+pub const CNA_BLEND_INVERSE_SOURCE_ALPHA: CNA_Blend = 5;
+pub const CNA_BLEND_DESTINATION_COLOR: CNA_Blend = 6;
+pub const CNA_BLEND_INVERSE_DESTINATION_COLOR: CNA_Blend = 7;
+pub const CNA_BLEND_DESTINATION_ALPHA: CNA_Blend = 8;
+pub const CNA_BLEND_INVERSE_DESTINATION_ALPHA: CNA_Blend = 9;
+pub const CNA_BLEND_FACTOR: CNA_Blend = 10;
+pub const CNA_BLEND_INVERSE_FACTOR: CNA_Blend = 11;
+pub const CNA_BLEND_SOURCE_ALPHA_SATURATION: CNA_Blend = 12;
+pub const CNA_BLEND_FUNCTION_ADD: CNA_BlendFunction = 0;
+pub const CNA_BLEND_FUNCTION_SUBTRACT: CNA_BlendFunction = 1;
+pub const CNA_BLEND_FUNCTION_REVERSE_SUBTRACT: CNA_BlendFunction = 2;
+pub const CNA_BLEND_FUNCTION_MAX: CNA_BlendFunction = 3;
+pub const CNA_BLEND_FUNCTION_MIN: CNA_BlendFunction = 4;
+pub const CNA_COLOR_WRITE_NONE: CNA_ColorWriteChannels = 0;
+pub const CNA_COLOR_WRITE_RED: CNA_ColorWriteChannels = 1;
+pub const CNA_COLOR_WRITE_GREEN: CNA_ColorWriteChannels = 2;
+pub const CNA_COLOR_WRITE_BLUE: CNA_ColorWriteChannels = 4;
+pub const CNA_COLOR_WRITE_ALPHA: CNA_ColorWriteChannels = 8;
+pub const CNA_COLOR_WRITE_ALL: CNA_ColorWriteChannels = 15;
+pub const CNA_COMPARE_ALWAYS: CNA_CompareFunction = 0;
+pub const CNA_COMPARE_NEVER: CNA_CompareFunction = 1;
+pub const CNA_COMPARE_LESS: CNA_CompareFunction = 2;
+pub const CNA_COMPARE_LESS_EQUAL: CNA_CompareFunction = 3;
+pub const CNA_COMPARE_EQUAL: CNA_CompareFunction = 4;
+pub const CNA_COMPARE_GREATER_EQUAL: CNA_CompareFunction = 5;
+pub const CNA_COMPARE_GREATER: CNA_CompareFunction = 6;
+pub const CNA_COMPARE_NOT_EQUAL: CNA_CompareFunction = 7;
+pub const CNA_STENCIL_KEEP: CNA_StencilOperation = 0;
+pub const CNA_STENCIL_ZERO: CNA_StencilOperation = 1;
+pub const CNA_STENCIL_REPLACE: CNA_StencilOperation = 2;
+pub const CNA_STENCIL_INCREMENT: CNA_StencilOperation = 3;
+pub const CNA_STENCIL_DECREMENT: CNA_StencilOperation = 4;
+pub const CNA_STENCIL_INCREMENT_SATURATION: CNA_StencilOperation = 5;
+pub const CNA_STENCIL_DECREMENT_SATURATION: CNA_StencilOperation = 6;
+pub const CNA_STENCIL_INVERT: CNA_StencilOperation = 7;
+pub const CNA_CULL_NONE: CNA_CullMode = 0;
+pub const CNA_CULL_CLOCKWISE_FACE: CNA_CullMode = 1;
+pub const CNA_CULL_COUNTER_CLOCKWISE_FACE: CNA_CullMode = 2;
+pub const CNA_FILL_SOLID: CNA_FillMode = 0;
+pub const CNA_FILL_WIREFRAME: CNA_FillMode = 1;
+pub const CNA_TEXTURE_ADDRESS_WRAP: CNA_TextureAddressMode = 0;
+pub const CNA_TEXTURE_ADDRESS_CLAMP: CNA_TextureAddressMode = 1;
+pub const CNA_TEXTURE_ADDRESS_MIRROR: CNA_TextureAddressMode = 2;
+pub const CNA_TEXTURE_FILTER_LINEAR: CNA_TextureFilter = 0;
+pub const CNA_TEXTURE_FILTER_POINT: CNA_TextureFilter = 1;
+pub const CNA_TEXTURE_FILTER_ANISOTROPIC: CNA_TextureFilter = 2;
+pub const CNA_TEXTURE_FILTER_LINEAR_MIP_POINT: CNA_TextureFilter = 3;
+pub const CNA_TEXTURE_FILTER_POINT_MIP_LINEAR: CNA_TextureFilter = 4;
+pub const CNA_TEXTURE_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR: CNA_TextureFilter = 5;
+pub const CNA_TEXTURE_FILTER_MIN_LINEAR_MAG_POINT_MIP_POINT: CNA_TextureFilter = 6;
+pub const CNA_TEXTURE_FILTER_MIN_POINT_MAG_LINEAR_MIP_LINEAR: CNA_TextureFilter = 7;
+pub const CNA_TEXTURE_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT: CNA_TextureFilter = 8;
+pub const CNA_TEXTURE_DATA_COLOR: CNA_TextureDataType = 0;
+pub const CNA_TEXTURE_DATA_BGR565: CNA_TextureDataType = 1;
+pub const CNA_TEXTURE_DATA_BGRA5551: CNA_TextureDataType = 2;
+pub const CNA_TEXTURE_DATA_BGRA4444: CNA_TextureDataType = 3;
+pub const CNA_TEXTURE_DATA_BYTE: CNA_TextureDataType = 4;
+pub const CNA_TEXTURE_DATA_NORMALIZED_BYTE2: CNA_TextureDataType = 5;
+pub const CNA_TEXTURE_DATA_NORMALIZED_BYTE4: CNA_TextureDataType = 6;
+pub const CNA_TEXTURE_DATA_RGBA1010102: CNA_TextureDataType = 7;
+pub const CNA_TEXTURE_DATA_RG32: CNA_TextureDataType = 8;
+pub const CNA_TEXTURE_DATA_RGBA64: CNA_TextureDataType = 9;
+pub const CNA_TEXTURE_DATA_ALPHA8: CNA_TextureDataType = 10;
+pub const CNA_TEXTURE_DATA_SINGLE: CNA_TextureDataType = 11;
+pub const CNA_TEXTURE_DATA_VECTOR2: CNA_TextureDataType = 12;
+pub const CNA_TEXTURE_DATA_VECTOR4: CNA_TextureDataType = 13;
+pub const CNA_TEXTURE_DATA_HALF_SINGLE: CNA_TextureDataType = 14;
+pub const CNA_TEXTURE_DATA_HALF_VECTOR2: CNA_TextureDataType = 15;
+pub const CNA_TEXTURE_DATA_HALF_VECTOR4: CNA_TextureDataType = 16;
+pub const CNA_TEXTURE_DATA_USHORT: CNA_TextureDataType = 17;
+pub const CNA_TEXTURE_IMAGE_FORMAT_PNG: CNA_TextureImageFormat = 0;
+pub const CNA_TEXTURE_IMAGE_FORMAT_JPEG: CNA_TextureImageFormat = 1;
 pub const CNA_KEY_ESCAPE: CNA_Key = 27;
+pub const CNA_MOUSE_BUTTON_LEFT: CNA_MouseButtonFlags = 1 << 0;
+pub const CNA_MOUSE_BUTTON_MIDDLE: CNA_MouseButtonFlags = 1 << 1;
+pub const CNA_MOUSE_BUTTON_RIGHT: CNA_MouseButtonFlags = 1 << 2;
+pub const CNA_MOUSE_BUTTON_X1: CNA_MouseButtonFlags = 1 << 3;
+pub const CNA_MOUSE_BUTTON_X2: CNA_MouseButtonFlags = 1 << 4;
+pub const CNA_GAMEPAD_TYPE_UNKNOWN: CNA_GamePadType = 0;
+pub const CNA_GAMEPAD_TYPE_GAMEPAD: CNA_GamePadType = 1;
+pub const CNA_GAMEPAD_TYPE_WHEEL: CNA_GamePadType = 2;
+pub const CNA_GAMEPAD_TYPE_ARCADE_STICK: CNA_GamePadType = 3;
+pub const CNA_GAMEPAD_TYPE_FLIGHT_STICK: CNA_GamePadType = 4;
+pub const CNA_GAMEPAD_TYPE_DANCE_PAD: CNA_GamePadType = 5;
+pub const CNA_GAMEPAD_TYPE_GUITAR: CNA_GamePadType = 6;
+pub const CNA_GAMEPAD_TYPE_ALTERNATE_GUITAR: CNA_GamePadType = 7;
+pub const CNA_GAMEPAD_TYPE_DRUM_KIT: CNA_GamePadType = 8;
+pub const CNA_GAMEPAD_TYPE_BIG_BUTTON_PAD: CNA_GamePadType = 9;
+pub const CNA_PLAYER_INDEX_ONE: CNA_PlayerIndex = 0;
+pub const CNA_PLAYER_INDEX_TWO: CNA_PlayerIndex = 1;
+pub const CNA_PLAYER_INDEX_THREE: CNA_PlayerIndex = 2;
+pub const CNA_PLAYER_INDEX_FOUR: CNA_PlayerIndex = 3;
+pub const CNA_GAMEPAD_DEAD_ZONE_NONE: CNA_GamePadDeadZone = 0;
+pub const CNA_GAMEPAD_DEAD_ZONE_INDEPENDENT_AXES: CNA_GamePadDeadZone = 1;
+pub const CNA_GAMEPAD_DEAD_ZONE_CIRCULAR: CNA_GamePadDeadZone = 2;
+pub const CNA_GAMEPAD_BUTTON_A: CNA_GamePadButtonFlags = 0x0000_1000;
+pub const CNA_GAMEPAD_BUTTON_LEFT_TRIGGER: CNA_GamePadButtonFlags = 0x0080_0000;
+pub const CNA_GAMEPAD_BUTTON_LEFT_THUMBSTICK_RIGHT: CNA_GamePadButtonFlags = 0x4000_0000;
+pub const CNA_GAMEPAD_BUTTON_ALL: CNA_GamePadButtonFlags = 0x7fff_ffff;
 
 pub type CNA_Result = u32;
 pub type CNA_Bool = u8;
@@ -44,9 +166,29 @@ pub type CNA_GraphicsCapability = u32;
 pub type CNA_GraphicsCapabilityFlags = u64;
 pub type CNA_GraphicsRendererType = u32;
 pub type CNA_SurfaceFormat = u32;
+pub type CNA_TextureDataType = u32;
+pub type CNA_TextureImageFormat = u32;
 pub type CNA_SpriteSortMode = u32;
 pub type CNA_SpriteEffects = u32;
+pub type CNA_Blend = u32;
+pub type CNA_BlendFunction = u32;
+pub type CNA_ColorWriteChannels = u32;
+pub type CNA_CompareFunction = u32;
+pub type CNA_StencilOperation = u32;
+pub type CNA_CullMode = u32;
+pub type CNA_FillMode = u32;
+pub type CNA_TextureAddressMode = u32;
+pub type CNA_TextureFilter = u32;
+pub type CNA_BlendStatePreset = u32;
+pub type CNA_DepthStencilStatePreset = u32;
+pub type CNA_RasterizerStatePreset = u32;
+pub type CNA_SamplerStatePreset = u32;
 pub type CNA_Key = u32;
+pub type CNA_MouseButtonFlags = u32;
+pub type CNA_PlayerIndex = u32;
+pub type CNA_GamePadDeadZone = u32;
+pub type CNA_GamePadButtonFlags = u32;
+pub type CNA_GamePadType = u32;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -199,6 +341,31 @@ pub struct CNA_Texture2DInfo {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_Texture2DCreateInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub width: u32,
+    pub height: u32,
+    pub mip_map: CNA_Bool,
+    pub reserved: [u8; 3],
+    pub format: CNA_SurfaceFormat,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_Texture2DTransfer {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub level: i32,
+    pub has_rectangle: CNA_Bool,
+    pub reserved: [u8; 3],
+    pub rectangle: CNA_Rectangle,
+    pub start_index: u64,
+    pub element_count: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct CNA_Texture2DDecodeInfo {
     pub struct_size: u32,
     pub struct_version: u32,
@@ -206,6 +373,78 @@ pub struct CNA_Texture2DDecodeInfo {
     pub height: u32,
     pub zoom: CNA_Bool,
     pub reserved: [u8; 7],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_BlendState {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub alpha_blend_function: CNA_BlendFunction,
+    pub alpha_destination_blend: CNA_Blend,
+    pub alpha_source_blend: CNA_Blend,
+    pub color_blend_function: CNA_BlendFunction,
+    pub color_destination_blend: CNA_Blend,
+    pub color_source_blend: CNA_Blend,
+    pub color_write_channels: CNA_ColorWriteChannels,
+    pub color_write_channels1: CNA_ColorWriteChannels,
+    pub color_write_channels2: CNA_ColorWriteChannels,
+    pub color_write_channels3: CNA_ColorWriteChannels,
+    pub blend_factor: CNA_Color,
+    pub multi_sample_mask: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_DepthStencilState {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub depth_buffer_enable: CNA_Bool,
+    pub depth_buffer_write_enable: CNA_Bool,
+    pub stencil_enable: CNA_Bool,
+    pub two_sided_stencil_mode: CNA_Bool,
+    pub depth_buffer_function: CNA_CompareFunction,
+    pub stencil_function: CNA_CompareFunction,
+    pub stencil_mask: i32,
+    pub stencil_write_mask: i32,
+    pub reference_stencil: i32,
+    pub stencil_fail: CNA_StencilOperation,
+    pub stencil_depth_buffer_fail: CNA_StencilOperation,
+    pub stencil_pass: CNA_StencilOperation,
+    pub counter_clockwise_stencil_function: CNA_CompareFunction,
+    pub counter_clockwise_stencil_fail: CNA_StencilOperation,
+    pub counter_clockwise_stencil_depth_buffer_fail: CNA_StencilOperation,
+    pub counter_clockwise_stencil_pass: CNA_StencilOperation,
+    pub reserved: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_RasterizerState {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub cull_mode: CNA_CullMode,
+    pub fill_mode: CNA_FillMode,
+    pub depth_bias: f32,
+    pub slope_scale_depth_bias: f32,
+    pub multi_sample_anti_alias: CNA_Bool,
+    pub scissor_test_enable: CNA_Bool,
+    pub reserved: [u8; 2],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_SamplerState {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub address_u: CNA_TextureAddressMode,
+    pub address_v: CNA_TextureAddressMode,
+    pub address_w: CNA_TextureAddressMode,
+    pub filter: CNA_TextureFilter,
+    pub max_anisotropy: i32,
+    pub max_mip_level: i32,
+    pub mip_map_level_of_detail_bias: f32,
+    pub reserved: u32,
 }
 
 #[repr(C)]
@@ -240,6 +479,85 @@ pub struct CNA_KeyboardState {
     pub pressed_key_words: [u64; 4],
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_MouseState {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub x: i32,
+    pub y: i32,
+    pub scroll_wheel: i32,
+    pub horizontal_scroll_wheel: i32,
+    pub pressed_buttons: CNA_MouseButtonFlags,
+    pub reserved: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_GamePadAnalogState {
+    pub left_thumb_stick: CNA_Vector2,
+    pub right_thumb_stick: CNA_Vector2,
+    pub left_trigger: f32,
+    pub right_trigger: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_GamePadState {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub is_connected: CNA_Bool,
+    pub reserved0: [u8; 3],
+    pub packet_number: i32,
+    pub pressed_buttons: CNA_GamePadButtonFlags,
+    pub reserved1: u32,
+    pub analog: CNA_GamePadAnalogState,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_GamePadCapabilities {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub gamepad_type: CNA_GamePadType,
+    pub is_connected: CNA_Bool,
+    pub has_a_button: CNA_Bool,
+    pub has_b_button: CNA_Bool,
+    pub has_x_button: CNA_Bool,
+    pub has_y_button: CNA_Bool,
+    pub has_back_button: CNA_Bool,
+    pub has_start_button: CNA_Bool,
+    pub has_big_button: CNA_Bool,
+    pub has_dpad_up_button: CNA_Bool,
+    pub has_dpad_down_button: CNA_Bool,
+    pub has_dpad_left_button: CNA_Bool,
+    pub has_dpad_right_button: CNA_Bool,
+    pub has_left_shoulder_button: CNA_Bool,
+    pub has_right_shoulder_button: CNA_Bool,
+    pub has_left_stick_button: CNA_Bool,
+    pub has_right_stick_button: CNA_Bool,
+    pub has_left_x_thumb_stick: CNA_Bool,
+    pub has_left_y_thumb_stick: CNA_Bool,
+    pub has_right_x_thumb_stick: CNA_Bool,
+    pub has_right_y_thumb_stick: CNA_Bool,
+    pub has_left_trigger: CNA_Bool,
+    pub has_right_trigger: CNA_Bool,
+    pub has_left_vibration_motor: CNA_Bool,
+    pub has_right_vibration_motor: CNA_Bool,
+    pub has_voice_support: CNA_Bool,
+    pub has_light_bar_ext: CNA_Bool,
+    pub has_trigger_vibration_motors_ext: CNA_Bool,
+    pub has_misc1_ext: CNA_Bool,
+    pub has_paddle1_ext: CNA_Bool,
+    pub has_paddle2_ext: CNA_Bool,
+    pub has_paddle3_ext: CNA_Bool,
+    pub has_paddle4_ext: CNA_Bool,
+    pub has_touchpad_ext: CNA_Bool,
+    pub has_gyro_ext: CNA_Bool,
+    pub has_accelerometer_ext: CNA_Bool,
+    pub reserved: [u8; 1],
+}
+
 pub type cna_get_abi_version_fn = unsafe extern "C" fn() -> u32;
 pub type cna_error_get_last_message_size_fn = unsafe extern "C" fn(*mut u64) -> CNA_Result;
 pub type cna_error_copy_last_message_fn =
@@ -256,6 +574,31 @@ pub type cna_game_get_graphics_device_fn =
     unsafe extern "C" fn(CNA_Handle, *mut CNA_Handle) -> CNA_Result;
 pub type cna_graphics_device_get_viewport_fn =
     unsafe extern "C" fn(CNA_Handle, *mut CNA_Viewport) -> CNA_Result;
+pub type cna_graphics_device_set_viewport_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_Viewport) -> CNA_Result;
+pub type cna_graphics_device_get_scissor_rectangle_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Rectangle) -> CNA_Result;
+pub type cna_graphics_device_set_scissor_rectangle_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_Rectangle) -> CNA_Result;
+pub type cna_graphics_device_get_blend_factor_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Color) -> CNA_Result;
+pub type cna_graphics_device_set_blend_factor_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_Color) -> CNA_Result;
+pub type cna_graphics_device_get_multi_sample_mask_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut i32) -> CNA_Result;
+pub type cna_graphics_device_set_multi_sample_mask_fn =
+    unsafe extern "C" fn(CNA_Handle, i32) -> CNA_Result;
+pub type cna_graphics_device_get_reference_stencil_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut i32) -> CNA_Result;
+pub type cna_graphics_device_set_reference_stencil_fn =
+    unsafe extern "C" fn(CNA_Handle, i32) -> CNA_Result;
+pub type cna_graphics_device_set_blend_state_fn =
+    unsafe extern "C" fn(CNA_Handle, *const CNA_BlendState) -> CNA_Result;
+pub type cna_graphics_device_set_depth_stencil_state_fn =
+    unsafe extern "C" fn(CNA_Handle, *const CNA_DepthStencilState) -> CNA_Result;
+pub type cna_graphics_device_set_rasterizer_state_fn =
+    unsafe extern "C" fn(CNA_Handle, *const CNA_RasterizerState) -> CNA_Result;
+pub type cna_graphics_device_present_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
 pub type cna_graphics_device_clear_rgba_fn =
     unsafe extern "C" fn(CNA_Handle, f32, f32, f32, f32) -> CNA_Result;
 pub type cna_graphics_device_supports_capability_fn =
@@ -273,13 +616,49 @@ pub type cna_texture2d_create_from_encoded_memory_fn = unsafe extern "C" fn(
     *const CNA_Texture2DDecodeInfo,
     *mut CNA_Handle,
 ) -> CNA_Result;
+pub type cna_texture2d_create_fn =
+    unsafe extern "C" fn(CNA_Handle, *const CNA_Texture2DCreateInfo, *mut CNA_Handle) -> CNA_Result;
 pub type cna_texture2d_get_info_fn =
     unsafe extern "C" fn(CNA_Handle, *mut CNA_Texture2DInfo) -> CNA_Result;
+pub type cna_texture2d_set_data_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    CNA_TextureDataType,
+    *const CNA_Texture2DTransfer,
+    *const c_void,
+    u64,
+) -> CNA_Result;
+pub type cna_texture2d_get_data_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    CNA_TextureDataType,
+    *const CNA_Texture2DTransfer,
+    *mut c_void,
+    u64,
+    *mut u64,
+) -> CNA_Result;
+pub type cna_texture2d_get_encoded_byte_count_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_TextureImageFormat, u32, u32, *mut u64) -> CNA_Result;
+pub type cna_texture2d_copy_encoded_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    CNA_TextureImageFormat,
+    u32,
+    u32,
+    *mut u8,
+    u64,
+    *mut u64,
+) -> CNA_Result;
 pub type cna_texture2d_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
 pub type cna_sprite_batch_create_fn =
     unsafe extern "C" fn(CNA_Handle, *mut CNA_Handle) -> CNA_Result;
 pub type cna_sprite_batch_begin_fn =
     unsafe extern "C" fn(CNA_Handle, *const CNA_SpriteBatchBeginInfo) -> CNA_Result;
+pub type cna_sprite_batch_begin_with_states_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    CNA_SpriteSortMode,
+    *const CNA_BlendState,
+    *const CNA_SamplerState,
+    *const CNA_DepthStencilState,
+    *const CNA_RasterizerState,
+) -> CNA_Result;
 pub type cna_sprite_batch_submit_many_fn =
     unsafe extern "C" fn(CNA_Handle, *const CNA_SpriteCommand, u64) -> CNA_Result;
 pub type cna_sprite_batch_end_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
@@ -288,6 +667,23 @@ pub type cna_keyboard_get_state_fn =
     unsafe extern "C" fn(CNA_Handle, *mut CNA_KeyboardState) -> CNA_Result;
 pub type cna_keyboard_state_is_key_down_fn =
     unsafe extern "C" fn(*const CNA_KeyboardState, CNA_Key, *mut CNA_Bool) -> CNA_Result;
+pub type cna_mouse_get_state_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_MouseState) -> CNA_Result;
+pub type cna_mouse_get_window_handle_fn = unsafe extern "C" fn(CNA_Handle, *mut u64) -> CNA_Result;
+pub type cna_mouse_set_window_handle_fn = unsafe extern "C" fn(CNA_Handle, u64) -> CNA_Result;
+pub type cna_mouse_set_position_fn = unsafe extern "C" fn(CNA_Handle, i32, i32) -> CNA_Result;
+pub type cna_gamepad_get_state_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_PlayerIndex, *mut CNA_GamePadState) -> CNA_Result;
+pub type cna_gamepad_get_state_with_dead_zone_fn = unsafe extern "C" fn(
+    CNA_Handle,
+    CNA_PlayerIndex,
+    CNA_GamePadDeadZone,
+    *mut CNA_GamePadState,
+) -> CNA_Result;
+pub type cna_gamepad_get_capabilities_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_PlayerIndex, *mut CNA_GamePadCapabilities) -> CNA_Result;
+pub type cna_gamepad_set_vibration_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_PlayerIndex, f32, f32, *mut CNA_Bool) -> CNA_Result;
 
 #[cfg(test)]
 mod layout_tests {
@@ -353,6 +749,20 @@ mod layout_tests {
         );
         assert_eq!(
             (
+                size_of::<CNA_Texture2DCreateInfo>(),
+                align_of::<CNA_Texture2DCreateInfo>()
+            ),
+            (24, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_Texture2DTransfer>(),
+                align_of::<CNA_Texture2DTransfer>()
+            ),
+            (48, 8)
+        );
+        assert_eq!(
+            (
                 size_of::<CNA_Texture2DDecodeInfo>(),
                 align_of::<CNA_Texture2DDecodeInfo>()
             ),
@@ -378,6 +788,31 @@ mod layout_tests {
                 align_of::<CNA_KeyboardState>()
             ),
             (40, 8)
+        );
+        assert_eq!(
+            (size_of::<CNA_MouseState>(), align_of::<CNA_MouseState>()),
+            (32, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_GamePadAnalogState>(),
+                align_of::<CNA_GamePadAnalogState>()
+            ),
+            (24, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_GamePadState>(),
+                align_of::<CNA_GamePadState>()
+            ),
+            (48, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_GamePadCapabilities>(),
+                align_of::<CNA_GamePadCapabilities>()
+            ),
+            (48, 4)
         );
     }
 }

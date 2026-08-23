@@ -15,17 +15,17 @@ fn accepts_texture<T: Texture>() {}
 #[allow(dead_code)]
 fn projected_resource_relationships(
     game: &GameContext<'_>,
-    device: &GraphicsDevice<'_>,
+    device: &GraphicsDevice,
     texture: &mut Texture2D,
     batch: &mut SpriteBatch,
 ) -> cna::Result<()> {
     let _state: KeyboardState = Keyboard::GetState(game)?;
     let _ = Keys::Escape;
-    device.Clear(Color::CornflowerBlue)?;
+    device.ClearWithColor(Color::CornflowerBlue)?;
     batch.Begin()?;
     batch.Draw(texture, Vector2::Zero, Color::White)?;
     batch.End()?;
-    texture.Dispose()
+    texture.DisposeWithNoArguments()
 }
 
 struct ProbeGame;

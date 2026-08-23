@@ -1,92 +1,164 @@
 # Architecture
 
-## Layers
+## Layers and public identity
 
 ```text
 Rust game
   -> cna::Microsoft::Xna::Framework::*   strict XNA projection
-  -> cna safe facades + cna::extensions CNA-only surface
-  -> crate-private native bridge         audited dynamic loading/callbacks
+  -> private family modules              value/input/game/graphics
+  -> crate-private native bridge         typed safe calls over dynamic symbols
   -> cna_sys                             raw ABI 0.7 declarations
   -> CNA stable C ABI                    cna_* only
   -> CNA C++
 ```
 
 The published package is `cna-rust` and its library crate is `cna`. The raw
-package is `cna-rust-sys` and its crate is `cna_sys`. Dependencies use explicit
-Cargo `package = ...` renaming; neither identity relies on Cargo's hyphen
-normalization.
+package is `cna-rust-sys` and its crate is `cna_sys`. Filesystem organization
+does not create public namespaces: private `value`, `input`, `game`,
+`graphics`, and `native` modules are re-exported into the exact XNA hierarchy.
+CNA-only renderer and opaque-window concepts remain under `cna::extensions`.
 
-The compatibility hierarchy preserves XNA identifiers and casing. Its formal
-language rules are normative in [xna-rust-mapping.md](xna-rust-mapping.md).
-CNA-only renderer information lives under `cna::extensions`, not on strict XNA
-types as an inherent member.
+## Native boundary and ABI evidence
 
-## Native boundary
+`cna-sys` contains the reviewed ABI-0.7 slice: fixed-width aliases, `repr(C)`
+structures, callbacks, constants, and 53 function-pointer declarations. The
+safe bridge is grouped by concern:
 
-`cna-sys` contains a reviewed ABI 0.7 slice: fixed-width aliases, `repr(C)`
-structures, callbacks, constants, and function-pointer declarations. The safe
-crate loads only unmangled `cna_*` symbols and rejects any ABI other than the
-declared version before resolving the operational symbols.
+- `native/api.rs`: exact version gate and symbol inventory;
+- `native/loader.rs`: dynamic-library ownership and Unix loading;
+- `native/game.rs`, `graphics.rs`, and `input.rs`: typed facade calls;
+- `native/fault.rs`: feature-gated, test-only failure injection;
+- `native/error.rs`: CNA error extraction.
 
-Library discovery checks, in order:
+The loader accepts exactly `0x00000700`; it does not silently accept ABI 0.8.
+There is no fake backend fallback. Unix is runtime-tested and unsupported
+loaders return a typed error.
 
-1. `CNA_NATIVE_LIBRARY` as an exact file;
-2. platform library names inside `CNA_NATIVE_DIR`;
-3. common build/install locations derived from `CNA_ROOT`;
-4. the executable directory and platform library name.
+The ABI verifier derives full C prototypes from Clang's view of canonical CNA
+headers and compares them with every reviewed `cna-sys` function type. It
+measures return and parameter types, scalar width/signedness, pointer depth and
+constness, callback/struct pointers, and boolean/enum representations. The
+current pass checks 53 functions and 188 prototype type positions. Independent
+C and Rust probes add layouts for 14 structures, two callback signatures, and
+98 constants, for 313 total C/Rust measurements and zero mismatches.
 
-A failure reports every attempted path and loader diagnostic. There is no fake
-fallback. The current loader is implemented and runtime-tested on Unix; other
-platform loaders are pending and return `UnsupportedPlatform`.
+## Durable device identity
 
-Unsafe code is confined to `native.rs` and callback trampolines in `game.rs`.
-Each operation states its pointer/handle/lifetime invariant, and
-`unsafe_op_in_unsafe_fn` is denied. The strict public API contains no unsafe
-function, raw pointer, integer native handle, or `cna_sys` type.
+The game host creates one private `Arc<DeviceState>` for its logical
+`GraphicsDevice`. Every `GameContext.GraphicsDevice()` clone points to that
+same state, so repeated access and resource association preserve identity.
+The `Arc` does not own CNA's native device: the native game remains its sole
+owner.
 
-## Game and lifetimes
+Only the native device handle is callback-scoped. At callback entry the bridge
+borrows CNA's current device handle into the private state; at callback exit it
+clears that handle. Safe device operations outside a callback therefore return
+a deterministic error instead of extending the native borrow or fabricating a
+`'static` lifetime. No `transmute`, leak, public raw handle, or untracked
+integer identity is used.
 
-The `Game` trait is the user lifecycle contract. `GameContext<'callback>`
-composes the native, host-owned portion of XNA `Game`. A `GraphicsDevice`
-borrowed from it inherits the callback lifetime, matching CNA's rule that the
-C handle is invalid after callback return.
+`Texture2D`, `SpriteBatch`, and bound graphics-state descriptors retain a clone
+of the durable device wrapper. This supports same-device validation and shared
+invalidation without giving a child ownership of the native device. The host
+keeps weak registrations for owned native children and releases live children
+in reverse registration order before parent destruction. It then invalidates
+the device after the destroy attempt, including reported destroy failure.
+After shutdown, device/resource access fails safely and repeated child
+`Dispose` remains idempotent.
 
-Owned resources (`Texture2D`, `SpriteBatch`) hold an `Arc` keeping the dynamic
-library loaded plus one native handle. `Dispose` is idempotent; `Drop` calls it.
-The handle becomes invalid only after successful native destruction, so an
-error cannot silently lose ownership state. Traits model the public
-`GraphicsResource` and `Texture` base contracts.
+## Lifecycle and teardown
 
-CNA ABI 0.7 checks that C-owned child resources are absent before
-`cna_game_destroy`, but invokes `unload_content` inside shutdown after that
-check. The runner therefore gives the Rust game a pre-destroy `UnloadContent`
-release point after the loop and then accepts CNA's normal shutdown callback.
-Resource cleanup must be idempotent. The 60/600-frame tests cover explicit
-dispose followed by drop and this double unload notification.
+`Game` is the user lifecycle trait and `GameContext<'callback>` exposes the
+host-owned portion needed during callbacks. CNA ABI 0.7's frame hooks now drive
+`Initialize`, `BeginRun`, `BeginDraw`, `EndDraw`, and `EndRun` in addition to
+the original content/update/draw/shutdown callbacks. A measured one-frame run
+has this user-visible order:
 
-## Verification
+```text
+Initialize
+LoadContent
+BeginRun
+Update
+BeginDraw
+Draw
+EndDraw
+OnExiting
+EndRun
+UnloadContent
+Dispose
+```
 
-The API verifier hashes the seven XNA 4.0 Windows runtime assemblies, extracts a
-neutral CLR contract with Mono, applies the formal mapping rules, and inspects
-the Rust surface through compiler rustdoc JSON. Rust 1.74 requires unstable
-rustdoc JSON, so only the tool subprocess receives `RUSTC_BOOTSTRAP=1`; the
-library and tests remain stable Rust 1.74. Unimplemented comparison categories
-are reported as unmeasured rather than false zeroes.
+`BeginDraw == false` suppresses `Draw` and `EndDraw`; the next update/frame can
+still proceed. Panic in either ordinary lifecycle callbacks or `BeginDraw` is
+caught before returning through C and becomes `CnaError::Callback`.
 
-The ABI verifier parses all canonical CNA C headers, compares the reviewed
-inventory by symbol and arity, optionally scans ELF exports, and calls
-`cna_get_abi_version`. It is platform-honest: the ELF export check is Linux
-evidence only.
+CNA ABI 0.7 rejects `cna_game_destroy` while owned child handles remain, but
+CNA itself emits the shutdown lifecycle during destruction. The host therefore
+performs an internal child-release pass after `cna_game_run` and before
+`cna_game_destroy`. That pass invokes neither user `UnloadContent` nor public
+resource `Disposing` events. CNA then emits exactly one `OnExiting`, one
+`EndRun`, and one `UnloadContent`; Rust invokes user `Game.Dispose` after the
+destroy attempt. User lifecycle notification and native dependency cleanup are
+therefore separate mechanisms, and normal `UnloadContent` code need not be
+idempotent because of the host.
 
-## Current scope
+## Graphics resource foundation
 
-The implemented coherent runtime slice covers native game callbacks, signed
-game time, callback-scoped graphics device access, viewport/clear, encoded
-texture creation, sprite batching, keyboard capture, renderer facts, and clean
-shutdown. Pure Rust value work covers an initial subset of vector, quaternion,
-matrix, color, point/rectangle, plane/ray, and bounding behavior.
+`GraphicsResource` is the shared safe trait for device association, name, tag,
+disposed state, disposal, finalization projection, string representation, and
+the normative `Disposing` event. Event dispatch snapshots subscription order,
+supports removal and self-removal, catches handler panic, and never unwinds
+into native code. Explicit `Dispose(true)` emits while the resource is still
+observable as not disposed, then releases it exactly once. `Drop` and internal
+pre-destroy cleanup do not synthesize the user event.
 
-It does not yet implement the full Game object model, XNB content, remaining
-graphics, complete input, models, audio/XACT, media/storage, GamerServices, or
-the complete value method surface. The strict verifier quantifies that gap.
+`Texture` composes `GraphicsResource`. `Texture2D` completes the selected
+profile's mapped constructors, stream overloads, bounds/format/level metadata,
+generic full/rectangle/mip transfers, PNG/JPEG encoding, and disposal. Data
+routes accept only layouts CNA ABI 0.7 can represent exactly; they validate
+dimensions, mip/rectangle/window bounds, format/type compatibility, disposed
+parents/children, bad streams, and construction rollback.
+
+`SpriteBatch` implements all texture draw overloads and the non-effect
+state-bearing begin routes. Its remaining eight diagnostics are two
+effect-bearing `Begin` overloads and six `SpriteFont.DrawString` overloads;
+those wait for real `Effect` and `SpriteFont` families rather than shallow
+signature shells. Invalid begin/draw/end/dispose transitions are tested.
+
+Managed `BlendState`, `DepthStencilState`, `RasterizerState`, and
+`SamplerState` descriptors have complete XNA properties, defaults, stock
+states, resource behavior, and real CNA application routes. CNA and XNA assign
+opposite C numeric identities to `BlendFunction.Min`/`Max`; the private bridge
+performs an explicit translation while the public XNA enum values remain exact.
+
+## Verification and fault evidence
+
+The API verifier hashes all seven XNA 4.0 Windows runtime assemblies, extracts
+neutral CLR metadata with Mono, applies the normative mapping, and inspects
+compiler-produced rustdoc JSON. Schema 2 measures every declared structural
+category and emits the deterministic type scoreboard. `unmeasuredCategories`
+and the allowlist are empty; the leak-only public-surface gate is zero.
+
+The XNA-derived managed corpus has 105 named observations plus a final count
+assertion. New groups cover curves, every remaining packed-vector format, and
+graphics-state defaults. The native suite uses isolated child processes for
+143 successful game lifetimes and 93 resource constructions, repeated dispose
+and drop, live-child parent shutdown, callback panic, transfer validation, and
+test-bridge create/info/destroy failures. Absence of a crash is not a leak
+proof. `tools/native-stress/run-sanitized.sh` is an optional path requiring a
+separately instrumented exact ABI-0.7 CNA library; no sanitizer pass is claimed
+for the current run.
+
+## Current blockers and dependency order
+
+Canonical CNA HEAD `1bb2145d99ed572dd4eb15009c34e2e5f410fcf0` still fails
+its unmodified C API build at `CnaCApiCoreExt.cpp:250`: the renderer identity
+assertion reduces to `49 == 50`. Runtime evidence therefore uses the clearly
+labelled experimental ABI-0.7 HEADLESS library.
+
+The remaining strict work is dependency-ordered, not optimized for missing
+type count: finish `Game` components/services/window and events; stabilize
+device state collections and presentation/adapter identity; add buffers and
+render targets; then effects and `SpriteFont`, models, XNB/content, audio/XACT,
+and media/storage. PNG decoding remains a texture route, not content-pipeline
+support.
