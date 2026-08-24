@@ -9,6 +9,7 @@ mod audio;
 mod game;
 mod graphics;
 mod input;
+mod media;
 mod native;
 mod packed;
 mod storage;
@@ -42,6 +43,12 @@ pub use graphics::{
 pub use storage::{
     FileAccess, FileMode, FileShare, StorageAsyncCallback, StorageAsyncResult, StorageAsyncState,
     StorageStream,
+};
+pub use media::{
+    Album, AlbumCollection, Artist, ArtistCollection, Genre, GenreCollection, MediaLibrary,
+    MediaPlayer, MediaQueue, MediaSource, MediaSourceType, MediaState, Picture, PictureAlbum,
+    PictureAlbumCollection, PictureCollection, Playlist, PlaylistCollection, Song,
+    SongCollection, Video, VideoPlayer, VideoSoundtrackType, VisualizationData,
 };
 
 /// XNA 4.0 compatibility hierarchy. Casing intentionally follows XNA.
@@ -169,12 +176,51 @@ pub mod Microsoft {
                     SoundBank, SoundEffect, SoundEffectInstance, SoundState, WaveBank,
                 };
             }
+
+            #[allow(non_snake_case, clippy::module_name_repetitions)]
+            pub mod Media {
+                pub use crate::media::{
+                    Album, AlbumCollection, Artist, ArtistCollection, Genre, GenreCollection,
+                    MediaLibrary, MediaPlayer, MediaQueue, MediaSource, MediaSourceType,
+                    MediaState, Picture, PictureAlbum, PictureAlbumCollection, PictureCollection,
+                    Playlist, PlaylistCollection, Song, SongCollection, Video, VideoPlayer,
+                    VideoSoundtrackType, VisualizationData,
+                };
+            }
         }
     }
 }
 
 /// CNA-specific functionality kept outside the strict XNA projection.
 pub mod extensions {
+    /// CNA-only deterministic Media callback qualification hooks.
+    #[allow(non_snake_case)]
+    pub mod media {
+        use crate::game::GameContext;
+        use crate::media::{MediaPlayer, Song};
+        use crate::Result;
+
+        pub fn RaiseActiveSongChanged(game: &GameContext<'_>) -> Result<()> {
+            MediaPlayer::raise_active_song_changed(game)
+        }
+
+        pub fn RaiseMediaStateChanged(game: &GameContext<'_>) -> Result<()> {
+            MediaPlayer::raise_media_state_changed(game)
+        }
+
+        /// Stops process-global playback from inside an owner-thread
+        /// `MediaPlayer` event handler. It fails outside that dispatch scope.
+        pub fn StopFromEvent() -> Result<()> {
+            MediaPlayer::stop_from_event()
+        }
+
+        /// Starts a live same-generation Song from inside an owner-thread
+        /// `MediaPlayer` event handler. It fails outside that dispatch scope.
+        pub fn PlayFromEvent(song: &Song) -> Result<()> {
+            MediaPlayer::play_from_event(song)
+        }
+    }
+
     pub mod events {
         use std::any::Any;
 

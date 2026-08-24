@@ -6,11 +6,12 @@ mod device_manager;
 mod display;
 mod error;
 #[cfg(feature = "native-fault-injection")]
-mod fault;
+pub(crate) mod fault;
 mod game;
 mod graphics;
 mod input;
 mod loader;
+pub(crate) mod media;
 mod storage;
 mod window;
 

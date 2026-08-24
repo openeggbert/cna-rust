@@ -5,7 +5,7 @@
 )]
 
 use std::any::Any;
-use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use cna_sys as sys;
@@ -17,6 +17,7 @@ use crate::extensions::events::{EventArgs, EventHandler};
 use crate::graphics::resource::EventHandlers;
 use crate::graphics::GraphicsDevice;
 use crate::native::Native;
+use crate::media::MediaRuntime;
 
 use super::{
     manager_service_type_ids, GameComponentCollection, GameServiceContainer, GameWindow,
@@ -50,6 +51,8 @@ pub struct GameState {
     disposed: EventHandlers<EventArgs>,
     disposed_once: AtomicBool,
     audio: Arc<AudioRuntime>,
+    media: Arc<MediaRuntime>,
+    media_generation: AtomicU64,
 }
 
 impl GameState {
@@ -77,6 +80,8 @@ impl GameState {
             disposed: EventHandlers::new(),
             disposed_once: AtomicBool::new(false),
             audio: AudioRuntime::new(),
+            media: MediaRuntime::process(),
+            media_generation: AtomicU64::new(0),
         }
     }
 
@@ -104,6 +109,15 @@ impl GameState {
         let inactive_sleep_time_ticks = self.inactive_sleep_time_ticks.load(Ordering::Acquire);
         self.window.attach(native, handle)?;
         self.audio.attach(native, handle)?;
+        let media_generation = match self.media.attach(native, handle) {
+            Ok(generation) => generation,
+            Err(error) => {
+                self.audio.detach();
+                self.window.detach();
+                return Err(error);
+            }
+        };
+        self.media_generation.store(media_generation, Ordering::Release);
         *self
             .binding
             .lock()
@@ -210,6 +224,8 @@ impl GameState {
     }
 
     pub(crate) fn detach(&self) {
+        self.media.detach();
+        self.media_generation.store(0, Ordering::Release);
         self.audio.detach();
         self.window.detach();
         self.binding
@@ -276,6 +292,20 @@ impl GameState {
 
     pub(crate) fn cleanup_audio(&self) -> Result<()> {
         self.audio.cleanup()
+    }
+
+    pub(crate) fn media_runtime(&self) -> &Arc<MediaRuntime> {
+        &self.media
+    }
+
+    pub(crate) fn media_generation(&self) -> u64 {
+        self.media_generation.load(Ordering::Acquire)
+    }
+
+    pub(crate) fn cleanup_media(&self) -> Result<()> {
+        self.media.detach();
+        self.media_generation.store(0, Ordering::Release);
+        Ok(())
     }
 
     #[must_use]

@@ -34,6 +34,71 @@ class VerifierMappingTests(unittest.TestCase):
             "cna::Microsoft::Xna::Framework::AudioChannels", actual
         )
 
+    def test_media_static_state_uses_game_context_and_is_not_a_constant(self):
+        player = {
+            "name": "Microsoft.Xna.Framework.Media.MediaPlayer", "kind": "class",
+            "genericParameters": [], "members": [
+                {"kind": "property", "name": "State",
+                 "type": "Microsoft.Xna.Framework.Media.MediaState", "static": True,
+                 "get": True, "set": False, "parameters": []},
+                {"kind": "property", "name": "GameHasControl",
+                 "type": "System.Boolean", "static": True,
+                 "get": True, "set": False, "parameters": []},
+            ],
+        }
+        state = {"name": "Microsoft.Xna.Framework.Media.MediaState", "kind": "enum"}
+        members = VERIFY.mapped_members(player, RULES, {
+            player["name"]: player, state["name"]: state,
+        })
+        self.assertEqual(members["State"]["parameters"], [
+            {"name": "game", "type": "&GameContext"}
+        ])
+        self.assertEqual(members["State"]["returnType"], "Result<Media::MediaState>")
+        self.assertEqual(members["GameHasControl"]["parameters"], [
+            {"name": "game", "type": "&GameContext"}
+        ])
+        self.assertEqual(members["GameHasControl"]["returnType"], "Result<bool>")
+
+    def test_media_datetime_visualization_and_retained_collection_mappings(self):
+        visualization = {
+            "name": "Microsoft.Xna.Framework.Media.VisualizationData", "kind": "class",
+            "genericParameters": [], "members": [
+                {"kind": "property", "name": "Frequencies",
+                 "type": "System.Collections.ObjectModel.ReadOnlyCollection`1[System.Single]",
+                 "static": False, "get": True, "set": False, "parameters": []},
+                {"kind": "property", "name": "Samples",
+                 "type": "System.Collections.ObjectModel.ReadOnlyCollection`1[System.Single]",
+                 "static": False, "get": True, "set": False, "parameters": []},
+            ],
+        }
+        picture = {
+            "name": "Microsoft.Xna.Framework.Media.Picture", "kind": "class",
+            "genericParameters": [], "members": [
+                {"kind": "property", "name": "Date", "type": "System.DateTime",
+                 "static": False, "get": True, "set": False, "parameters": []},
+            ],
+        }
+        collection = {
+            "name": "Microsoft.Xna.Framework.Media.AlbumCollection", "kind": "class",
+            "genericParameters": [], "members": [
+                {"kind": "property", "name": "Item",
+                 "type": "Microsoft.Xna.Framework.Media.Album", "static": False,
+                 "get": True, "set": False,
+                 "parameters": [{"name": "index", "type": "System.Int32"}]},
+            ],
+        }
+        album = {"name": "Microsoft.Xna.Framework.Media.Album", "kind": "class"}
+        reference = {value["name"]: value for value in
+                     (visualization, picture, collection, album)}
+        visualization_members = VERIFY.mapped_members(visualization, RULES, reference)
+        self.assertEqual(visualization_members["Frequencies"]["returnType"], "&[f32]")
+        self.assertEqual(visualization_members["Samples"]["returnType"], "&[f32]")
+        picture_members = VERIFY.mapped_members(picture, RULES, reference)
+        self.assertEqual(picture_members["Date"]["returnType"], "Result<SystemTime>")
+        collection_members = VERIFY.mapped_members(collection, RULES, reference)
+        self.assertEqual(collection_members["Item"]["returnType"],
+                         "Result<Arc<Media::Album>>")
+
     @staticmethod
     def _empty_actual(kind, members, *, traits=(), drop=False):
         return {

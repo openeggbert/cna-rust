@@ -43,7 +43,7 @@ def load(path: Path) -> dict:
         if unknown:
             raise SystemExit(f"unknown statuses for {name}: {sorted(unknown)}")
         if row.get("strictComplete") is not True:
-            raise SystemExit(f"Audio strict completion is false for {name}")
+            raise SystemExit(f"runtime strict completion is false for {name}")
     return data
 
 

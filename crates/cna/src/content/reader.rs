@@ -22,6 +22,7 @@ use crate::graphics::{
     Model, SkinnedEffect, SpriteFont, SurfaceFormat, Texture, Texture2D, Texture3D, TextureCube,
     VertexBuffer, VertexDeclaration, VertexElement, VertexElementFormat, VertexElementUsage,
 };
+use crate::media::{Video, VideoSoundtrackType};
 use crate::value::{
     BoundingSphere, Color, Matrix, Quaternion, Rectangle, Vector2, Vector3, Vector4,
 };
@@ -1069,6 +1070,52 @@ fn registered_reader_for_target(target: TypeId) -> Option<ContentTypeReader> {
     })
 }
 
+fn video_reader() -> ContentTypeReader {
+    class_reader::<Video, _>(|input| {
+        let file_name = input
+            .ReadObject::<String>()?
+            .ok_or_else(|| xnb_error(&input.asset_name, "video file reference is null"))?;
+        let duration = *input
+            .ReadObject::<i32>()?
+            .ok_or_else(|| xnb_error(&input.asset_name, "video duration is null"))?;
+        let width = *input
+            .ReadObject::<i32>()?
+            .ok_or_else(|| xnb_error(&input.asset_name, "video width is null"))?;
+        let height = *input
+            .ReadObject::<i32>()?
+            .ok_or_else(|| xnb_error(&input.asset_name, "video height is null"))?;
+        let frames_per_second = *input
+            .ReadObject::<f32>()?
+            .ok_or_else(|| xnb_error(&input.asset_name, "video frame rate is null"))?;
+        let soundtrack = *input
+            .ReadObject::<i32>()?
+            .ok_or_else(|| xnb_error(&input.asset_name, "video soundtrack type is null"))?;
+        let soundtrack = match soundtrack {
+            0 => VideoSoundtrackType::Music,
+            1 => VideoSoundtrackType::Dialog,
+            2 => VideoSoundtrackType::MusicAndDialog,
+            _ => return Err(xnb_error(&input.asset_name, "video soundtrack type is undefined")),
+        };
+        let parent = Path::new(&input.asset_name)
+            .parent()
+            .unwrap_or_else(|| Path::new(""));
+        let relative = normalize_external_reference(&parent.join(file_name.as_str()))?;
+        let resolved = Path::new(&input.content_manager.RootDirectory())
+            .join(relative)
+            .to_string_lossy()
+            .into_owned();
+        Video::from_content(
+            &input.content_manager.graphics_device()?,
+            &resolved,
+            duration,
+            width,
+            height,
+            frames_per_second,
+            soundtrack,
+        )
+    })
+}
+
 fn strip_assembly_qualification(value: &str) -> String {
     let mut depth = 0_i32;
     for (index, character) in value.char_indices() {
@@ -2103,6 +2150,7 @@ fn builtin_reader(name: &str) -> Option<ContentTypeReader> {
         }
         "Microsoft.Xna.Framework.Content.SkinnedEffectReader" => skinned_effect_reader(),
         "Microsoft.Xna.Framework.Content.ModelReader" => model_reader(),
+        "Microsoft.Xna.Framework.Content.VideoReader" => video_reader(),
         _ => return None,
     })
 }
@@ -2143,6 +2191,7 @@ fn builtin_reader_for_target(target: TypeId) -> Option<ContentTypeReader> {
         "Microsoft.Xna.Framework.Content.EnvironmentMapEffectReader",
         "Microsoft.Xna.Framework.Content.SkinnedEffectReader",
         "Microsoft.Xna.Framework.Content.ModelReader",
+        "Microsoft.Xna.Framework.Content.VideoReader",
         "Microsoft.Xna.Framework.Content.ListReader`1[[Microsoft.Xna.Framework.Rectangle]]",
         "Microsoft.Xna.Framework.Content.ListReader`1[[Microsoft.Xna.Framework.Vector3]]",
         "Microsoft.Xna.Framework.Content.ListReader`1[[System.Char]]",

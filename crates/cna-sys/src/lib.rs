@@ -30,6 +30,15 @@ pub const CNA_RESULT_BUFFER_TOO_SMALL: CNA_Result = 14;
 pub const CNA_FALSE: CNA_Bool = 0;
 pub const CNA_TRUE: CNA_Bool = 1;
 pub const CNA_INVALID_HANDLE: CNA_Handle = 0;
+pub const CNA_MEDIA_STATE_STOPPED: CNA_MediaState = 0;
+pub const CNA_MEDIA_STATE_PLAYING: CNA_MediaState = 1;
+pub const CNA_MEDIA_STATE_PAUSED: CNA_MediaState = 2;
+pub const CNA_MEDIA_SOURCE_TYPE_LOCAL_DEVICE: CNA_MediaSourceType = 0;
+pub const CNA_MEDIA_SOURCE_TYPE_WINDOWS_MEDIA_CONNECT: CNA_MediaSourceType = 4;
+pub const CNA_VIDEO_SOUNDTRACK_TYPE_MUSIC: CNA_VideoSoundtrackType = 0;
+pub const CNA_VIDEO_SOUNDTRACK_TYPE_DIALOG: CNA_VideoSoundtrackType = 1;
+pub const CNA_VIDEO_SOUNDTRACK_TYPE_MUSIC_AND_DIALOG: CNA_VideoSoundtrackType = 2;
+pub const CNA_VISUALIZATION_DATA_SIZE: u32 = 256;
 pub const CNA_DISPLAY_ORIENTATION_DEFAULT: CNA_DisplayOrientation = 0;
 pub const CNA_DISPLAY_ORIENTATION_LANDSCAPE_LEFT: CNA_DisplayOrientation = 1;
 pub const CNA_DISPLAY_ORIENTATION_LANDSCAPE_RIGHT: CNA_DisplayOrientation = 2;
@@ -401,12 +410,55 @@ pub type CNA_AudioStopOptions = u32;
 pub type CNA_MicrophoneState = u32;
 pub type CNA_AudioEventRegistrationHandle = CNA_Handle;
 pub type CNA_AudioEventCallback = Option<unsafe extern "C" fn(*mut c_void)>;
+pub type CNA_MediaState = u32;
+pub type CNA_MediaSourceType = u32;
+pub type CNA_VideoSoundtrackType = u32;
+pub type CNA_SongHandle = CNA_Handle;
+pub type CNA_SongCollectionHandle = CNA_Handle;
+pub type CNA_MediaLibraryHandle = CNA_Handle;
+pub type CNA_AlbumHandle = CNA_Handle;
+pub type CNA_AlbumCollectionHandle = CNA_Handle;
+pub type CNA_ArtistHandle = CNA_Handle;
+pub type CNA_ArtistCollectionHandle = CNA_Handle;
+pub type CNA_GenreHandle = CNA_Handle;
+pub type CNA_GenreCollectionHandle = CNA_Handle;
+pub type CNA_PlaylistHandle = CNA_Handle;
+pub type CNA_PlaylistCollectionHandle = CNA_Handle;
+pub type CNA_PictureHandle = CNA_Handle;
+pub type CNA_PictureCollectionHandle = CNA_Handle;
+pub type CNA_PictureAlbumHandle = CNA_Handle;
+pub type CNA_PictureAlbumCollectionHandle = CNA_Handle;
+pub type CNA_MediaQueueHandle = CNA_Handle;
+pub type CNA_MediaPlayerEventRegistrationHandle = CNA_Handle;
+pub type CNA_VideoHandle = CNA_Handle;
+pub type CNA_VideoPlayerHandle = CNA_Handle;
+pub type CNA_MediaPlayerEventCallback = Option<unsafe extern "C" fn(*mut c_void)>;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct CNA_StringView {
     pub data: *const c_char,
     pub byte_length: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_VisualizationData {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub frequencies: [f32; CNA_VISUALIZATION_DATA_SIZE as usize],
+    pub samples: [f32; CNA_VISUALIZATION_DATA_SIZE as usize],
+}
+
+impl Default for CNA_VisualizationData {
+    fn default() -> Self {
+        Self {
+            struct_size: core::mem::size_of::<Self>() as u32,
+            struct_version: 1,
+            frequencies: [0.0; CNA_VISUALIZATION_DATA_SIZE as usize],
+            samples: [0.0; CNA_VISUALIZATION_DATA_SIZE as usize],
+        }
+    }
 }
 
 #[repr(C)]
@@ -2724,6 +2776,452 @@ pub type cna_cue_resume_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
 pub type cna_cue_stop_fn =
     unsafe extern "C" fn(CNA_Handle, CNA_AudioStopOptions) -> CNA_Result;
 
+// Media / video -- canonical CNA C ABI 0.7.
+pub type cna_media_source_get_available_count_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut u32) -> CNA_Result;
+pub type cna_media_source_get_type_at_fn =
+    unsafe extern "C" fn(CNA_Handle, u32, *mut CNA_MediaSourceType) -> CNA_Result;
+pub type cna_media_source_get_name_size_at_fn =
+    unsafe extern "C" fn(CNA_Handle, u32, *mut u64) -> CNA_Result;
+pub type cna_media_source_copy_name_at_fn =
+    unsafe extern "C" fn(CNA_Handle, u32, *mut c_char, u64, *mut u64) -> CNA_Result;
+
+pub type cna_song_create_from_uri_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, CNA_StringView, *mut CNA_SongHandle,
+) -> CNA_Result;
+pub type cna_song_get_name_size_fn =
+    unsafe extern "C" fn(CNA_SongHandle, *mut u64) -> CNA_Result;
+pub type cna_song_copy_name_fn =
+    unsafe extern "C" fn(CNA_SongHandle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_song_get_duration_fn =
+    unsafe extern "C" fn(CNA_SongHandle, *mut i64) -> CNA_Result;
+pub type cna_song_get_is_protected_fn =
+    unsafe extern "C" fn(CNA_SongHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_song_get_is_rated_fn =
+    unsafe extern "C" fn(CNA_SongHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_song_get_play_count_fn =
+    unsafe extern "C" fn(CNA_SongHandle, *mut i32) -> CNA_Result;
+pub type cna_song_get_rating_fn =
+    unsafe extern "C" fn(CNA_SongHandle, *mut i32) -> CNA_Result;
+pub type cna_song_get_track_number_fn =
+    unsafe extern "C" fn(CNA_SongHandle, *mut i32) -> CNA_Result;
+pub type cna_song_get_is_disposed_fn =
+    unsafe extern "C" fn(CNA_SongHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_song_dispose_fn = unsafe extern "C" fn(CNA_SongHandle) -> CNA_Result;
+pub type cna_song_destroy_fn = unsafe extern "C" fn(CNA_SongHandle) -> CNA_Result;
+pub type cna_song_equals_fn = unsafe extern "C" fn(
+    CNA_SongHandle, CNA_SongHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_song_get_hash_code_fn =
+    unsafe extern "C" fn(CNA_SongHandle, *mut i32) -> CNA_Result;
+pub type cna_song_get_album_fn = unsafe extern "C" fn(
+    CNA_SongHandle, *mut CNA_AlbumHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_song_get_artist_fn = unsafe extern "C" fn(
+    CNA_SongHandle, *mut CNA_ArtistHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_song_get_genre_fn = unsafe extern "C" fn(
+    CNA_SongHandle, *mut CNA_GenreHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_song_collection_get_at_fn = unsafe extern "C" fn(
+    CNA_SongCollectionHandle, i32, *mut CNA_SongHandle,
+) -> CNA_Result;
+pub type cna_song_collection_get_count_fn =
+    unsafe extern "C" fn(CNA_SongCollectionHandle, *mut i32) -> CNA_Result;
+pub type cna_song_collection_get_is_disposed_fn =
+    unsafe extern "C" fn(CNA_SongCollectionHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_song_collection_dispose_fn =
+    unsafe extern "C" fn(CNA_SongCollectionHandle) -> CNA_Result;
+pub type cna_song_collection_destroy_fn =
+    unsafe extern "C" fn(CNA_SongCollectionHandle) -> CNA_Result;
+
+pub type cna_media_player_get_game_has_control_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_media_player_get_is_muted_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_media_player_set_is_muted_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_Bool) -> CNA_Result;
+pub type cna_media_player_get_is_repeating_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_media_player_set_is_repeating_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_Bool) -> CNA_Result;
+pub type cna_media_player_get_is_shuffled_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_media_player_set_is_shuffled_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_Bool) -> CNA_Result;
+pub type cna_media_player_get_play_position_ticks_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut i64) -> CNA_Result;
+pub type cna_media_player_get_state_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_MediaState) -> CNA_Result;
+pub type cna_media_player_get_volume_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut f32) -> CNA_Result;
+pub type cna_media_player_set_volume_fn =
+    unsafe extern "C" fn(CNA_Handle, f32) -> CNA_Result;
+pub type cna_media_player_get_is_visualization_enabled_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_media_player_set_is_visualization_enabled_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_Bool) -> CNA_Result;
+pub type cna_media_player_get_visualization_data_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_VisualizationData) -> CNA_Result;
+pub type cna_media_player_get_queue_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_MediaQueueHandle) -> CNA_Result;
+pub type cna_media_player_play_song_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_SongHandle) -> CNA_Result;
+pub type cna_media_player_play_songs_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_SongCollectionHandle) -> CNA_Result;
+pub type cna_media_player_play_songs_from_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_SongCollectionHandle, i32) -> CNA_Result;
+pub type cna_media_player_move_next_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_media_player_move_previous_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_media_player_pause_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_media_player_resume_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_media_player_stop_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_media_player_update_ext_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_media_player_program_exit_ext_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_media_player_subscribe_active_song_changed_ext_fn = unsafe extern "C" fn(
+    CNA_MediaPlayerEventCallback, *mut c_void, *mut CNA_MediaPlayerEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_media_player_subscribe_media_state_changed_ext_fn = unsafe extern "C" fn(
+    CNA_MediaPlayerEventCallback, *mut c_void, *mut CNA_MediaPlayerEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_media_player_unsubscribe_ext_fn =
+    unsafe extern "C" fn(CNA_MediaPlayerEventRegistrationHandle) -> CNA_Result;
+pub type cna_media_player_raise_active_song_changed_ext_fn =
+    unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_media_player_raise_media_state_changed_ext_fn =
+    unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_media_queue_get_count_fn =
+    unsafe extern "C" fn(CNA_MediaQueueHandle, *mut i32) -> CNA_Result;
+pub type cna_media_queue_get_active_song_index_fn =
+    unsafe extern "C" fn(CNA_MediaQueueHandle, *mut i32) -> CNA_Result;
+pub type cna_media_queue_set_active_song_index_fn =
+    unsafe extern "C" fn(CNA_MediaQueueHandle, i32) -> CNA_Result;
+pub type cna_media_queue_get_active_song_fn = unsafe extern "C" fn(
+    CNA_MediaQueueHandle, *mut CNA_SongHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_media_queue_get_at_fn = unsafe extern "C" fn(
+    CNA_MediaQueueHandle, i32, *mut CNA_SongHandle,
+) -> CNA_Result;
+pub type cna_media_queue_destroy_fn =
+    unsafe extern "C" fn(CNA_MediaQueueHandle) -> CNA_Result;
+
+pub type cna_media_library_create_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_MediaLibraryHandle) -> CNA_Result;
+pub type cna_media_library_create_from_source_fn =
+    unsafe extern "C" fn(CNA_Handle, u32, *mut CNA_MediaLibraryHandle) -> CNA_Result;
+pub type cna_media_library_get_is_disposed_fn =
+    unsafe extern "C" fn(CNA_MediaLibraryHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_media_library_dispose_fn =
+    unsafe extern "C" fn(CNA_MediaLibraryHandle) -> CNA_Result;
+pub type cna_media_library_destroy_fn =
+    unsafe extern "C" fn(CNA_MediaLibraryHandle) -> CNA_Result;
+pub type cna_media_library_get_media_source_type_fn = unsafe extern "C" fn(
+    CNA_MediaLibraryHandle, *mut CNA_MediaSourceType,
+) -> CNA_Result;
+pub type cna_media_library_get_media_source_name_size_fn =
+    unsafe extern "C" fn(CNA_MediaLibraryHandle, *mut u64) -> CNA_Result;
+pub type cna_media_library_copy_media_source_name_fn = unsafe extern "C" fn(
+    CNA_MediaLibraryHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_media_library_get_songs_fn = unsafe extern "C" fn(
+    CNA_MediaLibraryHandle, *mut CNA_SongCollectionHandle,
+) -> CNA_Result;
+pub type cna_media_library_get_albums_fn = unsafe extern "C" fn(
+    CNA_MediaLibraryHandle, *mut CNA_AlbumCollectionHandle,
+) -> CNA_Result;
+pub type cna_media_library_get_artists_fn = unsafe extern "C" fn(
+    CNA_MediaLibraryHandle, *mut CNA_ArtistCollectionHandle,
+) -> CNA_Result;
+pub type cna_media_library_get_genres_fn = unsafe extern "C" fn(
+    CNA_MediaLibraryHandle, *mut CNA_GenreCollectionHandle,
+) -> CNA_Result;
+pub type cna_media_library_get_playlists_fn = unsafe extern "C" fn(
+    CNA_MediaLibraryHandle, *mut CNA_PlaylistCollectionHandle,
+) -> CNA_Result;
+pub type cna_media_library_get_pictures_fn = unsafe extern "C" fn(
+    CNA_MediaLibraryHandle, *mut CNA_PictureCollectionHandle,
+) -> CNA_Result;
+pub type cna_media_library_get_saved_pictures_fn = unsafe extern "C" fn(
+    CNA_MediaLibraryHandle, *mut CNA_PictureCollectionHandle,
+) -> CNA_Result;
+pub type cna_media_library_get_root_picture_album_fn = unsafe extern "C" fn(
+    CNA_MediaLibraryHandle, *mut CNA_PictureAlbumHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_media_library_get_picture_from_token_fn = unsafe extern "C" fn(
+    CNA_MediaLibraryHandle, CNA_StringView, *mut CNA_PictureHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_media_library_save_picture_fn = unsafe extern "C" fn(
+    CNA_MediaLibraryHandle, CNA_StringView, *const u8, u64, *mut CNA_PictureHandle,
+) -> CNA_Result;
+
+pub type cna_album_get_name_size_fn =
+    unsafe extern "C" fn(CNA_AlbumHandle, *mut u64) -> CNA_Result;
+pub type cna_album_copy_name_fn =
+    unsafe extern "C" fn(CNA_AlbumHandle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_album_get_is_disposed_fn =
+    unsafe extern "C" fn(CNA_AlbumHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_album_dispose_fn = unsafe extern "C" fn(CNA_AlbumHandle) -> CNA_Result;
+pub type cna_album_destroy_fn = unsafe extern "C" fn(CNA_AlbumHandle) -> CNA_Result;
+pub type cna_album_get_hash_code_fn =
+    unsafe extern "C" fn(CNA_AlbumHandle, *mut i32) -> CNA_Result;
+pub type cna_album_equals_fn = unsafe extern "C" fn(
+    CNA_AlbumHandle, CNA_AlbumHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_album_get_songs_fn = unsafe extern "C" fn(
+    CNA_AlbumHandle, *mut CNA_SongCollectionHandle,
+) -> CNA_Result;
+pub type cna_album_get_artist_fn = unsafe extern "C" fn(
+    CNA_AlbumHandle, *mut CNA_ArtistHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_album_get_genre_fn = unsafe extern "C" fn(
+    CNA_AlbumHandle, *mut CNA_GenreHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_album_get_duration_fn =
+    unsafe extern "C" fn(CNA_AlbumHandle, *mut i64) -> CNA_Result;
+pub type cna_album_get_has_art_fn =
+    unsafe extern "C" fn(CNA_AlbumHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_album_get_art_size_fn =
+    unsafe extern "C" fn(CNA_AlbumHandle, *mut u64) -> CNA_Result;
+pub type cna_album_copy_art_fn =
+    unsafe extern "C" fn(CNA_AlbumHandle, *mut u8, u64, *mut u64) -> CNA_Result;
+pub type cna_album_get_thumbnail_size_fn =
+    unsafe extern "C" fn(CNA_AlbumHandle, *mut u64) -> CNA_Result;
+pub type cna_album_copy_thumbnail_fn =
+    unsafe extern "C" fn(CNA_AlbumHandle, *mut u8, u64, *mut u64) -> CNA_Result;
+pub type cna_album_collection_get_count_fn =
+    unsafe extern "C" fn(CNA_AlbumCollectionHandle, *mut i32) -> CNA_Result;
+pub type cna_album_collection_get_at_fn = unsafe extern "C" fn(
+    CNA_AlbumCollectionHandle, i32, *mut CNA_AlbumHandle,
+) -> CNA_Result;
+pub type cna_album_collection_get_is_disposed_fn =
+    unsafe extern "C" fn(CNA_AlbumCollectionHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_album_collection_dispose_fn =
+    unsafe extern "C" fn(CNA_AlbumCollectionHandle) -> CNA_Result;
+pub type cna_album_collection_destroy_fn =
+    unsafe extern "C" fn(CNA_AlbumCollectionHandle) -> CNA_Result;
+
+pub type cna_artist_get_name_size_fn =
+    unsafe extern "C" fn(CNA_ArtistHandle, *mut u64) -> CNA_Result;
+pub type cna_artist_copy_name_fn =
+    unsafe extern "C" fn(CNA_ArtistHandle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_artist_get_is_disposed_fn =
+    unsafe extern "C" fn(CNA_ArtistHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_artist_dispose_fn = unsafe extern "C" fn(CNA_ArtistHandle) -> CNA_Result;
+pub type cna_artist_destroy_fn = unsafe extern "C" fn(CNA_ArtistHandle) -> CNA_Result;
+pub type cna_artist_get_hash_code_fn =
+    unsafe extern "C" fn(CNA_ArtistHandle, *mut i32) -> CNA_Result;
+pub type cna_artist_equals_fn = unsafe extern "C" fn(
+    CNA_ArtistHandle, CNA_ArtistHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_artist_get_songs_fn = unsafe extern "C" fn(
+    CNA_ArtistHandle, *mut CNA_SongCollectionHandle,
+) -> CNA_Result;
+pub type cna_artist_get_albums_fn = unsafe extern "C" fn(
+    CNA_ArtistHandle, *mut CNA_AlbumCollectionHandle,
+) -> CNA_Result;
+pub type cna_artist_collection_get_count_fn =
+    unsafe extern "C" fn(CNA_ArtistCollectionHandle, *mut i32) -> CNA_Result;
+pub type cna_artist_collection_get_at_fn = unsafe extern "C" fn(
+    CNA_ArtistCollectionHandle, i32, *mut CNA_ArtistHandle,
+) -> CNA_Result;
+pub type cna_artist_collection_get_is_disposed_fn =
+    unsafe extern "C" fn(CNA_ArtistCollectionHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_artist_collection_dispose_fn =
+    unsafe extern "C" fn(CNA_ArtistCollectionHandle) -> CNA_Result;
+pub type cna_artist_collection_destroy_fn =
+    unsafe extern "C" fn(CNA_ArtistCollectionHandle) -> CNA_Result;
+
+pub type cna_genre_get_name_size_fn =
+    unsafe extern "C" fn(CNA_GenreHandle, *mut u64) -> CNA_Result;
+pub type cna_genre_copy_name_fn =
+    unsafe extern "C" fn(CNA_GenreHandle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_genre_get_is_disposed_fn =
+    unsafe extern "C" fn(CNA_GenreHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_genre_dispose_fn = unsafe extern "C" fn(CNA_GenreHandle) -> CNA_Result;
+pub type cna_genre_destroy_fn = unsafe extern "C" fn(CNA_GenreHandle) -> CNA_Result;
+pub type cna_genre_get_hash_code_fn =
+    unsafe extern "C" fn(CNA_GenreHandle, *mut i32) -> CNA_Result;
+pub type cna_genre_equals_fn = unsafe extern "C" fn(
+    CNA_GenreHandle, CNA_GenreHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_genre_get_songs_fn = unsafe extern "C" fn(
+    CNA_GenreHandle, *mut CNA_SongCollectionHandle,
+) -> CNA_Result;
+pub type cna_genre_get_albums_fn = unsafe extern "C" fn(
+    CNA_GenreHandle, *mut CNA_AlbumCollectionHandle,
+) -> CNA_Result;
+pub type cna_genre_collection_get_count_fn =
+    unsafe extern "C" fn(CNA_GenreCollectionHandle, *mut i32) -> CNA_Result;
+pub type cna_genre_collection_get_at_fn = unsafe extern "C" fn(
+    CNA_GenreCollectionHandle, i32, *mut CNA_GenreHandle,
+) -> CNA_Result;
+pub type cna_genre_collection_get_is_disposed_fn =
+    unsafe extern "C" fn(CNA_GenreCollectionHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_genre_collection_dispose_fn =
+    unsafe extern "C" fn(CNA_GenreCollectionHandle) -> CNA_Result;
+pub type cna_genre_collection_destroy_fn =
+    unsafe extern "C" fn(CNA_GenreCollectionHandle) -> CNA_Result;
+
+pub type cna_playlist_get_name_size_fn =
+    unsafe extern "C" fn(CNA_PlaylistHandle, *mut u64) -> CNA_Result;
+pub type cna_playlist_copy_name_fn =
+    unsafe extern "C" fn(CNA_PlaylistHandle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_playlist_get_is_disposed_fn =
+    unsafe extern "C" fn(CNA_PlaylistHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_playlist_dispose_fn = unsafe extern "C" fn(CNA_PlaylistHandle) -> CNA_Result;
+pub type cna_playlist_destroy_fn = unsafe extern "C" fn(CNA_PlaylistHandle) -> CNA_Result;
+pub type cna_playlist_get_hash_code_fn =
+    unsafe extern "C" fn(CNA_PlaylistHandle, *mut i32) -> CNA_Result;
+pub type cna_playlist_equals_fn = unsafe extern "C" fn(
+    CNA_PlaylistHandle, CNA_PlaylistHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_playlist_get_songs_fn = unsafe extern "C" fn(
+    CNA_PlaylistHandle, *mut CNA_SongCollectionHandle,
+) -> CNA_Result;
+pub type cna_playlist_get_duration_fn =
+    unsafe extern "C" fn(CNA_PlaylistHandle, *mut i64) -> CNA_Result;
+pub type cna_playlist_collection_get_count_fn =
+    unsafe extern "C" fn(CNA_PlaylistCollectionHandle, *mut i32) -> CNA_Result;
+pub type cna_playlist_collection_get_at_fn = unsafe extern "C" fn(
+    CNA_PlaylistCollectionHandle, i32, *mut CNA_PlaylistHandle,
+) -> CNA_Result;
+pub type cna_playlist_collection_get_is_disposed_fn =
+    unsafe extern "C" fn(CNA_PlaylistCollectionHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_playlist_collection_dispose_fn =
+    unsafe extern "C" fn(CNA_PlaylistCollectionHandle) -> CNA_Result;
+pub type cna_playlist_collection_destroy_fn =
+    unsafe extern "C" fn(CNA_PlaylistCollectionHandle) -> CNA_Result;
+
+pub type cna_picture_get_name_size_fn =
+    unsafe extern "C" fn(CNA_PictureHandle, *mut u64) -> CNA_Result;
+pub type cna_picture_copy_name_fn =
+    unsafe extern "C" fn(CNA_PictureHandle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_picture_get_album_fn = unsafe extern "C" fn(
+    CNA_PictureHandle, *mut CNA_PictureAlbumHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_picture_get_date_unix_ticks_fn =
+    unsafe extern "C" fn(CNA_PictureHandle, *mut i64) -> CNA_Result;
+pub type cna_picture_get_width_fn =
+    unsafe extern "C" fn(CNA_PictureHandle, *mut i32) -> CNA_Result;
+pub type cna_picture_get_height_fn =
+    unsafe extern "C" fn(CNA_PictureHandle, *mut i32) -> CNA_Result;
+pub type cna_picture_get_image_size_fn =
+    unsafe extern "C" fn(CNA_PictureHandle, *mut u64) -> CNA_Result;
+pub type cna_picture_copy_image_fn =
+    unsafe extern "C" fn(CNA_PictureHandle, *mut u8, u64, *mut u64) -> CNA_Result;
+pub type cna_picture_get_thumbnail_size_fn =
+    unsafe extern "C" fn(CNA_PictureHandle, *mut u64) -> CNA_Result;
+pub type cna_picture_copy_thumbnail_fn =
+    unsafe extern "C" fn(CNA_PictureHandle, *mut u8, u64, *mut u64) -> CNA_Result;
+pub type cna_picture_get_is_disposed_fn =
+    unsafe extern "C" fn(CNA_PictureHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_picture_dispose_fn = unsafe extern "C" fn(CNA_PictureHandle) -> CNA_Result;
+pub type cna_picture_destroy_fn = unsafe extern "C" fn(CNA_PictureHandle) -> CNA_Result;
+pub type cna_picture_equals_fn = unsafe extern "C" fn(
+    CNA_PictureHandle, CNA_PictureHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_picture_get_hash_code_fn =
+    unsafe extern "C" fn(CNA_PictureHandle, *mut i32) -> CNA_Result;
+pub type cna_picture_collection_get_count_fn =
+    unsafe extern "C" fn(CNA_PictureCollectionHandle, *mut i32) -> CNA_Result;
+pub type cna_picture_collection_get_at_fn = unsafe extern "C" fn(
+    CNA_PictureCollectionHandle, i32, *mut CNA_PictureHandle,
+) -> CNA_Result;
+pub type cna_picture_collection_get_is_disposed_fn =
+    unsafe extern "C" fn(CNA_PictureCollectionHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_picture_collection_dispose_fn =
+    unsafe extern "C" fn(CNA_PictureCollectionHandle) -> CNA_Result;
+pub type cna_picture_collection_destroy_fn =
+    unsafe extern "C" fn(CNA_PictureCollectionHandle) -> CNA_Result;
+
+pub type cna_picture_album_get_name_size_fn =
+    unsafe extern "C" fn(CNA_PictureAlbumHandle, *mut u64) -> CNA_Result;
+pub type cna_picture_album_copy_name_fn =
+    unsafe extern "C" fn(CNA_PictureAlbumHandle, *mut c_char, u64, *mut u64) -> CNA_Result;
+pub type cna_picture_album_get_parent_fn = unsafe extern "C" fn(
+    CNA_PictureAlbumHandle, *mut CNA_PictureAlbumHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_picture_album_get_albums_fn = unsafe extern "C" fn(
+    CNA_PictureAlbumHandle, *mut CNA_PictureAlbumCollectionHandle,
+) -> CNA_Result;
+pub type cna_picture_album_get_pictures_fn = unsafe extern "C" fn(
+    CNA_PictureAlbumHandle, *mut CNA_PictureCollectionHandle,
+) -> CNA_Result;
+pub type cna_picture_album_get_is_disposed_fn =
+    unsafe extern "C" fn(CNA_PictureAlbumHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_picture_album_dispose_fn =
+    unsafe extern "C" fn(CNA_PictureAlbumHandle) -> CNA_Result;
+pub type cna_picture_album_destroy_fn =
+    unsafe extern "C" fn(CNA_PictureAlbumHandle) -> CNA_Result;
+pub type cna_picture_album_equals_fn = unsafe extern "C" fn(
+    CNA_PictureAlbumHandle, CNA_PictureAlbumHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_picture_album_get_hash_code_fn =
+    unsafe extern "C" fn(CNA_PictureAlbumHandle, *mut i32) -> CNA_Result;
+pub type cna_picture_album_collection_get_count_fn =
+    unsafe extern "C" fn(CNA_PictureAlbumCollectionHandle, *mut i32) -> CNA_Result;
+pub type cna_picture_album_collection_get_at_fn = unsafe extern "C" fn(
+    CNA_PictureAlbumCollectionHandle, i32, *mut CNA_PictureAlbumHandle,
+) -> CNA_Result;
+pub type cna_picture_album_collection_get_is_disposed_fn =
+    unsafe extern "C" fn(CNA_PictureAlbumCollectionHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_picture_album_collection_dispose_fn =
+    unsafe extern "C" fn(CNA_PictureAlbumCollectionHandle) -> CNA_Result;
+pub type cna_picture_album_collection_destroy_fn =
+    unsafe extern "C" fn(CNA_PictureAlbumCollectionHandle) -> CNA_Result;
+
+pub type cna_video_create_with_metadata_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, i32, i32, i32, f32, CNA_VideoSoundtrackType,
+    *mut CNA_VideoHandle,
+) -> CNA_Result;
+pub type cna_video_get_width_fn =
+    unsafe extern "C" fn(CNA_VideoHandle, *mut i32) -> CNA_Result;
+pub type cna_video_get_height_fn =
+    unsafe extern "C" fn(CNA_VideoHandle, *mut i32) -> CNA_Result;
+pub type cna_video_get_frames_per_second_fn =
+    unsafe extern "C" fn(CNA_VideoHandle, *mut f32) -> CNA_Result;
+pub type cna_video_get_duration_fn =
+    unsafe extern "C" fn(CNA_VideoHandle, *mut i64) -> CNA_Result;
+pub type cna_video_get_soundtrack_type_fn = unsafe extern "C" fn(
+    CNA_VideoHandle, *mut CNA_VideoSoundtrackType,
+) -> CNA_Result;
+pub type cna_video_destroy_fn = unsafe extern "C" fn(CNA_VideoHandle) -> CNA_Result;
+pub type cna_video_player_create_fn =
+    unsafe extern "C" fn(CNA_Handle, *mut CNA_VideoPlayerHandle) -> CNA_Result;
+pub type cna_video_player_get_is_disposed_fn =
+    unsafe extern "C" fn(CNA_VideoPlayerHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_video_player_get_is_looped_fn =
+    unsafe extern "C" fn(CNA_VideoPlayerHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_video_player_set_is_looped_fn =
+    unsafe extern "C" fn(CNA_VideoPlayerHandle, CNA_Bool) -> CNA_Result;
+pub type cna_video_player_get_is_muted_fn =
+    unsafe extern "C" fn(CNA_VideoPlayerHandle, *mut CNA_Bool) -> CNA_Result;
+pub type cna_video_player_set_is_muted_fn =
+    unsafe extern "C" fn(CNA_VideoPlayerHandle, CNA_Bool) -> CNA_Result;
+pub type cna_video_player_get_play_position_ticks_fn =
+    unsafe extern "C" fn(CNA_VideoPlayerHandle, *mut i64) -> CNA_Result;
+pub type cna_video_player_get_state_fn =
+    unsafe extern "C" fn(CNA_VideoPlayerHandle, *mut CNA_MediaState) -> CNA_Result;
+pub type cna_video_player_get_volume_fn =
+    unsafe extern "C" fn(CNA_VideoPlayerHandle, *mut f32) -> CNA_Result;
+pub type cna_video_player_set_volume_fn =
+    unsafe extern "C" fn(CNA_VideoPlayerHandle, f32) -> CNA_Result;
+pub type cna_video_player_get_texture_fn = unsafe extern "C" fn(
+    CNA_VideoPlayerHandle, *mut CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_video_player_play_fn =
+    unsafe extern "C" fn(CNA_VideoPlayerHandle, CNA_VideoHandle) -> CNA_Result;
+pub type cna_video_player_stop_fn =
+    unsafe extern "C" fn(CNA_VideoPlayerHandle) -> CNA_Result;
+pub type cna_video_player_pause_fn =
+    unsafe extern "C" fn(CNA_VideoPlayerHandle) -> CNA_Result;
+pub type cna_video_player_resume_fn =
+    unsafe extern "C" fn(CNA_VideoPlayerHandle) -> CNA_Result;
+pub type cna_video_player_dispose_fn =
+    unsafe extern "C" fn(CNA_VideoPlayerHandle) -> CNA_Result;
+pub type cna_video_player_destroy_fn =
+    unsafe extern "C" fn(CNA_VideoPlayerHandle) -> CNA_Result;
+
 #[cfg(test)]
 mod layout_tests {
     use super::*;
@@ -3094,6 +3592,13 @@ mod layout_tests {
                 align_of::<CNA_GraphicsDeviceInformation>()
             ),
             (60, 4)
+        );
+        assert_eq!(
+            (
+                size_of::<CNA_VisualizationData>(),
+                align_of::<CNA_VisualizationData>()
+            ),
+            (2056, 4)
         );
     }
 }

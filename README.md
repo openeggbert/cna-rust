@@ -4,10 +4,11 @@ CNA-Rust is an early, measurable safe Rust projection of Microsoft XNA
 Framework 4.0 backed by CNA C++. Its Graphics projection, compressed and
 uncompressed XNB pipeline, Framework device management, Touch/Gesture,
 Storage, GamerServicesComponent, managed Design converters, 2D sprite/font,
-Model graph, stock effects, typed device/buffer foundations, and Audio/XACT
-projection are functional;
-it is **not** yet an XNA-complete binding and does not compile XNA C# source as
-Rust.
+Model graph, stock effects, typed device/buffer foundations, Audio/XACT, and
+Media/Video projection are functional. The selected XNA 4.0 Windows runtime
+Rust projection is **structurally complete**. This is not a claim that every
+XNA platform/profile or runtime backend is complete, and XNA C# source is not
+Rust source compatible.
 
 ```text
 cna::Microsoft::Xna::Framework::*
@@ -51,11 +52,11 @@ hierarchy and deliberate CNA extensions.
   `RUSTFMT_STATUS=NOT_AVAILABLE` and `CLIPPY_STATUS=NOT_AVAILABLE` rather than
   claiming either gate passed.
 - XNA 4.0 Windows runtime inventory remains 257 CLR types and 2,964 members;
-  259 Rust types are expected and 235 strict types now exist.
-- Strict diagnostics are 24, all of them whole Media types. Graphics,
-  Framework/core, Input, Storage, GamerServices, Design, and Audio have zero
-  missing types. Missing members and
-  constructor/overload/property/event mapping mismatches are zero.
+  all 259 expected Rust types exist.
+- Normal strict verification exits zero: total diagnostics, missing types,
+  missing members, and every constructor/overload/property/event mapping
+  mismatch are zero. Graphics, Framework/core, Input, Storage, GamerServices,
+  Design, Audio, and Media all have zero local diagnostics.
   `Game`, `GraphicsDevice`, and `SpriteBatch` each have zero local diagnostics.
   Parameter/signature, disposal, type-kind, base/trait/interface, return,
   generic/bound, ref/out, enum/value, flags, and delegate mismatches remain
@@ -92,10 +93,18 @@ hierarchy and deliberate CNA extensions.
 - All nineteen Audio types are complete. SoundEffect, instances, dynamic PCM,
   microphone facades, and XACT use reviewed ABI-0.7 routes with explicit
   ownership and the existing owner-thread FrameworkDispatcher. True
-  multi-listener mixing, renderer/look-ahead fidelity, cross-Game global audio
-  persistence, and malformed-bank failure propagation are recorded CNA
+  multi-listener mixing, renderer/look-ahead fidelity, and malformed-bank
+  failure propagation are recorded CNA
   blockers; physical capture is hardware pending and authored XACT playback is
   asset pending. No device, sample, bank, or callback delivery is fabricated.
+- All 24 Media types are complete as one ownership-safe graph. MediaLibrary,
+  seven read-only collection facades, Song, MediaSource, process-global
+  MediaPlayer/MediaQueue, owner-thread events, fixed visualization buffers,
+  Video, and VideoPlayer use reviewed CNA ABI-0.7 routes. Catalog population,
+  picture providers, decoded video, and assets retain explicit platform,
+  backend, or asset qualifications. GetTexture never wraps or destroys CNA's
+  transient player-owned frame handle; a stable Texture2D view is explicitly
+  upstream-blocked.
 - Typed vertex declarations and vertex/index buffers, device binding/draw/
   reset/back-buffer routes, TextureCube, and render targets are complete. CNA
   calls are never replaced by no-ops; HEADLESS limitations are explicit.
@@ -115,11 +124,11 @@ hierarchy and deliberate CNA extensions.
   error 6. OcclusionQuery's real native state machine is verified.
 - `SpriteFont` loads through XNB with one atlas owner, measures strings, and all
   six `DrawString` projections submit native glyph commands.
-- The XNA-derived corpus passes 205 named observations and 206 assertions,
-  including 20 deterministic Audio observations.
-- The reviewed ABI slice is 528 functions. It has 1,862 full prototype type
-  positions and 1,004 independent C/Rust measurements across 61 layouts, six
-  callback signatures, scalar representations, and 253 constants, all with
+- The XNA-derived corpus passes 215 named observations and 216 assertions,
+  including 20 deterministic Audio and 10 deterministic Media observations.
+- The reviewed ABI slice is 730 functions. It has 2,492 full prototype type
+  positions and 1,028 independent C/Rust measurements across 62 layouts, seven
+  callback signatures, scalar representations, and 262 constants, all with
   zero mismatches.
 - Pre-Audio Linux x86-64 HEADLESS validation covers 209 created native game lifetimes,
   ten buffer-binding cycles, ten SpriteFont/content cycles, ten Effect
@@ -129,7 +138,8 @@ hierarchy and deliberate CNA extensions.
   Game lifetimes, at least 75 effect/instance/dynamic cycles, 50 callback
   deliveries, 60 microphone iterations, 21 engine cycles, and 60 malformed
   bank constructions. The unchanged template remains the native consumer
-  canary.
+  canary. Dedicated Media stress adds 20+ library, Song, queue-generation,
+  Video, VideoPlayer, and frame-route cycles plus 50 event deliveries.
 
 `GraphicsDevice` has durable shared identity while its private CNA handle
 remains callback-scoped. Resources retain device association without owning
@@ -182,7 +192,7 @@ cargo doc --workspace --no-deps
 XNA_REFERENCE_PATH=/path/to/xna4/windows \
   python3 tools/api-compat/verify.py
 
-# Records the intentionally incomplete strict scoreboard without hiding it.
+# Optionally records the same complete strict scoreboard as JSON.
 XNA_REFERENCE_PATH=/path/to/xna4/windows \
   python3 tools/api-compat/verify.py --report-only \
   --output target/xna-api-report.json
@@ -197,10 +207,10 @@ CNA_NATIVE_LIBRARY=/path/to/libcna_c_api.so \
   cargo test --workspace --all-features --test native_stress -- --nocapture
 ```
 
-The normal API verifier intentionally exits nonzero while genuine gaps remain.
-It uses Mono for neutral CLR extraction and compiler rustdoc JSON for Rust API
-inspection. The mapping transforms CLR concepts before comparison; it does not
-compare raw C# syntax to Rust syntax.
+The normal API verifier exits zero for the selected profile. It uses Mono for
+neutral CLR extraction and compiler rustdoc JSON for Rust API inspection. The
+mapping transforms CLR concepts before comparison; it does not compare raw C#
+syntax to Rust syntax or imply other XNA profiles are selected.
 
 `tools/native-stress/run-sanitized.sh` is an optional ASan/UBSan path for a
 separately instrumented exact ABI-0.7 CNA library. Sanitizer status for this
@@ -214,6 +224,7 @@ See the [normative mapping](docs/xna-rust-mapping.md),
 [Storage evidence](docs/storage-evidence.md),
 [Design evidence](docs/design-evidence.md),
 [Audio/XACT evidence](docs/audio-xact-evidence.md),
+[Media/Video evidence](docs/media-video-evidence.md),
 [runtime capabilities](docs/runtime-capabilities.md), and
 [measured roadmap](plan.md).
 

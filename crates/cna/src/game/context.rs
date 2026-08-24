@@ -13,6 +13,7 @@ use crate::error::Result;
 use crate::audio::AudioRuntime;
 use crate::graphics::GraphicsDevice;
 use crate::native::Native;
+use crate::media::MediaRuntime;
 
 /// Callback-scoped access to the host-owned XNA game state.
 ///
@@ -24,6 +25,8 @@ pub struct GameContext<'callback> {
     pub(crate) handle: sys::CNA_Handle,
     pub(crate) device: &'callback GraphicsDevice,
     pub(crate) audio: &'callback Arc<AudioRuntime>,
+    pub(crate) media: &'callback Arc<MediaRuntime>,
+    pub(crate) media_generation: u64,
 }
 
 #[allow(non_snake_case)]
@@ -48,5 +51,13 @@ impl GameContext<'_> {
 
     pub(crate) fn native_game(&self) -> (&Arc<Native>, sys::CNA_Handle) {
         (self.native, self.handle)
+    }
+
+    pub(crate) fn media_runtime(&self) -> &Arc<MediaRuntime> {
+        self.media
+    }
+
+    pub(crate) fn media_generation(&self) -> u64 {
+        self.media_generation
     }
 }

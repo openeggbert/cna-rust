@@ -98,7 +98,21 @@ impl<T> EventHandlers<T> {
             .is_empty()
     }
 
+    pub(crate) fn registration_cutoff(&self) -> u64 {
+        self.state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_registration
+    }
+
     pub(crate) fn emit(&self, sender: &dyn Any, args: T) -> bool
+    where
+        T: Clone,
+    {
+        self.emit_through(sender, args, u64::MAX)
+    }
+
+    pub(crate) fn emit_through(&self, sender: &dyn Any, args: T, cutoff: u64) -> bool
     where
         T: Clone,
     {
@@ -108,6 +122,7 @@ impl<T> EventHandlers<T> {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .entries
             .iter()
+            .filter(|(registration, _)| *registration <= cutoff)
             .map(|(_, handler)| Arc::clone(handler))
             .collect::<Vec<_>>();
         let mut panicked = false;

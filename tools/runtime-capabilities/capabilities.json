@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "scope": "Microsoft XNA 4.0 Windows Audio/XACT projection",
+  "scope": "Microsoft XNA 4.0 Windows Audio/XACT and Media/Video projection",
   "qualifiedArtifactSha256": "6dcefcadb7aa0233da98682bdbc343581a9f1e754a09c641078d1bef97afd7ca",
   "abiVersion": "0.7",
   "rows": [
@@ -13,8 +13,8 @@
     {
       "capability": "SoundEffect process-global state",
       "strictComplete": true,
-      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE", "UPSTREAM_CNA_BLOCKED"],
-      "evidence": "Set/get routes are native-verified. XNA process-static values persist, while the qualified CNA artifact resets them when Game is recreated."
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE"],
+      "evidence": "Set/get routes and XNA process-static persistence across Game recreation are native-verified while the process-global Media registrations retain the qualified library generation."
     },
     {
       "capability": "SoundEffectInstance",
@@ -111,6 +111,96 @@
       "strictComplete": true,
       "statuses": ["VERIFIED_NATIVE", "BACKEND_BLOCKED"],
       "evidence": "The qualified artifact is stable with SDL's dummy driver. This sandbox's default PulseAudio route cannot wake its mainloop and is not used as playback evidence."
+    },
+    {
+      "capability": "Album/Artist/Genre relationship graph",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE", "PLATFORM_PENDING"],
+      "evidence": "All CNA relationship routes and stable repeated-property caches are implemented. The qualified provider returned empty music catalogs, so populated cross-object platform metadata remains pending."
+    },
+    {
+      "capability": "Media collections",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE"],
+      "evidence": "Seven read-only collection facades preserve native order, stable per-index Arc identity, snapshot iteration, bounds behavior, disposal invalidation, and legitimate empty collections."
+    },
+    {
+      "capability": "MediaLibrary",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE", "PLATFORM_PENDING"],
+      "evidence": "Real CNA construction, source identity, child collection caching/invalidation, explicit/double Dispose, Drop, wrong-thread refusal and owner-thread retry pass 20 cycles. Music-catalog population is provider-dependent."
+    },
+    {
+      "capability": "MediaLibrary pictures",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE", "PLATFORM_PENDING"],
+      "evidence": "The host provider returned 21 real Picture entries and native name/dimension/index routes were exercised without fabricated files. Deterministic image/thumbnail, token, SavePicture and picture-album provider qualification remains pending."
+    },
+    {
+      "capability": "MediaSource",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE", "PLATFORM_PENDING"],
+      "evidence": "Actual CNA source enumeration, snapshot name/type values, generation validation and MediaLibrary source construction are implemented; removable/network-provider coverage remains pending."
+    },
+    {
+      "capability": "Song",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE", "PLATFORM_PENDING"],
+      "evidence": "A project-authored PCM WAV verifies cna_song_create_from_uri, name/metadata, MediaPlayer playback, Dispose/double Dispose, 20 creation cycles and stale-generation rejection. Populated platform Artist/Album/Genre metadata is pending."
+    },
+    {
+      "capability": "MediaPlayer",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE"],
+      "evidence": "The static facade is process-global, owner-thread constrained and generation-bound. Native transport, clamp/NaN/signed-zero scalar behavior, Stop persistence and scalar persistence across 20+ Game recreations are verified."
+    },
+    {
+      "capability": "MediaQueue",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE"],
+      "evidence": "One stable facade per live Game preserves repeated queue/song identity, native Count/active index/order and independently owned Song copies; old queues and songs fail deterministically after generation replacement."
+    },
+    {
+      "capability": "MediaPlayer events",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE"],
+      "evidence": "Process-static CNA subscriptions use panic-safe trampolines and the single FrameworkDispatcher owner-thread queue. Registration cutoffs, self-removal, reentrant native Stop/Play, later handlers after panic, 50 explicit deliveries, skipped-Update discard and Game recreation are verified; scoped reentrant controls fail outside Media dispatch."
+    },
+    {
+      "capability": "VisualizationData",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE", "BACKEND_BLOCKED"],
+      "evidence": "Both fixed 256-float read-only views and the exact 2,056-byte ABI layout are verified; enabled and disabled native fill routes run on the dummy backend, which supplies no qualified real playback spectrum."
+    },
+    {
+      "capability": "Video",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE", "ASSET_PENDING"],
+      "evidence": "A deterministic project-authored XNB metadata fixture verifies Content VideoReader routing, native metadata creation, duration, dimensions, frame rate, soundtrack type, 20 load/unload cycles, retained-object invalidation, post-create fault rollback/cache recovery and generation-safe destruction."
+    },
+    {
+      "capability": "VideoPlayer control path",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "VERIFIED_NATIVE"],
+      "evidence": "Native create/play/pause/resume/stop, retained Video identity, NaN and finite Volume validation, cached loop/mute/volume after double Dispose, wrong-thread retry and 20 cycles are verified."
+    },
+    {
+      "capability": "Video decode",
+      "strictComplete": true,
+      "statuses": ["BACKEND_BLOCKED", "ASSET_PENDING"],
+      "evidence": "HEADLESS accepts the metadata/control object but produces no decoded frame for the deliberately missing project-authored media path. No proprietary asset or synthetic pixels are used."
+    },
+    {
+      "capability": "VideoPlayer.GetTexture",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "UPSTREAM_CNA_BLOCKED"],
+      "evidence": "The real ABI route is called and no-frame returns None. If a frame exists, Rust returns UnsupportedRuntime because ABI 0.7 exposes a player-owned handle only until the next player call and cannot satisfy Texture2D's stable identity contract."
+    },
+    {
+      "capability": "Video frame texture lifetime",
+      "strictComplete": true,
+      "statuses": ["VERIFIED_MANAGED", "UPSTREAM_CNA_BLOCKED"],
+      "evidence": "Rust never wraps, destroys or exposes the transient player-owned frame handle. A safe PARENT_OWNED generation facade remains blocked on an upstream stable identity/generation contract."
     },
     {
       "capability": "Native ABI platform coverage",

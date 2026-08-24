@@ -42,6 +42,9 @@ use cna::Microsoft::Xna::Framework::Input::{
     ButtonState, Buttons, GamePadButtons, GamePadDPad, GamePadState, GamePadThumbSticks,
     GamePadTriggers, KeyboardState, Keys, MouseState,
 };
+use cna::Microsoft::Xna::Framework::Media::{
+    MediaSourceType, MediaState, VideoSoundtrackType, VisualizationData,
+};
 use cna::Microsoft::Xna::Framework::{
     BoundingBox, BoundingFrustum, BoundingSphere, Color, Curve, CurveContinuity, CurveKey,
     CurveLoopType, CurveTangent, DisplayOrientation, DrawableGameComponent, Game, GameComponent,
@@ -2101,5 +2104,19 @@ fn pinned_xna_math_observations() {
         (true, true)
     );
 
-    assert_eq!(observations, 205);
+    // XNA Media value identities and fixed visualization shape. These are
+    // reference-runtime facts, not HEADLESS/native-backend observations.
+    observe!(MediaSourceType::LocalDevice as i32, 0);
+    observe!(MediaSourceType::WindowsMediaConnect as i32, 4);
+    observe!(MediaState::Stopped as i32, 0);
+    observe!(MediaState::Playing as i32, 1);
+    observe!(MediaState::Paused as i32, 2);
+    observe!(VideoSoundtrackType::Music as i32, 0);
+    observe!(VideoSoundtrackType::Dialog as i32, 1);
+    observe!(VideoSoundtrackType::MusicAndDialog as i32, 2);
+    let visualization = VisualizationData::new();
+    observe!(visualization.Frequencies().len(), 256);
+    observe!(visualization.Samples().len(), 256);
+
+    assert_eq!(observations, 215);
 }

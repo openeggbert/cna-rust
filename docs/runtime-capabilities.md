@@ -2,7 +2,7 @@
 
 Generated from `tools/runtime-capabilities/capabilities.json`; do not edit by hand.
 
-Scope: Microsoft XNA 4.0 Windows Audio/XACT projection
+Scope: Microsoft XNA 4.0 Windows Audio/XACT and Media/Video projection
 
 Qualified CNA ABI: `0.7`
 Qualified artifact SHA-256: `6dcefcadb7aa0233da98682bdbc343581a9f1e754a09c641078d1bef97afd7ca`
@@ -10,7 +10,7 @@ Qualified artifact SHA-256: `6dcefcadb7aa0233da98682bdbc343581a9f1e754a09c641078
 | Capability | Strict | Runtime status | Evidence |
 |---|---:|---|---|
 | SoundEffect | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE` | PCM16 construction, deterministic PCM WAV FromStream, duration/name caching, Play/CreateInstance, explicit Dispose/Drop, and 25+ ownership cycles. |
-| SoundEffect process-global state | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE`, `UPSTREAM_CNA_BLOCKED` | Set/get routes are native-verified. XNA process-static values persist, while the qualified CNA artifact resets them when Game is recreated. |
+| SoundEffect process-global state | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE` | Set/get routes and XNA process-static persistence across Game recreation are native-verified while the process-global Media registrations retain the qualified library generation. |
 | SoundEffectInstance | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE` | Cached properties, playback state routes, loop/pan/3D ordering, disposal, parent-child lifetime, and 25+ cycles are verified. |
 | Apply3D single listener | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE` | Exact listener/emitter value copy and canonical cna_sound_effect_instance_apply_3d route verified. |
 | Apply3D multiple listeners | complete | `VERIFIED_MANAGED`, `UPSTREAM_CNA_BLOCKED` | The overload is present, but CNA ABI 0.7's canonical implementation refuses every listener count except one; Rust returns UnsupportedRuntime without silently reducing the input. |
@@ -27,6 +27,21 @@ Qualified artifact SHA-256: `6dcefcadb7aa0233da98682bdbc343581a9f1e754a09c641078
 | Cue | complete | `VERIFIED_MANAGED`, `ASSET_PENDING` | Complete state/transport/variable/Apply3D/disposal projection and failed native lookup are verified; successful Cue handle behavior requires an authored bank. |
 | Authored XACT playback | complete | `ASSET_PENDING` | No Microsoft-authored or otherwise legally redistributable XGS/XSB/XWB success fixture is committed. Parser/error/ownership paths do not constitute authored playback qualification. |
 | Host audio backend | complete | `VERIFIED_NATIVE`, `BACKEND_BLOCKED` | The qualified artifact is stable with SDL's dummy driver. This sandbox's default PulseAudio route cannot wake its mainloop and is not used as playback evidence. |
+| Album/Artist/Genre relationship graph | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE`, `PLATFORM_PENDING` | All CNA relationship routes and stable repeated-property caches are implemented. The qualified provider returned empty music catalogs, so populated cross-object platform metadata remains pending. |
+| Media collections | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE` | Seven read-only collection facades preserve native order, stable per-index Arc identity, snapshot iteration, bounds behavior, disposal invalidation, and legitimate empty collections. |
+| MediaLibrary | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE`, `PLATFORM_PENDING` | Real CNA construction, source identity, child collection caching/invalidation, explicit/double Dispose, Drop, wrong-thread refusal and owner-thread retry pass 20 cycles. Music-catalog population is provider-dependent. |
+| MediaLibrary pictures | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE`, `PLATFORM_PENDING` | The host provider returned 21 real Picture entries and native name/dimension/index routes were exercised without fabricated files. Deterministic image/thumbnail, token, SavePicture and picture-album provider qualification remains pending. |
+| MediaSource | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE`, `PLATFORM_PENDING` | Actual CNA source enumeration, snapshot name/type values, generation validation and MediaLibrary source construction are implemented; removable/network-provider coverage remains pending. |
+| Song | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE`, `PLATFORM_PENDING` | A project-authored PCM WAV verifies cna_song_create_from_uri, name/metadata, MediaPlayer playback, Dispose/double Dispose, 20 creation cycles and stale-generation rejection. Populated platform Artist/Album/Genre metadata is pending. |
+| MediaPlayer | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE` | The static facade is process-global, owner-thread constrained and generation-bound. Native transport, clamp/NaN/signed-zero scalar behavior, Stop persistence and scalar persistence across 20+ Game recreations are verified. |
+| MediaQueue | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE` | One stable facade per live Game preserves repeated queue/song identity, native Count/active index/order and independently owned Song copies; old queues and songs fail deterministically after generation replacement. |
+| MediaPlayer events | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE` | Process-static CNA subscriptions use panic-safe trampolines and the single FrameworkDispatcher owner-thread queue. Registration cutoffs, self-removal, reentrant native Stop/Play, later handlers after panic, 50 explicit deliveries, skipped-Update discard and Game recreation are verified; scoped reentrant controls fail outside Media dispatch. |
+| VisualizationData | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE`, `BACKEND_BLOCKED` | Both fixed 256-float read-only views and the exact 2,056-byte ABI layout are verified; enabled and disabled native fill routes run on the dummy backend, which supplies no qualified real playback spectrum. |
+| Video | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE`, `ASSET_PENDING` | A deterministic project-authored XNB metadata fixture verifies Content VideoReader routing, native metadata creation, duration, dimensions, frame rate, soundtrack type, 20 load/unload cycles, retained-object invalidation, post-create fault rollback/cache recovery and generation-safe destruction. |
+| VideoPlayer control path | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE` | Native create/play/pause/resume/stop, retained Video identity, NaN and finite Volume validation, cached loop/mute/volume after double Dispose, wrong-thread retry and 20 cycles are verified. |
+| Video decode | complete | `BACKEND_BLOCKED`, `ASSET_PENDING` | HEADLESS accepts the metadata/control object but produces no decoded frame for the deliberately missing project-authored media path. No proprietary asset or synthetic pixels are used. |
+| VideoPlayer.GetTexture | complete | `VERIFIED_MANAGED`, `UPSTREAM_CNA_BLOCKED` | The real ABI route is called and no-frame returns None. If a frame exists, Rust returns UnsupportedRuntime because ABI 0.7 exposes a player-owned handle only until the next player call and cannot satisfy Texture2D's stable identity contract. |
+| Video frame texture lifetime | complete | `VERIFIED_MANAGED`, `UPSTREAM_CNA_BLOCKED` | Rust never wraps, destroys or exposes the transient player-owned frame handle. A safe PARENT_OWNED generation facade remains blocked on an upstream stable identity/generation contract. |
 | Native ABI platform coverage | complete | `VERIFIED_NATIVE`, `PLATFORM_PENDING` | ABI 0.7 compiler/export probes pass on Linux x86-64; other operating-system/architecture binaries were not measured in this run. |
 | CLR Audio exception delivery | complete | `VERIFIED_MANAGED`, `LANGUAGE_MAPPING_LIMITATION` | The three public exception identities are projected as marker/error values; ordinary Rust operations use Result<T, CnaError> per the established mapping instead of CLR throw semantics. |
 

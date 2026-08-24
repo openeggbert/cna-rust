@@ -2,8 +2,9 @@
 
 Status date: 2026-08-23
 
-Status: strict complete. Audio has zero local diagnostics; Media was not
-started. Runtime limits are separate from structural completeness in
+Status: strict complete. Audio has zero local diagnostics. The contract counts
+below are the Audio milestone snapshot; Media was subsequently completed in
+[media-video-evidence.md](media-video-evidence.md). Runtime limits are separate from structural completeness in
 [runtime-capabilities.md](runtime-capabilities.md).
 
 ## Strict contract
@@ -60,8 +61,9 @@ behavior. `RendererDetail` implements XNA equality over display name and
 renderer ID, XNA's UTF-16 string-hash XOR, and XNA `ToString`; CNA's ID-only
 behavior is not exposed.
 
-The corpus passes 205 named observations and 206 assertions, including 20 new
-deterministic Audio observations, with zero failures. Backend state, hardware
+The final selected-profile corpus passes 215 named observations and 216
+assertions, including the 20 deterministic Audio observations, with zero
+failures. Backend state, hardware
 enumeration, playback timing, callbacks, and malformed-bank behavior remain
 native qualification rather than golden XNA behavior.
 
@@ -157,7 +159,8 @@ ABI                                      0x0700
 
 Every added symbol is measured against canonical C headers for prototype,
 pointer depth/constness, scalar and enum representation, callback ABI, and
-export presence. No C++ ABI or Media symbol is bound.
+export presence. No C++ ABI or Media symbol was added by the Audio milestone;
+the final reviewed slice is recorded separately in the Media evidence.
 
 Crash-isolated Audio stress covers at least 75 SoundEffect, 75 instance, 75
 dynamic, 50 callback-delivery, 60 microphone-lifetime/enumeration, 21 engine,
@@ -181,16 +184,21 @@ Crash absence is not allocator-level leak evidence.
 |---|---|---|---|---|---|---|
 | Apply3D listeners[] | instance Apply3D | one native; multiple UnsupportedRuntime | true multi-listener mixing | retain instance/effect | owner thread | route mixing all listeners |
 | AudioEngine renderer/look-ahead | engine create | exact validation and native call | CNA discards both values | engine sole owner | owner-thread create | CNA honoring both arguments |
-| SoundEffect global state across Games | static get/set | exposes qualified reset and records blocker | XNA process-static persistence | PROCESS_GLOBAL | owner native boundary | state lifetime independent of Game |
 | malformed XWB/XSB | bank create | preserve/dispose returned handles | parser failure not propagated | child retains engine | owner create/destroy | atomic parser failure result |
 | microphone capture | capture routes | no device/samples fabricated | qualified host has no hardware | stable facade | queue worker callback to owner | physical-device qualification |
 | authored XACT playback | bank/cue routes | validation/error/ownership only | no CNA defect asserted | full dependency graph | owner lifecycle | legal deterministic authored fixture |
 
-The first four are `UPSTREAM_CNA_BLOCKED`, microphone capture is
+The first three are `UPSTREAM_CNA_BLOCKED`, microphone capture is
 `HARDWARE_PENDING`, and authored playback is `ASSET_PENDING`. The sandbox's
 default PulseAudio route cannot wake its mainloop; native stress uses SDL's
 dummy driver and classifies the default route `BACKEND_BLOCKED`. Linux x86-64
 is measured; other platforms are `PLATFORM_PENDING`.
+
+The later process-global Media registration architecture retains the exact
+qualified CNA library generation across Game recreation. Requalification then
+showed that SoundEffect's process-static values persist as XNA requires; the
+earlier reset observation was an artifact of unloading/reloading the native
+library, not a remaining CNA semantic blocker.
 
 Canonical read-only CNA HEAD is
 `1bb2145d99ed572dd4eb15009c34e2e5f410fcf0` and still fails its unmodified C

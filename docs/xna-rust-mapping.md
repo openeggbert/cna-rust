@@ -102,6 +102,14 @@ Calls that can reach native Audio/XACT state return `Result`; the pure
 binary32 sample arithmetic and cached disposed/value properties remain
 infallible.
 
+Media uses the explicit context for `Song.FromUri`, media-source enumeration,
+`MediaLibrary` construction, all `MediaPlayer` operations, and
+`VideoPlayer` construction. `MediaPlayer` nevertheless remains an XNA
+process-global static facade: the context proves the active owner thread and
+selects the current CNA Game generation; it does not create a per-Game player
+object. Native handles and queue views are generation-bound, while XNA-defined
+process-global scalar properties persist across Game recreation.
+
 A read-only instance property `Foo` maps to `Foo(&self)`. A read/write property
 maps to `Foo(&self)` and `SetFoo(&mut self, value)`. A natural borrowed result is
 returned as `&T` or `&mut T`; a resource is not cloned to imitate a property.
@@ -240,6 +248,21 @@ collection type. `AudioEngine.RendererDetails` therefore returns an owned
 returns `Option<Arc<Self>>`; an empty native enumeration is not an error and no
 synthetic device is inserted. Repeated enumeration reuses each game
 generation's stable microphone facade identity.
+
+The seven named Media collections are read-only wrappers, not mutable `Vec`
+aliases. They retain their native parent, preserve native order, cache one
+stable `Arc` facade per index, expose checked XNA `Item`/`Count`, and provide a
+fallible snapshot enumerator plus ordinary Rust `IntoIterator` ergonomics. A
+legitimately empty native collection remains empty; the binding never inserts
+catalog entries.
+
+Borrowed `System.Uri` inputs map to UTF-8 `&str`. `Picture.Date` maps to
+`std::time::SystemTime`. Media methods accepting `System.IO.Stream` map to a
+borrowed `&mut R where R: Read`; returned album-art, picture, and thumbnail
+streams map to owned `Box<dyn Read + Send>` values. No stream route is replaced
+by direct host-filesystem access. `VisualizationData`'s two CLR
+`ReadOnlyCollection<float>` properties map to immutable `&[f32]` views whose
+length is always exactly 256.
 
 ## Design-time math converters
 
@@ -473,6 +496,15 @@ registration snapshot taken for that event emission. A closure must be
 `Send`/`Sync` only when CNA can invoke it from the corresponding threads.
 Delegate signatures follow the same parameter, null, and ref/out mappings as
 methods.
+
+Static MediaPlayer events retain XNA's null sender as the stateless Rust unit
+sender. Because ordinary MediaPlayer operations require an explicit
+callback-scoped `GameContext`, the CNA-only `extensions::media::PlayFromEvent`
+and `StopFromEvent` helpers provide the otherwise unreachable XNA reentrant
+transport case. They are enabled only while the single owner-thread Media
+event pump is invoking a handler, use the current checked generation, and fail
+outside that scope. They do not create ambient general-purpose Game state or
+additional strict XNA members.
 
 ## Disposal, ownership, and unsafe code
 

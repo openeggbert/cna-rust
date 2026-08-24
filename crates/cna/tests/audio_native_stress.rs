@@ -252,7 +252,7 @@ impl Game for CallbackPanicGame {
 
 struct GlobalAudioGame {
     state: Arc<GameState>,
-    verify_cna_reset: bool,
+    verify_persistence: bool,
 }
 
 impl GameStateAccess for GlobalAudioGame {
@@ -261,13 +261,14 @@ impl GameStateAccess for GlobalAudioGame {
 
 impl Game for GlobalAudioGame {
     fn Initialize(&mut self, game: &mut GameContext<'_>) -> Result<()> {
-        if self.verify_cna_reset {
-            // XNA's fields are process-static. The qualified CNA 0.7 artifact instead resets
-            // them during Game recreation; preserve and document that upstream limitation.
-            assert_eq!(SoundEffect::MasterVolume(game)?, 1.0);
-            assert_eq!(SoundEffect::DistanceScale(game)?, 1.0);
-            assert_eq!(SoundEffect::DopplerScale(game)?, 1.0);
-            assert_eq!(SoundEffect::SpeedOfSound(game)?, 343.5);
+        if self.verify_persistence {
+            // These XNA fields are process-static. The process-global Media callback
+            // registration now keeps the exact ABI-0.7 library generation loaded across Game
+            // recreation, so CNA's static values retain the XNA-observable state as well.
+            assert_eq!(SoundEffect::MasterVolume(game)?, 0.25);
+            assert_eq!(SoundEffect::DistanceScale(game)?, 2.0);
+            assert_eq!(SoundEffect::DopplerScale(game)?, 3.0);
+            assert_eq!(SoundEffect::SpeedOfSound(game)?, 300.0);
         } else {
             SoundEffect::SetMasterVolume(game, 0.25)?;
             SoundEffect::SetDistanceScale(game, 2.0)?;
@@ -503,15 +504,15 @@ fn run_child_case(case: &str) {
         }
         "global-state" => {
             run_for_frames(
-                GlobalAudioGame { state: Arc::new(GameState::new()), verify_cna_reset: false },
+                GlobalAudioGame { state: Arc::new(GameState::new()), verify_persistence: false },
                 1,
             )
             .expect("set process-global SoundEffect state");
             run_for_frames(
-                GlobalAudioGame { state: Arc::new(GameState::new()), verify_cna_reset: true },
+                GlobalAudioGame { state: Arc::new(GameState::new()), verify_persistence: true },
                 1,
             )
-            .expect("verify CNA SoundEffect static-state reset after Game recreation");
+            .expect("verify XNA SoundEffect static-state persistence after Game recreation");
         }
         _ => panic!("unknown Audio stress child case"),
     }

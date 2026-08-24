@@ -82,7 +82,7 @@ pub(super) struct DeviceState {
 }
 
 impl DeviceState {
-    pub(super) fn handle(&self) -> Result<sys::CNA_Handle> {
+    pub(crate) fn handle(&self) -> Result<sys::CNA_Handle> {
         self.ensure_alive()?;
         let handle = *self
             .handle
@@ -287,7 +287,7 @@ impl GraphicsDevice {
         ))
     }
 
-    pub(super) fn handle(&self) -> Result<sys::CNA_Handle> {
+    pub(crate) fn handle(&self) -> Result<sys::CNA_Handle> {
         self.state.handle()
     }
 

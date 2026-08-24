@@ -172,6 +172,7 @@ fn run_inner<G: Game>(game: &mut G, mode: RunMode) -> Result<()> {
     // user's Exiting/UnloadContent lifecycle callbacks. Release registered
     // native children here without synthesizing a second user callback.
     let content_cleanup_result = state.game.game_state().cleanup_content();
+    let media_cleanup_result = state.game.game_state().cleanup_media();
     let audio_cleanup_result = state.game.game_state().cleanup_audio();
     let cleanup_result = state
         .device
@@ -201,6 +202,7 @@ fn run_inner<G: Game>(game: &mut G, mode: RunMode) -> Result<()> {
     unsubscribe_result?;
     manager_cleanup_result?;
     content_cleanup_result?;
+    media_cleanup_result?;
     audio_cleanup_result?;
     cleanup_result?;
     destroy_result
@@ -317,11 +319,15 @@ unsafe extern "C" fn callback<G: Game, const LIFECYCLE: u8>(
         return sys::CNA_RESULT_CALLBACK;
     }
     let audio = Arc::clone(state.game.game_state().audio_runtime());
+    let media = Arc::clone(state.game.game_state().media_runtime());
+    let media_generation = state.game.game_state().media_generation();
     let mut game_context = GameContext {
         native: &state.native,
         handle: game_handle,
         device,
         audio: &audio,
+        media: &media,
+        media_generation,
     };
     let lifecycle = match LIFECYCLE {
         value if value == Lifecycle::Initialize as u8 => Lifecycle::Initialize,
@@ -363,6 +369,8 @@ unsafe extern "C" fn callback<G: Game, const LIFECYCLE: u8>(
         }
         Lifecycle::Draw => {
             state.game.game_state().audio_runtime().dispatch_pending()?;
+            crate::media::MediaPlayer::update(&game_context)?;
+            state.game.game_state().media_runtime().dispatch_pending()?;
             state.game.Draw(&mut game_context, &game_time)?;
             state.game.game_state().draw_components(&game_time);
             state.drawn_frames += 1;

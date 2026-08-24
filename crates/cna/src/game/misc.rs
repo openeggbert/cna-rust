@@ -13,7 +13,10 @@ impl FrameworkDispatcher {
     pub fn Update(game: &GameContext<'_>) -> Result<()> {
         let (native, handle) = game.native_game();
         native.framework_dispatcher_update(handle)?;
-        game.audio_runtime().dispatch_pending()
+        game.audio_runtime().dispatch_pending()?;
+        crate::media::MediaPlayer::update(game)?;
+        game.media_runtime().dispatch_pending()?;
+        Ok(())
     }
 }
 
