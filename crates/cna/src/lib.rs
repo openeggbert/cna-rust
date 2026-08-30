@@ -166,7 +166,9 @@ pub mod Microsoft {
             pub mod GamerServices {
                 pub use crate::game::GamerServicesComponent;
                 pub use crate::gamer_services::{
-                    Achievement, AchievementCollection,
+                    Achievement, AchievementCollection, AvatarAnimation,
+                    IAvatarAnimation,
+                    AvatarDescription, AvatarRenderer,
                     AvatarAnimationPreset, AvatarBodyType, AvatarBone, AvatarExpression, AvatarEye,
                     AvatarEyebrow,
                     AvatarMouth, AvatarRendererState, ControllerSensitivity, FriendCollection,

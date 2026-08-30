@@ -305,7 +305,11 @@
     "Microsoft.Xna.Framework.GamerServices.LeaderboardReader::*",
     "Microsoft.Xna.Framework.GamerServices.LeaderboardWriter::*",
     "Microsoft.Xna.Framework.GamerServices.Guide::*",
-    "Microsoft.Xna.Framework.GamerServices.GamerServicesDispatcher::*"
+    "Microsoft.Xna.Framework.GamerServices.GamerServicesDispatcher::*",
+    "Microsoft.Xna.Framework.GamerServices.AvatarDescription::*",
+    "Microsoft.Xna.Framework.GamerServices.AvatarAnimation::*",
+    "Microsoft.Xna.Framework.GamerServices.AvatarRenderer::*",
+    "Microsoft.Xna.Framework.GamerServices.IAvatarAnimation::*"
   ],
   "fallibleExclusions": [
     "Microsoft.Xna.Framework.Content.ContentReader::ContentManager",
@@ -342,7 +346,12 @@
     "Microsoft.Xna.Framework.GamerServices.GamerCollectionEnumerator::*",
     "Microsoft.Xna.Framework.GamerServices.FriendCollection::Finalize",
     "Microsoft.Xna.Framework.GamerServices.GamerServicesDispatcher::AddInstallingTitleUpdateHandler",
-    "Microsoft.Xna.Framework.GamerServices.GamerServicesDispatcher::RemoveInstallingTitleUpdateHandler"
+    "Microsoft.Xna.Framework.GamerServices.GamerServicesDispatcher::RemoveInstallingTitleUpdateHandler",
+    "Microsoft.Xna.Framework.GamerServices.AvatarAnimation::Finalize",
+    "Microsoft.Xna.Framework.GamerServices.AvatarRenderer::Finalize",
+    "Microsoft.Xna.Framework.GamerServices.AvatarRenderer::BoneCount",
+    "Microsoft.Xna.Framework.GamerServices.AvatarDescription::AddChangedHandler",
+    "Microsoft.Xna.Framework.GamerServices.AvatarDescription::RemoveChangedHandler"
   ],
   "mutableReceiverMembers": [
     "*::Dispose",
@@ -420,7 +429,11 @@
     "Microsoft.Xna.Framework.GamerServices.LeaderboardReader::*",
     "Microsoft.Xna.Framework.GamerServices.LeaderboardWriter::*",
     "Microsoft.Xna.Framework.GamerServices.Guide::*",
-    "Microsoft.Xna.Framework.GamerServices.GamerServicesDispatcher::*"
+    "Microsoft.Xna.Framework.GamerServices.GamerServicesDispatcher::*",
+    "Microsoft.Xna.Framework.GamerServices.AvatarDescription::*",
+    "Microsoft.Xna.Framework.GamerServices.AvatarAnimation::*",
+    "Microsoft.Xna.Framework.GamerServices.AvatarRenderer::*",
+    "Microsoft.Xna.Framework.GamerServices.IAvatarAnimation::*"
   ],
   "parameterTypeOverrides": {
     "Microsoft.Xna.Framework.Content.ContentManager::.ctor::serviceProvider": "Arc<dyn ServiceProvider>",
@@ -543,7 +556,16 @@
     "Microsoft.Xna.Framework.GamerServices.Guide::ShowMessages::player": "PlayerIndex",
     "Microsoft.Xna.Framework.GamerServices.GamerServicesDispatcher::Initialize::serviceProvider": "&GameContext",
     "Microsoft.Xna.Framework.GamerServices.GamerServicesDispatcher::WindowHandle::value": "WindowHandle",
-    "Microsoft.Xna.Framework.GamerServices.GamerServicesDispatcher::InstallingTitleUpdate::handler": "Box<dyn EventHandler>"
+    "Microsoft.Xna.Framework.GamerServices.GamerServicesDispatcher::InstallingTitleUpdate::handler": "Box<dyn EventHandler>",
+    "Microsoft.Xna.Framework.GamerServices.AvatarDescription::.ctor::data": "&[u8]",
+    "Microsoft.Xna.Framework.GamerServices.AvatarDescription::BeginGetFromGamer::gamer": "&GamerServices::Gamer",
+    "Microsoft.Xna.Framework.GamerServices.AvatarDescription::BeginGetFromGamer::callback": "Option<GamerAsyncCallback>",
+    "Microsoft.Xna.Framework.GamerServices.AvatarDescription::BeginGetFromGamer::state": "GamerAsyncState",
+    "Microsoft.Xna.Framework.GamerServices.AvatarDescription::EndGetFromGamer::result": "&GamerAsyncResult",
+    "Microsoft.Xna.Framework.GamerServices.AvatarRenderer::.ctor::avatarDescription": "&GamerServices::AvatarDescription",
+    "Microsoft.Xna.Framework.GamerServices.AvatarRenderer::Draw::animation": "&GamerServices::AvatarAnimation",
+    "Microsoft.Xna.Framework.GamerServices.AvatarRenderer::Draw::bones": "&[Matrix]",
+    "Microsoft.Xna.Framework.GamerServices.AvatarDescription::Changed::handler": "Box<dyn EventHandler>"
   },
   "returnTypeOverrides": {
     "Microsoft.Xna.Framework.Content.ContentManager::ServiceProvider": "Arc<dyn ServiceProvider>",
@@ -720,7 +742,14 @@
     "Microsoft.Xna.Framework.GamerServices.Guide::BeginShowMessageBoxWithTitleAndTextAndButtonsAndFocusButtonAndIconAndCallbackAndState": "GamerAsyncResult",
     "Microsoft.Xna.Framework.GamerServices.Guide::BeginShowKeyboardInput": "GamerAsyncResult",
     "Microsoft.Xna.Framework.GamerServices.Guide::BeginShowKeyboardInputWithPlayerAndTitleAndDescriptionAndDefaultTextAndCallbackAndStateAndUsePasswordMode": "GamerAsyncResult",
-    "Microsoft.Xna.Framework.GamerServices.GamerServicesDispatcher::WindowHandle": "WindowHandle"
+    "Microsoft.Xna.Framework.GamerServices.GamerServicesDispatcher::WindowHandle": "WindowHandle",
+    "Microsoft.Xna.Framework.GamerServices.AvatarDescription::BeginGetFromGamer": "GamerAsyncResult",
+    "Microsoft.Xna.Framework.GamerServices.AvatarDescription::EndGetFromGamer": "Self",
+    "Microsoft.Xna.Framework.GamerServices.AvatarDescription::Description": "Vec<u8>",
+    "Microsoft.Xna.Framework.GamerServices.AvatarRenderer::ParentBones": "Vec<i32>",
+    "Microsoft.Xna.Framework.GamerServices.AvatarRenderer::BindPose": "Vec<Matrix>",
+    "Microsoft.Xna.Framework.GamerServices.AvatarAnimation::BoneTransforms": "Vec<Matrix>",
+    "Microsoft.Xna.Framework.GamerServices.IAvatarAnimation::BoneTransforms": "Vec<Matrix>"
   },
   "contextInjectedMembers": {
     "Microsoft.Xna.Framework.Graphics.GraphicsAdapter::UseReferenceDevice": [

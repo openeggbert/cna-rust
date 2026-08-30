@@ -21,10 +21,11 @@ use cna::extensions::gamer_services::{
     PendingGuideRequest, SignedInGamerPublisher, SignedInGamerRegistration,
 };
 use cna::Microsoft::Xna::Framework::GamerServices::{
-    Achievement, Gamer, GamerServicesDispatcher, Guide, LeaderboardIdentity, LeaderboardKey,
-    NotificationPosition, PropertyDictionary, SignedInGamer,
+    Achievement, AvatarAnimation, AvatarAnimationPreset, AvatarBodyType, AvatarDescription,
+    AvatarExpression, AvatarRenderer, AvatarRendererState, Gamer, GamerServicesDispatcher, Guide, LeaderboardIdentity,
+    LeaderboardKey, NotificationPosition, PropertyDictionary, SignedInGamer,
 };
-use cna::Microsoft::Xna::Framework::PlayerIndex;
+use cna::Microsoft::Xna::Framework::{Matrix, PlayerIndex, TimeSpan, Vector3};
 use cna::{CnaError, GamerBase, GamerCollectionBase, PropertyValueKind, Result};
 
 fn native_enabled() -> bool {
@@ -518,5 +519,165 @@ fn sign_in_handlers_stop_receiving_once_removed() -> Result<()> {
     let _publisher = SignedInGamerPublisher::publish(&roster(&[("late", PlayerIndex::One)]))?;
     GamerServicesDispatcher::Update()?;
     assert_eq!(seen.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[test]
+fn an_avatar_description_preserves_xnas_own_random_behaviour() -> Result<()> {
+    if !native_enabled() {
+        return Ok(());
+    }
+    let _services = gamer_services_guard();
+
+    // Despite its name, XNA's `CreateRandom` randomizes nothing: it answers an
+    // all-zero description, which is invalid. CNA preserves that exactly, and
+    // the projection reports it rather than "fixing" the upstream behaviour.
+    let random = AvatarDescription::CreateRandom()?;
+    assert!(!random.IsValid()?);
+    let bytes = random.Description()?;
+    assert!(!bytes.is_empty());
+    assert!(bytes.iter().all(|byte| *byte == 0));
+
+    // The body-type overload validates its argument and then ignores it, which
+    // is also XNA's own behaviour: both answers are the same all-zero
+    // description, and neither reports the body type that was asked for.
+    let female = AvatarDescription::CreateRandomWithBodyType(AvatarBodyType::Female)?;
+    let male = AvatarDescription::CreateRandomWithBodyType(AvatarBodyType::Male)?;
+    assert_eq!(female.Description()?, bytes);
+    assert_eq!(male.Description()?, bytes);
+    assert_eq!(female.BodyType()?, male.BodyType()?);
+
+    // The constructor copies the caller's bytes and answers them back.
+    let rebuilt = AvatarDescription::new(&bytes)?;
+    assert_eq!(rebuilt.Description()?, bytes);
+    assert!(!rebuilt.IsValid()?);
+    Ok(())
+}
+
+#[test]
+fn an_avatar_animation_advances_its_own_clock() -> Result<()> {
+    if !native_enabled() {
+        return Ok(());
+    }
+    let _services = gamer_services_guard();
+
+    let animation = AvatarAnimation::new(AvatarAnimationPreset::Wave)?;
+    // XNA's animation carries 71 zero bone transforms and a zero length
+    // whichever preset was asked for. Preserved, not corrected.
+    assert_eq!(animation.Length()?.Ticks(), 0);
+    assert_eq!(animation.CurrentPosition()?.Ticks(), 0);
+    let bones = animation.BoneTransforms()?;
+    assert_eq!(bones.len(), AvatarRenderer::BoneCount as usize);
+
+    // The clock is real state, and XNA clamps it to the clip: advancing past
+    // the end pins the position at the length, which for a zero-length clip is
+    // zero. A projection that stored the elapsed time instead of asking CNA
+    // would report 100 ms here.
+    let step = TimeSpan::FromMilliseconds(100.0);
+    animation.Update(step, false)?;
+    assert_eq!(animation.CurrentPosition()?.Ticks(), 0);
+
+    // Looping is refused for a zero-length clip -- wrapping would not
+    // terminate -- so the clamp applies there too.
+    animation.Update(step, true)?;
+    assert_eq!(animation.CurrentPosition()?.Ticks(), 0);
+
+    // The setter clamps by the same rule, in both directions.
+    animation.SetCurrentPosition(step)?;
+    assert_eq!(animation.CurrentPosition()?.Ticks(), 0);
+    animation.SetCurrentPosition(TimeSpan::FromMilliseconds(-100.0))?;
+    assert_eq!(animation.CurrentPosition()?.Ticks(), 0);
+
+    let _expression = animation.Expression()?;
+
+    // Disposal is observable and idempotent, and a disposed animation refuses
+    // rather than reading a released handle.
+    assert!(!animation.IsDisposed()?);
+    animation.Dispose()?;
+    assert!(animation.IsDisposed()?);
+    animation.Dispose()?;
+    assert!(animation.Length().is_err());
+    Ok(())
+}
+
+#[test]
+fn an_avatar_renderer_holds_the_state_it_was_given() -> Result<()> {
+    if !native_enabled() {
+        return Ok(());
+    }
+    let _services = gamer_services_guard();
+
+    let description = AvatarDescription::CreateRandom()?;
+    let renderer = AvatarRenderer::new(&description)?;
+
+    // The renderer copies what it needs, so releasing the description must not
+    // invalidate it.
+    drop(description);
+    assert!(!renderer.IsDisposed()?);
+    let _state = renderer.State()?;
+
+    // Transforms round-trip through CNA, and setting one must not disturb the
+    // other two -- a projection that wrote all three from one setter would
+    // fail here.
+    renderer.SetWorld(Matrix::Identity)?;
+    renderer.SetView(Matrix::CreateTranslation(Vector3::from_x_and_y_and_z(1.0, 2.0, 3.0)))?;
+    renderer.SetProjection(Matrix::CreateScale(2.0, 2.0, 2.0))?;
+    assert_eq!(renderer.World()?, Matrix::Identity);
+    assert_eq!(renderer.View()?, Matrix::CreateTranslation(Vector3::from_x_and_y_and_z(1.0, 2.0, 3.0)));
+    assert_eq!(renderer.Projection()?, Matrix::CreateScale(2.0, 2.0, 2.0));
+
+    renderer.SetLightColor(Vector3::from_x_and_y_and_z(1.0, 0.0, 0.0))?;
+    renderer.SetLightDirection(Vector3::from_x_and_y_and_z(0.0, 1.0, 0.0))?;
+    renderer.SetAmbientLightColor(Vector3::from_x_and_y_and_z(0.0, 0.0, 1.0))?;
+    assert_eq!(renderer.LightColor()?.X, 1.0);
+    assert_eq!(renderer.LightDirection()?.Y, 1.0);
+    assert_eq!(renderer.AmbientLightColor()?.Z, 1.0);
+
+    // The skeleton is fixed for a renderer's life, and repeated reads agree.
+    let parents = renderer.ParentBones()?;
+    assert_eq!(parents.len(), AvatarRenderer::BoneCount as usize);
+    assert_eq!(renderer.ParentBones()?, parents);
+
+    // XNA raises unless the renderer has reached `Ready`, and nothing in this
+    // runtime ever sets that state, so the honest answer is the refusal. A
+    // projection that answered 71 identity matrices here would be inventing a
+    // bind pose the avatar service never supplied.
+    assert_eq!(renderer.State()?, AvatarRendererState::Unavailable);
+    assert!(matches!(renderer.BindPose(), Err(CnaError::Native { .. })));
+
+    renderer.Dispose()?;
+    assert!(renderer.IsDisposed()?);
+    renderer.Dispose()?;
+    Ok(())
+}
+
+#[test]
+fn an_avatar_draw_reports_what_the_renderer_can_do() -> Result<()> {
+    if !native_enabled() {
+        return Ok(());
+    }
+    let _services = gamer_services_guard();
+
+    let description = AvatarDescription::CreateRandom()?;
+    let renderer = AvatarRenderer::new(&description)?;
+    let animation = AvatarAnimation::new(AvatarAnimationPreset::Stand0)?;
+
+    // Nothing here claims a frame appeared. The call reaches CNA and whatever
+    // CNA answers -- a success on a build that can draw, a refusal on one that
+    // cannot -- is the answer. What must never happen is a Rust-side no-op
+    // reported as a successful draw, so both outcomes are admitted and an
+    // unexpected error category would fail.
+    match renderer.Draw(&animation) {
+        Ok(()) => {}
+        Err(CnaError::Native { .. }) => {}
+        Err(other) => panic!("unexpected avatar draw failure: {other:?}"),
+    }
+
+    let bones = animation.BoneTransforms()?;
+    match renderer.DrawWithBonesAndExpression(&bones, AvatarExpression::default()) {
+        Ok(()) => {}
+        Err(CnaError::Native { .. }) => {}
+        Err(other) => panic!("unexpected avatar bone draw failure: {other:?}"),
+    }
     Ok(())
 }

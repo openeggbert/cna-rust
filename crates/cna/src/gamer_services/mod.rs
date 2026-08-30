@@ -19,6 +19,7 @@
 
 mod achievements;
 mod async_result;
+mod avatar;
 mod core;
 mod dispatcher;
 mod events;
@@ -37,6 +38,7 @@ pub(crate) fn open_runtime() -> crate::error::Result<GamerServicesRuntimeHandle>
 pub use achievements::{Achievement, AchievementCollection};
 pub use dispatcher::{GamerServicesDispatcher, Guide};
 pub use events::{InviteAcceptedEventArgs, SignedInEventArgs, SignedOutEventArgs};
+pub use avatar::{AvatarAnimation, AvatarDescription, AvatarRenderer, IAvatarAnimation};
 pub use async_result::{GamerAsyncCallback, GamerAsyncResult, GamerAsyncState};
 pub use leaderboards::{
     LeaderboardEntry, LeaderboardReader, LeaderboardWriter, PropertyDictionary, PropertyValueKind,

@@ -52,6 +52,7 @@ pub use presentation::{
     DisplayMode, PresentationParameters, ResourceCreatedEventArgs, ResourceDestroyedEventArgs,
 };
 pub use render_target::{RenderTarget2D, RenderTargetBinding, RenderTargetCube};
+pub(crate) use effect::{from_native_matrix, native_matrix};
 pub(crate) use resource::BorrowedHandle;
 pub use resource::{GraphicsResource, Texture};
 pub use sprite_batch::SpriteBatch;
