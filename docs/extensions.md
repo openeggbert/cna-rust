@@ -261,3 +261,43 @@ workspace.
 published, because Cargo resolves the path dependency's version through the
 registry. That is a publish-order fact, not a defect, and it is why the
 packaged-source consumer stages the file list directly.
+
+
+## `extensions::gamer_services` and `extensions::net`
+
+Two families that exist for a reason worth stating plainly: XNA has no way for
+a game to *be* the platform, and on a host with no gamer service and no peer,
+the strict projection must therefore report nothing. These modules are how a
+host supplies what the platform would.
+
+`SignedInGamerPublisher` publishes a roster through
+`cna_signed_in_gamer_create_ext` and `cna_gamer_set_signed_in_gamers_ext`. XNA
+declares no public `SignedInGamer` constructor and this projection declares
+none either; a game that calls the publisher is acting as its own platform, and
+after it does, every strict `Gamer.SignedInGamers` read reports CNA's real
+roster. The publisher owns each gamer it creates and clears the roster before
+releasing them, because CNA refuses to destroy a gamer its collection still
+names.
+
+`PendingGuideRequest` publishes CNA's Guide state and the routes that resolve
+it. XNA's `BeginShowMessageBox` is answered by a person; CNA leaves the request
+pending rather than inventing a choice, so `EndShowMessageBox` reports CNA's
+state error until something answers it. This is what answers it. It also
+publishes CNA's own visibility setter, which the canonical layer accepts and
+ignores because visibility is derived from whether a request is pending -- the
+route is exposed with that stated rather than described as if it worked.
+
+`RemoteGamerInjection` and `NetworkEventInjection` do the same job for the
+network: they admit a remote gamer to a session and deliver a state change, a
+gamer join or leave, or a packet. A single process has no peer, and the strict
+`NetworkSession.RemoteGamers` stays empty without them. With them, one process
+can prove that a peer lands in the remote roster and not the local one, that a
+subscribed handler fires exactly once with the reason it was given, that a
+delivered packet arrives byte for byte and decodes through `PacketReader`, and
+that a removed handler stops receiving.
+
+`AchievementCollectionExt::item_at` and `AchievementExt::equals` are the third
+kind of entry here and the least interesting: XNA overloads `this[...]` by
+integer and by string, and Rust cannot give two methods one name, so the strict
+type keeps the metadata-selected string form and the integer operation arrives
+through a trait. Same collection, same handle, same identity rule.

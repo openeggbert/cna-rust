@@ -408,6 +408,25 @@
         "HARDWARE_PENDING"
       ],
       "evidence": "Enumeration, per-device capabilities and snapshot capture answer against the live library, and the projection preserves the canonical rule that capturing an identifier no device carries succeeds with every array empty rather than failing. No joystick is attached to this host, so the measured enumeration is empty and the populated path is hardware pending."
+    },
+    {
+      "family": "extensions::gamer_services",
+      "routes": 250,
+      "statuses": [
+        "VERIFIED_HEADLESS",
+        "UPSTREAM_BLOCKED"
+      ],
+      "evidence": "The whole GamerServices and Avatar C surface is bound and the strict XNA object model is projected over it. A roster published through SignedInGamerPublisher is read back through Gamer.SignedInGamers, one position keeps one logical identity across reads, an awarded achievement is found again by its key, a leaderboard entry's columns are the entry's own, and a Guide message box is answered through CNA's pending-request routes and reports that exact choice. Guide.IsScreenSaverEnabled is platform state a headless host has no display layer for, so CNA answers true and its setter changes nothing; that is asserted rather than cached."
+    },
+    {
+      "family": "extensions::net",
+      "routes": 186,
+      "statuses": [
+        "VERIFIED_HEADLESS",
+        "NO_LIVE_PEER",
+        "UPSTREAM_BLOCKED"
+      ],
+      "evidence": "A local session is created, its rosters read, its properties round-tripped, its state machine driven through Update, and its events proven to fire exactly once and to stop after removal. A single process cannot produce a peer, so RemoteGamerInjection and NetworkEventInjection supply one deliberately and the strict surface reports an empty remote roster without them. A genuine second machine is NO_LIVE_PEER. cna_gamer_* refuses a network gamer handle and cna_local_network_gamer_get_signed_in_gamer answers NOT_SUPPORTED; both refusals are reported rather than guessed around."
     }
   ]
 }

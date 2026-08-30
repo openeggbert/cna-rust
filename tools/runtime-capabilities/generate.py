@@ -33,6 +33,10 @@ VALID_EXTENSION_STATUSES = VALID_STATUSES | {
     "VERIFIED_REAL_RENDERER",
     "NOT_SUPPORTED_BY_BACKEND",
     "UPSTREAM_BLOCKED",
+    # A networked family a single process can drive completely except for one
+    # thing: a second machine. That is not hardware, a backend or an upstream
+    # gap, so it gets its own status rather than being rounded to one of those.
+    "NO_LIVE_PEER",
 }
 
 

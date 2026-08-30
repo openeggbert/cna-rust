@@ -1,6 +1,6 @@
 # CNA-Rust plan
 
-Status date: 2026-08-30
+Status date: 2026-08-31
 
 Scope: a Rust projection of Microsoft XNA Framework 4.0 over the canonical CNA
 C ABI, plus a separately namespaced safe Rust API for CNA's own modern
@@ -71,32 +71,42 @@ SHA-256 and measured as explicit profiles rather than merged into one:
 | Profile | Assemblies | Reference types | Reference members | Missing Rust types |
 |---|---:|---:|---:|---:|
 | `xna40-windows-runtime` (selected) | 7 | 257 | 2,964 | 0 |
-| `xna40-windows-full` | 10 | 331 | 3,640 | 40 |
+| `xna40-windows-full` | 10 | 331 | 3,640 | 0 |
 | `xna40-windows-pipeline` | 7 | 128 | 743 | 125 |
-| `xna40-windows-superset` (discovery) | 17 | 459 | 4,383 | 165 |
+| `xna40-windows-superset` (discovery) | 17 | 459 | 4,383 | 125 |
 
-Every type the Rust projection already declares matches the superset's expected
-contract exactly: the only diagnostic in any wider profile is `MISSING_TYPE`.
-The complete runtime profile's value identities are done: 22 enums and 7
-exception identities, exact managed Rust with no native backing because CLR
-metadata is the whole of their contract. `PacketWriter` and `PacketReader` are done too: XNA derives them from
-`BinaryWriter`/`BinaryReader` over a `MemoryStream`, and the projection owns
-the buffer directly and reproduces XNA's byte order exactly, including the bit
-reinterpretation its `Write(float)` override performs. `AvatarExpression`, `LeaderboardIdentity` and `NetworkSessionProperties` are
-done too. What remains of that profile's 40 types is its object model -- `Gamer`, `SignedInGamer`, `Guide`,
-`AvatarRenderer`, `NetworkSession` and their collections -- which needs the
-canonical `gamer_services.h` and `net*.h` routes behind it. The 125-type gap is
-the design-time Content Pipeline.
+**The complete Windows runtime profile is closed.** All ten retained runtime
+assemblies are projected at strict zero: 333 expected Rust types present, and
+zero in every measured category -- missing and unexpected type and member,
+signature, parameter, generic and generic bound, ref/out, base projection,
+trait, interface, enum and flags value, delegate, disposal, type kind, internal
+type leak, raw handle leak and public unsafe API -- with an empty allowlist and
+no unmeasured category. What closed it, in three slices:
 
-Measurement is profile-scoped. A Rust type some other retained XNA assembly
-declares belongs to a profile this run is not measuring and is not a
-diagnostic; `UNEXPECTED_TYPE` therefore means what it should -- a type **no**
-Microsoft XNA 4.0 assembly declares. That is what lets a wider profile be
-implemented incrementally without the selected profile's strict gate reporting
-the new types as inventions.
+- **GamerServices** (22 types): `Gamer`, `SignedInGamer`, `FriendGamer`, their
+  collections and enumerator, `GamerProfile`, `GamerPresence`,
+  `GamerPrivileges`, `GameDefaults`, `Achievement`, `AchievementCollection`,
+  `PropertyDictionary`, `LeaderboardEntry`, `LeaderboardReader`,
+  `LeaderboardWriter`, `Guide`, `GamerServicesDispatcher` and the three
+  `EventArgs` identities.
+- **Avatar** (4 types): `AvatarDescription`, `AvatarAnimation`,
+  `IAvatarAnimation`, `AvatarRenderer`.
+- **Net** (14 types): `NetworkSession`, `NetworkGamer`, `LocalNetworkGamer`,
+  `NetworkMachine`, `AvailableNetworkSession`,
+  `AvailableNetworkSessionCollection`, `QualityOfService` and the seven
+  session `EventArgs`.
 
-No Windows Phone or Xbox 360 reference assembly is present on this host, so
-those profiles do not exist here rather than being claimed untested.
+The 125-type gap that remains in the superset is exactly the design-time
+Content Pipeline, which is a product-boundary question rather than a missing
+projection.
+
+Nothing in the family fabricates a service the host does not have. A headless
+host reports an empty signed-in roster, no friends, no Guide screen and no
+remote participant, and each of those is a measured answer rather than a
+refusal or a placeholder. Where CNA cannot answer at all -- a network gamer's
+inherited `Gamer` members, a local gamer's signed-in gamer -- the projection
+reports CNA's refusal and the behaviour is recorded as `BLOCKED_UPSTREAM`.
+Where only a second machine could supply the answer, it is `NO_LIVE_PEER`.
 
 ### 3b. Runtime and behaviour evidence
 
@@ -105,16 +115,18 @@ re-measured against the live ABI before it may be carried forward.
 
 ### 3c. Full canonical C API accounting
 
-All 4,051 canonical routes carry exactly one classification and there are no
-unexplained holes. See
+Every canonical route carries exactly one classification and there are no
+unexplained holes. The live canonical surface grew from 4,051 to 4,054 routes
+while this milestone was in progress; the inventory measures the live headers,
+so the total moves with them. See
 [docs/c-api-classification.md](docs/c-api-classification.md).
 
 | Category | Routes |
 |---|---:|
-| `RUST_SYS_BOUND` | 886 |
-| `CNA_EXTENSION_BACKING` | 1,770 |
-| `STRICT_XNA_BACKING` | 626 |
-| `MANAGED_BY_DESIGN` | 598 |
+| `RUST_SYS_BOUND` | 1,326 |
+| `CNA_EXTENSION_BACKING` | 1,705 |
+| `STRICT_XNA_BACKING` | 275 |
+| `MANAGED_BY_DESIGN` | 577 |
 | `UPSTREAM_NOT_USEFUL_TO_RUST` | 126 |
 | `TOOLING_ONLY` | 42 |
 | `PLATFORM_ONLY` | 3 |
