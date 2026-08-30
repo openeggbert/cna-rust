@@ -13,7 +13,10 @@ use core::ops::{BitAnd, BitOr, BitOrAssign};
 use std::error::Error;
 
 use crate::content::{SerializationInfo, StreamingContext};
+use crate::error::{CnaError, Result};
+use crate::disposal::Disposable;
 use crate::gamer_services::NetworkExceptionBase;
+use crate::value::{Color, Matrix, Quaternion, Vector2, Vector3, Vector4};
 
 /// XNA `Microsoft.Xna.Framework.Net.NetworkSessionEndReason`.
 #[repr(i32)]
@@ -193,5 +196,275 @@ impl Error for NetworkSessionJoinException {}
 impl NetworkExceptionBase for NetworkSessionJoinException {
     fn Message(&self) -> String {
         self.message.clone()
+    }
+}
+
+/// XNA `Microsoft.Xna.Framework.Net.PacketWriter`.
+///
+/// CLR derives it from `System.IO.BinaryWriter` over a `MemoryStream`; the
+/// Rust projection owns the buffer directly. Every value is written in the
+/// exact byte order XNA writes it, including the bit reinterpretation XNA's
+/// `Write(float)` and `Write(double)` overrides perform.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct PacketWriter {
+    buffer: Vec<u8>,
+    position: usize,
+    disposed: bool,
+}
+
+impl PacketWriter {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::from_capacity(0)
+    }
+
+    #[must_use]
+    pub fn from_capacity(capacity: i32) -> Self {
+        Self {
+            buffer: Vec::with_capacity(capacity.max(0) as usize),
+            position: 0,
+            disposed: false,
+        }
+    }
+
+    /// Writes at the current position, growing and zero-filling like the
+    /// `MemoryStream` XNA writes into.
+    ///
+    /// Writing after `Dispose` is refused. CLR raises `ObjectDisposedException`
+    /// from the closed stream; the projection reports it through the
+    /// established `Result` mapping instead of writing into a released buffer.
+    fn put(&mut self, bytes: &[u8]) -> Result<()> {
+        if self.disposed {
+            return Err(CnaError::InvalidInput("the PacketWriter is disposed"));
+        }
+        let end = self.position + bytes.len();
+        if end > self.buffer.len() {
+            self.buffer.resize(end, 0);
+        }
+        self.buffer[self.position..end].copy_from_slice(bytes);
+        self.position = end;
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn Length(&self) -> i32 {
+        i32::try_from(self.buffer.len()).unwrap_or(i32::MAX)
+    }
+
+    #[must_use]
+    pub fn Position(&self) -> i32 {
+        i32::try_from(self.position).unwrap_or(i32::MAX)
+    }
+
+    pub fn SetPosition(&mut self, value: i32) {
+        self.position = value.max(0) as usize;
+    }
+
+    pub fn WriteWithValueAsSingle(&mut self, value: f32) -> Result<()> {
+        self.put(&value.to_bits().to_le_bytes())
+    }
+
+    pub fn WriteWithValueAsDouble(&mut self, value: f64) -> Result<()> {
+        self.put(&value.to_bits().to_le_bytes())
+    }
+
+    pub fn Write(&mut self, value: Vector2) -> Result<()> {
+        self.WriteWithValueAsSingle(value.X)?;
+        self.WriteWithValueAsSingle(value.Y)
+    }
+
+    pub fn WriteWithValueAsVector3(&mut self, value: Vector3) -> Result<()> {
+        self.WriteWithValueAsSingle(value.X)?;
+        self.WriteWithValueAsSingle(value.Y)?;
+        self.WriteWithValueAsSingle(value.Z)
+    }
+
+    pub fn WriteWithValueAsVector4(&mut self, value: Vector4) -> Result<()> {
+        self.WriteWithValueAsSingle(value.X)?;
+        self.WriteWithValueAsSingle(value.Y)?;
+        self.WriteWithValueAsSingle(value.Z)?;
+        self.WriteWithValueAsSingle(value.W)
+    }
+
+    pub fn WriteWithValueAsQuaternion(&mut self, value: Quaternion) -> Result<()> {
+        self.WriteWithValueAsSingle(value.X)?;
+        self.WriteWithValueAsSingle(value.Y)?;
+        self.WriteWithValueAsSingle(value.Z)?;
+        self.WriteWithValueAsSingle(value.W)
+    }
+
+    pub fn WriteWithValueAsMatrix(&mut self, value: Matrix) -> Result<()> {
+        for component in [
+            value.M11, value.M12, value.M13, value.M14, value.M21, value.M22, value.M23, value.M24,
+            value.M31, value.M32, value.M33, value.M34, value.M41, value.M42, value.M43, value.M44,
+        ] {
+            self.WriteWithValueAsSingle(component)?;
+        }
+        Ok(())
+    }
+
+    pub fn WriteWithValueAsColor(&mut self, value: Color) -> Result<()> {
+        self.put(&value.PackedValue().to_le_bytes())
+    }
+
+    /// The bytes written so far. Reached through `cna::extensions::net`,
+    /// because XNA keeps this internal to its network session.
+    pub(super) fn bytes(&self) -> &[u8] {
+        &self.buffer
+    }
+}
+
+/// XNA `Microsoft.Xna.Framework.Net.PacketReader`.
+///
+/// CLR derives it from `System.IO.BinaryReader`. Reading past the end of a
+/// packet is a failure in both: CLR raises `EndOfStreamException`, and the
+/// Rust projection reports it through the established `Result` mapping rather
+/// than returning a fabricated value.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct PacketReader {
+    buffer: Vec<u8>,
+    position: usize,
+    disposed: bool,
+}
+
+impl PacketReader {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::from_capacity(0)
+    }
+
+    #[must_use]
+    pub fn from_capacity(capacity: i32) -> Self {
+        Self {
+            buffer: Vec::with_capacity(capacity.max(0) as usize),
+            position: 0,
+            disposed: false,
+        }
+    }
+
+    /// Fills the reader with one received packet. Reached through
+    /// `cna::extensions::net`, because XNA's network session owns this path.
+    pub(super) fn fill(&mut self, bytes: &[u8]) {
+        self.buffer.clear();
+        self.buffer.extend_from_slice(bytes);
+        self.position = 0;
+    }
+
+    fn take<const N: usize>(&mut self) -> Result<[u8; N]> {
+        if self.disposed {
+            return Err(CnaError::InvalidInput("the PacketReader is disposed"));
+        }
+        let end = self.position.checked_add(N).ok_or(CnaError::InvalidInput(
+            "packet read position overflowed",
+        ))?;
+        if end > self.buffer.len() {
+            return Err(CnaError::InvalidInput("read past the end of the packet"));
+        }
+        let mut value = [0_u8; N];
+        value.copy_from_slice(&self.buffer[self.position..end]);
+        self.position = end;
+        Ok(value)
+    }
+
+    #[must_use]
+    pub fn Length(&self) -> i32 {
+        i32::try_from(self.buffer.len()).unwrap_or(i32::MAX)
+    }
+
+    #[must_use]
+    pub fn Position(&self) -> i32 {
+        i32::try_from(self.position).unwrap_or(i32::MAX)
+    }
+
+    pub fn SetPosition(&mut self, value: i32) {
+        self.position = value.max(0) as usize;
+    }
+
+    pub fn ReadSingle(&mut self) -> Result<f32> {
+        Ok(f32::from_bits(u32::from_le_bytes(self.take::<4>()?)))
+    }
+
+    pub fn ReadDouble(&mut self) -> Result<f64> {
+        Ok(f64::from_bits(u64::from_le_bytes(self.take::<8>()?)))
+    }
+
+    pub fn ReadVector2(&mut self) -> Result<Vector2> {
+        Ok(Vector2::from_x_and_y(self.ReadSingle()?, self.ReadSingle()?))
+    }
+
+    pub fn ReadVector3(&mut self) -> Result<Vector3> {
+        Ok(Vector3::from_x_and_y_and_z(
+            self.ReadSingle()?,
+            self.ReadSingle()?,
+            self.ReadSingle()?,
+        ))
+    }
+
+    pub fn ReadVector4(&mut self) -> Result<Vector4> {
+        Ok(Vector4::from_x_and_y_and_z_and_w(
+            self.ReadSingle()?,
+            self.ReadSingle()?,
+            self.ReadSingle()?,
+            self.ReadSingle()?,
+        ))
+    }
+
+    pub fn ReadQuaternion(&mut self) -> Result<Quaternion> {
+        Ok(Quaternion::from_x_and_y_and_z_and_w(
+            self.ReadSingle()?,
+            self.ReadSingle()?,
+            self.ReadSingle()?,
+            self.ReadSingle()?,
+        ))
+    }
+
+    pub fn ReadMatrix(&mut self) -> Result<Matrix> {
+        let mut components = [0.0_f32; 16];
+        for component in &mut components {
+            *component = self.ReadSingle()?;
+        }
+        Ok(Matrix::new(
+            components[0], components[1], components[2], components[3],
+            components[4], components[5], components[6], components[7],
+            components[8], components[9], components[10], components[11],
+            components[12], components[13], components[14], components[15],
+        ))
+    }
+
+    pub fn ReadColor(&mut self) -> Result<Color> {
+        let mut value = Color::default();
+        value.SetPackedValue(u32::from_le_bytes(self.take::<4>()?));
+        Ok(value)
+    }
+}
+
+impl Drop for PacketWriter {
+    fn drop(&mut self) {
+        // Rust lifetime safety only. Dispose is the observable operation and is
+        // idempotent, so an explicit Dispose before Drop changes nothing here.
+        self.Dispose();
+    }
+}
+
+impl Drop for PacketReader {
+    fn drop(&mut self) {
+        // Rust lifetime safety only; see PacketWriter's note.
+        self.Dispose();
+    }
+}
+
+impl Disposable for PacketWriter {
+    fn Dispose(&mut self) {
+        self.buffer = Vec::new();
+        self.position = 0;
+        self.disposed = true;
+    }
+}
+
+impl Disposable for PacketReader {
+    fn Dispose(&mut self) {
+        self.buffer = Vec::new();
+        self.position = 0;
+        self.disposed = true;
     }
 }

@@ -8,5 +8,6 @@
 pub mod events;
 pub mod graphics;
 pub mod media;
+pub mod net;
 pub mod runtime;
 pub mod window;

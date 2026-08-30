@@ -21,9 +21,11 @@ use cna::Microsoft::Xna::Framework::GamerServices::{
     GamerPrivilegeException, GamerZone, LeaderboardKey, NetworkException,
     NetworkNotAvailableException, NotificationPosition,
 };
+use cna::extensions::net::{FillPacket, PacketBytes};
+use cna::Disposable;
 use cna::Microsoft::Xna::Framework::Net::{
     NetworkSessionEndReason, NetworkSessionJoinError, NetworkSessionJoinException,
-    NetworkSessionState, NetworkSessionType, SendDataOptions,
+    NetworkSessionState, NetworkSessionType, PacketReader, PacketWriter, SendDataOptions,
 };
 use cna::Microsoft::Xna::Framework::Design::{
     BoundingBoxConverter, BoundingSphereConverter, ColorConverter, MathTypeConverter,
@@ -2195,5 +2197,48 @@ fn pinned_xna_math_observations() {
         "no room".to_owned()
     );
 
-    assert_eq!(observations, 240);
+    // PacketWriter/PacketReader round-trip. XNA's Write(float) is a bit
+    // reinterpretation to UInt32 rather than a formatted write, so a NaN
+    // payload survives the trip exactly; the projection must reproduce that
+    // and not normalize it.
+    let mut writer = PacketWriter::new();
+    writer.Write(Vector2::from_x_and_y(1.5, -2.5)).expect("write");
+    writer
+        .WriteWithValueAsVector3(Vector3::from_x_and_y_and_z(3.0, 4.0, 5.0))
+        .expect("write");
+    writer
+        .WriteWithValueAsSingle(f32::from_bits(0x7FC0_1234))
+        .expect("write");
+    writer.WriteWithValueAsDouble(-0.0).expect("write");
+    let mut color = Color::default();
+    color.SetPackedValue(0x8877_6655);
+    writer.WriteWithValueAsColor(color).expect("write");
+    observe!(writer.Length(), 8 + 12 + 4 + 8 + 4);
+    observe!(writer.Position(), writer.Length());
+
+    let mut reader = PacketReader::new();
+    FillPacket(&mut reader, PacketBytes(&writer));
+    observe!(reader.Length(), writer.Length());
+    observe!(
+        reader.ReadVector2().expect("read"),
+        Vector2::from_x_and_y(1.5, -2.5)
+    );
+    observe!(
+        reader.ReadVector3().expect("read"),
+        Vector3::from_x_and_y_and_z(3.0, 4.0, 5.0)
+    );
+    observe!(reader.ReadSingle().expect("read").to_bits(), 0x7FC0_1234);
+    observe!(reader.ReadDouble().expect("read").to_bits(), (-0.0_f64).to_bits());
+    observe!(reader.ReadColor().expect("read").PackedValue(), 0x8877_6655);
+    // Reading past the packet is a failure in CLR and here, never a zero.
+    observe!(reader.ReadSingle().is_err(), true);
+
+    // Dispose is the observable release and is idempotent; a write afterwards
+    // is refused rather than landing in a released buffer.
+    writer.Dispose();
+    writer.Dispose();
+    observe!(writer.Length(), 0);
+    observe!(writer.WriteWithValueAsSingle(1.0).is_err(), true);
+
+    assert_eq!(observations, 251);
 }

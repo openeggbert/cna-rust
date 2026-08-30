@@ -71,16 +71,19 @@ SHA-256 and measured as explicit profiles rather than merged into one:
 | Profile | Assemblies | Reference types | Reference members | Missing Rust types |
 |---|---:|---:|---:|---:|
 | `xna40-windows-runtime` (selected) | 7 | 257 | 2,964 | 0 |
-| `xna40-windows-full` | 10 | 331 | 3,640 | 45 |
+| `xna40-windows-full` | 10 | 331 | 3,640 | 43 |
 | `xna40-windows-pipeline` | 7 | 128 | 743 | 125 |
-| `xna40-windows-superset` (discovery) | 17 | 459 | 4,383 | 170 |
+| `xna40-windows-superset` (discovery) | 17 | 459 | 4,383 | 168 |
 
 Every type the Rust projection already declares matches the superset's expected
 contract exactly: the only diagnostic in any wider profile is `MISSING_TYPE`.
 The complete runtime profile's value identities are done: 22 enums and 7
 exception identities, exact managed Rust with no native backing because CLR
-metadata is the whole of their contract. What remains of that profile's 45
-types is its object model -- `Gamer`, `SignedInGamer`, `Guide`,
+metadata is the whole of their contract. `PacketWriter` and `PacketReader` are done too: XNA derives them from
+`BinaryWriter`/`BinaryReader` over a `MemoryStream`, and the projection owns
+the buffer directly and reproduces XNA's byte order exactly, including the bit
+reinterpretation its `Write(float)` override performs. What remains of that
+profile's 43 types is its object model -- `Gamer`, `SignedInGamer`, `Guide`,
 `AvatarRenderer`, `NetworkSession` and their collections -- which needs the
 canonical `gamer_services.h` and `net*.h` routes behind it. The 125-type gap is
 the design-time Content Pipeline.

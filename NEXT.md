@@ -60,7 +60,7 @@ items, in order:
 
 1. Continue `cna::extensions`: logging sink and level, renderer capability
    reporting, then the `.cnb` content vertical slice.
-2. Close the remaining 45-type `xna40-windows-full` gap: the GamerServices,
+2. Close the remaining 43-type `xna40-windows-full` gap: the GamerServices,
    Avatar and Net object model over `gamer_services.h` and `net*.h`.
 3. Windows loader source support, packaging qualification, and the template's
    modern-extension canary.

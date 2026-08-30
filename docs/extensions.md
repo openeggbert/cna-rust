@@ -85,6 +85,13 @@ into one texture in place and publishes a monotonic counter instead.
 in. These are language projections rather than CNA concepts, and they live here
 so the strict hierarchy contains only members Microsoft declared.
 
+### `net` — the packet buffers XNA keeps internal
+
+XNA's `NetworkSession` reaches a `PacketWriter`'s bytes through an `internal`
+member and fills a `PacketReader` the same way, so a game never touches either.
+CNA has no session yet, and without these two routes the packet types would be
+a write-only sink and a permanently empty source.
+
 ### `window` — opaque native window identity
 
 `WindowHandle` cannot be dereferenced or forged through the safe API.

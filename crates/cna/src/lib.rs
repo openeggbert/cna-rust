@@ -4,6 +4,7 @@
 
 mod content;
 mod design;
+mod disposal;
 mod error;
 mod audio;
 mod game;
@@ -32,6 +33,7 @@ pub use design::{
     DesignConstructor, DesignConversion, DesignCulture, DesignInstanceDescriptor,
     DesignPropertyDescriptor, DesignPropertyValue, DesignType, DesignValue, MathTypeConverterBase,
 };
+pub use disposal::Disposable;
 pub use error::{CnaError, Result};
 pub use gamer_services::NetworkExceptionBase;
 pub use game::{
@@ -176,7 +178,7 @@ pub mod Microsoft {
                 pub use crate::net::{
                     NetworkSessionEndReason, NetworkSessionJoinError,
                     NetworkSessionJoinException, NetworkSessionState, NetworkSessionType,
-                    SendDataOptions,
+                    PacketReader, PacketWriter, SendDataOptions,
                 };
             }
 

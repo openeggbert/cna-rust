@@ -271,7 +271,16 @@
     "Microsoft.Xna.Framework.Media.Song::*",
     "Microsoft.Xna.Framework.Media.SongCollection::*",
     "Microsoft.Xna.Framework.Media.Video::*",
-    "Microsoft.Xna.Framework.Media.VideoPlayer::*"
+    "Microsoft.Xna.Framework.Media.VideoPlayer::*",
+    "Microsoft.Xna.Framework.Net.PacketReader::ReadVector2",
+    "Microsoft.Xna.Framework.Net.PacketReader::ReadVector3",
+    "Microsoft.Xna.Framework.Net.PacketReader::ReadVector4",
+    "Microsoft.Xna.Framework.Net.PacketReader::ReadMatrix",
+    "Microsoft.Xna.Framework.Net.PacketReader::ReadQuaternion",
+    "Microsoft.Xna.Framework.Net.PacketReader::ReadColor",
+    "Microsoft.Xna.Framework.Net.PacketReader::ReadSingle",
+    "Microsoft.Xna.Framework.Net.PacketReader::ReadDouble",
+    "Microsoft.Xna.Framework.Net.PacketWriter::Write"
   ],
   "fallibleExclusions": [
     "Microsoft.Xna.Framework.Content.ContentReader::ContentManager",
@@ -317,7 +326,16 @@
     "Microsoft.Xna.Framework.Game::BeginDraw",
     "Microsoft.Xna.Framework.Game::EndDraw",
     "Microsoft.Xna.Framework.Game::Run",
-    "Microsoft.Xna.Framework.Game::RunOneFrame"
+    "Microsoft.Xna.Framework.Game::RunOneFrame",
+    "Microsoft.Xna.Framework.Net.PacketReader::ReadVector2",
+    "Microsoft.Xna.Framework.Net.PacketReader::ReadVector3",
+    "Microsoft.Xna.Framework.Net.PacketReader::ReadVector4",
+    "Microsoft.Xna.Framework.Net.PacketReader::ReadMatrix",
+    "Microsoft.Xna.Framework.Net.PacketReader::ReadQuaternion",
+    "Microsoft.Xna.Framework.Net.PacketReader::ReadColor",
+    "Microsoft.Xna.Framework.Net.PacketReader::ReadSingle",
+    "Microsoft.Xna.Framework.Net.PacketReader::ReadDouble",
+    "Microsoft.Xna.Framework.Net.PacketWriter::Write"
   ],
   "sharedReceiverMembers": [
     "Microsoft.Xna.Framework.Content.ContentManager::*",
