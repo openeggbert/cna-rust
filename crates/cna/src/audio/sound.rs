@@ -335,11 +335,6 @@ impl InstanceState {
         if listeners.is_empty() {
             return Err(CnaError::InvalidInput("at least one AudioListener is required"));
         }
-        if listeners.len() > 1 {
-            return Err(CnaError::UnsupportedRuntime(
-                "CNA ABI 0.7 cannot faithfully mix multiple AudioListeners",
-            ));
-        }
         {
             let cached = self.cached.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             if cached.has_played && !cached.is_3d {

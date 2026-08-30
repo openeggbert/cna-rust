@@ -30,6 +30,19 @@ pub(super) enum ResourceKind {
     OcclusionQuery,
 }
 
+/// A native handle this crate uses but does not own.
+///
+/// CNA hands a few resources back on a borrow whose validity is bounded by the
+/// owner rather than by a destroy call -- a `VideoPlayer` frame texture is the
+/// current example. Such a resource never calls a native destroy, and every
+/// use re-asks the owner whether the borrow is still the one it was created
+/// from, so a stale handle becomes a typed Rust error instead of a native call
+/// on a resource the owner has since replaced.
+pub(crate) trait BorrowedHandle: Send + Sync {
+    /// Returns `Ok(())` while the borrowed handle is still current.
+    fn validate(&self) -> Result<()>;
+}
+
 pub(super) struct ResourceState {
     device: GraphicsDevice,
     handle: Mutex<sys::CNA_Handle>,
@@ -38,6 +51,8 @@ pub(super) struct ResourceState {
     name: Mutex<String>,
     tag: Mutex<Option<Arc<dyn Any + Send + Sync>>>,
     disposing: EventHandlers<EventArgs>,
+    /// `None` for an owned resource; the owner's borrow guard otherwise.
+    borrowed: Option<Arc<dyn BorrowedHandle>>,
 }
 
 type SharedHandler<T> = Arc<Mutex<Box<dyn EventHandler<T>>>>;
@@ -145,6 +160,25 @@ impl ResourceState {
         handle: sys::CNA_Handle,
         kind: ResourceKind,
     ) -> Arc<Self> {
+        Self::create(device, handle, kind, None)
+    }
+
+    /// Adopts a handle whose lifetime another native object controls.
+    pub(super) fn borrowed(
+        device: &GraphicsDevice,
+        handle: sys::CNA_Handle,
+        kind: ResourceKind,
+        owner: Arc<dyn BorrowedHandle>,
+    ) -> Arc<Self> {
+        Self::create(device, handle, kind, Some(owner))
+    }
+
+    fn create(
+        device: &GraphicsDevice,
+        handle: sys::CNA_Handle,
+        kind: ResourceKind,
+        borrowed: Option<Arc<dyn BorrowedHandle>>,
+    ) -> Arc<Self> {
         let state = Arc::new(Self {
             device: device.clone(),
             handle: Mutex::new(handle),
@@ -153,6 +187,7 @@ impl ResourceState {
             name: Mutex::new(String::new()),
             tag: Mutex::new(None),
             disposing: EventHandlers::default(),
+            borrowed,
         });
         device.state.register(&state);
         state
@@ -168,6 +203,9 @@ impl ResourceState {
 
     pub(super) fn require_handle(&self) -> Result<sys::CNA_Handle> {
         self.device.state.ensure_alive()?;
+        if let Some(owner) = &self.borrowed {
+            owner.validate()?;
+        }
         self.handle()
             .ok_or(CnaError::InvalidInput("graphics resource is disposed"))
     }
@@ -247,6 +285,12 @@ impl ResourceState {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         if *handle == sys::CNA_INVALID_HANDLE {
+            return Ok(());
+        }
+        if self.borrowed.is_some() {
+            // A borrowed handle belongs to another native object. Releasing the
+            // Rust view must never destroy it; the owner does that.
+            *handle = sys::CNA_INVALID_HANDLE;
             return Ok(());
         }
         if self.device.state.is_resource_bound(self.kind, *handle) {

@@ -325,10 +325,6 @@
       "category": "STRICT_XNA_BACKING",
       "rationale": "backs XNA GameServiceContainer.RemoveService"
     },
-    "cna_video_player_get_frame_ext": {
-      "category": "STRICT_XNA_BACKING",
-      "rationale": "carries the frame identity and generation XNA VideoPlayer.GetTexture needs; the historical ABI-0.7 blocker"
-    },
     "cna_model_get_content_tag_dictionary_ext": {
       "category": "STRICT_XNA_BACKING",
       "rationale": "backs XNA Model.Tag written by a content processor"

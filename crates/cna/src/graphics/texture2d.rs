@@ -17,7 +17,7 @@ use crate::error::{CnaError, Result};
 use crate::extensions::events::EventHandler;
 use crate::value::Rectangle;
 
-use super::resource::{ResourceKind, ResourceState};
+use super::resource::{BorrowedHandle, ResourceKind, ResourceState};
 use super::{GraphicsDevice, GraphicsResource, SurfaceFormat, Texture, TextureRuntime};
 
 /// Composition marker for XNA types inheriting `Texture2D`.
@@ -156,6 +156,28 @@ impl Texture2D {
     }
 
     fn from_handle(graphics_device: &GraphicsDevice, handle: sys::CNA_Handle) -> Result<Self> {
+        Self::adopt(graphics_device, handle, None)
+    }
+
+    /// Wraps a texture another native object owns for the duration of a borrow.
+    ///
+    /// `VideoPlayer::GetTexture` is the one caller: CNA hands back the frame
+    /// texture on a borrow that ends when the frame advances, so the resulting
+    /// `Texture2D` never destroys the handle and re-validates the borrow on
+    /// every native use.
+    pub(crate) fn from_borrowed_handle(
+        graphics_device: &GraphicsDevice,
+        handle: sys::CNA_Handle,
+        owner: Arc<dyn BorrowedHandle>,
+    ) -> Result<Self> {
+        Self::adopt(graphics_device, handle, Some(owner))
+    }
+
+    fn adopt(
+        graphics_device: &GraphicsDevice,
+        handle: sys::CNA_Handle,
+        owner: Option<Arc<dyn BorrowedHandle>>,
+    ) -> Result<Self> {
         let mut info = sys::CNA_Texture2DInfo {
             struct_size: size_of::<sys::CNA_Texture2DInfo>() as u32,
             struct_version: 1,
@@ -166,7 +188,12 @@ impl Texture2D {
             .native()
             .texture_info(handle, &mut info)?;
         Ok(Self {
-            state: ResourceState::new(graphics_device, handle, ResourceKind::Texture2D),
+            state: match owner {
+                None => ResourceState::new(graphics_device, handle, ResourceKind::Texture2D),
+                Some(owner) => {
+                    ResourceState::borrowed(graphics_device, handle, ResourceKind::Texture2D, owner)
+                }
+            },
             width: i32::try_from(info.width)
                 .map_err(|_| CnaError::InvalidInput("texture width exceeds i32"))?,
             height: i32::try_from(info.height)

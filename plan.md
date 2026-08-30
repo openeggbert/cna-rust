@@ -96,9 +96,9 @@ unexplained holes. See
 
 | Category | Routes |
 |---|---:|
-| `RUST_SYS_BOUND` | 731 |
+| `RUST_SYS_BOUND` | 732 |
 | `CNA_EXTENSION_BACKING` | 1,919 |
-| `STRICT_XNA_BACKING` | 627 |
+| `STRICT_XNA_BACKING` | 626 |
 | `MANAGED_BY_DESIGN` | 598 |
 | `UPSTREAM_NOT_USEFUL_TO_RUST` | 130 |
 | `TOOLING_ONLY` | 42 |

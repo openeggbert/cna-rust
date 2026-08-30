@@ -212,7 +212,13 @@ def main() -> int:
         for rule in rules["rules"]
         if rule.get("id") and not any(v["rule"] == rule.get("id") for v in routes.values())
     )
-    stale_overrides = sorted(set(rules["overrides"]) - set(headers["functions"]))
+    # An override is fiction once its route stops existing, and dead weight once
+    # the route is bound: a bound route is measured, never classified by rule.
+    stale_overrides = sorted(
+        name
+        for name in rules["overrides"]
+        if name not in headers["functions"] or name in rust["functions"]
+    )
 
     report = {
         "schemaVersion": 1,

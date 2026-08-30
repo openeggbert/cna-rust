@@ -85,10 +85,15 @@ operations still require a live native handle. Parent-first, child-first,
 multiple-child, double-dispose, wrong-thread refusal, and owner-thread retry
 are stress tested without duplicate owners.
 
-Single-listener Apply3D uses the canonical native route. The strict
-multi-listener overload is present, but CNA ABI 0.7 rejects every listener
-count except one. Rust returns `CnaError::UnsupportedRuntime` for multiple
-listeners instead of selecting or averaging them.
+Both Apply3D overloads use their canonical native route. ABI 0.9.0 lifted the
+single-listener restriction the previous milestone recorded, so Rust now passes
+any positive listener count to
+`cna_sound_effect_instance_apply_3d_multi_ext` rather than refusing it; a count
+of zero stays refused, as it is upstream. How several listeners combine is
+CNA's approximation and not XACT's: CNA's mixer has one stereo gain pair and no
+per-listener output matrices, so the nearest listener decides the applied
+attenuation, pan and Doppler. Rust neither hides that nor averages the array
+itself.
 
 ## Dynamic audio and callbacks
 
@@ -182,13 +187,15 @@ Crash absence is not allocator-level leak evidence.
 
 | AFFECTED_XNA_API | CURRENT_CNA_ROUTE | CURRENT_RUST_BEHAVIOR | MISSING_CNA_SEMANTIC | OWNERSHIP_REQUIREMENT | THREAD/CALLBACK_REQUIREMENT | WHAT_WOULD_UNBLOCK_IT |
 |---|---|---|---|---|---|---|
-| Apply3D listeners[] | instance Apply3D | one native; multiple UnsupportedRuntime | true multi-listener mixing | retain instance/effect | owner thread | route mixing all listeners |
+| Apply3D listeners[] | instance Apply3D | every positive count reaches the canonical multi route | XACT per-listener output matrices | retain instance/effect | owner thread | a mixer with per-listener matrices |
 | AudioEngine renderer/look-ahead | engine create | exact validation and native call | CNA discards both values | engine sole owner | owner-thread create | CNA honoring both arguments |
 | malformed XWB/XSB | bank create | preserve/dispose returned handles | parser failure not propagated | child retains engine | owner create/destroy | atomic parser failure result |
 | microphone capture | capture routes | no device/samples fabricated | qualified host has no hardware | stable facade | queue worker callback to owner | physical-device qualification |
 | authored XACT playback | bank/cue routes | validation/error/ownership only | no CNA defect asserted | full dependency graph | owner lifecycle | legal deterministic authored fixture |
 
-The first three are `UPSTREAM_CNA_BLOCKED`, microphone capture is
+The first row is now measured natively and its remaining limit is CNA's
+single-gain-pair mixer; the next two are `UPSTREAM_CNA_BLOCKED`, microphone
+capture is
 `HARDWARE_PENDING`, and authored playback is `ASSET_PENDING`. The sandbox's
 default PulseAudio route cannot wake its mainloop; native stress uses SDL's
 dummy driver and classifies the default route `BACKEND_BLOCKED`. Linux x86-64

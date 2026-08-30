@@ -92,19 +92,19 @@ hierarchy and deliberate CNA extensions.
   deliberately reject string input while retaining value-string output.
 - All nineteen Audio types are complete. SoundEffect, instances, dynamic PCM,
   microphone facades, and XACT use reviewed ABI-0.7 routes with explicit
-  ownership and the existing owner-thread FrameworkDispatcher. True
-  multi-listener mixing, renderer/look-ahead fidelity, and malformed-bank
-  failure propagation are recorded CNA
-  blockers; physical capture is hardware pending and authored XACT playback is
-  asset pending. No device, sample, bank, or callback delivery is fabricated.
+  ownership and the existing owner-thread FrameworkDispatcher. Multi-listener
+  Apply3D reaches its canonical route, with CNA's single-gain-pair mixer as the
+  remaining fidelity limit; renderer/look-ahead fidelity and malformed-bank
+  failure propagation are recorded CNA blockers; physical capture is hardware
+  pending and authored XACT playback is asset pending. No device, sample, bank, or callback delivery is fabricated.
 - All 24 Media types are complete as one ownership-safe graph. MediaLibrary,
   seven read-only collection facades, Song, MediaSource, process-global
   MediaPlayer/MediaQueue, owner-thread events, fixed visualization buffers,
   Video, and VideoPlayer use reviewed CNA ABI-0.7 routes. Catalog population,
   picture providers, decoded video, and assets retain explicit platform,
-  backend, or asset qualifications. GetTexture never wraps or destroys CNA's
-  transient player-owned frame handle; a stable Texture2D view is explicitly
-  upstream-blocked.
+  backend, or asset qualifications. GetTexture wraps a decoded frame in a
+  borrowed `Texture2D` that is never destroyed by Rust and is refused once a
+  later player call replaces it.
 - Typed vertex declarations and vertex/index buffers, device binding/draw/
   reset/back-buffer routes, TextureCube, and render targets are complete. CNA
   calls are never replaced by no-ops; HEADLESS limitations are explicit.

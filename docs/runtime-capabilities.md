@@ -4,8 +4,8 @@ Generated from `tools/runtime-capabilities/capabilities.json`; do not edit by ha
 
 Scope: Microsoft XNA 4.0 Windows Audio/XACT and Media/Video projection
 
-Qualified CNA ABI: `0.7`
-Qualified artifact SHA-256: `6dcefcadb7aa0233da98682bdbc343581a9f1e754a09c641078d1bef97afd7ca`
+Qualified CNA ABI: `0.20`
+Qualified artifact SHA-256: `195924825a12290cdd2244fc845e119295de515cf27d1f6b31e1ecc84e93f05d`
 
 | Capability | Strict | Runtime status | Evidence |
 |---|---:|---|---|
@@ -13,7 +13,7 @@ Qualified artifact SHA-256: `6dcefcadb7aa0233da98682bdbc343581a9f1e754a09c641078
 | SoundEffect process-global state | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE` | Set/get routes and XNA process-static persistence across Game recreation are native-verified while the process-global Media registrations retain the qualified library generation. |
 | SoundEffectInstance | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE` | Cached properties, playback state routes, loop/pan/3D ordering, disposal, parent-child lifetime, and 25+ cycles are verified. |
 | Apply3D single listener | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE` | Exact listener/emitter value copy and canonical cna_sound_effect_instance_apply_3d route verified. |
-| Apply3D multiple listeners | complete | `VERIFIED_MANAGED`, `UPSTREAM_CNA_BLOCKED` | The overload is present, but CNA ABI 0.7's canonical implementation refuses every listener count except one; Rust returns UnsupportedRuntime without silently reducing the input. |
+| Apply3D multiple listeners | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE`, `BACKEND_BLOCKED` | ABI 0.9.0 lifted the single-listener restriction the previous milestone recorded, and the canonical cna_sound_effect_instance_apply_3d_multi_ext route is now called for every positive count; a zero count stays refused. CNA's mixer has one stereo gain pair and no per-listener output matrices, so the nearest listener decides the applied attenuation, pan and Doppler rather than XACT's per-listener mix. |
 | DynamicSoundEffectInstance | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE` | PCM16 queue copying, ranges, pending count, transport, disposal, and 25+ dynamic cycles verified. |
 | Dynamic BufferNeeded delivery | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE` | Native trampoline only enqueues work; Game/FrameworkDispatcher owner-thread delivery, 50+ handlers, duplicate order, self-removal, reentrant submit, panic containment, unsubscribe, shutdown, and recreation verified. |
 | Microphone enumeration | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE` | Read-only All shape, stable facade identity, Default reconciliation, no-device shape, callback registration lifetime, and 20+ cycles verified against the qualified backend. |
@@ -40,8 +40,8 @@ Qualified artifact SHA-256: `6dcefcadb7aa0233da98682bdbc343581a9f1e754a09c641078
 | Video | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE`, `ASSET_PENDING` | A deterministic project-authored XNB metadata fixture verifies Content VideoReader routing, native metadata creation, duration, dimensions, frame rate, soundtrack type, 20 load/unload cycles, retained-object invalidation, post-create fault rollback/cache recovery and generation-safe destruction. |
 | VideoPlayer control path | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE` | Native create/play/pause/resume/stop, retained Video identity, NaN and finite Volume validation, cached loop/mute/volume after double Dispose, wrong-thread retry and 20 cycles are verified. |
 | Video decode | complete | `BACKEND_BLOCKED`, `ASSET_PENDING` | HEADLESS accepts the metadata/control object but produces no decoded frame for the deliberately missing project-authored media path. No proprietary asset or synthetic pixels are used. |
-| VideoPlayer.GetTexture | complete | `VERIFIED_MANAGED`, `UPSTREAM_CNA_BLOCKED` | The real ABI route is called and no-frame returns None. If a frame exists, Rust returns UnsupportedRuntime because ABI 0.7 exposes a player-owned handle only until the next player call and cannot satisfy Texture2D's stable identity contract. |
-| Video frame texture lifetime | complete | `VERIFIED_MANAGED`, `UPSTREAM_CNA_BLOCKED` | Rust never wraps, destroys or exposes the transient player-owned frame handle. A safe PARENT_OWNED generation facade remains blocked on an upstream stable identity/generation contract. |
+| VideoPlayer.GetTexture | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE`, `BACKEND_BLOCKED` | GetTexture now calls cna_video_player_get_frame_ext and wraps a decoded frame in a borrowed Texture2D that never destroys the handle. HEADLESS decodes nothing, so the measured answer is the canonical no-frame Ok(None) rather than a fabricated texture; a real decoder backend is what remains to exercise the wrapped path. |
+| Video frame texture lifetime | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE` | CNA's frame texture is valid only until the next call on its player, which the Rust view models by counting player calls: a stale frame Texture2D refuses in Rust one call before CNA would answer INVALID_HANDLE, and Dispose and Drop both invalidate outstanding borrows. The monotonic frame generation and presentation time are published as cna::extensions::media, never inside the strict XNA hierarchy. |
 | Native ABI platform coverage | complete | `VERIFIED_NATIVE`, `PLATFORM_PENDING` | ABI 0.7 compiler/export probes pass on Linux x86-64; other operating-system/architecture binaries were not measured in this run. |
 | CLR Audio exception delivery | complete | `VERIFIED_MANAGED`, `LANGUAGE_MAPPING_LIMITATION` | The three public exception identities are projected as marker/error values; ordinary Rust operations use Result<T, CnaError> per the established mapping instead of CLR throw semantics. |
 

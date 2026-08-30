@@ -20,7 +20,7 @@ use cna::Microsoft::Xna::Framework::Audio::{
     DynamicSoundEffectInstance, Microphone, SoundBank, SoundEffect, WaveBank,
 };
 use cna::Microsoft::Xna::Framework::{
-    FrameworkDispatcher, Game, GameContext, GameTime, TimeSpan,
+    FrameworkDispatcher, Game, GameContext, GameTime, TimeSpan, Vector3,
 };
 use cna::{run_for_frames, CnaError, GameState, GameStateAccess, Result};
 
@@ -86,9 +86,18 @@ impl Game for SoundStressGame {
             // XNA permits Pan before the packet's first Play and thereby clears the 3D mode.
             instance.SetPan(-0.25)?;
             instance.Apply3D(&listener, &emitter)?;
+            // ABI 0.9.0 lifted the single-listener restriction: XNA copies the
+            // whole array to XACT with no count restriction, and CNA now accepts
+            // any positive count, letting the nearest listener decide the
+            // applied attenuation, pan and Doppler.
+            let mut far = AudioListener::new();
+            far.SetPosition(Vector3::from_x_and_y_and_z(0.0, 0.0, 1_000.0));
+            instance.Apply3DWithListenersAndEmitter(&[listener, listener], &emitter)?;
+            instance.Apply3DWithListenersAndEmitter(&[far, listener, far], &emitter)?;
+            // A count of zero stays refused rather than guessed at.
             assert!(matches!(
-                instance.Apply3DWithListenersAndEmitter(&[listener, listener], &emitter),
-                Err(CnaError::UnsupportedRuntime(_))
+                instance.Apply3DWithListenersAndEmitter(&[], &emitter),
+                Err(CnaError::InvalidInput(_))
             ));
             instance.Play()?;
             assert!(instance.SetIsLooped(false).is_err());

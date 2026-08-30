@@ -79,6 +79,7 @@ pub const CNA_VIDEO_SOUNDTRACK_TYPE_MUSIC: CNA_VideoSoundtrackType = 0;
 pub const CNA_VIDEO_SOUNDTRACK_TYPE_DIALOG: CNA_VideoSoundtrackType = 1;
 pub const CNA_VIDEO_SOUNDTRACK_TYPE_MUSIC_AND_DIALOG: CNA_VideoSoundtrackType = 2;
 pub const CNA_VISUALIZATION_DATA_SIZE: u32 = 256;
+pub const CNA_VIDEO_FRAME_EXT_STRUCT_VERSION: u32 = 1;
 pub const CNA_DISPLAY_ORIENTATION_DEFAULT: CNA_DisplayOrientation = 0;
 pub const CNA_DISPLAY_ORIENTATION_LANDSCAPE_LEFT: CNA_DisplayOrientation = 1;
 pub const CNA_DISPLAY_ORIENTATION_LANDSCAPE_RIGHT: CNA_DisplayOrientation = 2;
@@ -1080,6 +1081,18 @@ pub struct CNA_RendererInfo {
     pub capability_flags: CNA_GraphicsCapabilityFlags,
     pub renderer_type: CNA_GraphicsRendererType,
     pub max_texture_dimension: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_VideoFrameEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub texture: CNA_Handle,
+    pub generation: u64,
+    pub presentation_time: f64,
+    pub available: CNA_Bool,
+    pub reserved: [u8; 3],
 }
 
 #[repr(C)]
@@ -3248,6 +3261,9 @@ pub type cna_video_player_set_volume_fn =
     unsafe extern "C" fn(CNA_VideoPlayerHandle, f32) -> CNA_Result;
 pub type cna_video_player_get_texture_fn = unsafe extern "C" fn(
     CNA_VideoPlayerHandle, *mut CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_video_player_get_frame_ext_fn = unsafe extern "C" fn(
+    CNA_VideoPlayerHandle, *mut CNA_VideoFrameEXT,
 ) -> CNA_Result;
 pub type cna_video_player_play_fn =
     unsafe extern "C" fn(CNA_VideoPlayerHandle, CNA_VideoHandle) -> CNA_Result;

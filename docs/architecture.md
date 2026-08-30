@@ -428,12 +428,14 @@ handler and never publish an ambient Game handle.
 `Video` owns its CNA metadata object, while `VideoPlayer` owns one player and
 retains the active Video. Player scalar properties are cached exactly where
 XNA keeps them readable after disposal; NaN volume is preserved and finite
-out-of-range values fail. ABI 0.7's GetTexture handle is player-owned and valid
-only until the next player operation. It cannot satisfy the existing
-Texture2D stable-identity contract, so Rust calls the route, returns `None`
-when CNA has no frame, and returns `UnsupportedRuntime` rather than wrapping or
-destroying a reported transient handle. A safe parent-owned frame facade
-requires an upstream identity/generation contract.
+out-of-range values fail. CNA's frame texture is player-owned and valid only
+until the next call on that player, so `GetTexture` reads
+`cna_video_player_get_frame_ext` and wraps a decoded frame in a borrowed
+`Texture2D`: the Rust view never destroys the handle and refuses every use once
+a later player call has replaced it, one call before CNA would answer
+`INVALID_HANDLE`. The monotonic frame generation and presentation time CNA
+publishes alongside the texture have no XNA counterpart and are exposed through
+`cna::extensions::media`.
 
 ## Verification and fault evidence
 

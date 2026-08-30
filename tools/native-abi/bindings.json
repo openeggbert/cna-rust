@@ -726,6 +726,7 @@
     "cna_video_player_get_state": 2,
     "cna_video_player_get_volume": 2,
     "cna_video_player_set_volume": 2,
+    "cna_video_player_get_frame_ext": 2,
     "cna_video_player_get_texture": 3,
     "cna_video_player_play": 2,
     "cna_video_player_stop": 1,
@@ -749,6 +750,7 @@
     "CNA_EffectAnnotationInfo": ["struct_size", "struct_version", "row_count", "column_count", "parameter_class", "parameter_type"],
     "CNA_EffectParameterCreateInfo": ["struct_size", "struct_version", "name", "semantic", "row_count", "column_count", "parameter_class", "parameter_type"],
     "CNA_EffectParameterInfo": ["struct_size", "struct_version", "row_count", "column_count", "parameter_class", "parameter_type"],
+    "CNA_VideoFrameEXT": ["struct_size", "struct_version", "texture", "generation", "presentation_time", "available", "reserved"],
     "CNA_Texture2DCreateInfo": ["struct_size", "struct_version", "width", "height", "mip_map", "reserved", "format"],
     "CNA_Texture2DTransfer": ["struct_size", "struct_version", "level", "has_rectangle", "reserved", "rectangle", "start_index", "element_count"],
     "CNA_VertexElement": ["offset", "format", "usage", "usage_index"],
@@ -852,7 +854,7 @@
     "CNA_MEDIA_SOURCE_TYPE_LOCAL_DEVICE", "CNA_MEDIA_SOURCE_TYPE_WINDOWS_MEDIA_CONNECT",
     "CNA_MEDIA_STATE_PLAYING", "CNA_MEDIA_STATE_PAUSED", "CNA_MEDIA_STATE_STOPPED",
     "CNA_VIDEO_SOUNDTRACK_TYPE_MUSIC", "CNA_VIDEO_SOUNDTRACK_TYPE_DIALOG", "CNA_VIDEO_SOUNDTRACK_TYPE_MUSIC_AND_DIALOG",
-    "CNA_VISUALIZATION_DATA_SIZE"
+    "CNA_VISUALIZATION_DATA_SIZE", "CNA_VIDEO_FRAME_EXT_STRUCT_VERSION"
   ],
   "callbackSignatures": {
     "CNA_GameLifecycleCallback": {

@@ -67,7 +67,7 @@ native operations. No implementation helper became a strict XNA type.
 | MediaQueue | PROCESS_GLOBAL | stable non-player-owning view for one active generation |
 | Video | OWNED | one CNA Video metadata object; Game generation |
 | VideoPlayer | OWNED | one CNA player; strongly retains selected Video |
-| GetTexture native frame | PARENT_OWNED | transient, player-owned, never wrapped or destroyed by Rust |
+| GetTexture native frame | PARENT_OWNED | player-owned; wrapped as a call-scoped borrow, never destroyed by Rust |
 | VisualizationData | MANAGED_VALUE | two fixed 256-element arrays |
 | three enums | MANAGED_VALUE | exact XNA integer identities |
 
@@ -182,15 +182,27 @@ live-handle boundary after disposal.
 
 ### GetTexture boundary
 
-Canonical CNA ABI 0.7 reports a Texture2D handle owned by VideoPlayer and valid
-only until the next player operation. Rust therefore does not construct a
-normal owned Texture2D, call native texture destruction, claim XNA's stable
-two-buffer identity, or fabricate pixels. Before Play the route fails; after
-Play the qualified HEADLESS backend returns no frame. If CNA reports a handle,
-Rust returns `UnsupportedRuntime` without exposing it. A safe
-`PARENT_OWNED`, non-destroying, operation-generation-scoped Texture2D facade
-requires CNA to publish stable frame identity and invalidation semantics; this
-is `UPSTREAM_CNA_BLOCKED`.
+ABI 0.9.0 added `cna_video_player_get_frame_ext`, which publishes the frame
+identity the previous milestone was missing: a borrowed texture handle, a
+monotonic `generation` that changes only when a frame is actually decoded and
+is never restarted by `Stop` or by playing a different video, and a
+presentation timestamp.
+
+`GetTexture` now calls that route. A decoded frame is wrapped in a
+`PARENT_OWNED` `Texture2D` that never calls native texture destruction. CNA's
+frame texture is valid only until the *next call on its player*, including
+another `GetTexture`, so the Rust view counts player calls and refuses a stale
+frame texture in Rust one call before CNA would answer `INVALID_HANDLE`.
+Validating the borrow deliberately makes no native call, because asking the
+player would itself be the call that invalidates the handle. `Dispose` and
+`Drop` invalidate every outstanding borrow.
+
+XNA owns two frame textures and alternates between them; CNA decodes into one
+texture in place. The projection maps both XNA slots onto that one frame and
+publishes `generation` for change detection through
+`cna::extensions::media::VideoFrameGeneration`, never inside the strict XNA
+hierarchy. Before `Play` the route fails, and on HEADLESS no frame is decoded,
+so the measured answer is the canonical `Ok(None)`. No pixels are fabricated.
 
 ## ABI, behavior, and stress
 

@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 use cna::extensions::events::EventArgs;
 use cna::extensions::media::{
     PlayFromEvent, RaiseActiveSongChanged, RaiseMediaStateChanged, StopFromEvent,
+    VideoFrameGeneration, VideoFramePresentationTime,
 };
 use cna::Microsoft::Xna::Framework::Media::{
     MediaLibrary, MediaPlayer, MediaQueue, MediaSource, MediaState, Song, Video, VideoPlayer,
@@ -259,28 +260,35 @@ impl Game for MediaStressGame {
             player.Pause()?; player.Resume()?; player.Stop()?;
             player.Play(Arc::clone(&video))?;
             assert!(Arc::ptr_eq(&player.Video()?.expect("current Video"), &video));
-            // CNA accepts the metadata/control object even when this legal fixture has no
-            // decodable asset. HEADLESS currently reports no frame; a backend that does expose
-            // one reaches the explicit borrowed-frame UnsupportedRuntime boundary instead.
-            let _frame_qualification = player.GetTexture();
-            let _repeated_frame_qualification = player.GetTexture();
+            // CNA accepts the metadata/control object even when this legal fixture
+            // has no decodable asset. HEADLESS decodes nothing, so the frame route
+            // answers "no frame" rather than failing, and the generation counter
+            // stays at zero. A backend that does decode hands back a borrowed
+            // Texture2D whose validity ends at the next player call.
+            assert!(matches!(player.GetTexture(), Ok(None)));
+            assert_eq!(VideoFrameGeneration(&player)?, 0);
+            assert!(VideoFramePresentationTime(&player)?.is_none());
+            assert!(matches!(player.GetTexture(), Ok(None)));
             player.Pause()?;
-            let _paused_frame_qualification = player.GetTexture();
+            assert!(matches!(player.GetTexture(), Ok(None)));
             player.Resume()?;
-            let _resumed_frame_qualification = player.GetTexture();
+            assert!(matches!(player.GetTexture(), Ok(None)));
             player.Play(Arc::clone(&second_video))?;
             assert!(Arc::ptr_eq(
                 &player.Video()?.expect("replacement Video"),
                 &second_video,
             ));
-            let _replacement_frame_qualification = player.GetTexture();
+            assert!(matches!(player.GetTexture(), Ok(None)));
             player.Stop()?;
-            let _stopped_frame_qualification = player.GetTexture();
+            // The counter is monotonic: neither Stop nor a different Video restarts it.
+            assert_eq!(VideoFrameGeneration(&player)?, 0);
+            assert!(matches!(player.GetTexture(), Ok(None)));
             player.Dispose()?; player.Dispose()?;
             assert!(player.IsDisposed()?);
             assert!(player.IsLooped()? && player.IsMuted()? && player.Volume()?.is_nan());
             assert!(player.State().is_err());
             assert!(player.GetTexture().is_err());
+            assert!(VideoFrameGeneration(&player).is_err());
         }
 
         let wrong_thread_player = VideoPlayer::new(game)?;
@@ -291,7 +299,7 @@ impl Game for MediaStressGame {
         wrong_thread_player.Dispose()?;
         let retained_player = Arc::new(VideoPlayer::new(game)?);
         retained_player.Play(Arc::clone(&video))?;
-        let _retained_frame_qualification = retained_player.GetTexture();
+        assert!(matches!(retained_player.GetTexture(), Ok(None)));
         *self.old_player.lock().unwrap() = Some(retained_player);
 
         let self_registration = Arc::clone(&self.self_registration);

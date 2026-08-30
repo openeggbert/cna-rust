@@ -52,6 +52,7 @@ pub use presentation::{
     DisplayMode, PresentationParameters, ResourceCreatedEventArgs, ResourceDestroyedEventArgs,
 };
 pub use render_target::{RenderTarget2D, RenderTargetBinding, RenderTargetCube};
+pub(crate) use resource::BorrowedHandle;
 pub use resource::{GraphicsResource, Texture};
 pub use sprite_batch::SpriteBatch;
 pub use sprite_font::SpriteFont;

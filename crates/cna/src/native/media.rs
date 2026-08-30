@@ -1,4 +1,4 @@
-//! Audited Media/Video calls over the canonical CNA ABI 0.7 table.
+//! Audited Media/Video calls over the canonical CNA ABI table.
 
 use crate::error::Result;
 
@@ -202,6 +202,7 @@ macro_rules! media_fields {
             video_player_get_state: cna_video_player_get_state,
             video_player_get_volume: cna_video_player_get_volume,
             video_player_set_volume: cna_video_player_set_volume,
+            video_player_get_frame_ext: cna_video_player_get_frame_ext,
             video_player_get_texture: cna_video_player_get_texture,
             video_player_play: cna_video_player_play,
             video_player_stop: cna_video_player_stop,
@@ -215,7 +216,15 @@ macro_rules! media_fields {
 
 macro_rules! declare_fields {
     ($($field:ident: $symbol:ident,)+) => {
+        /// Every reviewed Media/Video route, resolved once when the library loads.
+        ///
+        /// A slot is kept even where the safe API prefers a richer sibling --
+        /// `cna_video_player_get_texture` next to `cna_video_player_get_frame_ext`
+        /// is the current case. Resolving the whole reviewed table up front is
+        /// what makes a library missing any of it fail at load rather than at
+        /// the first call that happens to need the missing route.
         #[derive(Debug)]
+        #[allow(dead_code)]
         pub(crate) struct MediaApi {
             $(pub(crate) $field: usize,)+
         }
@@ -224,7 +233,7 @@ macro_rules! declare_fields {
             pub(super) fn load(library: &Library) -> Result<Self> {
                 Ok(Self {
                     $(
-                        // SAFETY: every symbol is present in cna-sys with its exact ABI-0.7
+                        // SAFETY: every symbol is present in cna-sys with its exact canonical
                         // function-pointer declaration. Calls recover that audited type.
                         $field: unsafe { library.symbol::<usize>(stringify!($symbol))? },
                     )+

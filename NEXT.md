@@ -16,12 +16,12 @@ LIBRARY_EXPORTS=4051
 
 REVIEWED_SYMBOLS_REMOVED=0
 REVIEWED_SYMBOLS_ARITY_CHANGED=0
-ABI_FUNCTIONS=731
-PROTOTYPE_TYPE_POSITIONS=2496
-C_RUST_MEASUREMENTS=1028
-LAYOUTS=62
+ABI_FUNCTIONS=732
+PROTOTYPE_TYPE_POSITIONS=2499
+C_RUST_MEASUREMENTS=1038
+LAYOUTS=63
 CALLBACKS=7
-CONSTANTS=262
+CONSTANTS=263
 ABI_FINDINGS=0
 
 CANONICAL_ROUTES=4051
@@ -33,6 +33,11 @@ EXPECTED_RUST_TYPES=259
 ACTUAL_RUST_TYPES=259
 TOTAL_DIAGNOSTICS=0
 ```
+
+Two historical `UPSTREAM_CNA_BLOCKED` rows are closed by measurement rather
+than by assertion: multi-listener `Apply3D` now reaches its canonical route,
+and `VideoPlayer.GetTexture` wraps a decoded frame in a borrowed `Texture2D`
+using the frame identity ABI 0.9.0 added.
 
 The selected Windows runtime profile is back at strict zero over the new
 runtime boundary and the whole workspace test suite passes against the live
@@ -48,16 +53,15 @@ builds its C API, because ABI 0.20.0 is exactly the version that moved
 Work the backlog in [docs/backlog.md](docs/backlog.md). The highest-value ready
 items, in order:
 
-1. Re-measure the historical ABI-0.7 runtime blockers that the live ABI's own
-   release notes say are closed: multi-listener `Apply3D` (0.9.0) and
-   `VideoPlayer` frame identity (0.9.0). Neither may keep an
-   `UPSTREAM_CNA_BLOCKED` row without a fresh measurement.
-2. Implement the first modern `cna::extensions` family from `core_ext.h` and
+1. Implement the first modern `cna::extensions` family from `core_ext.h` and
    `graphics.h` capability reporting, which is safe, additive and outside the
    strict XNA hierarchy.
-3. Close the 74-type `xna40-windows-full` gap: GamerServices, Avatar and Net.
-4. Windows loader source support, packaging qualification, and the template's
+2. Close the 74-type `xna40-windows-full` gap: GamerServices, Avatar and Net.
+3. Windows loader source support, packaging qualification, and the template's
    modern-extension canary.
+4. Re-measure the remaining historical blockers: `AudioEngine` renderer and
+   look-ahead, `GraphicsDeviceManager.RankDevices`, and repeated `Game` frame
+   callback-context rebinding.
 
 ## Toolchain reality on this host
 
