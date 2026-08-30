@@ -73,7 +73,7 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-PLATFORM-004 | Static-linkage mode so `Native` can be filled from `extern "C"` declarations | the prerequisite for any WebAssembly route | READY |
 | RUST-PACKAGE-001 | `cargo package` file list, notices, no native binary | LICENSE and NOTICE.md now ship with each crate; an outside consumer builds from the packaged file set alone | DONE |
 | RUST-PACKAGE-003 | `cargo package -p cna-rust` needs `cna-rust-sys` published first | publish order recorded | BLOCKED_UPSTREAM |
-| RUST-PACKAGE-002 | MSRV 1.74 evidence | toolchain not installed; source audit only | BLOCKED_PLATFORM |
+| RUST-PACKAGE-002 | MSRV 1.74 evidence | `tools/msrv/audit.py` denylist; two real violations found and fixed. Compiling with 1.74 is still `MSRV_RUNTIME_NOT_RUN` | DONE |
 | RUST-TEMPLATE-001 | Template against the live artifact | 60/600 frames on ABI 0.20 | DONE |
 | RUST-TEMPLATE-002 | Template modern-extension canary | `--extensions-smoke` | DONE |
 | RUST-TEMPLATE-003 | Generated standalone project on the live ABI | workspace tests, 60/600 frames, extension canary, no developer path | DONE |

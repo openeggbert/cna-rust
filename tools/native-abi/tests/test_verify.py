@@ -72,7 +72,11 @@ class PrototypeDiscriminationTests(unittest.TestCase):
 
 class HeaderAgreementTests(unittest.TestCase):
     def header_directory(self, text: str) -> Path:
-        directory = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        # addCleanup rather than enterContext: the latter needs Python 3.11 and
+        # nothing else here does.
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        directory = Path(temporary.name)
         (directory / "probe.h").write_text(text, encoding="utf-8")
         return directory
 

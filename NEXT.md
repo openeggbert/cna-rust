@@ -76,6 +76,7 @@ rustfmt=NOT_AVAILABLE
 clippy=NOT_AVAILABLE
 rustup=NOT_AVAILABLE
 MSRV 1.74 toolchain=NOT_INSTALLED -> MSRV_RUNTIME_NOT_RUN
+MSRV source denylist=PASS (tools/msrv/audit.py)
 ```
 
 Record those as `NOT_AVAILABLE`, never as passed.

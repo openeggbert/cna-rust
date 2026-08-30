@@ -138,7 +138,13 @@ impl SoundEffect {
         let frames = count_usize / alignment;
         let loop_start = usize::try_from(loopStart).map_err(|_| CnaError::InvalidInput("loopStart is outside the selected audio"))?;
         let loop_length = usize::try_from(loopLength).map_err(|_| CnaError::InvalidInput("loopLength is outside the selected audio"))?;
-        if loop_start > frames || loop_start.checked_add(loop_length).is_none_or(|value| value > frames) {
+        // `Option::is_none_or` is stable only from 1.82; `map_or` with the same
+        // predicate is the 1.74-compatible spelling.
+        if loop_start > frames
+            || loop_start
+                .checked_add(loop_length)
+                .map_or(true, |value| value > frames)
+        {
             return Err(CnaError::InvalidInput("loop range is outside the selected audio"));
         }
         let (loopStart, loopLength) = if loopLength == 0 {

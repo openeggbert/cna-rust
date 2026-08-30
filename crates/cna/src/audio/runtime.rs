@@ -197,7 +197,10 @@ impl AudioCallbackToken {
     }
 
     pub(super) fn context(&mut self) -> *mut c_void {
-        core::ptr::from_mut(self).cast()
+        // `ptr::from_mut` is stable only from 1.76; `addr_of_mut!` has been
+        // stable since 1.51 and produces the same pointer without an
+        // intermediate reference, so the declared 1.74 MSRV holds.
+        core::ptr::addr_of_mut!(*self).cast()
     }
 
     pub(super) fn deactivate(&self) {
