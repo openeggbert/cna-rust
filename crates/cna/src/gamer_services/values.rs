@@ -550,6 +550,14 @@ impl LeaderboardIdentity {
         Self::Create(key, 0)
     }
 
+    /// Rebuilds an identity from a key spelling CNA reported.
+    pub(crate) fn from_key_and_game_mode(key: &str, gameMode: i32) -> Self {
+        Self {
+            key: key.to_owned(),
+            game_mode: gameMode,
+        }
+    }
+
     #[must_use]
     pub fn Key(&self) -> String {
         self.key.clone()
@@ -567,4 +575,48 @@ impl LeaderboardIdentity {
     pub fn SetGameMode(&mut self, value: i32) {
         self.game_mode = value;
     }
+}
+
+/// Gives each value identity a checked conversion from CNA's ordinal.
+///
+/// The Rust discriminants already carry XNA's own numbers, so this generates
+/// the reverse direction rather than a second table that could drift: an
+/// ordinal CNA reports that XNA never declared answers `None` and becomes a
+/// mapping error at the call site, never a silently wrong identity.
+macro_rules! xna_gamer_identity {
+    ($($name:ident { $($variant:ident),+ $(,)? }),+ $(,)?) => {
+        $(
+            impl $name {
+                #[allow(dead_code)]
+                pub(crate) fn from_native(value: u32) -> Option<Self> {
+                    $(
+                        if value == Self::$variant as u32 {
+                            return Some(Self::$variant);
+                        }
+                    )+
+                    None
+                }
+            }
+        )+
+    };
+}
+
+xna_gamer_identity! {
+    AvatarAnimationPreset { Stand0, Stand1, Stand2, Stand3, Stand4, Stand5, Stand6, Stand7, Clap, Wave, Celebrate, FemaleIdleCheckNails, FemaleIdleLookAround, FemaleIdleShiftWeight, FemaleIdleFixShoe, FemaleAngry, FemaleConfused, FemaleLaugh, FemaleCry, FemaleShocked, FemaleYawn, MaleIdleLookAround, MaleIdleStretch, MaleIdleShiftWeight, MaleIdleCheckHand, MaleAngry, MaleConfused, MaleLaugh, MaleCry, MaleSurprised, MaleYawn },
+    AvatarBodyType { Female, Male },
+    AvatarBone { Root, BackLower, HipLeft, HipRight, BackUpper, KneeLeft, KneeRight, AnkleLeft, CollarLeft, Neck, AnkleRight, CollarRight, Head, ShoulderLeft, ToeLeft, ShoulderRight, ToeRight, ElbowLeft, ElbowRight, WristLeft, WristRight, FingerIndexLeft, FingerMiddleLeft, FingerRingLeft, FingerSmallLeft, PropLeft, SpecialLeft, FingerThumbLeft, FingerIndexRight, FingerMiddleRight, FingerRingRight, FingerSmallRight, PropRight, SpecialRight, FingerThumbRight, FingerIndex2Left, FingerMiddle2Left, FingerRing2Left, FingerSmall2Left, FingerThumb2Left, FingerIndex2Right, FingerMiddle2Right, FingerRing2Right, FingerSmall2Right, FingerThumb2Right, FingerIndex3Left, FingerMiddle3Left, FingerRing3Left, FingerSmall3Left, FingerThumb3Left, FingerIndex3Right, FingerMiddle3Right, FingerRing3Right, FingerSmall3Right, FingerThumb3Right },
+    AvatarEye { Neutral, Sad, Angry, Confused, Laughing, Shocked, Happy, Yawning, Sleeping, LookUp, LookDown, LookLeft, LookRight, Blink },
+    AvatarEyebrow { Neutral, Sad, Angry, Confused, Raised },
+    AvatarMouth { Neutral, Sad, Angry, Confused, Laughing, Shocked, Happy, PhoneticO, PhoneticAi, PhoneticEe, PhoneticFv, PhoneticW, PhoneticL, PhoneticDth },
+    AvatarRendererState { Loading, Ready, Unavailable },
+    ControllerSensitivity { Low, Medium, High },
+    GameDifficulty { Easy, Normal, Hard },
+    GamerPresenceMode { None, SinglePlayer, Multiplayer, LocalCoOp, LocalVersus, OnlineCoOp, OnlineVersus, VersusComputer, Stage, Level, CoOpStage, CoOpLevel, ArcadeMode, CampaignMode, ChallengeMode, ExplorationMode, PracticeMode, PuzzleMode, ScenarioMode, StoryMode, SurvivalMode, TutorialMode, DifficultyEasy, DifficultyMedium, DifficultyHard, DifficultyExtreme, Score, VersusScore, Winning, Losing, ScoreIsTied, Outnumbered, OnARoll, InCombat, BattlingBoss, TimeAttack, TryingForRecord, FreePlay, WastingTime, StuckOnAHardBit, NearlyFinished, LookingForGames, WaitingForPlayers, WaitingInLobby, SettingUpMatch, PlayingWithFriends, AtMenu, StartingGame, Paused, GameOver, WonTheGame, ConfiguringSettings, CustomizingPlayer, EditingLevel, InGameStore, WatchingCutscene, WatchingCredits, PlayingMinigame, FoundSecret, CornflowerBlue },
+    GamerPrivilegeSetting { Blocked, FriendsOnly, Everyone },
+    GamerZone { Unknown, Recreation, Pro, Family, Underground },
+    LeaderboardKey { BestScoreLifeTime, BestScoreRecent, BestTimeLifeTime, BestTimeRecent },
+    LeaderboardOutcome { None, Win, Loss, Tie },
+    MessageBoxIcon { None, Error, Warning, Alert },
+    NotificationPosition { TopLeft, TopCenter, TopRight, CenterLeft, Center, CenterRight, BottomLeft, BottomCenter, BottomRight },
+    RacingCameraAngle { Back, Front, Inside },
 }

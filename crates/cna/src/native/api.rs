@@ -20,6 +20,10 @@ pub(crate) struct Native {
     pub(crate) media: MediaApi,
     pub(crate) runtime: RuntimeApi,
     pub(crate) gamer_services: GamerServicesApi,
+    /// Resolved with the library so a CNA build missing any Net route fails at
+    /// load. The safe `Microsoft.Xna.Framework.Net` projection is the next
+    /// slice of the wider profile and is what will read it.
+    #[allow(dead_code)]
     pub(crate) net: NetApi,
     pub(super) error_get_last_info: sys::cna_error_get_last_info_fn,
     pub(super) error_get_last_message_size: sys::cna_error_get_last_message_size_fn,

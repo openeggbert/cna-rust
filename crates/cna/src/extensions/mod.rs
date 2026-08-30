@@ -8,6 +8,7 @@
 pub mod content;
 pub mod devices;
 pub mod events;
+pub mod gamer_services;
 pub mod graphics;
 pub mod input;
 pub mod logging;

@@ -35,7 +35,10 @@ pub use design::{
 };
 pub use disposal::Disposable;
 pub use error::{CnaError, ErrorCategory, Result};
-pub use gamer_services::NetworkExceptionBase;
+pub use gamer_services::{
+    GamerAsyncCallback, GamerAsyncResult, GamerAsyncState, GamerBase, GamerCollectionBase,
+    NetworkExceptionBase, PropertyValueKind,
+};
 pub use game::{
     run, run_for_frames, GameComponentBase, GameComponentCollectionExt, GameComponentRuntime,
     GameState, GameStateAccess, LaunchParametersExt, ServiceProvider,
@@ -163,14 +166,24 @@ pub mod Microsoft {
             pub mod GamerServices {
                 pub use crate::game::GamerServicesComponent;
                 pub use crate::gamer_services::{
+                    Achievement, AchievementCollection,
                     AvatarAnimationPreset, AvatarBodyType, AvatarBone, AvatarExpression, AvatarEye,
                     AvatarEyebrow,
-                    AvatarMouth, AvatarRendererState, ControllerSensitivity, GameDifficulty,
-                    GameUpdateRequiredException, GamerPresenceMode, GamerPrivilegeException,
-                    GamerPrivilegeSetting, GamerServicesNotAvailableException, GamerZone,
-                    GuideAlreadyVisibleException, LeaderboardIdentity, LeaderboardKey,
-                    LeaderboardOutcome, MessageBoxIcon, NetworkException,
-                    NetworkNotAvailableException, NotificationPosition, RacingCameraAngle,
+                    AvatarMouth, AvatarRendererState, ControllerSensitivity, FriendCollection,
+                    FriendGamer, GameDefaults, GameDifficulty,
+                    GameUpdateRequiredException, Gamer, GamerCollection,
+                    GamerCollectionEnumerator, GamerPresence, GamerPresenceMode,
+                    GamerPrivilegeException, GamerPrivileges,
+                    GamerPrivilegeSetting, GamerProfile, GamerServicesNotAvailableException,
+                    GamerServicesDispatcher, GamerZone, Guide,
+                    GuideAlreadyVisibleException, InviteAcceptedEventArgs, LeaderboardEntry,
+                    LeaderboardIdentity,
+                    LeaderboardKey, LeaderboardOutcome, LeaderboardReader, LeaderboardWriter,
+                    MessageBoxIcon, NetworkException,
+                    NetworkNotAvailableException, NotificationPosition, PropertyDictionary,
+                    RacingCameraAngle,
+                    SignedInEventArgs, SignedInGamer, SignedInGamerCollection,
+                    SignedOutEventArgs,
                 };
             }
 
