@@ -716,6 +716,20 @@ impl Native {
         })
     }
 
+    pub(crate) fn clear_graphics_device_options(
+        &self,
+        device: sys::CNA_Handle,
+        options: sys::CNA_ClearOptions,
+        color: sys::CNA_Color,
+        depth: f32,
+        stencil: i32,
+    ) -> Result<()> {
+        // SAFETY: GraphicsDevice guarantees its callback-scoped handle.
+        self.check(unsafe {
+            (self.graphics_device_clear_options)(device, options, color, depth, stencil)
+        })
+    }
+
     pub(crate) fn graphics_device_status(
         &self,
         device: sys::CNA_Handle,
@@ -1704,6 +1718,53 @@ impl Native {
                     byte_count,
                     vertex_count,
                     vertex_stride,
+                ),
+            }
+        };
+        self.check(result)
+    }
+
+    /// Uploads raw vertex bytes with an explicit streaming hint.
+    ///
+    /// Split from `set_raw_vertex_data` rather than folded into it: the
+    /// option-carrying canonical routes are a different pair of symbols, and a
+    /// caller that passes `SetDataOptions::None` must keep reaching the
+    /// original pair so the qualified static-buffer path is unchanged.
+    pub(crate) fn set_raw_vertex_data_with_options(
+        &self,
+        buffer: sys::CNA_Handle,
+        offset_in_bytes: Option<u64>,
+        data: &[u8],
+        vertex_count: u64,
+        vertex_stride: u32,
+        options: sys::CNA_SetDataOptions,
+    ) -> Result<()> {
+        let byte_count = u64::try_from(data.len())
+            .map_err(|_| CnaError::InvalidInput("vertex data array is too large"))?;
+        let pointer = if data.is_empty() {
+            core::ptr::null()
+        } else {
+            data.as_ptr().cast()
+        };
+        // SAFETY: the byte slice describes exactly byte_count readable bytes and is copied.
+        let result = unsafe {
+            match offset_in_bytes {
+                Some(offset) => (self.vertex_buffer_set_data_raw_at_with_options)(
+                    buffer,
+                    offset,
+                    pointer,
+                    byte_count,
+                    vertex_count,
+                    vertex_stride,
+                    options,
+                ),
+                None => (self.vertex_buffer_set_data_raw_with_options)(
+                    buffer,
+                    pointer,
+                    byte_count,
+                    vertex_count,
+                    vertex_stride,
+                    options,
                 ),
             }
         };

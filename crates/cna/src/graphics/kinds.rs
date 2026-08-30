@@ -221,6 +221,10 @@ impl ClearOptions {
     pub const Target: Self = Self(1);
     pub const DepthBuffer: Self = Self(2);
     pub const Stencil: Self = Self(4);
+
+    pub(super) const fn bits(self) -> u32 {
+        u32::from_ne_bytes(self.0.to_ne_bytes())
+    }
 }
 
 macro_rules! open_graphics_flags {

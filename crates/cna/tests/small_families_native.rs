@@ -10,10 +10,11 @@ use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use cna::Microsoft::Xna::Framework::GamerServices::GamerServicesComponent;
 use cna::Microsoft::Xna::Framework::Graphics::IGraphicsDeviceService;
 use cna::Microsoft::Xna::Framework::Input::Touch::{GestureType, TouchPanel};
+use cna::Microsoft::Xna::Framework::Input::Keyboard;
 use cna::Microsoft::Xna::Framework::Storage::{StorageContainer, StorageDevice};
 use cna::Microsoft::Xna::Framework::{
     Game, GameContext, GraphicsDeviceManager, IGameComponent, IGraphicsDeviceManager,
-    PreparingDeviceSettingsEventArgs,
+    PlayerIndex, PreparingDeviceSettingsEventArgs,
 };
 use cna::{
     run_for_frames, CnaError, FileMode, GameComponentCollectionExt, GameState, GameStateAccess,
@@ -26,6 +27,7 @@ struct FrameworkEvidence {
     resetting: AtomicUsize,
     reset: AtomicUsize,
     disposed: AtomicUsize,
+    keyboard_checked: AtomicUsize,
     self_removed: AtomicUsize,
     touch_checked: AtomicUsize,
 }
@@ -101,6 +103,23 @@ impl Game for SmallFamilyGame {
         assert!(!TouchPanel::IsGestureAvailable(game)?);
         assert!(TouchPanel::ReadGesture(game).is_err());
         self.evidence.touch_checked.fetch_add(1, Ordering::SeqCst);
+
+        // XNA's per-player Chatpad overload reaches a real canonical route
+        // rather than the refusal it used to return. CNA has one keyboard, so
+        // the documented answer is that every slot reports the shared
+        // snapshot -- and a slot that disagreed with `GetState` would fail
+        // here rather than pass silently.
+        let shared = Keyboard::GetState(game)?;
+        for player in [
+            PlayerIndex::One,
+            PlayerIndex::Two,
+            PlayerIndex::Three,
+            PlayerIndex::Four,
+        ] {
+            assert_eq!(Keyboard::GetStateWithPlayerIndex(game, player)?, shared);
+        }
+        assert_eq!(shared.GetPressedKeys().len(), 0);
+        self.evidence.keyboard_checked.fetch_add(1, Ordering::SeqCst);
 
         manager.ApplyChanges()?;
         Ok(())
@@ -217,6 +236,7 @@ fn framework_touch_and_gamer_services_use_the_game_owned_runtime() {
     run_for_frames(game, 1).expect("Framework manager, Touch, and GamerServices lifecycle");
 
     assert_eq!(evidence.touch_checked.load(Ordering::SeqCst), 1);
+    assert_eq!(evidence.keyboard_checked.load(Ordering::SeqCst), 1);
     assert!(evidence.preparing.load(Ordering::SeqCst) >= 1);
     assert!(evidence.resetting.load(Ordering::SeqCst) >= 1);
     assert!(evidence.reset.load(Ordering::SeqCst) >= 1);

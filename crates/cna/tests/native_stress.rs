@@ -18,11 +18,12 @@ use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use cna::extensions::graphics::{
     EffectAnnotationCollectionExt, EffectFactoryExt, EffectParameterCollectionExt,
-    EffectPassCollectionExt, EffectTechniqueCollectionExt, ModelCollectionExt,
+    EffectPassCollectionExt, EffectTechniqueCollectionExt, FloatClearExt, ModelCollectionExt,
 };
 use cna::Microsoft::Xna::Framework::GamerServices::GamerServicesComponent;
 use cna::Microsoft::Xna::Framework::Graphics::{
-    AlphaTestEffect, BasicEffect, BlendState, BufferUsage, CompareFunction, CubeMapFace,
+    AlphaTestEffect, BasicEffect, BlendState, BufferUsage, ClearOptions, CompareFunction,
+    CubeMapFace,
     DepthStencilState, DualTextureEffect, DynamicIndexBuffer, DynamicVertexBuffer, Effect,
     EffectMaterial, EffectParameterClass, EffectParameterType, EnvironmentMapEffect,
     GraphicsAdapter, GraphicsDevice, GraphicsDeviceStatus, GraphicsProfile, GraphicsResource,
@@ -2113,17 +2114,48 @@ impl Game for BufferTransferGame {
         dynamic.SetData(&vertices, 0, 3, SetDataOptions::Discard)?;
         dynamic.SetData(&vertices, 0, 3, SetDataOptions::NoOverwrite)?;
         assert!(!dynamic.IsContentLost()?);
-        assert!(matches!(
-            dynamic.SetDataWithOffsetInBytesAndDataAndStartIndexAndElementCountAndVertexStrideAndOptions(
+        // A byte offset combined with a streaming hint. It is not enough that
+        // the call succeeds: the vertex has to land in slot one and leave slot
+        // zero alone, which is the whole meaning of `offsetInBytes`.
+        dynamic
+            .SetDataWithOffsetInBytesAndDataAndStartIndexAndElementCountAndVertexStrideAndOptions(
                 16,
-                &vertices,
+                &[VertexPositionColor::new(Vector3::UnitZ, Color::Yellow)],
                 0,
                 1,
                 16,
-                SetDataOptions::Discard,
-            ),
-            Err(CnaError::InvalidInput(_))
-        ));
+                SetDataOptions::NoOverwrite,
+            )?;
+        let mut streamed = [VertexPositionColor::default(); 3];
+        dynamic.GetData(&mut streamed)?;
+        assert_eq!(streamed[0], vertices[0]);
+        assert_eq!(
+            streamed[1],
+            VertexPositionColor::new(Vector3::UnitZ, Color::Yellow)
+        );
+        assert_eq!(streamed[2], vertices[2]);
+        // A user-declared vertex type with a streaming hint. CNA's typed
+        // transfer route only knows the built-in XNA layouts, so this is the
+        // byte route carrying the option, and the readback proves it wrote.
+        let dynamic_custom = DynamicVertexBuffer::new(
+            &device,
+            CustomVertex::vertex_declaration(),
+            2,
+            BufferUsage::None,
+        )?;
+        dynamic_custom.SetData(
+            &[
+                CustomVertex { x: 5.0, y: 6.0 },
+                CustomVertex { x: 7.0, y: 8.0 },
+            ],
+            0,
+            2,
+            SetDataOptions::Discard,
+        )?;
+        let mut custom_streamed = [CustomVertex::default(); 2];
+        dynamic_custom.GetData(&mut custom_streamed)?;
+        assert_eq!(custom_streamed[0].x, 5.0);
+        assert_eq!(custom_streamed[1].y, 8.0);
 
         let binding = VertexBufferBinding::from_vertex_buffer_and_vertex_offset(&vertex, 1)?;
         device.SetVertexBuffers(&[binding.clone()])?;
@@ -2276,6 +2308,48 @@ impl Game for BufferTransferGame {
         ));
 
         device.ClearWithColor(Color::CornflowerBlue)?;
+        // The mapped depth/stencil clear, which is a route this binding used
+        // to refuse outright. All three option masks reach CNA.
+        device.ClearWithOptionsAndColorAndDepthAndStencil(
+            ClearOptions::Target,
+            Color::CornflowerBlue,
+            1.0,
+            0,
+        )?;
+        device.ClearWithOptionsAndColorAndDepthAndStencil(
+            ClearOptions::Target | ClearOptions::DepthBuffer,
+            Color::Black,
+            1.0,
+            0,
+        )?;
+        device.ClearWithOptionsAndColorAndDepthAndStencil(
+            ClearOptions::DepthBuffer | ClearOptions::Stencil,
+            Color::Black,
+            0.5,
+            7,
+        )?;
+        // XNA packs the Vector4 overload's color through `new Color(color)`
+        // before the device sees it, so the two overloads are the same call.
+        device.Clear(
+            ClearOptions::Target,
+            Color::CornflowerBlue.ToVector4(),
+            1.0,
+            0,
+        )?;
+        // CNA argument validation still reaches the caller unchanged.
+        assert!(device
+            .ClearWithOptionsAndColorAndDepthAndStencil(
+                ClearOptions::Target,
+                Color::Black,
+                f32::NAN,
+                0,
+            )
+            .is_err());
+        // The CNA-only float clear keeps channels XNA cannot express.
+        device.clear_color_channels([0.25, 0.5, 0.75, 1.0])?;
+        assert!(device
+            .clear_color_channels([f32::INFINITY, 0.0, 0.0, 1.0])
+            .is_err());
         let mut region = [Color::Transparent; 2];
         assert_headless_readback_unsupported(device.GetBackBufferData(
             Some(Rectangle::new(0, 0, 1, 1)),

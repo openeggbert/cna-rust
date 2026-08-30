@@ -177,3 +177,68 @@ The sibling template source was not changed. Its tests plus fresh 60- and
 600-frame HEADLESS runs pass. A fresh generated consumer vendors both binding
 crates, passes all workspace tests and a 60-frame native smoke, and contains no
 developer path, sibling dependency, or symlink back to the source workspace.
+
+## ABI 0.20 capability gaps the version migration left refused (2026-08-31)
+
+The 0.7 -> 0.20 migration moved the version gate and proved the reviewed slice
+had not decayed. It did not re-measure the *refusals* the safe layer carried
+from 0.7, and six of them still named that version in a message a consumer
+could see. Re-measuring each against the live canonical headers found four
+that ABI 0.20 can now satisfy.
+
+| Refusal carried from ABI 0.7 | Live canonical route | Outcome |
+|---|---|---|
+| `Keyboard.GetState(PlayerIndex)` had no route | `cna_keyboard_get_state_for_player` | bound; every slot answers |
+| `Clear` could not select depth or stencil | `cna_graphics_device_clear_options` | bound; all three option bits reach CNA |
+| a vertex byte offset could not carry `Discard`/`NoOverwrite` | `cna_vertex_buffer_set_data_raw_at_with_options` | bound; the offset write is read back |
+| `Discard`/`NoOverwrite` needed a built-in XNA layout | `cna_vertex_buffer_set_data_raw_with_options` | bound; a user-declared vertex type streams |
+| `GraphicsDeviceManager.RankDevices` | none | re-measured; still absent |
+| an index byte offset could not carry a streaming hint | none | re-measured; `index_resources.h` has no option-carrying route |
+
+`cna_graphics_device_dispose` also exists now, but it answers
+`CNA_RESULT_NOT_SUPPORTED` for the running game's device **by design**: the
+game owns that device and `cna_game_destroy` performs the canonical disposal.
+The projection therefore still refuses, and the message now states CNA's
+reason rather than claiming a missing route.
+
+### What the clear rework actually changed
+
+XNA's `Clear(ClearOptions, Vector4, float, int)` is not a floating-point
+clear. Its first statement is `new Color(color)`, so XNA packs to eight bits
+per channel before the device sees the value, and the `Vector4` and `Color`
+overloads are the same call. The projection now performs that pack and sends
+both overloads to `cna_graphics_device_clear_options`, which is why they agree
+exactly.
+
+`Clear(Color)` is `Clear(DefaultClearOptions, color, 1f, 0)`, and
+`DefaultClearOptions` is state, not a constant: `Target`, plus `DepthBuffer`
+when the active depth-stencil format is not `None`, plus `Stencil` only for
+`Depth24Stencil8`. The active format is render target zero's when any render
+target is bound and the presentation parameters' otherwise. The projection
+computes it the same way; before this change the single-argument overload
+cleared color alone.
+
+`cna_graphics_device_clear_rgba` keeps the four `f32` channels and so has no
+XNA spelling at all. Rather than dropping it from the audited table it is
+published as `cna::extensions::graphics::FloatClearExt::clear_color_channels`,
+a CNA-only clear for a renderer with a wide color target.
+
+### Measurements
+
+| Measurement | Before | After |
+|---|---:|---:|
+| reviewed ABI functions | 886 | 890 |
+| prototype type positions | 3,019 | 3,044 |
+| independent C/Rust measurements | 1,236 | 1,241 |
+| layouts | 71 | 71 |
+| callbacks | 8 | 8 |
+| constants | 397 | 400 |
+| mismatches | 0 | 0 |
+
+Runtime evidence is the HEADLESS ABI 0.20 artifact with SHA-256
+`092b2d80a775f39a6ad872d084bc09492576c82ac33641faeb4a3036c7fc347b`. The
+streaming upload is proved by reading the buffer back and checking that the
+vertex landed in slot one with slots zero and two unchanged; the per-player
+keyboard snapshot is proved by checking all four slots against `GetState`; the
+clear masks are proved by executing each of them and by CNA still rejecting a
+non-finite depth through the safe wrapper.

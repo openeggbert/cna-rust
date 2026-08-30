@@ -464,30 +464,46 @@ impl VertexBuffer {
         )?;
         validate_options(options, self.dynamic)?;
         if options != SetDataOptions::None {
-            if offset != 0 {
-                return Err(CnaError::InvalidInput(
-                    "CNA ABI 0.7 cannot combine a vertex-buffer byte offset with Discard or NoOverwrite",
-                ));
+            // A built-in XNA layout written from the start of the buffer keeps
+            // the typed canonical route: CNA checks the element type against
+            // the buffer's declaration natively, which no byte route can do.
+            // Every other streaming upload -- a user-declared vertex type, or
+            // any nonzero `offsetInBytes` -- goes through the byte route that
+            // also carries the option, which is what XNA's own overload means.
+            if offset == 0 {
+                if let Some(vertex_type) = native_vertex_type::<T>() {
+                    let transfer = sys::CNA_VertexBufferTransfer {
+                        struct_size: size_of::<sys::CNA_VertexBufferTransfer>() as u32,
+                        struct_version: 1,
+                        vertex_type,
+                        options: options.bits(),
+                        start_index: range.start as u64,
+                        element_count: range.len() as u64,
+                    };
+                    // SAFETY: TypeId was matched against the exact repr(C) built-in T layout.
+                    return unsafe {
+                        self.state.device().state.native().set_typed_vertex_data(
+                            self.state.require_handle()?,
+                            &transfer,
+                            data,
+                        )
+                    };
+                }
             }
-            let vertex_type = native_vertex_type::<T>().ok_or(CnaError::InvalidInput(
-                "Discard and NoOverwrite require a built-in XNA vertex layout in CNA ABI 0.7",
-            ))?;
-            let transfer = sys::CNA_VertexBufferTransfer {
-                struct_size: size_of::<sys::CNA_VertexBufferTransfer>() as u32,
-                struct_version: 1,
-                vertex_type,
-                options: options.bits(),
-                start_index: range.start as u64,
-                element_count: range.len() as u64,
-            };
-            // SAFETY: TypeId was matched against the exact repr(C) built-in T layout.
-            return unsafe {
-                self.state.device().state.native().set_typed_vertex_data(
+            let bytes = encode_vertices(&data[range]);
+            return self
+                .state
+                .device()
+                .state
+                .native()
+                .set_raw_vertex_data_with_options(
                     self.state.require_handle()?,
-                    &transfer,
-                    data,
-                )
-            };
+                    (offset != 0).then_some(offset as u64),
+                    &bytes,
+                    count as u64,
+                    stride as u32,
+                    options.bits(),
+                );
         }
         let bytes = encode_vertices(&data[range]);
         self.state.device().state.native().set_raw_vertex_data(

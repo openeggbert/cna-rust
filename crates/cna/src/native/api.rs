@@ -120,6 +120,7 @@ pub(crate) struct Native {
     pub(super) graphics_device_get_backbuffer_data_window:
         sys::cna_graphics_device_get_backbuffer_data_window_fn,
     pub(super) graphics_device_clear_rgba: sys::cna_graphics_device_clear_rgba_fn,
+    pub(super) graphics_device_clear_options: sys::cna_graphics_device_clear_options_fn,
     pub(super) graphics_device_set_vertex_buffer: sys::cna_graphics_device_set_vertex_buffer_fn,
     pub(super) graphics_device_set_vertex_buffer_offset:
         sys::cna_graphics_device_set_vertex_buffer_offset_fn,
@@ -196,6 +197,10 @@ pub(crate) struct Native {
     pub(super) vertex_buffer_set_data: sys::cna_vertex_buffer_set_data_fn,
     pub(super) vertex_buffer_set_data_raw: sys::cna_vertex_buffer_set_data_raw_fn,
     pub(super) vertex_buffer_set_data_raw_at: sys::cna_vertex_buffer_set_data_raw_at_fn,
+    pub(super) vertex_buffer_set_data_raw_with_options:
+        sys::cna_vertex_buffer_set_data_raw_with_options_fn,
+    pub(super) vertex_buffer_set_data_raw_at_with_options:
+        sys::cna_vertex_buffer_set_data_raw_at_with_options_fn,
     pub(super) vertex_buffer_get_data_raw: sys::cna_vertex_buffer_get_data_raw_fn,
     pub(super) index_buffer_create: sys::cna_index_buffer_create_fn,
     pub(super) index_buffer_destroy: sys::cna_index_buffer_destroy_fn,
@@ -441,6 +446,7 @@ pub(crate) struct Native {
     pub(super) effect_technique_collection_get_at: sys::cna_effect_technique_collection_get_at_fn,
     pub(super) effect_technique_collection_find: sys::cna_effect_technique_collection_find_fn,
     pub(super) keyboard_get_state: sys::cna_keyboard_get_state_fn,
+    pub(super) keyboard_get_state_for_player: sys::cna_keyboard_get_state_for_player_fn,
     pub(super) mouse_get_state: sys::cna_mouse_get_state_fn,
     pub(super) mouse_get_window_handle: sys::cna_mouse_get_window_handle_fn,
     pub(super) mouse_set_window_handle: sys::cna_mouse_set_window_handle_fn,
@@ -926,6 +932,10 @@ impl Native {
                 "cna_graphics_device_clear_rgba",
                 sys::cna_graphics_device_clear_rgba_fn
             ),
+            graphics_device_clear_options: symbol!(
+                "cna_graphics_device_clear_options",
+                sys::cna_graphics_device_clear_options_fn
+            ),
             graphics_device_set_vertex_buffer: symbol!(
                 "cna_graphics_device_set_vertex_buffer",
                 sys::cna_graphics_device_set_vertex_buffer_fn
@@ -1140,6 +1150,14 @@ impl Native {
             vertex_buffer_set_data_raw_at: symbol!(
                 "cna_vertex_buffer_set_data_raw_at",
                 sys::cna_vertex_buffer_set_data_raw_at_fn
+            ),
+            vertex_buffer_set_data_raw_with_options: symbol!(
+                "cna_vertex_buffer_set_data_raw_with_options",
+                sys::cna_vertex_buffer_set_data_raw_with_options_fn
+            ),
+            vertex_buffer_set_data_raw_at_with_options: symbol!(
+                "cna_vertex_buffer_set_data_raw_at_with_options",
+                sys::cna_vertex_buffer_set_data_raw_at_with_options_fn
             ),
             vertex_buffer_get_data_raw: symbol!(
                 "cna_vertex_buffer_get_data_raw",
@@ -1916,6 +1934,10 @@ impl Native {
                 sys::cna_effect_technique_collection_find_fn
             ),
             keyboard_get_state: symbol!("cna_keyboard_get_state", sys::cna_keyboard_get_state_fn),
+            keyboard_get_state_for_player: symbol!(
+                "cna_keyboard_get_state_for_player",
+                sys::cna_keyboard_get_state_for_player_fn
+            ),
             mouse_get_state: symbol!("cna_mouse_get_state", sys::cna_mouse_get_state_fn),
             mouse_get_window_handle: symbol!(
                 "cna_mouse_get_window_handle",

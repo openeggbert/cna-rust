@@ -21,7 +21,7 @@ use crate::value::{Color, Rectangle, Vector4};
 use super::buffer::encode_vertices;
 use super::resource::{EventHandlers, ResourceKind, ResourceState};
 use super::{
-    BlendState, DepthStencilState, DisplayMode, GraphicsAdapter, GraphicsDeviceStatus,
+    BlendState, DepthFormat, DepthStencilState, DisplayMode, GraphicsAdapter, GraphicsDeviceStatus,
     GraphicsProfile, IndexBuffer, PresentationParameters, PrimitiveType, RasterizerState,
     RenderTarget2D, RenderTargetBinding, RenderTargetCube, ResourceCreatedEventArgs,
     ResourceDestroyedEventArgs, SamplerStateCollection, TextureCollection, VertexBuffer,
@@ -490,6 +490,13 @@ impl GraphicsDevice {
         Arc::ptr_eq(&self.state, &other.state)
     }
 
+    /// XNA's `Vector4` clear overload.
+    ///
+    /// XNA does not keep the floating-point color: its first statement is
+    /// `new Color(color)`, so the value is packed to eight bits per channel
+    /// before it reaches the device. The projection performs the same pack and
+    /// then calls the same canonical route as the `Color` overload, which is
+    /// why both overloads agree exactly.
     pub fn Clear(
         &self,
         options: crate::Microsoft::Xna::Framework::Graphics::ClearOptions,
@@ -497,13 +504,12 @@ impl GraphicsDevice {
         depth: f32,
         stencil: i32,
     ) -> Result<()> {
-        let _ = (depth, stencil);
-        if options != crate::Microsoft::Xna::Framework::Graphics::ClearOptions::Target {
-            return Err(CnaError::UnsupportedRuntime(
-                "CNA ABI 0.7 exposes color-target clear but not the mapped depth/stencil clear route",
-            ));
-        }
-        self.clear_rgba([color.X, color.Y, color.Z, color.W])
+        self.ClearWithOptionsAndColorAndDepthAndStencil(
+            options,
+            Color::from_vector(color),
+            depth,
+            stencil,
+        )
     }
 
     pub fn ClearWithOptionsAndColorAndDepthAndStencil(
@@ -513,23 +519,64 @@ impl GraphicsDevice {
         depth: f32,
         stencil: i32,
     ) -> Result<()> {
-        self.Clear(options, color.ToVector4(), depth, stencil)
+        self.state.native.clear_graphics_device_options(
+            self.state.handle()?,
+            options.bits(),
+            super::texture_cube::color_to_native(color),
+            depth,
+            stencil,
+        )
     }
 
+    /// XNA's single-argument clear.
+    ///
+    /// XNA defines it as `Clear(DefaultClearOptions, color, 1f, 0)`, and
+    /// `DefaultClearOptions` is not a constant: it is `Target`, plus
+    /// `DepthBuffer` when the active depth-stencil format is not `None`, plus
+    /// `Stencil` only for `Depth24Stencil8`. The active format is render target
+    /// zero's when any render target is bound and the presentation
+    /// parameters' otherwise.
     pub fn ClearWithColor(&self, color: Color) -> Result<()> {
-        let scale = 1.0 / 255.0;
-        self.clear_rgba([
-            f32::from(color.R()) * scale,
-            f32::from(color.G()) * scale,
-            f32::from(color.B()) * scale,
-            f32::from(color.A()) * scale,
-        ])
+        let options = self.default_clear_options()?;
+        self.ClearWithOptionsAndColorAndDepthAndStencil(options, color, 1.0, 0)
     }
 
-    fn clear_rgba(&self, rgba: [f32; 4]) -> Result<()> {
+    /// CNA's float-channel color clear.
+    ///
+    /// Strict XNA cannot reach this: every XNA clear overload packs its color
+    /// to eight bits per channel before the device sees it. The route is
+    /// published through `cna::extensions::graphics` instead of being dropped,
+    /// because a CNA renderer with a wide color target can use the precision
+    /// XNA discards.
+    pub(crate) fn clear_color_channels(&self, rgba: [f32; 4]) -> Result<()> {
         self.state
             .native
             .clear_graphics_device(self.state.handle()?, rgba)
+    }
+
+    fn default_clear_options(
+        &self,
+    ) -> Result<crate::Microsoft::Xna::Framework::Graphics::ClearOptions> {
+        use crate::Microsoft::Xna::Framework::Graphics::ClearOptions;
+        let bound = self
+            .state
+            .bound_render_targets
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let format = match bound.first() {
+            Some(binding) => binding.depth_stencil_format(),
+            None => {
+                drop(bound);
+                self.PresentationParameters()?.DepthStencilFormat()
+            }
+        };
+        Ok(match format {
+            DepthFormat::None => ClearOptions::Target,
+            DepthFormat::Depth24Stencil8 => {
+                ClearOptions::Target | ClearOptions::DepthBuffer | ClearOptions::Stencil
+            }
+            _ => ClearOptions::Target | ClearOptions::DepthBuffer,
+        })
     }
 
     pub fn Viewport(&self) -> Result<Viewport> {
@@ -1692,8 +1739,13 @@ impl GraphicsDevice {
         if self.IsDisposed()? {
             return Ok(());
         }
+        // Not a missing route: `cna_graphics_device_dispose` exists and
+        // answers NOT_SUPPORTED by design for the running game's device,
+        // because disposing it through a borrowed handle would leave that game
+        // drawing into a destroyed device. `cna_game_destroy` performs the
+        // canonical disposal instead, and `IsDisposed` observes the result.
         Err(CnaError::UnsupportedRuntime(
-            "CNA ABI 0.7 has no independent game-owned GraphicsDevice dispose route",
+            "CNA reserves GraphicsDevice disposal to the owning Game; a borrowed device cannot dispose itself",
         ))
     }
 

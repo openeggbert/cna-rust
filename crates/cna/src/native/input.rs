@@ -16,6 +16,16 @@ impl Native {
         self.check(unsafe { (self.keyboard_get_state)(game, state) })
     }
 
+    pub(crate) fn keyboard_state_for_player(
+        &self,
+        game: sys::CNA_Handle,
+        player_index: sys::CNA_PlayerIndex,
+        state: &mut sys::CNA_KeyboardState,
+    ) -> Result<()> {
+        // SAFETY: the callback-scoped game and output reference are live.
+        self.check(unsafe { (self.keyboard_get_state_for_player)(game, player_index, state) })
+    }
+
     pub(crate) fn mouse_state(
         &self,
         game: sys::CNA_Handle,

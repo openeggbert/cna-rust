@@ -395,6 +395,17 @@ impl RenderTargetBinding {
         }
     }
 
+    /// The bound target's own depth-stencil format.
+    ///
+    /// XNA's `DefaultClearOptions` reads exactly this from render target zero
+    /// when any render target is set, rather than the presentation parameters.
+    pub(super) fn depth_stencil_format(&self) -> DepthFormat {
+        match &self.target {
+            BoundTarget::TwoD(value) => value.DepthStencilFormat(),
+            BoundTarget::Cube(value) => value.DepthStencilFormat(),
+        }
+    }
+
     pub(super) fn handle(&self) -> Result<sys::CNA_Handle> {
         match &self.target {
             BoundTarget::TwoD(value) => value.handle(),

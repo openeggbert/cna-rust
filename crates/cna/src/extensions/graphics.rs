@@ -46,6 +46,32 @@ impl RendererInfoExt for GraphicsDevice {
     }
 }
 
+/// CNA's unquantized color clear.
+///
+/// XNA has no equivalent. `GraphicsDevice.Clear(ClearOptions, Vector4, ...)`
+/// looks like a floating-point clear but its first statement is
+/// `new Color(color)`, so every strict overload reaches the device with eight
+/// bits per channel. CNA also publishes a clear that keeps the four `f32`
+/// channels, and this is that route.
+pub trait FloatClearExt {
+    /// Clears the color target from four finite linear channels.
+    ///
+    /// This clears the color target only; it carries no depth or stencil
+    /// value, which is why it is not a spelling of an XNA overload.
+    ///
+    /// # Errors
+    ///
+    /// Returns the exact error CNA reports, including the argument error for a
+    /// non-finite channel and the backend's refusal when it cannot clear.
+    fn clear_color_channels(&self, rgba: [f32; 4]) -> Result<()>;
+}
+
+impl FloatClearExt for GraphicsDevice {
+    fn clear_color_channels(&self, rgba: [f32; 4]) -> Result<()> {
+        GraphicsDevice::clear_color_channels(self, rgba)
+    }
+}
+
 /// Inherited read-only collection operations for XNA model graph views.
 #[allow(non_snake_case)]
 pub trait ModelCollectionExt<T: ?Sized> {

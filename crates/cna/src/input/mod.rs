@@ -4,7 +4,7 @@ use core::{any::Any, mem::size_of};
 
 use cna_sys as sys;
 
-use crate::error::{CnaError, Result};
+use crate::error::Result;
 use crate::game::GameContext;
 
 mod gamepad;
@@ -326,14 +326,25 @@ impl Keyboard {
         Ok(KeyboardState::from_native_words(state.pressed_key_words))
     }
 
+    /// XNA's per-player Chatpad overload.
+    ///
+    /// CNA has one keyboard, so every slot answers with the snapshot
+    /// `GetState` produces; the canonical route exists because the canonical
+    /// API has the overload, and the projection calls it rather than
+    /// forwarding to `GetState` so a future per-slot backend is observed here
+    /// without a Rust change.
     pub fn GetStateWithPlayerIndex(
         game: &GameContext<'_>,
         playerIndex: PlayerIndex,
     ) -> Result<KeyboardState> {
-        let _ = (game, playerIndex);
-        Err(CnaError::UnsupportedRuntime(
-            "CNA ABI 0.7 has no player-indexed Chatpad keyboard-state route",
-        ))
+        let mut state = sys::CNA_KeyboardState {
+            struct_size: size_of::<sys::CNA_KeyboardState>() as u32,
+            struct_version: 1,
+            pressed_key_words: [0; 4],
+        };
+        game.native
+            .keyboard_state_for_player(game.handle, playerIndex as u32, &mut state)?;
+        Ok(KeyboardState::from_native_words(state.pressed_key_words))
     }
 }
 

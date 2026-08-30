@@ -407,6 +407,9 @@ pub const CNA_BUFFER_USAGE_NONE: CNA_BufferUsage = 0;
 pub const CNA_BUFFER_USAGE_WRITE_ONLY: CNA_BufferUsage = 1;
 pub const CNA_INDEX_ELEMENT_SIZE_SIXTEEN_BITS: CNA_IndexElementSize = 0;
 pub const CNA_INDEX_ELEMENT_SIZE_THIRTY_TWO_BITS: CNA_IndexElementSize = 1;
+pub const CNA_CLEAR_OPTION_TARGET: CNA_ClearOptions = 1;
+pub const CNA_CLEAR_OPTION_DEPTH_BUFFER: CNA_ClearOptions = 2;
+pub const CNA_CLEAR_OPTION_STENCIL: CNA_ClearOptions = 4;
 pub const CNA_SET_DATA_NONE: CNA_SetDataOptions = 0;
 pub const CNA_SET_DATA_DISCARD: CNA_SetDataOptions = 1;
 pub const CNA_SET_DATA_NO_OVERWRITE: CNA_SetDataOptions = 2;
@@ -569,6 +572,7 @@ pub type CNA_TextureDataType = u32;
 pub type CNA_TextureImageFormat = u32;
 pub type CNA_BufferUsage = u32;
 pub type CNA_IndexElementSize = u32;
+pub type CNA_ClearOptions = u32;
 pub type CNA_SetDataOptions = u32;
 pub type CNA_PrimitiveType = u32;
 pub type CNA_UserVertexSource = u32;
@@ -1916,6 +1920,8 @@ pub type cna_graphics_device_get_backbuffer_data_window_fn = unsafe extern "C" f
 ) -> CNA_Result;
 pub type cna_graphics_device_clear_rgba_fn =
     unsafe extern "C" fn(CNA_Handle, f32, f32, f32, f32) -> CNA_Result;
+pub type cna_graphics_device_clear_options_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_ClearOptions, CNA_Color, f32, i32) -> CNA_Result;
 pub type cna_graphics_device_set_vertex_buffer_fn =
     unsafe extern "C" fn(CNA_Handle, CNA_VertexBufferHandle) -> CNA_Result;
 pub type cna_graphics_device_set_vertex_buffer_offset_fn =
@@ -2097,6 +2103,23 @@ pub type cna_vertex_buffer_set_data_raw_fn =
     unsafe extern "C" fn(CNA_VertexBufferHandle, *const c_void, u64, u64, u32) -> CNA_Result;
 pub type cna_vertex_buffer_set_data_raw_at_fn =
     unsafe extern "C" fn(CNA_VertexBufferHandle, u64, *const c_void, u64, u64, u32) -> CNA_Result;
+pub type cna_vertex_buffer_set_data_raw_with_options_fn = unsafe extern "C" fn(
+    CNA_VertexBufferHandle,
+    *const c_void,
+    u64,
+    u64,
+    u32,
+    CNA_SetDataOptions,
+) -> CNA_Result;
+pub type cna_vertex_buffer_set_data_raw_at_with_options_fn = unsafe extern "C" fn(
+    CNA_VertexBufferHandle,
+    u64,
+    *const c_void,
+    u64,
+    u64,
+    u32,
+    CNA_SetDataOptions,
+) -> CNA_Result;
 pub type cna_vertex_buffer_get_data_raw_fn =
     unsafe extern "C" fn(CNA_VertexBufferHandle, u64, *mut c_void, u64, u64, u32) -> CNA_Result;
 pub type cna_index_buffer_create_fn = unsafe extern "C" fn(
@@ -2596,6 +2619,8 @@ pub type cna_effect_technique_collection_find_fn = unsafe extern "C" fn(
     *mut CNA_Bool,
     *mut CNA_EffectTechniqueHandle,
 ) -> CNA_Result;
+pub type cna_keyboard_get_state_for_player_fn =
+    unsafe extern "C" fn(CNA_Handle, CNA_PlayerIndex, *mut CNA_KeyboardState) -> CNA_Result;
 pub type cna_keyboard_get_state_fn =
     unsafe extern "C" fn(CNA_Handle, *mut CNA_KeyboardState) -> CNA_Result;
 pub type cna_keyboard_state_is_key_down_fn =
