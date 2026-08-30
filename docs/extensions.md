@@ -221,6 +221,15 @@ Where upstream CNA marks an API experimental, this crate says so rather than
 presenting it as stable. The engine layer is the large case and is not yet
 bound; when it is, it will be reachable under a name that says what it is.
 
+## What is actually verified
+
+`docs/runtime-capabilities.md` carries a row per extension family with what was
+measured and what was not. It uses a different status vocabulary from the XNA
+capabilities above it, because an extension is measured on a different axis: a
+route existing is not the same as it working here, so a family says whether it
+is `API_PRESENT`, `VERIFIED_HEADLESS`, `VERIFIED_REAL_RENDERER`,
+`NOT_SUPPORTED_BY_BACKEND`, `HARDWARE_PENDING` or `UPSTREAM_BLOCKED`.
+
 ## Packaging
 
 Both crates ship the Ms-PL text and the notice file. `tools/package-consumer`

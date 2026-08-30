@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "scope": "Microsoft XNA 4.0 Windows Audio/XACT and Media/Video projection",
+  "scope": "Microsoft XNA 4.0 Windows Audio/XACT and Media/Video projection, plus every cna::extensions family",
   "qualifiedArtifactSha256": "195924825a12290cdd2244fc845e119295de515cf27d1f6b31e1ecc84e93f05d",
   "abiVersion": "0.20",
   "rows": [
@@ -331,6 +331,74 @@
         "LANGUAGE_MAPPING_LIMITATION"
       ],
       "evidence": "The three public exception identities are projected as marker/error values; ordinary Rust operations use Result<T, CnaError> per the established mapping instead of CLR throw semantics."
+    }
+  ],
+  "extensions": [
+    {
+      "family": "extensions::runtime",
+      "routes": 35,
+      "statuses": [
+        "VERIFIED_HEADLESS"
+      ],
+      "evidence": "Platform and desktop-OS identity, renderer identity, availability, backend category and maturity, the preferred selection and its latch, the fallback chain and CNA's fallback history are all exercised against the live library. The latch is proven by creating a real renderer: set_preferred_renderer is accepted before it and refused after."
+    },
+    {
+      "family": "extensions::logging",
+      "routes": 19,
+      "statuses": [
+        "VERIFIED_HEADLESS"
+      ],
+      "evidence": "Seven levels and their conditional forms, the level filter, and a Rust sink. The sink's panic is caught at the FFI boundary, the sink is uninstalled, and the caller still sees Ok; the test asserts the panicking sink is called exactly once."
+    },
+    {
+      "family": "extensions::graphics renderer capabilities",
+      "routes": 6,
+      "statuses": [
+        "VERIFIED_HEADLESS"
+      ],
+      "evidence": "Every named feature, limit and format answers on HEADLESS. The invariant that a renderer cannot support a usage it has no answer for is asserted, as is agreement between the per-feature answer and the renderer summary."
+    },
+    {
+      "family": "extensions::graphics extended effects",
+      "routes": 24,
+      "statuses": [
+        "VERIFIED_HEADLESS"
+      ],
+      "evidence": "CRT, depth and ASCII post-processing effects are all created on this host's HEADLESS build with CNA_CNAEXT=ON, and every knob round-trips through CNA rather than a cached Rust value. A build with the layer compiled out, or a renderer that refuses, is a documented answer the test admits from NOT_SUPPORTED or INVALID_STATE only."
+    },
+    {
+      "family": "extensions::devices",
+      "routes": 16,
+      "statuses": [
+        "VERIFIED_HEADLESS",
+        "HARDWARE_PENDING"
+      ],
+      "evidence": "Power, system facts, locale, display and clipboard answer against the live library with CNA_DEVICES=ON. A battery percentage, a remaining time and the display content scale are Option because CNA's canonical unknown would otherwise read as a real value; this headless host has no window, so the content scale is measured as None. No physical battery or clipboard peer was available, so the values themselves are not qualified."
+    },
+    {
+      "family": "extensions::content (.cnb)",
+      "routes": 33,
+      "statuses": [
+        "VERIFIED_HEADLESS"
+      ],
+      "evidence": "Build texture data, encode a Texture2D document, parse it back, read container version, asset identity and metadata, decode the texture, and compare the pixels byte for byte. Bounded parsing is proven by a file-size limit below a real document's size refusing it. Model, sprite font, sound effect and the loader registry are not bound yet."
+    },
+    {
+      "family": "extensions::net packet buffers",
+      "routes": 0,
+      "statuses": [
+        "VERIFIED_MANAGED"
+      ],
+      "evidence": "PacketWriter and PacketReader are exact managed Rust with no native backing; the corpus asserts XNA's bit-reinterpreting float write by round-tripping a specific NaN payload. The two routes here reach buffers XNA keeps internal to its network session."
+    },
+    {
+      "family": "extensions::media video frame identity",
+      "routes": 1,
+      "statuses": [
+        "VERIFIED_NATIVE",
+        "BACKEND_BLOCKED"
+      ],
+      "evidence": "The monotonic frame generation and presentation time are read from cna_video_player_get_frame_ext. HEADLESS decodes nothing, so the measured answer is the canonical no-frame one; a real decoder backend is what remains to exercise a decoded frame."
     }
   ]
 }

@@ -24,6 +24,17 @@ VALID_STATUSES = {
     "LANGUAGE_MAPPING_LIMITATION",
 }
 
+# An extension family is measured on a different axis from an XNA capability.
+# "The route exists" is not "the route works here", so a family says which of
+# those it has been taken to.
+VALID_EXTENSION_STATUSES = VALID_STATUSES | {
+    "API_PRESENT",
+    "VERIFIED_HEADLESS",
+    "VERIFIED_REAL_RENDERER",
+    "NOT_SUPPORTED_BY_BACKEND",
+    "UPSTREAM_BLOCKED",
+}
+
 
 def load(path: Path) -> dict:
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -46,6 +57,20 @@ def load(path: Path) -> dict:
             raise SystemExit(f"unknown statuses for {name}: {sorted(unknown)}")
         if row.get("strictComplete") is not True:
             raise SystemExit(f"runtime strict completion is false for {name}")
+    families: set[str] = set()
+    for family in data.get("extensions", []):
+        name = family.get("family")
+        if not isinstance(name, str) or not name or name in families:
+            raise SystemExit(f"invalid or duplicate extension family: {name!r}")
+        families.add(name)
+        statuses = family.get("statuses")
+        if not isinstance(statuses, list) or not statuses:
+            raise SystemExit(f"extension family has no status: {name}")
+        unknown = set(statuses) - VALID_EXTENSION_STATUSES
+        if unknown:
+            raise SystemExit(f"unknown statuses for {name}: {sorted(unknown)}")
+        if not family.get("evidence"):
+            raise SystemExit(f"extension family has no evidence: {name}")
     return data
 
 
@@ -101,6 +126,26 @@ def render(data: dict) -> str:
             "",
         ]
     )
+    if data.get("extensions"):
+        lines.extend(
+            [
+                "## CNA extension families",
+                "",
+                "An extension is measured on a different axis from an XNA capability: a route",
+                "existing is not the same as it working here, so each family says which of those",
+                "it has been taken to.",
+                "",
+                "| Family | Bound routes | Status | Evidence |",
+                "|---|---:|---|---|",
+            ]
+        )
+        for family in data["extensions"]:
+            statuses = ", ".join(f"`{value}`" for value in family["statuses"])
+            evidence = family["evidence"].replace("|", "\\|")
+            lines.append(
+                f"| `{family['family']}` | {family['routes']} | {statuses} | {evidence} |"
+            )
+        lines.append("")
     return "\n".join(lines)
 
 

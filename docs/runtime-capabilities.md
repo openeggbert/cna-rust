@@ -2,7 +2,7 @@
 
 Generated from `tools/runtime-capabilities/capabilities.json`; do not edit by hand.
 
-Scope: Microsoft XNA 4.0 Windows Audio/XACT and Media/Video projection
+Scope: Microsoft XNA 4.0 Windows Audio/XACT and Media/Video projection, plus every cna::extensions family
 
 Qualified CNA ABI: `0.20`
 Qualified artifact SHA-256: `195924825a12290cdd2244fc845e119295de515cf27d1f6b31e1ecc84e93f05d`
@@ -46,3 +46,20 @@ Qualified artifact SHA-256: `195924825a12290cdd2244fc845e119295de515cf27d1f6b31e
 | CLR Audio exception delivery | complete | `VERIFIED_MANAGED`, `LANGUAGE_MAPPING_LIMITATION` | The three public exception identities are projected as marker/error values; ordinary Rust operations use Result<T, CnaError> per the established mapping instead of CLR throw semantics. |
 
 `strictComplete` records API/ownership implementation completeness; it does not upgrade pending or blocked runtime semantics.
+
+## CNA extension families
+
+An extension is measured on a different axis from an XNA capability: a route
+existing is not the same as it working here, so each family says which of those
+it has been taken to.
+
+| Family | Bound routes | Status | Evidence |
+|---|---:|---|---|
+| `extensions::runtime` | 35 | `VERIFIED_HEADLESS` | Platform and desktop-OS identity, renderer identity, availability, backend category and maturity, the preferred selection and its latch, the fallback chain and CNA's fallback history are all exercised against the live library. The latch is proven by creating a real renderer: set_preferred_renderer is accepted before it and refused after. |
+| `extensions::logging` | 19 | `VERIFIED_HEADLESS` | Seven levels and their conditional forms, the level filter, and a Rust sink. The sink's panic is caught at the FFI boundary, the sink is uninstalled, and the caller still sees Ok; the test asserts the panicking sink is called exactly once. |
+| `extensions::graphics renderer capabilities` | 6 | `VERIFIED_HEADLESS` | Every named feature, limit and format answers on HEADLESS. The invariant that a renderer cannot support a usage it has no answer for is asserted, as is agreement between the per-feature answer and the renderer summary. |
+| `extensions::graphics extended effects` | 24 | `VERIFIED_HEADLESS` | CRT, depth and ASCII post-processing effects are all created on this host's HEADLESS build with CNA_CNAEXT=ON, and every knob round-trips through CNA rather than a cached Rust value. A build with the layer compiled out, or a renderer that refuses, is a documented answer the test admits from NOT_SUPPORTED or INVALID_STATE only. |
+| `extensions::devices` | 16 | `VERIFIED_HEADLESS`, `HARDWARE_PENDING` | Power, system facts, locale, display and clipboard answer against the live library with CNA_DEVICES=ON. A battery percentage, a remaining time and the display content scale are Option because CNA's canonical unknown would otherwise read as a real value; this headless host has no window, so the content scale is measured as None. No physical battery or clipboard peer was available, so the values themselves are not qualified. |
+| `extensions::content (.cnb)` | 33 | `VERIFIED_HEADLESS` | Build texture data, encode a Texture2D document, parse it back, read container version, asset identity and metadata, decode the texture, and compare the pixels byte for byte. Bounded parsing is proven by a file-size limit below a real document's size refusing it. Model, sprite font, sound effect and the loader registry are not bound yet. |
+| `extensions::net packet buffers` | 0 | `VERIFIED_MANAGED` | PacketWriter and PacketReader are exact managed Rust with no native backing; the corpus asserts XNA's bit-reinterpreting float write by round-tripping a specific NaN payload. The two routes here reach buffers XNA keeps internal to its network session. |
+| `extensions::media video frame identity` | 1 | `VERIFIED_NATIVE`, `BACKEND_BLOCKED` | The monotonic frame generation and presentation time are read from cna_video_player_get_frame_ext. HEADLESS decodes nothing, so the measured answer is the canonical no-frame one; a real decoder backend is what remains to exercise a decoded frame. |
