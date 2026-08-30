@@ -66,6 +66,31 @@ fails, and the binding surfaces that refusal instead of pretending the change
 took effect. `renderer_fallbacks()` is CNA's own account of what it tried and
 passed over, empty on a build whose first choice worked.
 
+### `logging` — the process log, its level filter, and a Rust sink
+
+XNA has no logging surface, so the whole family is a CNA concept. The
+destination is a correctness matter rather than a preference: CNA's default
+sink writes to stderr and never stdout, because a terminal-hosted game draws
+its frame on stdout and a log line there would corrupt it.
+
+```rust,ignore
+use cna::extensions::logging::{set_sink, set_minimum_level, LogLevel};
+
+set_minimum_level(LogLevel::Debug)?;
+set_sink(Box::new(|level, category, message: &str| {
+    eprintln!("[{level:?}][{category:?}] {message}");
+}))?;
+```
+
+The sink lives in this crate rather than behind the caller-owned context
+pointer CNA offers. Passing null instead means there is no Rust address handed
+to C that could dangle across a replacement, and nothing for the trampoline to
+validate. A sink that panics is contained at the FFI boundary and uninstalled,
+so one bad line does not repeat for the life of the process;
+`sink_panicked()` reports that it happened. A sink that logs would re-enter the
+sink lock, which CNA's contract forbids; rather than deadlock on a contract
+violation the line is dropped.
+
 ### `graphics` — CNA graphics facts and construction routes
 
 Renderer diagnostics for a strict `GraphicsDevice`, CNA's reflection-capable

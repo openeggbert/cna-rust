@@ -48,7 +48,7 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | ID | Subject | Canonical authority | Status |
 |---|---|---|---|
 | RUST-EXT-001 | Renderer selection, availability and fallback chain | `core_ext.h` | DONE |
-| RUST-EXT-002 | Logging sink and minimum level | `core_ext.h` | READY |
+| RUST-EXT-002 | Logging sink and minimum level | `core_ext.h` | DONE |
 | RUST-EXT-011 | Platform and desktop-OS identity | `core_ext.h` | DONE |
 | RUST-EXT-012 | Backend category and maturity classification | `core_ext.h` | DONE |
 | RUST-EXT-003 | Renderer capability report, limits and feature support | `graphics.h`, `graphics_device.h` | READY |

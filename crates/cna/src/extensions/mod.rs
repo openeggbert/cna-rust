@@ -7,6 +7,7 @@
 
 pub mod events;
 pub mod graphics;
+pub mod logging;
 pub mod media;
 pub mod net;
 pub mod runtime;

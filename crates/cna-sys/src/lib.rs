@@ -81,6 +81,22 @@ pub const CNA_VIDEO_SOUNDTRACK_TYPE_MUSIC_AND_DIALOG: CNA_VideoSoundtrackType = 
 pub const CNA_VISUALIZATION_DATA_SIZE: u32 = 256;
 pub const CNA_VIDEO_FRAME_EXT_STRUCT_VERSION: u32 = 1;
 pub const CNA_GRAPHICS_RENDERER_FALLBACK_RECORD_STRUCT_VERSION: u32 = 1;
+pub const CNA_LOG_LEVEL_FATAL: CNA_LogLevel = 0;
+pub const CNA_LOG_LEVEL_ERROR: CNA_LogLevel = 1;
+pub const CNA_LOG_LEVEL_WARN: CNA_LogLevel = 2;
+pub const CNA_LOG_LEVEL_INFO: CNA_LogLevel = 3;
+pub const CNA_LOG_LEVEL_DEBUG: CNA_LogLevel = 4;
+pub const CNA_LOG_LEVEL_TRACE: CNA_LogLevel = 5;
+pub const CNA_LOG_LEVEL_EXPERIMENT: CNA_LogLevel = 100;
+pub const CNA_LOG_CATEGORY_APPLICATION: CNA_LogCategory = 0;
+pub const CNA_LOG_CATEGORY_ERROR: CNA_LogCategory = 1;
+pub const CNA_LOG_CATEGORY_SYSTEM: CNA_LogCategory = 2;
+pub const CNA_LOG_CATEGORY_AUDIO: CNA_LogCategory = 3;
+pub const CNA_LOG_CATEGORY_VIDEO: CNA_LogCategory = 4;
+pub const CNA_LOG_CATEGORY_RENDER: CNA_LogCategory = 5;
+pub const CNA_LOG_CATEGORY_INPUT: CNA_LogCategory = 6;
+pub const CNA_LOG_CATEGORY_TEST: CNA_LogCategory = 7;
+pub const CNA_LOG_CATEGORY_GPU: CNA_LogCategory = 8;
 pub const CNA_PLATFORM_DESKTOP: CNA_Platform = 0;
 pub const CNA_PLATFORM_ANDROID: CNA_Platform = 1;
 pub const CNA_PLATFORM_IOS: CNA_Platform = 2;
@@ -427,6 +443,8 @@ pub type CNA_GraphicsRendererType = u32;
 pub type CNA_GraphicsBackendCategory = u32;
 pub type CNA_GraphicsBackendMaturity = u32;
 pub type CNA_GraphicsRendererFallbackReason = u32;
+pub type CNA_LogLevel = u32;
+pub type CNA_LogCategory = u32;
 pub type CNA_Platform = u32;
 pub type CNA_DesktopOS = u32;
 pub type CNA_SurfaceFormat = u32;
@@ -3698,6 +3716,11 @@ mod layout_tests {
     }
 }
 
+/// Receives one formatted log line. The bytes are borrowed for the call.
+pub type CNA_LogSinkCallback = Option<
+    unsafe extern "C" fn(CNA_LogLevel, CNA_LogCategory, CNA_StringView, *mut c_void),
+>;
+
 // --- CNA runtime identity and renderer selection (core_ext.h) ---
 
 pub type cna_platform_get_current_fn = unsafe extern "C" fn(*mut CNA_Platform) -> CNA_Result;
@@ -3795,3 +3818,31 @@ pub type cna_graphics_renderer_get_current_name_size_fn = unsafe extern "C" fn(
 pub type cna_graphics_renderer_copy_current_name_fn = unsafe extern "C" fn(
     *mut c_char, u64, *mut u64,
 ) -> CNA_Result;
+
+// --- CNA logging (core_ext.h) ---
+
+pub type cna_logger_log_fn = unsafe extern "C" fn(
+    CNA_LogLevel, CNA_StringView, CNA_LogCategory, CNA_Bool,
+) -> CNA_Result;
+pub type cna_logger_fatal_fn = unsafe extern "C" fn(CNA_StringView, CNA_LogCategory) -> CNA_Result;
+pub type cna_logger_error_fn = unsafe extern "C" fn(CNA_StringView, CNA_LogCategory) -> CNA_Result;
+pub type cna_logger_warn_fn = unsafe extern "C" fn(CNA_StringView, CNA_LogCategory) -> CNA_Result;
+pub type cna_logger_info_fn = unsafe extern "C" fn(CNA_StringView, CNA_LogCategory) -> CNA_Result;
+pub type cna_logger_debug_fn = unsafe extern "C" fn(CNA_StringView, CNA_LogCategory) -> CNA_Result;
+pub type cna_logger_trace_fn = unsafe extern "C" fn(CNA_StringView, CNA_LogCategory) -> CNA_Result;
+pub type cna_logger_experiment_fn = unsafe extern "C" fn(
+    CNA_StringView, CNA_LogCategory,
+) -> CNA_Result;
+pub type cna_logger_fatal_if_fn = unsafe extern "C" fn(CNA_StringView, CNA_Bool) -> CNA_Result;
+pub type cna_logger_error_if_fn = unsafe extern "C" fn(CNA_StringView, CNA_Bool) -> CNA_Result;
+pub type cna_logger_warn_if_fn = unsafe extern "C" fn(CNA_StringView, CNA_Bool) -> CNA_Result;
+pub type cna_logger_info_if_fn = unsafe extern "C" fn(CNA_StringView, CNA_Bool) -> CNA_Result;
+pub type cna_logger_debug_if_fn = unsafe extern "C" fn(CNA_StringView, CNA_Bool) -> CNA_Result;
+pub type cna_logger_trace_if_fn = unsafe extern "C" fn(CNA_StringView, CNA_Bool) -> CNA_Result;
+pub type cna_logger_experiment_if_fn = unsafe extern "C" fn(CNA_StringView, CNA_Bool) -> CNA_Result;
+pub type cna_logger_set_minimum_level_fn = unsafe extern "C" fn(CNA_LogLevel) -> CNA_Result;
+pub type cna_logger_get_minimum_level_fn = unsafe extern "C" fn(*mut CNA_LogLevel) -> CNA_Result;
+pub type cna_logger_set_sink_ext_fn = unsafe extern "C" fn(
+    CNA_LogSinkCallback, *mut c_void,
+) -> CNA_Result;
+pub type cna_logger_reset_sink_ext_fn = unsafe extern "C" fn() -> CNA_Result;
