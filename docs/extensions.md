@@ -94,3 +94,16 @@ so the strict hierarchy contains only members Microsoft declared.
 Where upstream CNA marks an API experimental, this crate says so rather than
 presenting it as stable. The engine layer is the large case and is not yet
 bound; when it is, it will be reachable under a name that says what it is.
+
+## Packaging
+
+Both crates ship the Ms-PL text and the notice file. `tools/package-consumer`
+builds an outside project against **only** the files each crate would ship, so
+a source file the crate needs but does not package fails there rather than on a
+user's machine; it also fails if any staged file still names the development
+workspace.
+
+`cargo package -p cna-rust` itself cannot run before `cna-rust-sys` is
+published, because Cargo resolves the path dependency's version through the
+registry. That is a publish-order fact, not a defect, and it is why the
+packaged-source consumer stages the file list directly.

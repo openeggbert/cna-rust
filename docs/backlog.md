@@ -66,7 +66,8 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-PLATFORM-001 | Windows dynamic loader | source complete; no Windows Rust target on this host, so `COMPILE_NOT_VERIFIED_PLATFORM` | DONE |
 | RUST-PLATFORM-002 | macOS loader | already `#[cfg(unix)]`; needs a runtime run | BLOCKED_PLATFORM |
 | RUST-PLATFORM-003 | WebAssembly | re-measure the canonical wasm C ABI route | READY |
-| RUST-PACKAGE-001 | `cargo package` file list, notices, no native binary | clean package | READY |
+| RUST-PACKAGE-001 | `cargo package` file list, notices, no native binary | LICENSE and NOTICE.md now ship with each crate; an outside consumer builds from the packaged file set alone | DONE |
+| RUST-PACKAGE-003 | `cargo package -p cna-rust` needs `cna-rust-sys` published first | publish order recorded | BLOCKED_UPSTREAM |
 | RUST-PACKAGE-002 | MSRV 1.74 evidence | toolchain not installed; source audit only | BLOCKED_PLATFORM |
 | RUST-TEMPLATE-001 | Template against the live artifact | 60/600 frames on ABI 0.20 | READY |
 | RUST-TEMPLATE-002 | Template modern-extension canary | one opt-in smoke route | READY |

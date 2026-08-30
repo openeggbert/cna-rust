@@ -204,6 +204,11 @@ python3 tools/native-abi/verify.py \
   --cna-root /path/to/cna \
   --library /path/to/libcna_c_api.so
 
+CNA_ROOT=/path/to/cna python3 tools/c-api-inventory/inventory.py
+
+# Builds an outside consumer from exactly the files the crates would ship.
+python3 tools/package-consumer/verify.py
+
 CNA_NATIVE_LIBRARY=/path/to/libcna_c_api.so \
   cargo test --workspace --all-features --test native_stress -- --nocapture
 ```
