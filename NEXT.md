@@ -16,12 +16,12 @@ LIBRARY_EXPORTS=4051
 
 REVIEWED_SYMBOLS_REMOVED=0
 REVIEWED_SYMBOLS_ARITY_CHANGED=0
-ABI_FUNCTIONS=809
-PROTOTYPE_TYPE_POSITIONS=2737
-C_RUST_MEASUREMENTS=1135
-LAYOUTS=65
+ABI_FUNCTIONS=842
+PROTOTYPE_TYPE_POSITIONS=2863
+C_RUST_MEASUREMENTS=1179
+LAYOUTS=68
 CALLBACKS=8
-CONSTANTS=346
+CONSTANTS=363
 ABI_FINDINGS=0
 
 CANONICAL_ROUTES=4051
@@ -58,8 +58,8 @@ builds its C API, because ABI 0.20.0 is exactly the version that moved
 Work the backlog in [docs/backlog.md](docs/backlog.md). The highest-value ready
 items, in order:
 
-1. Continue `cna::extensions`: the `.cnb` content vertical slice, then modern
-   input and sensors.
+1. Continue `cna::extensions`: `.cnb` Model and the loader registry, then
+   modern input and sensors.
 2. Close the remaining 43-type `xna40-windows-full` gap: the GamerServices,
    Avatar and Net object model over `gamer_services.h` and `net*.h`.
 3. Windows loader source support, packaging qualification, and the template's

@@ -134,6 +134,42 @@ into one texture in place and publishes a monotonic counter instead.
 in. These are language projections rather than CNA concepts, and they live here
 so the strict hierarchy contains only members Microsoft declared.
 
+### `content` — the `.cnb` container
+
+XNA has one content format, `.xnb`, and `ContentManager` reads it. CNA has its
+own, and it lives here: the strict
+`Microsoft::Xna::Framework::Content::ContentManager` is never taught to
+reinterpret a non-XNA format, because a game that asks XNA for an asset must
+get XNA's answer.
+
+The implemented slice is one complete vertical: build texture data, encode it
+as a `.cnb` document, parse a document back, read its metadata, and decode a
+texture out of it.
+
+```rust,ignore
+use cna::extensions::content::{CnbDocument, CnbTextureData, ReadLimits};
+
+let bytes = CnbTextureData::from_rgba8(width, height, &rgba)?.encode_texture2d("hero")?;
+let document = CnbDocument::parse(&bytes, "hero.cnb", ReadLimits::default())?;
+let pixels = document.decode_texture2d()?.level_bytes(0, 0)?;
+```
+
+Both handle kinds are owned and released by `Drop`, and nothing borrows a
+native buffer past a call.
+
+`ReadLimits` is not decoration. A `.cnb` file is untrusted input, so the parser
+is bounded rather than trusting the file's own counts, and the test proves a
+bound below a real document's size refuses it.
+
+`AssetTypeId::custom` mints a game-defined identity by hashing the name into
+CNA's custom range. It is deliberately **not** the inverse of
+`AssetTypeId::name`: minting from a built-in type's name yields a custom
+identity, not that built-in. Naming the method `from_name` implied an inverse
+that does not exist, which the round-trip test caught.
+
+A `.cnb` pixel format that has no XNA `SurfaceFormat` counterpart reports
+`UnsupportedRuntime` rather than being forced onto the nearest XNA format.
+
 ### `devices` — power, system facts, locale, display and clipboard
 
 CNA's device layer, none of which XNA 4.0 has. Every route takes the same

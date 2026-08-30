@@ -54,7 +54,8 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-EXT-003 | Renderer capability report, limits and feature support | `graphics.h`, `graphics_device.h` | DONE |
 | RUST-EXT-004 | Post-processing effects: CRT, depth, ASCII | `graphics_ext.h` | READY |
 | RUST-EXT-005 | PBR material and render-pipeline settings | `graphics_ext.h` | READY |
-| RUST-EXT-006 | `.cnb` container: open, metadata, Texture2D, Model | `cnb.h` | READY |
+| RUST-EXT-006 | `.cnb` container: open, metadata, Texture2D | `cnb.h` | DONE |
+| RUST-EXT-013 | `.cnb` Model, sprite font, sound effect and the loader registry | `cnb.h` | READY |
 | RUST-EXT-007 | Device layer: power, locale, clipboard, display info | `devices.h` | DONE |
 | RUST-EXT-008 | Modern input: haptics, joystick, text input, cursor | `input_*.h` | READY |
 | RUST-EXT-009 | Sensors: accelerometer, compass, gyroscope | `sensors.h` | READY |

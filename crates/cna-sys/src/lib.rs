@@ -137,6 +137,23 @@ pub const CNA_RENDERER_FORMAT_USAGE_MIPMAPPED: CNA_RendererFormatUsageFlags = 1 
 pub const CNA_RENDERER_FORMAT_USAGE_MULTISAMPLE: CNA_RendererFormatUsageFlags = 1 << 11;
 pub const CNA_RENDERER_FORMAT_USAGE_COLOR_TRANSFER: CNA_RendererFormatUsageFlags = 1 << 12;
 pub const CNA_RENDERER_FORMAT_USAGE_ALL: CNA_RendererFormatUsageFlags = (1 << 13) - 1;
+pub const CNA_CNB_ASSET_TYPE_INVALID: u32 = 0x0000_0000;
+pub const CNA_CNB_ASSET_TYPE_TEXTURE2D: u32 = 0x0000_0001;
+pub const CNA_CNB_ASSET_TYPE_TEXTURE3D: u32 = 0x0000_0002;
+pub const CNA_CNB_ASSET_TYPE_TEXTURE_CUBE: u32 = 0x0000_0003;
+pub const CNA_CNB_ASSET_TYPE_SPRITE_FONT: u32 = 0x0000_0004;
+pub const CNA_CNB_ASSET_TYPE_MODEL: u32 = 0x0000_0005;
+pub const CNA_CNB_ASSET_TYPE_ANIMATION_CLIP: u32 = 0x0000_0006;
+pub const CNA_CNB_ASSET_TYPE_CURVE: u32 = 0x0000_0007;
+pub const CNA_CNB_ASSET_TYPE_SOUND_EFFECT: u32 = 0x0000_0008;
+pub const CNA_CNB_ASSET_TYPE_SONG: u32 = 0x0000_0009;
+pub const CNA_CNB_ASSET_TYPE_VIDEO: u32 = 0x0000_000A;
+pub const CNA_CNB_ASSET_TYPE_EFFECT: u32 = 0x0000_000B;
+pub const CNA_CNB_ASSET_TYPE_RESERVED_RANGE_FIRST: u32 = 0x4000_0000;
+pub const CNA_CNB_ASSET_TYPE_CUSTOM_RANGE_FIRST: u32 = 0x8000_0000;
+pub const CNA_CNB_READ_LIMITS_STRUCT_VERSION: u32 = 1;
+pub const CNA_CNB_METADATA_STRUCT_VERSION: u32 = 1;
+pub const CNA_CNB_TEXTURE_INFO_STRUCT_VERSION: u32 = 1;
 pub const CNA_POWER_STATE_ERROR: CNA_PowerState = 0;
 pub const CNA_POWER_STATE_UNKNOWN: CNA_PowerState = 1;
 pub const CNA_POWER_STATE_ON_BATTERY: CNA_PowerState = 2;
@@ -489,6 +506,11 @@ pub type CNA_GraphicsRendererType = u32;
 pub type CNA_GraphicsBackendCategory = u32;
 pub type CNA_GraphicsBackendMaturity = u32;
 pub type CNA_GraphicsRendererFallbackReason = u32;
+pub type CNA_CnbChunkId = u32;
+pub type CNA_CnbCompression = u32;
+pub type CNA_CnbTextureFormat = u32;
+pub type CNA_CnbDocumentHandle = CNA_Handle;
+pub type CNA_CnbTextureDataHandle = CNA_Handle;
 pub type CNA_PowerState = u32;
 pub type CNA_RendererFeature = u32;
 pub type CNA_RendererFeatureSupport = u32;
@@ -1181,6 +1203,42 @@ pub struct CNA_RendererInfo {
     pub capability_flags: CNA_GraphicsCapabilityFlags,
     pub renderer_type: CNA_GraphicsRendererType,
     pub max_texture_dimension: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbReadLimits {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub max_file_size: u64,
+    pub max_chunk_size: u64,
+    pub max_total_uncompressed_size: u64,
+    pub max_chunk_count: u32,
+    pub max_string_bytes: u32,
+    pub max_array_element_count: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbMetadata {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub present: CNA_Bool,
+    pub reserved: [u8; 3],
+    pub flags: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbTextureInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub width: u32,
+    pub height: u32,
+    pub depth: u32,
+    pub face_count: u32,
+    pub mip_count: u32,
+    pub representation_count: u32,
 }
 
 #[repr(C)]
@@ -3965,3 +4023,101 @@ pub type cna_clipboard_copy_text_fn = unsafe extern "C" fn(
     CNA_Handle, *mut c_char, u64, *mut u64,
 ) -> CNA_Result;
 pub type cna_clipboard_set_text_fn = unsafe extern "C" fn(CNA_Handle, CNA_StringView) -> CNA_Result;
+
+// --- CNA .cnb content container (cnb.h) ---
+
+pub type cna_cnb_document_parse_fn = unsafe extern "C" fn(
+    *const u8, u64, CNA_StringView, *const CNA_CnbReadLimits, *mut CNA_CnbDocumentHandle,
+) -> CNA_Result;
+pub type cna_cnb_document_parse_file_fn = unsafe extern "C" fn(
+    CNA_StringView, *const CNA_CnbReadLimits, *mut CNA_CnbDocumentHandle,
+) -> CNA_Result;
+pub type cna_cnb_document_destroy_fn = unsafe extern "C" fn(CNA_CnbDocumentHandle) -> CNA_Result;
+pub type cna_cnb_document_get_origin_size_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_document_copy_origin_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_document_get_container_major_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut u16,
+) -> CNA_Result;
+pub type cna_cnb_document_get_container_minor_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut u16,
+) -> CNA_Result;
+pub type cna_cnb_document_get_asset_type_id_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut u32,
+) -> CNA_Result;
+pub type cna_cnb_document_get_asset_schema_version_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut u32,
+) -> CNA_Result;
+pub type cna_cnb_document_get_chunk_count_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_document_get_metadata_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut CNA_CnbMetadata,
+) -> CNA_Result;
+pub type cna_cnb_document_get_metadata_asset_type_name_size_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_document_copy_metadata_asset_type_name_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_document_get_metadata_content_name_size_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_document_copy_metadata_content_name_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_get_asset_type_name_size_fn = unsafe extern "C" fn(u32, *mut u64) -> CNA_Result;
+pub type cna_cnb_copy_asset_type_name_fn = unsafe extern "C" fn(
+    u32, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_is_custom_asset_type_id_fn = unsafe extern "C" fn(
+    u32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_cnb_asset_type_id_from_name_fn = unsafe extern "C" fn(
+    CNA_StringView, *mut u32,
+) -> CNA_Result;
+pub type cna_cnb_decode_texture2d_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut CNA_CnbTextureDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_encode_texture2d_fn = unsafe extern "C" fn(
+    CNA_CnbTextureDataHandle, CNA_StringView, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_texture_data_create_rgba8_fn = unsafe extern "C" fn(
+    u32, u32, *const u8, u64, *mut CNA_CnbTextureDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_texture_data_destroy_fn = unsafe extern "C" fn(
+    CNA_CnbTextureDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_texture_data_get_info_fn = unsafe extern "C" fn(
+    CNA_CnbTextureDataHandle, *mut CNA_CnbTextureInfo,
+) -> CNA_Result;
+pub type cna_cnb_texture_data_get_level_dimensions_fn = unsafe extern "C" fn(
+    CNA_CnbTextureDataHandle, u32, *mut u32, *mut u32, *mut u32,
+) -> CNA_Result;
+pub type cna_cnb_texture_data_get_representation_count_fn = unsafe extern "C" fn(
+    CNA_CnbTextureDataHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_texture_data_get_representation_format_fn = unsafe extern "C" fn(
+    CNA_CnbTextureDataHandle, u64, *mut CNA_CnbTextureFormat,
+) -> CNA_Result;
+pub type cna_cnb_texture_data_get_level_count_fn = unsafe extern "C" fn(
+    CNA_CnbTextureDataHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_texture_data_copy_level_fn = unsafe extern "C" fn(
+    CNA_CnbTextureDataHandle, u64, u64, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_texture_format_to_surface_format_fn = unsafe extern "C" fn(
+    CNA_CnbTextureFormat, *mut CNA_SurfaceFormat,
+) -> CNA_Result;
+pub type cna_cnb_get_texture_format_unit_bytes_fn = unsafe extern "C" fn(
+    CNA_CnbTextureFormat, *mut u32,
+) -> CNA_Result;
+pub type cna_cnb_get_texture_format_name_size_fn = unsafe extern "C" fn(
+    CNA_CnbTextureFormat, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_copy_texture_format_name_fn = unsafe extern "C" fn(
+    CNA_CnbTextureFormat, *mut c_char, u64, *mut u64,
+) -> CNA_Result;

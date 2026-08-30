@@ -111,8 +111,8 @@ unexplained holes. See
 
 | Category | Routes |
 |---|---:|
-| `RUST_SYS_BOUND` | 809 |
-| `CNA_EXTENSION_BACKING` | 1,843 |
+| `RUST_SYS_BOUND` | 842 |
+| `CNA_EXTENSION_BACKING` | 1,814 |
 | `STRICT_XNA_BACKING` | 626 |
 | `MANAGED_BY_DESIGN` | 598 |
 | `UPSTREAM_NOT_USEFUL_TO_RUST` | 130 |
@@ -124,7 +124,7 @@ unexplained holes. See
 
 ### 3d. Modern CNA API under `cna::extensions`
 
-1,843 canonical routes still back CNA concepts XNA 4.0 does not have. They are
+1,814 canonical routes still back CNA concepts XNA 4.0 does not have. They are
 exposed as safe, idiomatic Rust under `cna::extensions`, never inside the
 strict XNA hierarchy, and never as raw `cna_*` calls. See
 [docs/extensions.md](docs/extensions.md).
@@ -139,7 +139,10 @@ routes over per-feature support, numeric limits, per-format usage masks, the
 shader dialect and CNA's own capability report. `devices` covers the device
 layer in 16 routes -- power, system facts, locale, display and clipboard --
 including the availability query that separates a compiled-out layer from a
-missing device.
+missing device. `content` covers the `.cnb` container's first complete
+vertical in 33 routes: build texture data, encode a document, parse one back,
+read its metadata, and decode a texture, with bounded parsing of untrusted
+input.
 
 ## Ownership, threading and safety rules
 
