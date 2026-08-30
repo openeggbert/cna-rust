@@ -399,6 +399,15 @@
         "BACKEND_BLOCKED"
       ],
       "evidence": "The monotonic frame generation and presentation time are read from cna_video_player_get_frame_ext. HEADLESS decodes nothing, so the measured answer is the canonical no-frame one; a real decoder backend is what remains to exercise a decoded frame."
+    },
+    {
+      "family": "extensions::input raw joystick",
+      "routes": 20,
+      "statuses": [
+        "VERIFIED_HEADLESS",
+        "HARDWARE_PENDING"
+      ],
+      "evidence": "Enumeration, per-device capabilities and snapshot capture answer against the live library, and the projection preserves the canonical rule that capturing an identifier no device carries succeeds with every array empty rather than failing. No joystick is attached to this host, so the measured enumeration is empty and the populated path is hardware pending."
     }
   ]
 }

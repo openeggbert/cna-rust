@@ -137,6 +137,26 @@ pub const CNA_RENDERER_FORMAT_USAGE_MIPMAPPED: CNA_RendererFormatUsageFlags = 1 
 pub const CNA_RENDERER_FORMAT_USAGE_MULTISAMPLE: CNA_RendererFormatUsageFlags = 1 << 11;
 pub const CNA_RENDERER_FORMAT_USAGE_COLOR_TRANSFER: CNA_RendererFormatUsageFlags = 1 << 12;
 pub const CNA_RENDERER_FORMAT_USAGE_ALL: CNA_RendererFormatUsageFlags = (1 << 13) - 1;
+pub const CNA_JOYSTICK_STRUCT_VERSION: u32 = 1;
+pub const CNA_JOYSTICK_TYPE_UNKNOWN: CNA_JoystickType = 0;
+pub const CNA_JOYSTICK_TYPE_GAMEPAD: CNA_JoystickType = 1;
+pub const CNA_JOYSTICK_TYPE_WHEEL: CNA_JoystickType = 2;
+pub const CNA_JOYSTICK_TYPE_ARCADE_STICK: CNA_JoystickType = 3;
+pub const CNA_JOYSTICK_TYPE_FLIGHT_STICK: CNA_JoystickType = 4;
+pub const CNA_JOYSTICK_TYPE_DANCE_PAD: CNA_JoystickType = 5;
+pub const CNA_JOYSTICK_TYPE_GUITAR: CNA_JoystickType = 6;
+pub const CNA_JOYSTICK_TYPE_DRUM_KIT: CNA_JoystickType = 7;
+pub const CNA_JOYSTICK_TYPE_ARCADE_PAD: CNA_JoystickType = 8;
+pub const CNA_JOYSTICK_TYPE_THROTTLE: CNA_JoystickType = 9;
+pub const CNA_JOYSTICK_HAT_POSITION_CENTERED: CNA_JoystickHatPosition = 0;
+pub const CNA_JOYSTICK_HAT_POSITION_UP: CNA_JoystickHatPosition = 1;
+pub const CNA_JOYSTICK_HAT_POSITION_RIGHT: CNA_JoystickHatPosition = 2;
+pub const CNA_JOYSTICK_HAT_POSITION_DOWN: CNA_JoystickHatPosition = 3;
+pub const CNA_JOYSTICK_HAT_POSITION_LEFT: CNA_JoystickHatPosition = 4;
+pub const CNA_JOYSTICK_HAT_POSITION_RIGHT_UP: CNA_JoystickHatPosition = 5;
+pub const CNA_JOYSTICK_HAT_POSITION_RIGHT_DOWN: CNA_JoystickHatPosition = 6;
+pub const CNA_JOYSTICK_HAT_POSITION_LEFT_UP: CNA_JoystickHatPosition = 7;
+pub const CNA_JOYSTICK_HAT_POSITION_LEFT_DOWN: CNA_JoystickHatPosition = 8;
 pub const CNA_ASCII_QUANTIZE_MODE_BLACK_WHITE: CNA_AsciiQuantizeMode = 0;
 pub const CNA_ASCII_QUANTIZE_MODE_COLOR: CNA_AsciiQuantizeMode = 1;
 pub const CNA_CRT_MASK_TYPE_NONE: CNA_CRTMaskType = 0;
@@ -521,6 +541,9 @@ pub type CNA_GraphicsRendererType = u32;
 pub type CNA_GraphicsBackendCategory = u32;
 pub type CNA_GraphicsBackendMaturity = u32;
 pub type CNA_GraphicsRendererFallbackReason = u32;
+pub type CNA_JoystickStateHandle = CNA_Handle;
+pub type CNA_JoystickType = u32;
+pub type CNA_JoystickHatPosition = u32;
 pub type CNA_AsciiPostProcessEffectHandle = CNA_Handle;
 pub type CNA_AsciiQuantizeMode = u32;
 pub type CNA_CRTMaskType = u32;
@@ -1223,6 +1246,38 @@ pub struct CNA_RendererInfo {
     pub capability_flags: CNA_GraphicsCapabilityFlags,
     pub renderer_type: CNA_GraphicsRendererType,
     pub max_texture_dimension: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_Point {
+    pub x: i32,
+    pub y: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_JoystickInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub id: u32,
+    pub r#type: CNA_JoystickType,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_JoystickCapabilities {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub axis_count: i32,
+    pub button_count: i32,
+    pub hat_count: i32,
+    pub ball_count: i32,
+    pub r#type: CNA_JoystickType,
+    pub power_state: CNA_PowerState,
+    pub power_percent: i32,
+    pub is_connected: CNA_Bool,
+    pub reserved: [u8; 3],
 }
 
 #[repr(C)]
@@ -4213,4 +4268,65 @@ pub type cna_ascii_post_process_effect_get_last_grid_dimensions_fn = unsafe exte
 ) -> CNA_Result;
 pub type cna_ascii_post_process_effect_destroy_fn = unsafe extern "C" fn(
     CNA_AsciiPostProcessEffectHandle,
+) -> CNA_Result;
+
+// --- CNA raw joystick input (input_joystick.h) ---
+
+pub type cna_joysticks_get_count_fn = unsafe extern "C" fn(CNA_Handle, *mut u32) -> CNA_Result;
+pub type cna_joysticks_get_info_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut CNA_JoystickInfo,
+) -> CNA_Result;
+pub type cna_joysticks_get_name_size_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut u64,
+) -> CNA_Result;
+pub type cna_joysticks_copy_name_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_joysticks_get_capabilities_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut CNA_JoystickCapabilities,
+) -> CNA_Result;
+pub type cna_joysticks_get_capabilities_name_size_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut u64,
+) -> CNA_Result;
+pub type cna_joysticks_copy_capabilities_name_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_joysticks_get_capabilities_guid_size_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut u64,
+) -> CNA_Result;
+pub type cna_joysticks_copy_capabilities_guid_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_joysticks_capture_state_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut CNA_JoystickStateHandle,
+) -> CNA_Result;
+pub type cna_joystick_state_get_axis_count_fn = unsafe extern "C" fn(
+    CNA_JoystickStateHandle, *mut u32,
+) -> CNA_Result;
+pub type cna_joystick_state_copy_axes_fn = unsafe extern "C" fn(
+    CNA_JoystickStateHandle, *mut i16, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_joystick_state_get_button_count_fn = unsafe extern "C" fn(
+    CNA_JoystickStateHandle, *mut u32,
+) -> CNA_Result;
+pub type cna_joystick_state_copy_buttons_fn = unsafe extern "C" fn(
+    CNA_JoystickStateHandle, *mut CNA_Bool, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_joystick_state_get_hat_count_fn = unsafe extern "C" fn(
+    CNA_JoystickStateHandle, *mut u32,
+) -> CNA_Result;
+pub type cna_joystick_state_copy_hats_fn = unsafe extern "C" fn(
+    CNA_JoystickStateHandle, *mut CNA_JoystickHatPosition, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_joystick_state_get_ball_count_fn = unsafe extern "C" fn(
+    CNA_JoystickStateHandle, *mut u32,
+) -> CNA_Result;
+pub type cna_joystick_state_copy_balls_fn = unsafe extern "C" fn(
+    CNA_JoystickStateHandle, *mut CNA_Point, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_joystick_state_equals_fn = unsafe extern "C" fn(
+    CNA_JoystickStateHandle, CNA_JoystickStateHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_joystick_state_destroy_fn = unsafe extern "C" fn(
+    CNA_JoystickStateHandle,
 ) -> CNA_Result;

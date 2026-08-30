@@ -16,12 +16,12 @@ LIBRARY_EXPORTS=4051
 
 REVIEWED_SYMBOLS_REMOVED=0
 REVIEWED_SYMBOLS_ARITY_CHANGED=0
-ABI_FUNCTIONS=866
-PROTOTYPE_TYPE_POSITIONS=2936
-C_RUST_MEASUREMENTS=1194
-LAYOUTS=68
+ABI_FUNCTIONS=886
+PROTOTYPE_TYPE_POSITIONS=3019
+C_RUST_MEASUREMENTS=1236
+LAYOUTS=71
 CALLBACKS=8
-CONSTANTS=378
+CONSTANTS=397
 ABI_FINDINGS=0
 
 CANONICAL_ROUTES=4051
@@ -59,7 +59,7 @@ Work the backlog in [docs/backlog.md](docs/backlog.md). The highest-value ready
 items, in order:
 
 1. Continue `cna::extensions`: `.cnb` Model and the loader registry, then
-   modern input, sensors and the engine layer.
+   haptics, text input, sensors and the engine layer.
 2. Close the remaining 40-type `xna40-windows-full` gap: the GamerServices,
    Avatar and Net object model over `gamer_services.h` and `net*.h`.
 3. Windows loader source support, packaging qualification, and the template's

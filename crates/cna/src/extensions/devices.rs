@@ -38,6 +38,11 @@ pub enum PowerState {
 }
 
 impl PowerState {
+    /// Maps CNA's power-state identity, which a joystick's battery shares.
+    pub(super) const fn from_native_value(value: sys::CNA_PowerState) -> Self {
+        Self::from_native(value)
+    }
+
     const fn from_native(value: sys::CNA_PowerState) -> Self {
         match value {
             sys::CNA_POWER_STATE_ERROR => Self::Error,

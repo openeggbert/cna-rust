@@ -66,6 +66,25 @@ fails, and the binding surfaces that refusal instead of pretending the change
 took effect. `renderer_fallbacks()` is CNA's own account of what it tried and
 passed over, empty on a build whose first choice worked.
 
+### `input` — raw joystick devices
+
+XNA had `GamePad` and nothing else: a device that is not an Xbox-shaped
+controller could not be read at all. CNA exposes the raw device -- its axes,
+buttons, hats and trackballs -- so that is a CNA concept and lives here rather
+than beside `GamePad`.
+
+Two canonical rules are preserved rather than smoothed over:
+
+- Capturing an identifier that names no connected device **succeeds** with
+  every array empty. That is what the canonical query does, so the projection
+  does not turn it into a failure; `capabilities(..).is_connected` is what
+  distinguishes an absent device from an idle one.
+- Trackball values are relative motion since the previous read, so capturing
+  consumes them. Two captures in a row report the movement once.
+
+An index into the enumeration is not the identifier the other routes take;
+`JoystickInfo::id` is, and it survives another device disconnecting.
+
 ### `logging` — the process log, its level filter, and a Rust sink
 
 XNA has no logging surface, so the whole family is a CNA concept. The

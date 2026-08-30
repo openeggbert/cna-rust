@@ -9,6 +9,7 @@ pub mod content;
 pub mod devices;
 pub mod events;
 pub mod graphics;
+pub mod input;
 pub mod logging;
 pub mod media;
 pub mod net;
