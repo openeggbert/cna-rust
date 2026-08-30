@@ -1734,6 +1734,31 @@ impl GraphicsDevice {
         }
     }
 
+    pub(crate) fn renderer_feature_support(&self, feature: u32) -> Result<u32> {
+        let handle = self.state.handle()?;
+        self.state.native.renderer_feature_support(handle, feature)
+    }
+
+    pub(crate) fn renderer_limit(&self, limit: u32) -> Result<Option<u64>> {
+        let handle = self.state.handle()?;
+        self.state.native.renderer_limit(handle, limit)
+    }
+
+    pub(crate) fn surface_format_support(&self, format: u32) -> Result<(u32, u32)> {
+        let handle = self.state.handle()?;
+        self.state.native.surface_format_support(handle, format)
+    }
+
+    pub(crate) fn shader_dialect(&self) -> Result<u32> {
+        let handle = self.state.handle()?;
+        self.state.native.shader_dialect(handle)
+    }
+
+    pub(crate) fn capability_report(&self) -> Result<String> {
+        let handle = self.state.handle()?;
+        self.state.native.capability_report(handle)
+    }
+
     pub(crate) fn renderer_info(&self) -> Result<(String, bool, bool, u32)> {
         let handle = self.state.handle()?;
         let mut info = sys::CNA_RendererInfo {

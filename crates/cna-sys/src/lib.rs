@@ -97,6 +97,31 @@ pub const CNA_LOG_CATEGORY_RENDER: CNA_LogCategory = 5;
 pub const CNA_LOG_CATEGORY_INPUT: CNA_LogCategory = 6;
 pub const CNA_LOG_CATEGORY_TEST: CNA_LogCategory = 7;
 pub const CNA_LOG_CATEGORY_GPU: CNA_LogCategory = 8;
+pub const CNA_RENDERER_FEATURE_SUPPORT_UNKNOWN: CNA_RendererFeatureSupport = 0;
+pub const CNA_RENDERER_FEATURE_SUPPORT_UNSUPPORTED: CNA_RendererFeatureSupport = 1;
+pub const CNA_RENDERER_FEATURE_SUPPORT_SUPPORTED: CNA_RendererFeatureSupport = 2;
+pub const CNA_RENDERER_FEATURE_SUPPORT_RESTRICTED: CNA_RendererFeatureSupport = 3;
+pub const CNA_SHADER_DIALECT_UNKNOWN: CNA_ShaderDialect = 0;
+pub const CNA_SHADER_DIALECT_GLSL_DESKTOP: CNA_ShaderDialect = 1;
+pub const CNA_SHADER_DIALECT_GLSL_ES: CNA_ShaderDialect = 2;
+pub const CNA_SHADER_DIALECT_GLSL_VULKAN: CNA_ShaderDialect = 3;
+pub const CNA_SHADER_DIALECT_HLSL: CNA_ShaderDialect = 4;
+pub const CNA_SHADER_DIALECT_MSL: CNA_ShaderDialect = 5;
+pub const CNA_SHADER_DIALECT_WGSL: CNA_ShaderDialect = 6;
+pub const CNA_RENDERER_FORMAT_USAGE_TEXTURE_STORAGE: CNA_RendererFormatUsageFlags = 1 << 0;
+pub const CNA_RENDERER_FORMAT_USAGE_SAMPLED: CNA_RendererFormatUsageFlags = 1 << 1;
+pub const CNA_RENDERER_FORMAT_USAGE_FILTERABLE: CNA_RendererFormatUsageFlags = 1 << 2;
+pub const CNA_RENDERER_FORMAT_USAGE_RENDER_TARGET: CNA_RendererFormatUsageFlags = 1 << 3;
+pub const CNA_RENDERER_FORMAT_USAGE_BLENDABLE: CNA_RendererFormatUsageFlags = 1 << 4;
+pub const CNA_RENDERER_FORMAT_USAGE_STORAGE_READ: CNA_RendererFormatUsageFlags = 1 << 5;
+pub const CNA_RENDERER_FORMAT_USAGE_STORAGE_WRITE: CNA_RendererFormatUsageFlags = 1 << 6;
+pub const CNA_RENDERER_FORMAT_USAGE_STORAGE_ATOMIC: CNA_RendererFormatUsageFlags = 1 << 7;
+pub const CNA_RENDERER_FORMAT_USAGE_TRANSFER_SOURCE: CNA_RendererFormatUsageFlags = 1 << 8;
+pub const CNA_RENDERER_FORMAT_USAGE_TRANSFER_DESTINATION: CNA_RendererFormatUsageFlags = 1 << 9;
+pub const CNA_RENDERER_FORMAT_USAGE_MIPMAPPED: CNA_RendererFormatUsageFlags = 1 << 10;
+pub const CNA_RENDERER_FORMAT_USAGE_MULTISAMPLE: CNA_RendererFormatUsageFlags = 1 << 11;
+pub const CNA_RENDERER_FORMAT_USAGE_COLOR_TRANSFER: CNA_RendererFormatUsageFlags = 1 << 12;
+pub const CNA_RENDERER_FORMAT_USAGE_ALL: CNA_RendererFormatUsageFlags = (1 << 13) - 1;
 pub const CNA_PLATFORM_DESKTOP: CNA_Platform = 0;
 pub const CNA_PLATFORM_ANDROID: CNA_Platform = 1;
 pub const CNA_PLATFORM_IOS: CNA_Platform = 2;
@@ -443,6 +468,11 @@ pub type CNA_GraphicsRendererType = u32;
 pub type CNA_GraphicsBackendCategory = u32;
 pub type CNA_GraphicsBackendMaturity = u32;
 pub type CNA_GraphicsRendererFallbackReason = u32;
+pub type CNA_RendererFeature = u32;
+pub type CNA_RendererFeatureSupport = u32;
+pub type CNA_RendererLimit = u32;
+pub type CNA_RendererFormatUsageFlags = u32;
+pub type CNA_ShaderDialect = u32;
 pub type CNA_LogLevel = u32;
 pub type CNA_LogCategory = u32;
 pub type CNA_Platform = u32;
@@ -3846,3 +3876,24 @@ pub type cna_logger_set_sink_ext_fn = unsafe extern "C" fn(
     CNA_LogSinkCallback, *mut c_void,
 ) -> CNA_Result;
 pub type cna_logger_reset_sink_ext_fn = unsafe extern "C" fn() -> CNA_Result;
+
+// --- CNA renderer capability reporting (graphics.h) ---
+
+pub type cna_graphics_device_get_renderer_feature_support_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_RendererFeature, *mut CNA_RendererFeatureSupport,
+) -> CNA_Result;
+pub type cna_graphics_device_get_renderer_limit_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_RendererLimit, *mut CNA_Bool, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_device_get_surface_format_support_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_SurfaceFormat, *mut CNA_RendererFormatUsageFlags, *mut CNA_RendererFormatUsageFlags,
+) -> CNA_Result;
+pub type cna_graphics_device_get_capability_report_size_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_device_copy_capability_report_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_device_get_shader_dialect_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_ShaderDialect,
+) -> CNA_Result;

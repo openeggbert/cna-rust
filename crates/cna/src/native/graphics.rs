@@ -1215,6 +1215,79 @@ impl Native {
         self.check(unsafe { (self.graphics_device_get_renderer_info)(device, info) })
     }
 
+    pub(crate) fn renderer_feature_support(
+        &self,
+        device: sys::CNA_Handle,
+        feature: sys::CNA_RendererFeature,
+    ) -> Result<sys::CNA_RendererFeatureSupport> {
+        let mut support = 0;
+        // SAFETY: the device is callback-scoped and the output is a live local.
+        self.check(unsafe { (self.graphics_device_feature_support)(device, feature, &mut support) })?;
+        Ok(support)
+    }
+
+    pub(crate) fn renderer_limit(
+        &self,
+        device: sys::CNA_Handle,
+        limit: sys::CNA_RendererLimit,
+    ) -> Result<Option<u64>> {
+        let mut known = sys::CNA_FALSE;
+        let mut value = 0_u64;
+        // SAFETY: the device is callback-scoped and both outputs are live locals.
+        self.check(unsafe { (self.graphics_device_limit)(device, limit, &mut known, &mut value) })?;
+        Ok((known != sys::CNA_FALSE).then_some(value))
+    }
+
+    pub(crate) fn surface_format_support(
+        &self,
+        device: sys::CNA_Handle,
+        format: sys::CNA_SurfaceFormat,
+    ) -> Result<(sys::CNA_RendererFormatUsageFlags, sys::CNA_RendererFormatUsageFlags)> {
+        let mut known = 0;
+        let mut supported = 0;
+        // SAFETY: the device is callback-scoped and both outputs are live locals.
+        self.check(unsafe {
+            (self.graphics_device_format_support)(device, format, &mut known, &mut supported)
+        })?;
+        Ok((known, supported))
+    }
+
+    pub(crate) fn shader_dialect(
+        &self,
+        device: sys::CNA_Handle,
+    ) -> Result<sys::CNA_ShaderDialect> {
+        let mut dialect = 0;
+        // SAFETY: the device is callback-scoped and the output is a live local.
+        self.check(unsafe { (self.graphics_device_shader_dialect)(device, &mut dialect) })?;
+        Ok(dialect)
+    }
+
+    pub(crate) fn capability_report(&self, device: sys::CNA_Handle) -> Result<String> {
+        let mut bytes = 0_u64;
+        // SAFETY: the device is callback-scoped and the output is a live local.
+        self.check(unsafe { (self.graphics_device_capability_report_size)(device, &mut bytes) })?;
+        let capacity = usize::try_from(bytes)
+            .map_err(|_| CnaError::InvalidInput("capability report is too large"))?;
+        if capacity == 0 {
+            return Ok(String::new());
+        }
+        let mut buffer = vec![0_u8; capacity];
+        let mut copied = 0_u64;
+        // SAFETY: `buffer` holds exactly `bytes` writable bytes for the call.
+        self.check(unsafe {
+            (self.graphics_device_copy_capability_report)(
+                device,
+                buffer.as_mut_ptr().cast::<core::ffi::c_char>(),
+                bytes,
+                &mut copied,
+            )
+        })?;
+        let copied = usize::try_from(copied)
+            .map_err(|_| CnaError::InvalidInput("capability report is too large"))?;
+        buffer.truncate(copied.min(capacity));
+        Ok(String::from_utf8_lossy(&buffer).into_owned())
+    }
+
     pub(crate) fn renderer_name_size(&self, device: sys::CNA_Handle, size: &mut u64) -> Result<()> {
         // SAFETY: the device is callback-scoped and output is valid.
         self.check(unsafe { (self.graphics_device_get_renderer_name_size)(device, size) })

@@ -97,6 +97,30 @@ Renderer diagnostics for a strict `GraphicsDevice`, CNA's reflection-capable
 empty `Effect`, and the integer indexers CLR collections have but Rust's
 non-overloadable method surface cannot spell inside the strict hierarchy.
 
+It also carries CNA's renderer capability reporting. XNA answered capability
+questions through `GraphicsProfile` alone; CNA supports far more backends than
+two profiles can describe and publishes per-feature, per-limit and per-format
+answers instead.
+
+```rust,ignore
+use cna::extensions::graphics::{RendererCapabilityExt, RendererFeature, RendererLimit};
+
+if device.feature_support(RendererFeature::COMPUTE_SHADERS)? == FeatureSupport::Supported {
+    let groups = device.limit(RendererLimit::MAX_COMPUTE_WORK_GROUP_COUNT_X)?;
+}
+```
+
+Three distinctions are kept rather than flattened, because each one is a
+different answer:
+
+- `FeatureSupport::Unknown` is a real answer. A renderer that cannot say is not
+  the same as one that says no.
+- A limit is an `Option`. A renderer that does not publish one reports nothing
+  rather than a fabricated zero.
+- `FormatSupport` carries two masks. `known` is what the renderer has an answer
+  for; `supported` is what it can do. A usage outside `known` was not asked,
+  which is not a refusal.
+
 ### `media` — deterministic Media hooks and video frame identity
 
 Owner-thread `MediaPlayer` event helpers, and the frame generation and

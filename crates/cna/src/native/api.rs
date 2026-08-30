@@ -149,6 +149,16 @@ pub(crate) struct Native {
         sys::cna_graphics_device_get_render_target_count_fn,
     pub(super) graphics_device_copy_render_targets: sys::cna_graphics_device_copy_render_targets_fn,
     pub(super) graphics_device_get_renderer_info: sys::cna_graphics_device_get_renderer_info_fn,
+    pub(super) graphics_device_feature_support:
+        sys::cna_graphics_device_get_renderer_feature_support_ext_fn,
+    pub(super) graphics_device_limit: sys::cna_graphics_device_get_renderer_limit_ext_fn,
+    pub(super) graphics_device_format_support:
+        sys::cna_graphics_device_get_surface_format_support_ext_fn,
+    pub(super) graphics_device_capability_report_size:
+        sys::cna_graphics_device_get_capability_report_size_ext_fn,
+    pub(super) graphics_device_copy_capability_report:
+        sys::cna_graphics_device_copy_capability_report_ext_fn,
+    pub(super) graphics_device_shader_dialect: sys::cna_graphics_device_get_shader_dialect_ext_fn,
     pub(super) graphics_device_get_renderer_name_size:
         sys::cna_graphics_device_get_renderer_name_size_fn,
     pub(super) graphics_device_copy_renderer_name: sys::cna_graphics_device_copy_renderer_name_fn,
@@ -1002,6 +1012,30 @@ impl Native {
             graphics_device_get_renderer_info: symbol!(
                 "cna_graphics_device_get_renderer_info",
                 sys::cna_graphics_device_get_renderer_info_fn
+            ),
+            graphics_device_feature_support: symbol!(
+                "cna_graphics_device_get_renderer_feature_support_ext",
+                sys::cna_graphics_device_get_renderer_feature_support_ext_fn
+            ),
+            graphics_device_limit: symbol!(
+                "cna_graphics_device_get_renderer_limit_ext",
+                sys::cna_graphics_device_get_renderer_limit_ext_fn
+            ),
+            graphics_device_format_support: symbol!(
+                "cna_graphics_device_get_surface_format_support_ext",
+                sys::cna_graphics_device_get_surface_format_support_ext_fn
+            ),
+            graphics_device_capability_report_size: symbol!(
+                "cna_graphics_device_get_capability_report_size_ext",
+                sys::cna_graphics_device_get_capability_report_size_ext_fn
+            ),
+            graphics_device_copy_capability_report: symbol!(
+                "cna_graphics_device_copy_capability_report_ext",
+                sys::cna_graphics_device_copy_capability_report_ext_fn
+            ),
+            graphics_device_shader_dialect: symbol!(
+                "cna_graphics_device_get_shader_dialect_ext",
+                sys::cna_graphics_device_get_shader_dialect_ext_fn
             ),
             graphics_device_get_renderer_name_size: symbol!(
                 "cna_graphics_device_get_renderer_name_size",

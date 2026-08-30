@@ -111,8 +111,8 @@ unexplained holes. See
 
 | Category | Routes |
 |---|---:|
-| `RUST_SYS_BOUND` | 786 |
-| `CNA_EXTENSION_BACKING` | 1,865 |
+| `RUST_SYS_BOUND` | 792 |
+| `CNA_EXTENSION_BACKING` | 1,859 |
 | `STRICT_XNA_BACKING` | 626 |
 | `MANAGED_BY_DESIGN` | 598 |
 | `UPSTREAM_NOT_USEFUL_TO_RUST` | 130 |
@@ -124,7 +124,7 @@ unexplained holes. See
 
 ### 3d. Modern CNA API under `cna::extensions`
 
-1,865 canonical routes still back CNA concepts XNA 4.0 does not have. They are
+1,859 canonical routes still back CNA concepts XNA 4.0 does not have. They are
 exposed as safe, idiomatic Rust under `cna::extensions`, never inside the
 strict XNA hierarchy, and never as raw `cna_*` calls. See
 [docs/extensions.md](docs/extensions.md).
@@ -134,7 +134,9 @@ renderer selection in 35 routes: platform and desktop-OS identity, renderer
 identity, availability, backend category and maturity, preferred selection and
 its latch, the fallback chain and CNA's own fallback history. `logging` covers
 the process log in 19 routes, including a Rust sink whose panic is contained at
-the FFI boundary.
+the FFI boundary. `graphics` gained CNA's renderer capability reporting: 6
+routes over per-feature support, numeric limits, per-format usage masks, the
+shader dialect and CNA's own capability report.
 
 ## Ownership, threading and safety rules
 
