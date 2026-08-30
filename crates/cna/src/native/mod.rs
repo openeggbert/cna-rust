@@ -9,10 +9,12 @@ mod error;
 #[cfg(feature = "native-fault-injection")]
 pub(crate) mod fault;
 mod game;
+pub(crate) mod gamer_services;
 mod graphics;
 mod input;
 mod loader;
 pub(crate) mod media;
+pub(crate) mod net;
 pub(crate) mod runtime;
 mod storage;
 mod window;

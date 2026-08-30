@@ -145,3 +145,68 @@ class ProbeComparisonTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SymbolAcquisitionTests(unittest.TestCase):
+    """A resolved symbol must carry that symbol's own signature.
+
+    No other check sees this mistake: pairing a field with another route's
+    alias resolves a symbol that exists, loads without complaint, and then
+    calls it through the wrong prototype.
+    """
+
+    @staticmethod
+    def probe(source: str) -> list[dict]:
+        with tempfile.TemporaryDirectory(prefix="cna-rust-acquisition-") as name:
+            directory = Path(name)
+            (directory / "probe.rs").write_text(source, encoding="utf-8")
+            return VERIFY.acquisition_pairings(directory)
+
+    EXPLICIT = (
+        'pub(crate) alpha: sys::cna_alpha_fn,\n'
+        'alpha: symbol!("cna_alpha", sys::cna_alpha_fn),\n'
+    )
+    INFERRED = (
+        'pub(crate) beta: sys::cna_beta_fn,\n'
+        'beta: symbol!("cna_beta", _),\n'
+    )
+
+    def test_the_checked_in_native_tables_pair_correctly(self):
+        self.assertEqual(VERIFY.acquisition_pairings(), [])
+
+    def test_the_gate_measures_the_real_tables(self):
+        self.assertGreater(VERIFY.acquisition_count(), 0)
+
+    def test_an_exact_explicit_pairing_agrees(self):
+        self.assertEqual(self.probe(self.EXPLICIT), [])
+
+    def test_an_inferred_type_resolves_through_the_field_declaration(self):
+        self.assertEqual(self.probe(self.INFERRED), [])
+
+    def test_a_field_paired_with_another_routes_signature_is_reported(self):
+        findings = self.probe(
+            'pub(crate) alpha: sys::cna_alpha_fn,\n'
+            'alpha: symbol!("cna_alpha", sys::cna_gamma_fn),\n'
+        )
+        self.assertEqual(
+            findings,
+            [{
+                "code": "SYMBOL_TYPE_MISMATCH",
+                "file": "probe.rs",
+                "field": "alpha",
+                "symbol": "cna_alpha",
+                "expected": "cna_alpha_fn",
+                "actual": "cna_gamma_fn",
+            }],
+        )
+
+    def test_an_inferred_type_over_a_wrong_field_declaration_is_reported(self):
+        findings = self.probe(
+            'pub(crate) beta: sys::cna_delta_fn,\n'
+            'beta: symbol!("cna_beta", _),\n'
+        )
+        self.assertEqual([value["code"] for value in findings], ["SYMBOL_TYPE_MISMATCH"])
+
+    def test_an_inferred_type_with_no_field_declaration_is_reported(self):
+        findings = self.probe('beta: symbol!("cna_beta", _),\n')
+        self.assertEqual([value["code"] for value in findings], ["UNRESOLVED_ACQUISITION_TYPE"])

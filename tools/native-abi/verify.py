@@ -184,6 +184,66 @@ def unaudited_declarations(expected: set[str]) -> list[dict]:
     ]
 
 
+NATIVE_DIRECTORY = ROOT / "crates/cna/src/native"
+
+SYMBOL_ACQUISITION = re.compile(
+    r"(?P<field>[A-Za-z_][A-Za-z_0-9]*)\s*:\s*symbol!\(\s*\"(?P<name>cna_[a-z0-9_]+)\"\s*,"
+    r"\s*(?P<alias>sys::[A-Za-z_0-9]+|_)\s*\)",
+    re.S,
+)
+FIELD_DECLARATION = re.compile(
+    r"pub\((?:crate|super)\)\s+(?P<field>[A-Za-z_][A-Za-z_0-9]*)\s*:\s*sys::(?P<alias>[A-Za-z_0-9]+)\s*,",
+    re.S,
+)
+
+
+def acquisition_pairings(directory: Path | None = None) -> list[dict]:
+    """Checks that each resolved symbol carries that symbol's own signature.
+
+    Nothing below this catches the mistake it looks for. A field paired with
+    another route's `cna-sys` alias resolves a symbol that exists, loads
+    without complaint, and then calls it through the wrong prototype. The
+    alias name is mechanically `<symbol>_fn`, so the pairing is checkable, and
+    an inferred `_` type is resolved through the field's own declaration.
+    """
+    root = directory or NATIVE_DIRECTORY
+    findings: list[dict] = []
+    for path in sorted(root.rglob("*.rs")):
+        text = path.read_text(encoding="utf-8")
+        declared = {
+            match.group("field"): match.group("alias")
+            for match in FIELD_DECLARATION.finditer(text)
+        }
+        for match in SYMBOL_ACQUISITION.finditer(text):
+            field, name, alias = match.group("field", "name", "alias")
+            resolved = declared.get(field) if alias == "_" else alias[len("sys::"):]
+            if resolved is None:
+                findings.append({
+                    "code": "UNRESOLVED_ACQUISITION_TYPE",
+                    "file": path.name,
+                    "field": field,
+                    "symbol": name,
+                })
+            elif resolved != f"{name}_fn":
+                findings.append({
+                    "code": "SYMBOL_TYPE_MISMATCH",
+                    "file": path.name,
+                    "field": field,
+                    "symbol": name,
+                    "expected": f"{name}_fn",
+                    "actual": resolved,
+                })
+    return findings
+
+
+def acquisition_count(directory: Path | None = None) -> int:
+    root = directory or NATIVE_DIRECTORY
+    return sum(
+        len(SYMBOL_ACQUISITION.findall(path.read_text(encoding="utf-8")))
+        for path in root.rglob("*.rs")
+    )
+
+
 def elf_exports(library: Path) -> set[str]:
     output = subprocess.run(
         ["nm", "-D", "--defined-only", str(library)], check=True, text=True, capture_output=True
@@ -352,6 +412,7 @@ def main() -> int:
     # bug this repository has already shipped once, so the two sets must agree
     # exactly rather than the manifest merely being a subset.
     findings.extend(unaudited_declarations(set(expected)))
+    findings.extend(acquisition_pairings())
 
     c_probe, rust_probe = abi_probes(Path(args.cna_root), manifest)
     for key in sorted(c_probe.keys() | rust_probe.keys()):
@@ -391,6 +452,10 @@ def main() -> int:
         "nativeAbiVersion": actual_version,
         "missingHeaderSymbols": sum(x["code"] == "MISSING_HEADER_SYMBOL" for x in findings),
         "unauditedDeclarations": sum(x["code"] == "UNAUDITED_DECLARATION" for x in findings),
+        "symbolAcquisitions": acquisition_count(),
+        "symbolTypeMismatches": sum(
+            x["code"] in {"SYMBOL_TYPE_MISMATCH", "UNRESOLVED_ACQUISITION_TYPE"} for x in findings
+        ),
         "missingDeclarations": sum(x["code"] == "MISSING_DECLARATION" for x in findings),
         "arityMismatches": sum(x["code"] == "HEADER_ARITY_MISMATCH" for x in findings),
         "cRustProbeMeasurements": len(c_probe.keys() | rust_probe.keys()),

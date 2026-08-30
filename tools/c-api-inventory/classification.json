@@ -249,24 +249,6 @@
       "rationale": "a CNA-only knob, diagnostic or authoring route on an otherwise XNA family; XNA 4.0 has no counterpart"
     },
     {
-      "id": "wider-xna-gamer-services",
-      "category": "STRICT_XNA_BACKING",
-      "headers": [
-        "gamer_services.h"
-      ],
-      "rationale": "backs Microsoft.Xna.Framework.GamerServices and .Avatar, a wider XNA 4.0 profile"
-    },
-    {
-      "id": "wider-xna-net",
-      "category": "STRICT_XNA_BACKING",
-      "headers": [
-        "net.h",
-        "net_sessions.h",
-        "net_gamers.h"
-      ],
-      "rationale": "backs Microsoft.Xna.Framework.Net, a wider XNA 4.0 profile"
-    },
-    {
       "id": "strict-xna-remainder",
       "category": "STRICT_XNA_BACKING",
       "headers": [

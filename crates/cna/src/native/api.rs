@@ -8,6 +8,8 @@ use crate::error::{CnaError, Result};
 
 use super::loader::{library_candidates, Library};
 use super::audio::AudioApi;
+use super::gamer_services::GamerServicesApi;
+use super::net::NetApi;
 use super::media::MediaApi;
 use super::runtime::RuntimeApi;
 
@@ -17,6 +19,8 @@ pub(crate) struct Native {
     pub(super) audio: AudioApi,
     pub(crate) media: MediaApi,
     pub(crate) runtime: RuntimeApi,
+    pub(crate) gamer_services: GamerServicesApi,
+    pub(crate) net: NetApi,
     pub(super) error_get_last_info: sys::cna_error_get_last_info_fn,
     pub(super) error_get_last_message_size: sys::cna_error_get_last_message_size_fn,
     pub(super) error_copy_last_message: sys::cna_error_copy_last_message_fn,
@@ -646,6 +650,8 @@ impl Native {
 
         Ok(Self {
             runtime: RuntimeApi::load(&library)?,
+            gamer_services: GamerServicesApi::load(&library)?,
+            net: NetApi::load(&library)?,
             error_get_last_info: symbol!(
                 "cna_error_get_last_info",
                 sys::cna_error_get_last_info_fn

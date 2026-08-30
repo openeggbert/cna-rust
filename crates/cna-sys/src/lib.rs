@@ -4355,3 +4355,1953 @@ pub type cna_joystick_state_equals_fn = unsafe extern "C" fn(
 pub type cna_joystick_state_destroy_fn = unsafe extern "C" fn(
     CNA_JoystickStateHandle,
 ) -> CNA_Result;
+
+/* ---- GamerServices, Avatar and Net: scalars, handles, layouts and callbacks ---- */
+
+pub type CNA_GamerPresenceMode = u32;
+pub type CNA_NotificationPosition = u32;
+pub type CNA_GamerZone = u32;
+pub type CNA_LeaderboardKey = u32;
+pub type CNA_LeaderboardOutcome = u32;
+pub type CNA_MessageBoxIcon = u32;
+pub type CNA_ControllerSensitivity = u32;
+pub type CNA_GameDifficulty = u32;
+pub type CNA_GamerPrivilegeSetting = u32;
+pub type CNA_RacingCameraAngle = u32;
+pub type CNA_AvatarBodyType = u32;
+pub type CNA_AvatarRendererState = u32;
+pub type CNA_AvatarEyebrow = u32;
+pub type CNA_AvatarEye = u32;
+pub type CNA_AvatarMouth = u32;
+pub type CNA_AvatarAnimationPreset = u32;
+pub type CNA_AvatarBone = u32;
+pub type CNA_PropertyValueKind = u32;
+pub type CNA_NetworkSessionEndReason = u32;
+pub type CNA_NetworkSessionJoinError = u32;
+pub type CNA_NetworkSessionState = u32;
+pub type CNA_NetworkSessionType = u32;
+pub type CNA_SendDataOptions = u32;
+pub type CNA_NetworkEventType = u32;
+
+pub type CNA_SignedInGamerHandle = CNA_Handle;
+pub type CNA_GamerHandle = CNA_Handle;
+pub type CNA_GamerProfileHandle = CNA_Handle;
+pub type CNA_GamerCollectionHandle = CNA_Handle;
+pub type CNA_GamerEnumeratorHandle = CNA_Handle;
+pub type CNA_AchievementHandle = CNA_Handle;
+pub type CNA_AchievementCollectionHandle = CNA_Handle;
+pub type CNA_PropertyDictionaryHandle = CNA_Handle;
+pub type CNA_LeaderboardReaderHandle = CNA_Handle;
+pub type CNA_LeaderboardEntryHandle = CNA_Handle;
+pub type CNA_AvatarDescriptionHandle = CNA_Handle;
+pub type CNA_AvatarAnimationHandle = CNA_Handle;
+pub type CNA_AvatarRendererHandle = CNA_Handle;
+pub type CNA_NetworkSessionPropertiesHandle = CNA_Handle;
+pub type CNA_NetworkSessionPropertyEnumeratorHandle = CNA_Handle;
+pub type CNA_PacketWriterHandle = CNA_Handle;
+pub type CNA_PacketReaderHandle = CNA_Handle;
+pub type CNA_NetworkGamerHandle = CNA_Handle;
+pub type CNA_NetworkMachineHandle = CNA_Handle;
+pub type CNA_AvailableNetworkSessionHandle = CNA_Handle;
+pub type CNA_AvailableNetworkSessionCollectionHandle = CNA_Handle;
+pub type CNA_NetworkSessionHandle = CNA_Handle;
+pub type CNA_NetworkSessionEventRegistrationHandle = CNA_Handle;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_InviteAcceptedEventInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub gamer: CNA_SignedInGamerHandle,
+    pub is_current_session: CNA_Bool,
+    pub reserved: [u8; 7],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_GamerPresence {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub presence_mode: CNA_GamerPresenceMode,
+    pub presence_value: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_GamerPrivileges {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub allow_communication: CNA_GamerPrivilegeSetting,
+    pub allow_profile_viewing: CNA_GamerPrivilegeSetting,
+    pub allow_user_created_content: CNA_GamerPrivilegeSetting,
+    pub allow_online_sessions: CNA_Bool,
+    pub allow_premium_content: CNA_Bool,
+    pub allow_purchase_content: CNA_Bool,
+    pub allow_trade_content: CNA_Bool,
+    pub reserved: [u8; 4],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_GamerProfileInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub gamer_score: i32,
+    pub gamer_zone: CNA_GamerZone,
+    pub titles_played: i32,
+    pub total_achievements: i32,
+    pub reputation: f32,
+    pub is_disposed: CNA_Bool,
+    pub reserved: [u8; 3],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_FriendGamerInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub friend_request_received_from: CNA_Bool,
+    pub friend_request_sent_to: CNA_Bool,
+    pub has_voice: CNA_Bool,
+    pub invite_accepted: CNA_Bool,
+    pub invite_received_from: CNA_Bool,
+    pub invite_rejected: CNA_Bool,
+    pub invite_sent_to: CNA_Bool,
+    pub is_away: CNA_Bool,
+    pub is_busy: CNA_Bool,
+    pub is_joinable: CNA_Bool,
+    pub is_online: CNA_Bool,
+    pub is_playing: CNA_Bool,
+    pub reserved: [u8; 4],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_SignedInGamerEventInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub reserved: u32,
+    pub gamer: CNA_SignedInGamerHandle,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_AchievementInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub gamer_score: i32,
+    pub display_before_earned: CNA_Bool,
+    pub earned_online: CNA_Bool,
+    pub is_earned: CNA_Bool,
+    pub reserved: u8,
+    pub earned_date_time_ticks: i64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_GameDefaults {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub game_difficulty: CNA_GameDifficulty,
+    pub controller_sensitivity: CNA_ControllerSensitivity,
+    pub racing_camera_angle: CNA_RacingCameraAngle,
+    pub has_primary_color: CNA_Bool,
+    pub has_secondary_color: CNA_Bool,
+    pub auto_aim: CNA_Bool,
+    pub auto_center: CNA_Bool,
+    pub move_with_right_thumb_stick: CNA_Bool,
+    pub invert_y_axis: CNA_Bool,
+    pub manual_transmission: CNA_Bool,
+    pub accelerate_with_buttons: CNA_Bool,
+    pub brake_with_buttons: CNA_Bool,
+    pub reserved: [u8; 3],
+    pub primary_color: CNA_Color,
+    pub secondary_color: CNA_Color,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_LeaderboardIdentity {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub game_mode: i32,
+    pub key: [c_char; 64],
+}
+
+impl Default for CNA_LeaderboardIdentity {
+    fn default() -> Self {
+        Self {
+            struct_size: 0,
+            struct_version: 0,
+            game_mode: 0,
+            key: [0; 64],
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_LeaderboardReaderInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub page_start: i32,
+    pub total_leaderboard_size: i32,
+    pub entry_count: i32,
+    pub is_disposed: CNA_Bool,
+    pub can_page_down: CNA_Bool,
+    pub can_page_up: CNA_Bool,
+    pub reserved: u8,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_LeaderboardEntryInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub ranking: i32,
+    pub has_gamer: CNA_Bool,
+    pub reserved: [u8; 3],
+    pub rating: i64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_AvatarExpression {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub mouth: CNA_AvatarMouth,
+    pub left_eye: CNA_AvatarEye,
+    pub right_eye: CNA_AvatarEye,
+    pub left_eyebrow: CNA_AvatarEyebrow,
+    pub right_eyebrow: CNA_AvatarEyebrow,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_AvatarAppearanceEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub skin_color: CNA_Color,
+    pub hair_color: CNA_Color,
+    pub shirt_color: CNA_Color,
+    pub pants_color: CNA_Color,
+    pub shoes_color: CNA_Color,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_AvatarDescriptionInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub body_type: CNA_AvatarBodyType,
+    pub height: f32,
+    pub description_byte_count: u64,
+    pub is_valid: CNA_Bool,
+    pub reserved: [u8; 7],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_AvatarAnimationInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub bone_transform_count: i32,
+    pub is_disposed: CNA_Bool,
+    pub reserved: [u8; 3],
+    pub current_position_ticks: i64,
+    pub length_ticks: i64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_AvatarRendererInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub state: CNA_AvatarRendererState,
+    pub is_disposed: CNA_Bool,
+    pub is_real_rendering_enabled: CNA_Bool,
+    pub reserved: [u8; 2],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_QualityOfService {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub is_available: CNA_Bool,
+    pub reserved: [u8; 7],
+    pub average_roundtrip_ticks: i64,
+    pub minimum_roundtrip_ticks: i64,
+    pub bytes_per_second_downstream: i32,
+    pub bytes_per_second_upstream: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_OptionalInt32 {
+    pub has_value: CNA_Bool,
+    pub reserved: [u8; 3],
+    pub value: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_GameEndedEventInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_GameStartedEventInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_GamerJoinedEventInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub gamer: CNA_NetworkGamerHandle,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_GamerLeftEventInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub gamer: CNA_NetworkGamerHandle,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_HostChangedEventInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub old_host: CNA_NetworkGamerHandle,
+    pub new_host: CNA_NetworkGamerHandle,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_NetworkSessionEndedEventInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub end_reason: CNA_NetworkSessionEndReason,
+    pub reserved: [u8; 4],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_WriteLeaderboardsEventInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub gamer: CNA_NetworkGamerHandle,
+    pub is_leaving: CNA_Bool,
+    pub reserved: [u8; 7],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_AvailableNetworkSessionCreateInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub current_gamer_count: i32,
+    pub open_private_gamer_slots: i32,
+    pub open_public_gamer_slots: i32,
+    pub session_type: CNA_NetworkSessionType,
+    pub host_port: u16,
+    pub reserved: [u8; 6],
+    pub host_gamertag: CNA_StringView,
+    pub host_address: CNA_StringView,
+    pub session_properties: CNA_NetworkSessionPropertiesHandle,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_NetworkEventInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub r#type: CNA_NetworkEventType,
+    pub reliable: CNA_SendDataOptions,
+    pub state: CNA_NetworkSessionState,
+    pub reason: CNA_NetworkSessionEndReason,
+    pub gamer: CNA_NetworkGamerHandle,
+    pub sender: CNA_NetworkGamerHandle,
+    pub packet: *const u8,
+    pub packet_byte_count: u64,
+}
+
+pub type CNA_SignedInGamerEventCallback = Option<
+    unsafe extern "C" fn(
+        *mut c_void,
+        *const CNA_SignedInGamerEventInfo,
+    ),
+>;
+pub type CNA_GamerAsyncCallback = Option<unsafe extern "C" fn(*mut c_void)>;
+pub type CNA_NetworkSessionAsyncCallback = Option<unsafe extern "C" fn(*mut c_void)>;
+pub type CNA_GameStartedCallback = Option<
+    unsafe extern "C" fn(
+        CNA_NetworkSessionHandle,
+        *const CNA_GameStartedEventInfo,
+        *mut c_void,
+    ),
+>;
+pub type CNA_GameEndedCallback = Option<
+    unsafe extern "C" fn(
+        CNA_NetworkSessionHandle,
+        *const CNA_GameEndedEventInfo,
+        *mut c_void,
+    ),
+>;
+pub type CNA_GamerJoinedCallback = Option<
+    unsafe extern "C" fn(
+        CNA_NetworkSessionHandle,
+        *const CNA_GamerJoinedEventInfo,
+        *mut c_void,
+    ),
+>;
+pub type CNA_GamerLeftCallback = Option<
+    unsafe extern "C" fn(
+        CNA_NetworkSessionHandle,
+        *const CNA_GamerLeftEventInfo,
+        *mut c_void,
+    ),
+>;
+pub type CNA_HostChangedCallback = Option<
+    unsafe extern "C" fn(
+        CNA_NetworkSessionHandle,
+        *const CNA_HostChangedEventInfo,
+        *mut c_void,
+    ),
+>;
+pub type CNA_NetworkSessionEndedCallback = Option<
+    unsafe extern "C" fn(
+        CNA_NetworkSessionHandle,
+        *const CNA_NetworkSessionEndedEventInfo,
+        *mut c_void,
+    ),
+>;
+pub type CNA_WriteLeaderboardsCallback = Option<
+    unsafe extern "C" fn(
+        CNA_NetworkSessionHandle,
+        *const CNA_WriteLeaderboardsEventInfo,
+        *mut c_void,
+    ),
+>;
+pub type CNA_InviteAcceptedCallback = Option<
+    unsafe extern "C" fn(
+        *const CNA_InviteAcceptedEventInfo,
+        *mut c_void,
+    ),
+>;
+
+/* ---- GamerServices, Avatar and Net canonical identities ---- */
+
+pub const CNA_GAMER_PRESENCE_MODE_NONE: CNA_GamerPresenceMode = 0;
+pub const CNA_GAMER_PRESENCE_MODE_SINGLE_PLAYER: CNA_GamerPresenceMode = 1;
+pub const CNA_GAMER_PRESENCE_MODE_MULTIPLAYER: CNA_GamerPresenceMode = 2;
+pub const CNA_GAMER_PRESENCE_MODE_LOCAL_CO_OP: CNA_GamerPresenceMode = 3;
+pub const CNA_GAMER_PRESENCE_MODE_LOCAL_VERSUS: CNA_GamerPresenceMode = 4;
+pub const CNA_GAMER_PRESENCE_MODE_ONLINE_CO_OP: CNA_GamerPresenceMode = 5;
+pub const CNA_GAMER_PRESENCE_MODE_ONLINE_VERSUS: CNA_GamerPresenceMode = 6;
+pub const CNA_GAMER_PRESENCE_MODE_VERSUS_COMPUTER: CNA_GamerPresenceMode = 7;
+pub const CNA_GAMER_PRESENCE_MODE_STAGE: CNA_GamerPresenceMode = 8;
+pub const CNA_GAMER_PRESENCE_MODE_LEVEL: CNA_GamerPresenceMode = 9;
+pub const CNA_GAMER_PRESENCE_MODE_CO_OP_STAGE: CNA_GamerPresenceMode = 10;
+pub const CNA_GAMER_PRESENCE_MODE_CO_OP_LEVEL: CNA_GamerPresenceMode = 11;
+pub const CNA_GAMER_PRESENCE_MODE_ARCADE_MODE: CNA_GamerPresenceMode = 12;
+pub const CNA_GAMER_PRESENCE_MODE_CAMPAIGN_MODE: CNA_GamerPresenceMode = 13;
+pub const CNA_GAMER_PRESENCE_MODE_CHALLENGE_MODE: CNA_GamerPresenceMode = 14;
+pub const CNA_GAMER_PRESENCE_MODE_EXPLORATION_MODE: CNA_GamerPresenceMode = 15;
+pub const CNA_GAMER_PRESENCE_MODE_PRACTICE_MODE: CNA_GamerPresenceMode = 16;
+pub const CNA_GAMER_PRESENCE_MODE_PUZZLE_MODE: CNA_GamerPresenceMode = 17;
+pub const CNA_GAMER_PRESENCE_MODE_SCENARIO_MODE: CNA_GamerPresenceMode = 18;
+pub const CNA_GAMER_PRESENCE_MODE_STORY_MODE: CNA_GamerPresenceMode = 19;
+pub const CNA_GAMER_PRESENCE_MODE_SURVIVAL_MODE: CNA_GamerPresenceMode = 20;
+pub const CNA_GAMER_PRESENCE_MODE_TUTORIAL_MODE: CNA_GamerPresenceMode = 21;
+pub const CNA_GAMER_PRESENCE_MODE_DIFFICULTY_EASY: CNA_GamerPresenceMode = 22;
+pub const CNA_GAMER_PRESENCE_MODE_DIFFICULTY_MEDIUM: CNA_GamerPresenceMode = 23;
+pub const CNA_GAMER_PRESENCE_MODE_DIFFICULTY_HARD: CNA_GamerPresenceMode = 24;
+pub const CNA_GAMER_PRESENCE_MODE_DIFFICULTY_EXTREME: CNA_GamerPresenceMode = 25;
+pub const CNA_GAMER_PRESENCE_MODE_SCORE: CNA_GamerPresenceMode = 26;
+pub const CNA_GAMER_PRESENCE_MODE_VERSUS_SCORE: CNA_GamerPresenceMode = 27;
+pub const CNA_GAMER_PRESENCE_MODE_WINNING: CNA_GamerPresenceMode = 28;
+pub const CNA_GAMER_PRESENCE_MODE_LOSING: CNA_GamerPresenceMode = 29;
+pub const CNA_GAMER_PRESENCE_MODE_SCORE_IS_TIED: CNA_GamerPresenceMode = 30;
+pub const CNA_GAMER_PRESENCE_MODE_OUTNUMBERED: CNA_GamerPresenceMode = 31;
+pub const CNA_GAMER_PRESENCE_MODE_ON_A_ROLL: CNA_GamerPresenceMode = 32;
+pub const CNA_GAMER_PRESENCE_MODE_IN_COMBAT: CNA_GamerPresenceMode = 33;
+pub const CNA_GAMER_PRESENCE_MODE_BATTLING_BOSS: CNA_GamerPresenceMode = 34;
+pub const CNA_GAMER_PRESENCE_MODE_TIME_ATTACK: CNA_GamerPresenceMode = 35;
+pub const CNA_GAMER_PRESENCE_MODE_TRYING_FOR_RECORD: CNA_GamerPresenceMode = 36;
+pub const CNA_GAMER_PRESENCE_MODE_FREE_PLAY: CNA_GamerPresenceMode = 37;
+pub const CNA_GAMER_PRESENCE_MODE_WASTING_TIME: CNA_GamerPresenceMode = 38;
+pub const CNA_GAMER_PRESENCE_MODE_STUCK_ON_A_HARD_BIT: CNA_GamerPresenceMode = 39;
+pub const CNA_GAMER_PRESENCE_MODE_NEARLY_FINISHED: CNA_GamerPresenceMode = 40;
+pub const CNA_GAMER_PRESENCE_MODE_LOOKING_FOR_GAMES: CNA_GamerPresenceMode = 41;
+pub const CNA_GAMER_PRESENCE_MODE_WAITING_FOR_PLAYERS: CNA_GamerPresenceMode = 42;
+pub const CNA_GAMER_PRESENCE_MODE_WAITING_IN_LOBBY: CNA_GamerPresenceMode = 43;
+pub const CNA_GAMER_PRESENCE_MODE_SETTING_UP_MATCH: CNA_GamerPresenceMode = 44;
+pub const CNA_GAMER_PRESENCE_MODE_PLAYING_WITH_FRIENDS: CNA_GamerPresenceMode = 45;
+pub const CNA_GAMER_PRESENCE_MODE_AT_MENU: CNA_GamerPresenceMode = 46;
+pub const CNA_GAMER_PRESENCE_MODE_STARTING_GAME: CNA_GamerPresenceMode = 47;
+pub const CNA_GAMER_PRESENCE_MODE_PAUSED: CNA_GamerPresenceMode = 48;
+pub const CNA_GAMER_PRESENCE_MODE_GAME_OVER: CNA_GamerPresenceMode = 49;
+pub const CNA_GAMER_PRESENCE_MODE_WON_THE_GAME: CNA_GamerPresenceMode = 50;
+pub const CNA_GAMER_PRESENCE_MODE_CONFIGURING_SETTINGS: CNA_GamerPresenceMode = 51;
+pub const CNA_GAMER_PRESENCE_MODE_CUSTOMIZING_PLAYER: CNA_GamerPresenceMode = 52;
+pub const CNA_GAMER_PRESENCE_MODE_EDITING_LEVEL: CNA_GamerPresenceMode = 53;
+pub const CNA_GAMER_PRESENCE_MODE_IN_GAME_STORE: CNA_GamerPresenceMode = 54;
+pub const CNA_GAMER_PRESENCE_MODE_WATCHING_CUTSCENE: CNA_GamerPresenceMode = 55;
+pub const CNA_GAMER_PRESENCE_MODE_WATCHING_CREDITS: CNA_GamerPresenceMode = 56;
+pub const CNA_GAMER_PRESENCE_MODE_PLAYING_MINIGAME: CNA_GamerPresenceMode = 57;
+pub const CNA_GAMER_PRESENCE_MODE_FOUND_SECRET: CNA_GamerPresenceMode = 58;
+pub const CNA_GAMER_PRESENCE_MODE_CORNFLOWER_BLUE: CNA_GamerPresenceMode = 59;
+pub const CNA_NOTIFICATION_POSITION_TOP_LEFT: CNA_NotificationPosition = 0;
+pub const CNA_NOTIFICATION_POSITION_TOP_CENTER: CNA_NotificationPosition = 1;
+pub const CNA_NOTIFICATION_POSITION_TOP_RIGHT: CNA_NotificationPosition = 2;
+pub const CNA_NOTIFICATION_POSITION_CENTER_LEFT: CNA_NotificationPosition = 3;
+pub const CNA_NOTIFICATION_POSITION_CENTER: CNA_NotificationPosition = 4;
+pub const CNA_NOTIFICATION_POSITION_CENTER_RIGHT: CNA_NotificationPosition = 5;
+pub const CNA_NOTIFICATION_POSITION_BOTTOM_LEFT: CNA_NotificationPosition = 6;
+pub const CNA_NOTIFICATION_POSITION_BOTTOM_CENTER: CNA_NotificationPosition = 7;
+pub const CNA_NOTIFICATION_POSITION_BOTTOM_RIGHT: CNA_NotificationPosition = 8;
+pub const CNA_GAMER_ZONE_UNKNOWN: CNA_GamerZone = 0;
+pub const CNA_GAMER_ZONE_RECREATION: CNA_GamerZone = 1;
+pub const CNA_GAMER_ZONE_PRO: CNA_GamerZone = 2;
+pub const CNA_GAMER_ZONE_FAMILY: CNA_GamerZone = 3;
+pub const CNA_GAMER_ZONE_UNDERGROUND: CNA_GamerZone = 4;
+pub const CNA_LEADERBOARD_KEY_BEST_SCORE_LIFE_TIME: CNA_LeaderboardKey = 0;
+pub const CNA_LEADERBOARD_KEY_BEST_SCORE_RECENT: CNA_LeaderboardKey = 1;
+pub const CNA_LEADERBOARD_KEY_BEST_TIME_LIFE_TIME: CNA_LeaderboardKey = 2;
+pub const CNA_LEADERBOARD_KEY_BEST_TIME_RECENT: CNA_LeaderboardKey = 3;
+pub const CNA_LEADERBOARD_OUTCOME_NONE: CNA_LeaderboardOutcome = 0;
+pub const CNA_LEADERBOARD_OUTCOME_WIN: CNA_LeaderboardOutcome = 1;
+pub const CNA_LEADERBOARD_OUTCOME_LOSS: CNA_LeaderboardOutcome = 2;
+pub const CNA_LEADERBOARD_OUTCOME_TIE: CNA_LeaderboardOutcome = 3;
+pub const CNA_MESSAGE_BOX_ICON_NONE: CNA_MessageBoxIcon = 0;
+pub const CNA_MESSAGE_BOX_ICON_ERROR: CNA_MessageBoxIcon = 1;
+pub const CNA_MESSAGE_BOX_ICON_WARNING: CNA_MessageBoxIcon = 2;
+pub const CNA_MESSAGE_BOX_ICON_ALERT: CNA_MessageBoxIcon = 3;
+pub const CNA_CONTROLLER_SENSITIVITY_LOW: CNA_ControllerSensitivity = 0;
+pub const CNA_CONTROLLER_SENSITIVITY_MEDIUM: CNA_ControllerSensitivity = 1;
+pub const CNA_CONTROLLER_SENSITIVITY_HIGH: CNA_ControllerSensitivity = 2;
+pub const CNA_GAME_DIFFICULTY_EASY: CNA_GameDifficulty = 0;
+pub const CNA_GAME_DIFFICULTY_NORMAL: CNA_GameDifficulty = 1;
+pub const CNA_GAME_DIFFICULTY_HARD: CNA_GameDifficulty = 2;
+pub const CNA_GAMER_PRIVILEGE_SETTING_BLOCKED: CNA_GamerPrivilegeSetting = 0;
+pub const CNA_GAMER_PRIVILEGE_SETTING_FRIENDS_ONLY: CNA_GamerPrivilegeSetting = 1;
+pub const CNA_GAMER_PRIVILEGE_SETTING_EVERYONE: CNA_GamerPrivilegeSetting = 2;
+pub const CNA_RACING_CAMERA_ANGLE_BACK: CNA_RacingCameraAngle = 0;
+pub const CNA_RACING_CAMERA_ANGLE_FRONT: CNA_RacingCameraAngle = 1;
+pub const CNA_RACING_CAMERA_ANGLE_INSIDE: CNA_RacingCameraAngle = 2;
+pub const CNA_AVATAR_BODY_TYPE_FEMALE: CNA_AvatarBodyType = 0;
+pub const CNA_AVATAR_BODY_TYPE_MALE: CNA_AvatarBodyType = 1;
+pub const CNA_AVATAR_RENDERER_STATE_LOADING: CNA_AvatarRendererState = 0;
+pub const CNA_AVATAR_RENDERER_STATE_READY: CNA_AvatarRendererState = 1;
+pub const CNA_AVATAR_RENDERER_STATE_UNAVAILABLE: CNA_AvatarRendererState = 2;
+pub const CNA_AVATAR_EYEBROW_NEUTRAL: CNA_AvatarEyebrow = 0;
+pub const CNA_AVATAR_EYEBROW_SAD: CNA_AvatarEyebrow = 1;
+pub const CNA_AVATAR_EYEBROW_ANGRY: CNA_AvatarEyebrow = 2;
+pub const CNA_AVATAR_EYEBROW_CONFUSED: CNA_AvatarEyebrow = 3;
+pub const CNA_AVATAR_EYEBROW_RAISED: CNA_AvatarEyebrow = 4;
+pub const CNA_AVATAR_EYE_NEUTRAL: CNA_AvatarEye = 0;
+pub const CNA_AVATAR_EYE_SAD: CNA_AvatarEye = 1;
+pub const CNA_AVATAR_EYE_ANGRY: CNA_AvatarEye = 2;
+pub const CNA_AVATAR_EYE_CONFUSED: CNA_AvatarEye = 3;
+pub const CNA_AVATAR_EYE_LAUGHING: CNA_AvatarEye = 4;
+pub const CNA_AVATAR_EYE_SHOCKED: CNA_AvatarEye = 5;
+pub const CNA_AVATAR_EYE_HAPPY: CNA_AvatarEye = 6;
+pub const CNA_AVATAR_EYE_YAWNING: CNA_AvatarEye = 7;
+pub const CNA_AVATAR_EYE_SLEEPING: CNA_AvatarEye = 8;
+pub const CNA_AVATAR_EYE_LOOK_UP: CNA_AvatarEye = 9;
+pub const CNA_AVATAR_EYE_LOOK_DOWN: CNA_AvatarEye = 10;
+pub const CNA_AVATAR_EYE_LOOK_LEFT: CNA_AvatarEye = 11;
+pub const CNA_AVATAR_EYE_LOOK_RIGHT: CNA_AvatarEye = 12;
+pub const CNA_AVATAR_EYE_BLINK: CNA_AvatarEye = 13;
+pub const CNA_AVATAR_MOUTH_NEUTRAL: CNA_AvatarMouth = 0;
+pub const CNA_AVATAR_MOUTH_SAD: CNA_AvatarMouth = 1;
+pub const CNA_AVATAR_MOUTH_ANGRY: CNA_AvatarMouth = 2;
+pub const CNA_AVATAR_MOUTH_CONFUSED: CNA_AvatarMouth = 3;
+pub const CNA_AVATAR_MOUTH_LAUGHING: CNA_AvatarMouth = 4;
+pub const CNA_AVATAR_MOUTH_SHOCKED: CNA_AvatarMouth = 5;
+pub const CNA_AVATAR_MOUTH_HAPPY: CNA_AvatarMouth = 6;
+pub const CNA_AVATAR_MOUTH_PHONETIC_O: CNA_AvatarMouth = 7;
+pub const CNA_AVATAR_MOUTH_PHONETIC_AI: CNA_AvatarMouth = 8;
+pub const CNA_AVATAR_MOUTH_PHONETIC_EE: CNA_AvatarMouth = 9;
+pub const CNA_AVATAR_MOUTH_PHONETIC_FV: CNA_AvatarMouth = 10;
+pub const CNA_AVATAR_MOUTH_PHONETIC_W: CNA_AvatarMouth = 11;
+pub const CNA_AVATAR_MOUTH_PHONETIC_L: CNA_AvatarMouth = 12;
+pub const CNA_AVATAR_MOUTH_PHONETIC_DTH: CNA_AvatarMouth = 13;
+pub const CNA_AVATAR_ANIMATION_PRESET_STAND_0: CNA_AvatarAnimationPreset = 0;
+pub const CNA_AVATAR_ANIMATION_PRESET_STAND_1: CNA_AvatarAnimationPreset = 1;
+pub const CNA_AVATAR_ANIMATION_PRESET_STAND_2: CNA_AvatarAnimationPreset = 2;
+pub const CNA_AVATAR_ANIMATION_PRESET_STAND_3: CNA_AvatarAnimationPreset = 3;
+pub const CNA_AVATAR_ANIMATION_PRESET_STAND_4: CNA_AvatarAnimationPreset = 4;
+pub const CNA_AVATAR_ANIMATION_PRESET_STAND_5: CNA_AvatarAnimationPreset = 5;
+pub const CNA_AVATAR_ANIMATION_PRESET_STAND_6: CNA_AvatarAnimationPreset = 6;
+pub const CNA_AVATAR_ANIMATION_PRESET_STAND_7: CNA_AvatarAnimationPreset = 7;
+pub const CNA_AVATAR_ANIMATION_PRESET_CLAP: CNA_AvatarAnimationPreset = 8;
+pub const CNA_AVATAR_ANIMATION_PRESET_WAVE: CNA_AvatarAnimationPreset = 9;
+pub const CNA_AVATAR_ANIMATION_PRESET_CELEBRATE: CNA_AvatarAnimationPreset = 10;
+pub const CNA_AVATAR_ANIMATION_PRESET_FEMALE_IDLE_CHECK_NAILS: CNA_AvatarAnimationPreset = 11;
+pub const CNA_AVATAR_ANIMATION_PRESET_FEMALE_IDLE_LOOK_AROUND: CNA_AvatarAnimationPreset = 12;
+pub const CNA_AVATAR_ANIMATION_PRESET_FEMALE_IDLE_SHIFT_WEIGHT: CNA_AvatarAnimationPreset = 13;
+pub const CNA_AVATAR_ANIMATION_PRESET_FEMALE_IDLE_FIX_SHOE: CNA_AvatarAnimationPreset = 14;
+pub const CNA_AVATAR_ANIMATION_PRESET_FEMALE_ANGRY: CNA_AvatarAnimationPreset = 15;
+pub const CNA_AVATAR_ANIMATION_PRESET_FEMALE_CONFUSED: CNA_AvatarAnimationPreset = 16;
+pub const CNA_AVATAR_ANIMATION_PRESET_FEMALE_LAUGH: CNA_AvatarAnimationPreset = 17;
+pub const CNA_AVATAR_ANIMATION_PRESET_FEMALE_CRY: CNA_AvatarAnimationPreset = 18;
+pub const CNA_AVATAR_ANIMATION_PRESET_FEMALE_SHOCKED: CNA_AvatarAnimationPreset = 19;
+pub const CNA_AVATAR_ANIMATION_PRESET_FEMALE_YAWN: CNA_AvatarAnimationPreset = 20;
+pub const CNA_AVATAR_ANIMATION_PRESET_MALE_IDLE_LOOK_AROUND: CNA_AvatarAnimationPreset = 21;
+pub const CNA_AVATAR_ANIMATION_PRESET_MALE_IDLE_STRETCH: CNA_AvatarAnimationPreset = 22;
+pub const CNA_AVATAR_ANIMATION_PRESET_MALE_IDLE_SHIFT_WEIGHT: CNA_AvatarAnimationPreset = 23;
+pub const CNA_AVATAR_ANIMATION_PRESET_MALE_IDLE_CHECK_HAND: CNA_AvatarAnimationPreset = 24;
+pub const CNA_AVATAR_ANIMATION_PRESET_MALE_ANGRY: CNA_AvatarAnimationPreset = 25;
+pub const CNA_AVATAR_ANIMATION_PRESET_MALE_CONFUSED: CNA_AvatarAnimationPreset = 26;
+pub const CNA_AVATAR_ANIMATION_PRESET_MALE_LAUGH: CNA_AvatarAnimationPreset = 27;
+pub const CNA_AVATAR_ANIMATION_PRESET_MALE_CRY: CNA_AvatarAnimationPreset = 28;
+pub const CNA_AVATAR_ANIMATION_PRESET_MALE_SURPRISED: CNA_AvatarAnimationPreset = 29;
+pub const CNA_AVATAR_ANIMATION_PRESET_MALE_YAWN: CNA_AvatarAnimationPreset = 30;
+pub const CNA_AVATAR_BONE_ROOT: CNA_AvatarBone = 0;
+pub const CNA_AVATAR_BONE_BACK_LOWER: CNA_AvatarBone = 1;
+pub const CNA_AVATAR_BONE_HIP_LEFT: CNA_AvatarBone = 2;
+pub const CNA_AVATAR_BONE_HIP_RIGHT: CNA_AvatarBone = 3;
+pub const CNA_AVATAR_BONE_BACK_UPPER: CNA_AvatarBone = 5;
+pub const CNA_AVATAR_BONE_KNEE_LEFT: CNA_AvatarBone = 6;
+pub const CNA_AVATAR_BONE_KNEE_RIGHT: CNA_AvatarBone = 8;
+pub const CNA_AVATAR_BONE_ANKLE_LEFT: CNA_AvatarBone = 11;
+pub const CNA_AVATAR_BONE_COLLAR_LEFT: CNA_AvatarBone = 12;
+pub const CNA_AVATAR_BONE_NECK: CNA_AvatarBone = 14;
+pub const CNA_AVATAR_BONE_ANKLE_RIGHT: CNA_AvatarBone = 15;
+pub const CNA_AVATAR_BONE_COLLAR_RIGHT: CNA_AvatarBone = 16;
+pub const CNA_AVATAR_BONE_HEAD: CNA_AvatarBone = 19;
+pub const CNA_AVATAR_BONE_SHOULDER_LEFT: CNA_AvatarBone = 20;
+pub const CNA_AVATAR_BONE_TOE_LEFT: CNA_AvatarBone = 21;
+pub const CNA_AVATAR_BONE_SHOULDER_RIGHT: CNA_AvatarBone = 22;
+pub const CNA_AVATAR_BONE_TOE_RIGHT: CNA_AvatarBone = 23;
+pub const CNA_AVATAR_BONE_ELBOW_LEFT: CNA_AvatarBone = 25;
+pub const CNA_AVATAR_BONE_ELBOW_RIGHT: CNA_AvatarBone = 28;
+pub const CNA_AVATAR_BONE_WRIST_LEFT: CNA_AvatarBone = 33;
+pub const CNA_AVATAR_BONE_WRIST_RIGHT: CNA_AvatarBone = 36;
+pub const CNA_AVATAR_BONE_FINGER_INDEX_LEFT: CNA_AvatarBone = 37;
+pub const CNA_AVATAR_BONE_FINGER_MIDDLE_LEFT: CNA_AvatarBone = 38;
+pub const CNA_AVATAR_BONE_FINGER_RING_LEFT: CNA_AvatarBone = 39;
+pub const CNA_AVATAR_BONE_FINGER_SMALL_LEFT: CNA_AvatarBone = 40;
+pub const CNA_AVATAR_BONE_PROP_LEFT: CNA_AvatarBone = 41;
+pub const CNA_AVATAR_BONE_SPECIAL_LEFT: CNA_AvatarBone = 42;
+pub const CNA_AVATAR_BONE_FINGER_THUMB_LEFT: CNA_AvatarBone = 43;
+pub const CNA_AVATAR_BONE_FINGER_INDEX_RIGHT: CNA_AvatarBone = 44;
+pub const CNA_AVATAR_BONE_FINGER_MIDDLE_RIGHT: CNA_AvatarBone = 45;
+pub const CNA_AVATAR_BONE_FINGER_RING_RIGHT: CNA_AvatarBone = 46;
+pub const CNA_AVATAR_BONE_FINGER_SMALL_RIGHT: CNA_AvatarBone = 47;
+pub const CNA_AVATAR_BONE_PROP_RIGHT: CNA_AvatarBone = 48;
+pub const CNA_AVATAR_BONE_SPECIAL_RIGHT: CNA_AvatarBone = 49;
+pub const CNA_AVATAR_BONE_FINGER_THUMB_RIGHT: CNA_AvatarBone = 50;
+pub const CNA_AVATAR_BONE_FINGER_INDEX_2_LEFT: CNA_AvatarBone = 51;
+pub const CNA_AVATAR_BONE_FINGER_MIDDLE_2_LEFT: CNA_AvatarBone = 52;
+pub const CNA_AVATAR_BONE_FINGER_RING_2_LEFT: CNA_AvatarBone = 53;
+pub const CNA_AVATAR_BONE_FINGER_SMALL_2_LEFT: CNA_AvatarBone = 54;
+pub const CNA_AVATAR_BONE_FINGER_THUMB_2_LEFT: CNA_AvatarBone = 55;
+pub const CNA_AVATAR_BONE_FINGER_INDEX_2_RIGHT: CNA_AvatarBone = 56;
+pub const CNA_AVATAR_BONE_FINGER_MIDDLE_2_RIGHT: CNA_AvatarBone = 57;
+pub const CNA_AVATAR_BONE_FINGER_RING_2_RIGHT: CNA_AvatarBone = 58;
+pub const CNA_AVATAR_BONE_FINGER_SMALL_2_RIGHT: CNA_AvatarBone = 59;
+pub const CNA_AVATAR_BONE_FINGER_THUMB_2_RIGHT: CNA_AvatarBone = 60;
+pub const CNA_AVATAR_BONE_FINGER_INDEX_3_LEFT: CNA_AvatarBone = 61;
+pub const CNA_AVATAR_BONE_FINGER_MIDDLE_3_LEFT: CNA_AvatarBone = 62;
+pub const CNA_AVATAR_BONE_FINGER_RING_3_LEFT: CNA_AvatarBone = 63;
+pub const CNA_AVATAR_BONE_FINGER_SMALL_3_LEFT: CNA_AvatarBone = 64;
+pub const CNA_AVATAR_BONE_FINGER_THUMB_3_LEFT: CNA_AvatarBone = 65;
+pub const CNA_AVATAR_BONE_FINGER_INDEX_3_RIGHT: CNA_AvatarBone = 66;
+pub const CNA_AVATAR_BONE_FINGER_MIDDLE_3_RIGHT: CNA_AvatarBone = 67;
+pub const CNA_AVATAR_BONE_FINGER_RING_3_RIGHT: CNA_AvatarBone = 68;
+pub const CNA_AVATAR_BONE_FINGER_SMALL_3_RIGHT: CNA_AvatarBone = 69;
+pub const CNA_AVATAR_BONE_FINGER_THUMB_3_RIGHT: CNA_AvatarBone = 70;
+pub const CNA_PROPERTY_VALUE_KIND_UNKNOWN: CNA_PropertyValueKind = 0;
+pub const CNA_PROPERTY_VALUE_KIND_DATE_TIME: CNA_PropertyValueKind = 1;
+pub const CNA_PROPERTY_VALUE_KIND_DOUBLE: CNA_PropertyValueKind = 2;
+pub const CNA_PROPERTY_VALUE_KIND_INT32: CNA_PropertyValueKind = 3;
+pub const CNA_PROPERTY_VALUE_KIND_INT64: CNA_PropertyValueKind = 4;
+pub const CNA_PROPERTY_VALUE_KIND_OUTCOME: CNA_PropertyValueKind = 5;
+pub const CNA_PROPERTY_VALUE_KIND_SINGLE: CNA_PropertyValueKind = 6;
+pub const CNA_PROPERTY_VALUE_KIND_STREAM: CNA_PropertyValueKind = 7;
+pub const CNA_PROPERTY_VALUE_KIND_STRING: CNA_PropertyValueKind = 8;
+pub const CNA_PROPERTY_VALUE_KIND_TIME_SPAN: CNA_PropertyValueKind = 9;
+pub const CNA_LEADERBOARD_IDENTITY_KEY_CAPACITY: u32 = 64;
+pub const CNA_AVATAR_RENDERER_BONE_COUNT: i32 = 71;
+pub const CNA_NETWORK_SESSION_END_REASON_CLIENT_SIGNED_OUT: CNA_NetworkSessionEndReason = 0;
+pub const CNA_NETWORK_SESSION_END_REASON_HOST_ENDED_SESSION: CNA_NetworkSessionEndReason = 1;
+pub const CNA_NETWORK_SESSION_END_REASON_REMOVED_BY_HOST: CNA_NetworkSessionEndReason = 2;
+pub const CNA_NETWORK_SESSION_END_REASON_DISCONNECTED: CNA_NetworkSessionEndReason = 3;
+pub const CNA_NETWORK_SESSION_JOIN_ERROR_SESSION_NOT_FOUND: CNA_NetworkSessionJoinError = 0;
+pub const CNA_NETWORK_SESSION_JOIN_ERROR_SESSION_NOT_JOINABLE: CNA_NetworkSessionJoinError = 1;
+pub const CNA_NETWORK_SESSION_JOIN_ERROR_SESSION_FULL: CNA_NetworkSessionJoinError = 2;
+pub const CNA_NETWORK_SESSION_STATE_LOBBY: CNA_NetworkSessionState = 0;
+pub const CNA_NETWORK_SESSION_STATE_PLAYING: CNA_NetworkSessionState = 1;
+pub const CNA_NETWORK_SESSION_STATE_ENDED: CNA_NetworkSessionState = 2;
+pub const CNA_NETWORK_SESSION_TYPE_LOCAL: CNA_NetworkSessionType = 0;
+pub const CNA_NETWORK_SESSION_TYPE_SYSTEM_LINK: CNA_NetworkSessionType = 1;
+pub const CNA_NETWORK_SESSION_TYPE_PLAYER_MATCH: CNA_NetworkSessionType = 2;
+pub const CNA_NETWORK_SESSION_TYPE_RANKED: CNA_NetworkSessionType = 3;
+pub const CNA_NETWORK_SESSION_TYPE_LOCAL_WITH_LEADERBOARDS: CNA_NetworkSessionType = 4;
+pub const CNA_SEND_DATA_OPTIONS_NONE: CNA_SendDataOptions = 0;
+pub const CNA_SEND_DATA_OPTIONS_RELIABLE: CNA_SendDataOptions = 1;
+pub const CNA_SEND_DATA_OPTIONS_IN_ORDER: CNA_SendDataOptions = 2;
+pub const CNA_SEND_DATA_OPTIONS_RELIABLE_IN_ORDER: CNA_SendDataOptions = 3;
+pub const CNA_SEND_DATA_OPTIONS_CHAT: CNA_SendDataOptions = 4;
+pub const CNA_NETWORK_EVENT_TYPE_PACKET_SEND: CNA_NetworkEventType = 0;
+pub const CNA_NETWORK_EVENT_TYPE_GAMER_JOIN: CNA_NetworkEventType = 1;
+pub const CNA_NETWORK_EVENT_TYPE_GAMER_LEAVE: CNA_NetworkEventType = 2;
+pub const CNA_NETWORK_EVENT_TYPE_HOST_CHANGE: CNA_NetworkEventType = 3;
+pub const CNA_NETWORK_EVENT_TYPE_STATE_CHANGE: CNA_NetworkEventType = 4;
+pub const CNA_NETWORK_SESSION_ROSTER_ALL: u32 = 0;
+pub const CNA_NETWORK_SESSION_ROSTER_LOCAL: u32 = 1;
+pub const CNA_NETWORK_SESSION_ROSTER_REMOTE: u32 = 2;
+pub const CNA_NETWORK_SESSION_ROSTER_PREVIOUS: u32 = 3;
+pub const CNA_NETWORK_SESSION_MAX_SUPPORTED_GAMERS: i32 = 31;
+pub const CNA_NETWORK_SESSION_MAX_PREVIOUS_GAMERS: i32 = 100;
+
+/* ---- GamerServices, Avatar and Net routes ---- */
+
+pub type cna_achievement_collection_add_fn = unsafe extern "C" fn(
+    CNA_AchievementCollectionHandle, CNA_AchievementHandle,
+) -> CNA_Result;
+pub type cna_achievement_collection_clear_fn = unsafe extern "C" fn(
+    CNA_AchievementCollectionHandle,
+) -> CNA_Result;
+pub type cna_achievement_collection_contains_fn = unsafe extern "C" fn(
+    CNA_AchievementCollectionHandle, CNA_AchievementHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_achievement_collection_copy_to_fn = unsafe extern "C" fn(
+    CNA_AchievementCollectionHandle, *mut CNA_AchievementHandle, u64, i32, *mut u64,
+) -> CNA_Result;
+pub type cna_achievement_collection_create_ext_fn = unsafe extern "C" fn(
+    *const CNA_AchievementHandle, u64, *mut CNA_AchievementCollectionHandle,
+) -> CNA_Result;
+pub type cna_achievement_collection_destroy_fn = unsafe extern "C" fn(
+    CNA_AchievementCollectionHandle,
+) -> CNA_Result;
+pub type cna_achievement_collection_get_at_fn = unsafe extern "C" fn(
+    CNA_AchievementCollectionHandle, i32, *mut CNA_AchievementHandle,
+) -> CNA_Result;
+pub type cna_achievement_collection_get_by_key_fn = unsafe extern "C" fn(
+    CNA_AchievementCollectionHandle, CNA_StringView, *mut CNA_AchievementHandle,
+) -> CNA_Result;
+pub type cna_achievement_collection_get_count_fn = unsafe extern "C" fn(
+    CNA_AchievementCollectionHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_achievement_collection_get_is_disposed_fn = unsafe extern "C" fn(
+    CNA_AchievementCollectionHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_achievement_collection_get_is_read_only_fn = unsafe extern "C" fn(
+    CNA_AchievementCollectionHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_achievement_collection_index_of_fn = unsafe extern "C" fn(
+    CNA_AchievementCollectionHandle, CNA_AchievementHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_achievement_collection_insert_fn = unsafe extern "C" fn(
+    CNA_AchievementCollectionHandle, i32, CNA_AchievementHandle,
+) -> CNA_Result;
+pub type cna_achievement_collection_remove_fn = unsafe extern "C" fn(
+    CNA_AchievementCollectionHandle, CNA_AchievementHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_achievement_collection_remove_at_fn = unsafe extern "C" fn(
+    CNA_AchievementCollectionHandle, i32,
+) -> CNA_Result;
+pub type cna_achievement_copy_description_fn = unsafe extern "C" fn(
+    CNA_AchievementHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_achievement_copy_how_to_earn_fn = unsafe extern "C" fn(
+    CNA_AchievementHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_achievement_copy_key_fn = unsafe extern "C" fn(
+    CNA_AchievementHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_achievement_copy_name_fn = unsafe extern "C" fn(
+    CNA_AchievementHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_achievement_create_ext_fn = unsafe extern "C" fn(
+    CNA_StringView, CNA_StringView, CNA_StringView, CNA_Bool, CNA_Bool, i64, *mut CNA_AchievementHandle,
+) -> CNA_Result;
+pub type cna_achievement_destroy_fn = unsafe extern "C" fn(CNA_AchievementHandle) -> CNA_Result;
+pub type cna_achievement_equals_fn = unsafe extern "C" fn(
+    CNA_AchievementHandle, CNA_AchievementHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_achievement_get_description_size_fn = unsafe extern "C" fn(
+    CNA_AchievementHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_achievement_get_how_to_earn_size_fn = unsafe extern "C" fn(
+    CNA_AchievementHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_achievement_get_info_fn = unsafe extern "C" fn(
+    CNA_AchievementHandle, *mut CNA_AchievementInfo,
+) -> CNA_Result;
+pub type cna_achievement_get_key_size_fn = unsafe extern "C" fn(
+    CNA_AchievementHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_achievement_get_name_size_fn = unsafe extern "C" fn(
+    CNA_AchievementHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_achievement_get_picture_size_fn = unsafe extern "C" fn(
+    CNA_AchievementHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_available_network_session_collection_copy_session_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionCollectionHandle, i32, *mut CNA_AvailableNetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_available_network_session_collection_create_ext_fn = unsafe extern "C" fn(
+    *const CNA_AvailableNetworkSessionHandle, u64, *mut CNA_AvailableNetworkSessionCollectionHandle,
+) -> CNA_Result;
+pub type cna_available_network_session_collection_destroy_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionCollectionHandle,
+) -> CNA_Result;
+pub type cna_available_network_session_collection_dispose_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionCollectionHandle,
+) -> CNA_Result;
+pub type cna_available_network_session_collection_get_count_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionCollectionHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_available_network_session_collection_get_is_disposed_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionCollectionHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_available_network_session_copy_connect_address_ext_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_available_network_session_copy_host_gamertag_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_available_network_session_copy_session_properties_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionHandle, *mut CNA_NetworkSessionPropertiesHandle,
+) -> CNA_Result;
+pub type cna_available_network_session_create_ext_fn = unsafe extern "C" fn(
+    *const CNA_AvailableNetworkSessionCreateInfo, *const CNA_QualityOfService, *mut CNA_AvailableNetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_available_network_session_destroy_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_available_network_session_equals_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionHandle, CNA_AvailableNetworkSessionHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_available_network_session_get_connect_address_size_ext_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_available_network_session_get_connect_port_ext_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionHandle, *mut u16,
+) -> CNA_Result;
+pub type cna_available_network_session_get_current_gamer_count_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_available_network_session_get_host_gamertag_size_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_available_network_session_get_open_private_gamer_slots_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_available_network_session_get_open_public_gamer_slots_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_available_network_session_get_quality_of_service_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionHandle, *mut CNA_QualityOfService,
+) -> CNA_Result;
+pub type cna_available_network_session_get_session_type_ext_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionHandle, *mut CNA_NetworkSessionType,
+) -> CNA_Result;
+pub type cna_available_network_session_not_equals_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionHandle, CNA_AvailableNetworkSessionHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_avatar_animation_copy_real_clip_name_ext_fn = unsafe extern "C" fn(
+    CNA_AvatarAnimationHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_avatar_animation_create_fn = unsafe extern "C" fn(
+    CNA_AvatarAnimationPreset, *mut CNA_AvatarAnimationHandle,
+) -> CNA_Result;
+pub type cna_avatar_animation_destroy_fn = unsafe extern "C" fn(
+    CNA_AvatarAnimationHandle,
+) -> CNA_Result;
+pub type cna_avatar_animation_get_bone_transform_at_fn = unsafe extern "C" fn(
+    CNA_AvatarAnimationHandle, i32, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_avatar_animation_get_expression_fn = unsafe extern "C" fn(
+    CNA_AvatarAnimationHandle, *mut CNA_AvatarExpression,
+) -> CNA_Result;
+pub type cna_avatar_animation_get_info_fn = unsafe extern "C" fn(
+    CNA_AvatarAnimationHandle, *mut CNA_AvatarAnimationInfo,
+) -> CNA_Result;
+pub type cna_avatar_animation_get_real_clip_name_size_ext_fn = unsafe extern "C" fn(
+    CNA_AvatarAnimationHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_avatar_animation_preset_copy_clip_name_ext_fn = unsafe extern "C" fn(
+    CNA_AvatarAnimationPreset, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_avatar_animation_preset_get_clip_name_size_ext_fn = unsafe extern "C" fn(
+    CNA_AvatarAnimationPreset, *mut u64,
+) -> CNA_Result;
+pub type cna_avatar_animation_set_current_position_fn = unsafe extern "C" fn(
+    CNA_AvatarAnimationHandle, i64,
+) -> CNA_Result;
+pub type cna_avatar_animation_set_real_clip_name_ext_fn = unsafe extern "C" fn(
+    CNA_AvatarAnimationHandle, CNA_StringView,
+) -> CNA_Result;
+pub type cna_avatar_animation_update_fn = unsafe extern "C" fn(
+    CNA_AvatarAnimationHandle, i64, CNA_Bool,
+) -> CNA_Result;
+pub type cna_avatar_appearance_init_ext_fn = unsafe extern "C" fn(
+    *mut CNA_AvatarAppearanceEXT,
+) -> CNA_Result;
+pub type cna_avatar_body_type_copy_content_name_ext_fn = unsafe extern "C" fn(
+    CNA_AvatarBodyType, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_avatar_body_type_get_content_name_size_ext_fn = unsafe extern "C" fn(
+    CNA_AvatarBodyType, *mut u64,
+) -> CNA_Result;
+pub type cna_avatar_description_copy_description_fn = unsafe extern "C" fn(
+    CNA_AvatarDescriptionHandle, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_avatar_description_create_fn = unsafe extern "C" fn(
+    *const u8, u64, *mut CNA_AvatarDescriptionHandle,
+) -> CNA_Result;
+pub type cna_avatar_description_create_random_fn = unsafe extern "C" fn(
+    *mut CNA_AvatarDescriptionHandle,
+) -> CNA_Result;
+pub type cna_avatar_description_create_random_for_body_type_fn = unsafe extern "C" fn(
+    CNA_AvatarBodyType, *mut CNA_AvatarDescriptionHandle,
+) -> CNA_Result;
+pub type cna_avatar_description_destroy_fn = unsafe extern "C" fn(
+    CNA_AvatarDescriptionHandle,
+) -> CNA_Result;
+pub type cna_avatar_description_get_from_gamer_fn = unsafe extern "C" fn(
+    CNA_GamerHandle, CNA_GamerAsyncCallback, *mut c_void, *mut CNA_AvatarDescriptionHandle,
+) -> CNA_Result;
+pub type cna_avatar_description_get_info_fn = unsafe extern "C" fn(
+    CNA_AvatarDescriptionHandle, *mut CNA_AvatarDescriptionInfo,
+) -> CNA_Result;
+pub type cna_avatar_description_subscribe_changed_ext_fn = unsafe extern "C" fn(
+    CNA_GamerAsyncCallback, *mut c_void, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_avatar_expression_init_fn = unsafe extern "C" fn(
+    *mut CNA_AvatarExpression,
+) -> CNA_Result;
+pub type cna_avatar_renderer_create_fn = unsafe extern "C" fn(
+    CNA_AvatarDescriptionHandle, CNA_Bool, *mut CNA_AvatarRendererHandle,
+) -> CNA_Result;
+pub type cna_avatar_renderer_destroy_fn = unsafe extern "C" fn(
+    CNA_AvatarRendererHandle,
+) -> CNA_Result;
+pub type cna_avatar_renderer_draw_animation_fn = unsafe extern "C" fn(
+    CNA_AvatarRendererHandle, CNA_AvatarAnimationHandle,
+) -> CNA_Result;
+pub type cna_avatar_renderer_draw_bones_fn = unsafe extern "C" fn(
+    CNA_AvatarRendererHandle, *const CNA_Matrix, u64, *const CNA_AvatarExpression,
+) -> CNA_Result;
+pub type cna_avatar_renderer_draw_real_ext_fn = unsafe extern "C" fn(
+    CNA_AvatarRendererHandle, CNA_StringView, i64, CNA_Bool,
+) -> CNA_Result;
+pub type cna_avatar_renderer_enable_real_rendering_ext_fn = unsafe extern "C" fn(
+    CNA_AvatarRendererHandle, CNA_Handle, CNA_Handle,
+) -> CNA_Result;
+pub type cna_avatar_renderer_get_bind_pose_at_fn = unsafe extern "C" fn(
+    CNA_AvatarRendererHandle, i32, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_avatar_renderer_get_info_fn = unsafe extern "C" fn(
+    CNA_AvatarRendererHandle, *mut CNA_AvatarRendererInfo,
+) -> CNA_Result;
+pub type cna_avatar_renderer_get_lighting_fn = unsafe extern "C" fn(
+    CNA_AvatarRendererHandle, *mut CNA_Vector3, *mut CNA_Vector3, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_avatar_renderer_get_parent_bone_at_fn = unsafe extern "C" fn(
+    CNA_AvatarRendererHandle, i32, *mut i32,
+) -> CNA_Result;
+pub type cna_avatar_renderer_get_transforms_fn = unsafe extern "C" fn(
+    CNA_AvatarRendererHandle, *mut CNA_Matrix, *mut CNA_Matrix, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_avatar_renderer_set_appearance_ext_fn = unsafe extern "C" fn(
+    CNA_AvatarRendererHandle, *const CNA_AvatarAppearanceEXT,
+) -> CNA_Result;
+pub type cna_avatar_renderer_set_lighting_fn = unsafe extern "C" fn(
+    CNA_AvatarRendererHandle, *const CNA_Vector3, *const CNA_Vector3, *const CNA_Vector3,
+) -> CNA_Result;
+pub type cna_avatar_renderer_set_transforms_fn = unsafe extern "C" fn(
+    CNA_AvatarRendererHandle, *const CNA_Matrix, *const CNA_Matrix, *const CNA_Matrix,
+) -> CNA_Result;
+pub type cna_friend_collection_create_ext_fn = unsafe extern "C" fn(
+    *const CNA_GamerHandle, u64, *mut CNA_GamerCollectionHandle,
+) -> CNA_Result;
+pub type cna_friend_collection_get_is_disposed_fn = unsafe extern "C" fn(
+    CNA_GamerCollectionHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_friend_gamer_copy_presence_fn = unsafe extern "C" fn(
+    CNA_GamerHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_friend_gamer_create_ext_fn = unsafe extern "C" fn(
+    CNA_StringView, CNA_StringView, CNA_Bool, CNA_Bool, CNA_Bool, CNA_Bool, CNA_Bool, CNA_Bool, *mut CNA_GamerHandle,
+) -> CNA_Result;
+pub type cna_friend_gamer_get_info_fn = unsafe extern "C" fn(
+    CNA_GamerHandle, *mut CNA_FriendGamerInfo,
+) -> CNA_Result;
+pub type cna_friend_gamer_get_presence_size_fn = unsafe extern "C" fn(
+    CNA_GamerHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_game_defaults_init_fn = unsafe extern "C" fn(*mut CNA_GameDefaults) -> CNA_Result;
+pub type cna_game_ended_event_info_init_fn = unsafe extern "C" fn(
+    *mut CNA_GameEndedEventInfo,
+) -> CNA_Result;
+pub type cna_gamer_begin_get_from_gamertag_fn = unsafe extern "C" fn(
+    CNA_StringView, CNA_GamerAsyncCallback, *mut c_void, *mut CNA_GamerHandle,
+) -> CNA_Result;
+pub type cna_gamer_begin_get_partner_token_fn = unsafe extern "C" fn(
+    CNA_StringView, CNA_GamerAsyncCallback, *mut c_void, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_gamer_begin_get_profile_fn = unsafe extern "C" fn(
+    CNA_GamerHandle, CNA_GamerAsyncCallback, *mut c_void, *mut CNA_GamerProfileHandle,
+) -> CNA_Result;
+pub type cna_gamer_collection_add_fn = unsafe extern "C" fn(
+    CNA_GamerCollectionHandle, CNA_GamerHandle,
+) -> CNA_Result;
+pub type cna_gamer_collection_clear_fn = unsafe extern "C" fn(
+    CNA_GamerCollectionHandle,
+) -> CNA_Result;
+pub type cna_gamer_collection_contains_fn = unsafe extern "C" fn(
+    CNA_GamerCollectionHandle, CNA_GamerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_gamer_collection_copy_to_fn = unsafe extern "C" fn(
+    CNA_GamerCollectionHandle, *mut CNA_GamerHandle, u64, i32, *mut u64,
+) -> CNA_Result;
+pub type cna_gamer_collection_create_enumerator_fn = unsafe extern "C" fn(
+    CNA_GamerCollectionHandle, *mut CNA_GamerEnumeratorHandle,
+) -> CNA_Result;
+pub type cna_gamer_collection_destroy_fn = unsafe extern "C" fn(
+    CNA_GamerCollectionHandle,
+) -> CNA_Result;
+pub type cna_gamer_collection_get_at_fn = unsafe extern "C" fn(
+    CNA_GamerCollectionHandle, i32, *mut CNA_GamerHandle,
+) -> CNA_Result;
+pub type cna_gamer_collection_get_count_fn = unsafe extern "C" fn(
+    CNA_GamerCollectionHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_gamer_collection_index_of_fn = unsafe extern "C" fn(
+    CNA_GamerCollectionHandle, CNA_GamerHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_gamer_collection_remove_fn = unsafe extern "C" fn(
+    CNA_GamerCollectionHandle, CNA_GamerHandle,
+) -> CNA_Result;
+pub type cna_gamer_copy_display_name_fn = unsafe extern "C" fn(
+    CNA_GamerHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_gamer_copy_gamertag_fn = unsafe extern "C" fn(
+    CNA_GamerHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_gamer_copy_partner_token_fn = unsafe extern "C" fn(
+    CNA_StringView, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_gamer_copy_text_fn = unsafe extern "C" fn(
+    CNA_GamerHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_gamer_destroy_fn = unsafe extern "C" fn(CNA_GamerHandle) -> CNA_Result;
+pub type cna_gamer_enumerator_destroy_fn = unsafe extern "C" fn(
+    CNA_GamerEnumeratorHandle,
+) -> CNA_Result;
+pub type cna_gamer_enumerator_get_current_fn = unsafe extern "C" fn(
+    CNA_GamerEnumeratorHandle, *mut CNA_GamerHandle,
+) -> CNA_Result;
+pub type cna_gamer_enumerator_move_next_fn = unsafe extern "C" fn(
+    CNA_GamerEnumeratorHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_gamer_enumerator_reset_fn = unsafe extern "C" fn(
+    CNA_GamerEnumeratorHandle,
+) -> CNA_Result;
+pub type cna_gamer_get_display_name_size_fn = unsafe extern "C" fn(
+    CNA_GamerHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_gamer_get_from_gamertag_fn = unsafe extern "C" fn(
+    CNA_StringView, *mut CNA_GamerHandle,
+) -> CNA_Result;
+pub type cna_gamer_get_gamertag_size_fn = unsafe extern "C" fn(
+    CNA_GamerHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_gamer_get_is_disposed_fn = unsafe extern "C" fn(
+    CNA_GamerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_gamer_get_partner_token_size_fn = unsafe extern "C" fn(
+    CNA_StringView, *mut u64,
+) -> CNA_Result;
+pub type cna_gamer_get_profile_fn = unsafe extern "C" fn(
+    CNA_GamerHandle, *mut CNA_GamerProfileHandle,
+) -> CNA_Result;
+pub type cna_gamer_get_signed_in_gamer_at_fn = unsafe extern "C" fn(
+    i32, *mut CNA_SignedInGamerHandle,
+) -> CNA_Result;
+pub type cna_gamer_get_signed_in_gamer_at_player_index_fn = unsafe extern "C" fn(
+    CNA_PlayerIndex, *mut CNA_Bool, *mut CNA_SignedInGamerHandle,
+) -> CNA_Result;
+pub type cna_gamer_get_signed_in_gamer_count_fn = unsafe extern "C" fn(*mut i32) -> CNA_Result;
+pub type cna_gamer_get_tag_fn = unsafe extern "C" fn(CNA_GamerHandle, *mut u64) -> CNA_Result;
+pub type cna_gamer_get_text_size_fn = unsafe extern "C" fn(CNA_GamerHandle, *mut u64) -> CNA_Result;
+pub type cna_gamer_joined_event_info_init_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut CNA_GamerJoinedEventInfo,
+) -> CNA_Result;
+pub type cna_gamer_left_event_info_init_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut CNA_GamerLeftEventInfo,
+) -> CNA_Result;
+pub type cna_gamer_presence_init_fn = unsafe extern "C" fn(*mut CNA_GamerPresence) -> CNA_Result;
+pub type cna_gamer_profile_copy_motto_fn = unsafe extern "C" fn(
+    CNA_GamerProfileHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_gamer_profile_copy_region_name_fn = unsafe extern "C" fn(
+    CNA_GamerProfileHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_gamer_profile_destroy_fn = unsafe extern "C" fn(CNA_GamerProfileHandle) -> CNA_Result;
+pub type cna_gamer_profile_get_info_fn = unsafe extern "C" fn(
+    CNA_GamerProfileHandle, *mut CNA_GamerProfileInfo,
+) -> CNA_Result;
+pub type cna_gamer_profile_get_motto_size_fn = unsafe extern "C" fn(
+    CNA_GamerProfileHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_gamer_profile_get_picture_size_fn = unsafe extern "C" fn(
+    CNA_GamerProfileHandle, *mut CNA_Bool, *mut u64,
+) -> CNA_Result;
+pub type cna_gamer_profile_get_region_name_size_fn = unsafe extern "C" fn(
+    CNA_GamerProfileHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_gamer_services_component_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_gamer_services_dispatcher_get_freed_gamer_count_ext_fn = unsafe extern "C" fn(
+    *mut u64,
+) -> CNA_Result;
+pub type cna_gamer_services_dispatcher_get_is_initialized_fn = unsafe extern "C" fn(
+    *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_gamer_services_dispatcher_get_window_handle_fn = unsafe extern "C" fn(
+    *mut u64,
+) -> CNA_Result;
+pub type cna_gamer_services_dispatcher_initialize_fn = unsafe extern "C" fn(
+    CNA_Handle,
+) -> CNA_Result;
+pub type cna_gamer_services_dispatcher_set_window_handle_fn = unsafe extern "C" fn(
+    u64,
+) -> CNA_Result;
+pub type cna_gamer_services_dispatcher_subscribe_installing_title_update_ext_fn = unsafe extern "C" fn(
+    CNA_GamerAsyncCallback, *mut c_void, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_gamer_services_dispatcher_update_fn = unsafe extern "C" fn() -> CNA_Result;
+pub type cna_gamer_services_dispatcher_update_async_fn = unsafe extern "C" fn(
+    *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_gamer_set_display_name_fn = unsafe extern "C" fn(
+    CNA_GamerHandle, CNA_StringView,
+) -> CNA_Result;
+pub type cna_gamer_set_signed_in_gamers_ext_fn = unsafe extern "C" fn(
+    *const CNA_SignedInGamerHandle, u64,
+) -> CNA_Result;
+pub type cna_gamer_set_tag_fn = unsafe extern "C" fn(CNA_GamerHandle, u64) -> CNA_Result;
+pub type cna_gamer_signed_in_contains_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_gamer_signed_in_index_of_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_gamer_unsubscribe_ext_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_game_started_event_info_init_fn = unsafe extern "C" fn(
+    *mut CNA_GameStartedEventInfo,
+) -> CNA_Result;
+pub type cna_guide_begin_show_keyboard_input_fn = unsafe extern "C" fn(
+    CNA_PlayerIndex, CNA_StringView, CNA_StringView, CNA_StringView, CNA_Bool, CNA_GamerAsyncCallback, *mut c_void,
+) -> CNA_Result;
+pub type cna_guide_begin_show_message_box_fn = unsafe extern "C" fn(
+    CNA_PlayerIndex, CNA_StringView, CNA_StringView, *const CNA_StringView, u64, i32, CNA_MessageBoxIcon, CNA_GamerAsyncCallback, *mut c_void,
+) -> CNA_Result;
+pub type cna_guide_copy_pending_keyboard_input_description_ext_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_guide_copy_pending_keyboard_input_display_text_ext_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_guide_copy_pending_keyboard_input_title_ext_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_guide_delay_notifications_fn = unsafe extern "C" fn(i64) -> CNA_Result;
+pub type cna_guide_end_show_keyboard_input_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_guide_end_show_keyboard_input_size_fn = unsafe extern "C" fn(*mut u64) -> CNA_Result;
+pub type cna_guide_end_show_message_box_fn = unsafe extern "C" fn(
+    *mut CNA_Bool, *mut i32,
+) -> CNA_Result;
+pub type cna_guide_get_has_pending_keyboard_input_ext_fn = unsafe extern "C" fn(
+    *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_guide_get_has_pending_message_box_ext_fn = unsafe extern "C" fn(
+    *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_guide_get_is_screen_saver_enabled_fn = unsafe extern "C" fn(
+    *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_guide_get_is_trial_mode_fn = unsafe extern "C" fn(*mut CNA_Bool) -> CNA_Result;
+pub type cna_guide_get_is_visible_fn = unsafe extern "C" fn(*mut CNA_Bool) -> CNA_Result;
+pub type cna_guide_get_notification_position_fn = unsafe extern "C" fn(
+    *mut CNA_NotificationPosition,
+) -> CNA_Result;
+pub type cna_guide_get_pending_keyboard_input_description_size_ext_fn = unsafe extern "C" fn(
+    *mut u64,
+) -> CNA_Result;
+pub type cna_guide_get_pending_keyboard_input_display_text_size_ext_fn = unsafe extern "C" fn(
+    *mut u64,
+) -> CNA_Result;
+pub type cna_guide_get_pending_keyboard_input_title_size_ext_fn = unsafe extern "C" fn(
+    *mut u64,
+) -> CNA_Result;
+pub type cna_guide_get_pending_message_box_focus_button_ext_fn = unsafe extern "C" fn(
+    *mut i32,
+) -> CNA_Result;
+pub type cna_guide_get_simulate_trial_mode_fn = unsafe extern "C" fn(*mut CNA_Bool) -> CNA_Result;
+pub type cna_guide_render_pending_keyboard_input_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Handle, CNA_Handle, CNA_Handle,
+) -> CNA_Result;
+pub type cna_guide_render_pending_message_box_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Handle, CNA_Handle, CNA_Handle,
+) -> CNA_Result;
+pub type cna_guide_reset_pending_keyboard_input_ext_fn = unsafe extern "C" fn() -> CNA_Result;
+pub type cna_guide_reset_pending_message_box_ext_fn = unsafe extern "C" fn() -> CNA_Result;
+pub type cna_guide_set_is_screen_saver_enabled_fn = unsafe extern "C" fn(CNA_Bool) -> CNA_Result;
+pub type cna_guide_set_is_trial_mode_fn = unsafe extern "C" fn(CNA_Bool) -> CNA_Result;
+pub type cna_guide_set_is_visible_fn = unsafe extern "C" fn(CNA_Bool) -> CNA_Result;
+pub type cna_guide_set_notification_position_fn = unsafe extern "C" fn(
+    CNA_NotificationPosition,
+) -> CNA_Result;
+pub type cna_guide_set_simulate_trial_mode_fn = unsafe extern "C" fn(CNA_Bool) -> CNA_Result;
+pub type cna_guide_show_achievements_ext_fn = unsafe extern "C" fn(CNA_PlayerIndex) -> CNA_Result;
+pub type cna_guide_show_compose_message_fn = unsafe extern "C" fn(
+    CNA_PlayerIndex, CNA_StringView, *const CNA_GamerHandle, u64,
+) -> CNA_Result;
+pub type cna_guide_show_friend_request_fn = unsafe extern "C" fn(
+    CNA_PlayerIndex, CNA_GamerHandle,
+) -> CNA_Result;
+pub type cna_guide_show_friends_fn = unsafe extern "C" fn(CNA_PlayerIndex) -> CNA_Result;
+pub type cna_guide_show_game_invite_fn = unsafe extern "C" fn(
+    CNA_PlayerIndex, *const CNA_GamerHandle, u64,
+) -> CNA_Result;
+pub type cna_guide_show_game_invite_for_session_fn = unsafe extern "C" fn(
+    CNA_StringView,
+) -> CNA_Result;
+pub type cna_guide_show_gamer_card_fn = unsafe extern "C" fn(
+    CNA_PlayerIndex, CNA_GamerHandle,
+) -> CNA_Result;
+pub type cna_guide_show_marketplace_fn = unsafe extern "C" fn(CNA_PlayerIndex) -> CNA_Result;
+pub type cna_guide_show_messages_fn = unsafe extern "C" fn(CNA_PlayerIndex) -> CNA_Result;
+pub type cna_guide_show_party_fn = unsafe extern "C" fn(CNA_PlayerIndex) -> CNA_Result;
+pub type cna_guide_show_party_sessions_fn = unsafe extern "C" fn(CNA_PlayerIndex) -> CNA_Result;
+pub type cna_guide_show_player_review_fn = unsafe extern "C" fn(
+    CNA_PlayerIndex, CNA_GamerHandle,
+) -> CNA_Result;
+pub type cna_guide_show_players_fn = unsafe extern "C" fn(CNA_PlayerIndex) -> CNA_Result;
+pub type cna_guide_show_sign_in_fn = unsafe extern "C" fn(i32, CNA_Bool) -> CNA_Result;
+pub type cna_guide_simulate_keyboard_input_cancel_ext_fn = unsafe extern "C" fn() -> CNA_Result;
+pub type cna_guide_simulate_message_box_click_ext_fn = unsafe extern "C" fn(i32) -> CNA_Result;
+pub type cna_guide_was_keyboard_input_canceled_ext_fn = unsafe extern "C" fn(
+    *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_host_changed_event_info_init_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, CNA_NetworkGamerHandle, *mut CNA_HostChangedEventInfo,
+) -> CNA_Result;
+pub type cna_invite_accepted_event_info_init_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, CNA_Bool, *mut CNA_InviteAcceptedEventInfo,
+) -> CNA_Result;
+pub type cna_leaderboard_entry_create_ext_fn = unsafe extern "C" fn(
+    CNA_GamerHandle, i64, i32, *mut CNA_LeaderboardEntryHandle,
+) -> CNA_Result;
+pub type cna_leaderboard_entry_destroy_fn = unsafe extern "C" fn(
+    CNA_LeaderboardEntryHandle,
+) -> CNA_Result;
+pub type cna_leaderboard_entry_equals_fn = unsafe extern "C" fn(
+    CNA_LeaderboardEntryHandle, CNA_LeaderboardEntryHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_leaderboard_entry_get_columns_fn = unsafe extern "C" fn(
+    CNA_LeaderboardEntryHandle, *mut CNA_PropertyDictionaryHandle,
+) -> CNA_Result;
+pub type cna_leaderboard_entry_get_gamer_fn = unsafe extern "C" fn(
+    CNA_LeaderboardEntryHandle, *mut CNA_Bool, *mut CNA_GamerHandle,
+) -> CNA_Result;
+pub type cna_leaderboard_entry_get_info_fn = unsafe extern "C" fn(
+    CNA_LeaderboardEntryHandle, *mut CNA_LeaderboardEntryInfo,
+) -> CNA_Result;
+pub type cna_leaderboard_entry_set_rating_fn = unsafe extern "C" fn(
+    CNA_LeaderboardEntryHandle, i64,
+) -> CNA_Result;
+pub type cna_leaderboard_entry_set_rating_changed_hook_ext_fn = unsafe extern "C" fn(
+    CNA_LeaderboardEntryHandle, CNA_GamerAsyncCallback, *mut c_void,
+) -> CNA_Result;
+pub type cna_leaderboard_identity_init_fn = unsafe extern "C" fn(
+    CNA_LeaderboardKey, i32, *mut CNA_LeaderboardIdentity,
+) -> CNA_Result;
+pub type cna_leaderboard_reader_begin_page_down_fn = unsafe extern "C" fn(
+    CNA_LeaderboardReaderHandle, CNA_GamerAsyncCallback, *mut c_void,
+) -> CNA_Result;
+pub type cna_leaderboard_reader_begin_page_up_fn = unsafe extern "C" fn(
+    CNA_LeaderboardReaderHandle, CNA_GamerAsyncCallback, *mut c_void,
+) -> CNA_Result;
+pub type cna_leaderboard_reader_begin_read_fn = unsafe extern "C" fn(
+    *const CNA_LeaderboardIdentity, i32, i32, CNA_GamerAsyncCallback, *mut c_void, *mut CNA_LeaderboardReaderHandle,
+) -> CNA_Result;
+pub type cna_leaderboard_reader_begin_read_from_gamers_fn = unsafe extern "C" fn(
+    *const CNA_LeaderboardIdentity, *const CNA_GamerHandle, u64, CNA_GamerHandle, i32, CNA_GamerAsyncCallback, *mut c_void, *mut CNA_LeaderboardReaderHandle,
+) -> CNA_Result;
+pub type cna_leaderboard_reader_begin_read_from_pivot_fn = unsafe extern "C" fn(
+    *const CNA_LeaderboardIdentity, CNA_GamerHandle, i32, CNA_GamerAsyncCallback, *mut c_void, *mut CNA_LeaderboardReaderHandle,
+) -> CNA_Result;
+pub type cna_leaderboard_reader_destroy_fn = unsafe extern "C" fn(
+    CNA_LeaderboardReaderHandle,
+) -> CNA_Result;
+pub type cna_leaderboard_reader_get_entry_at_fn = unsafe extern "C" fn(
+    CNA_LeaderboardReaderHandle, i32, *mut CNA_LeaderboardEntryHandle,
+) -> CNA_Result;
+pub type cna_leaderboard_reader_get_identity_fn = unsafe extern "C" fn(
+    CNA_LeaderboardReaderHandle, *mut CNA_LeaderboardIdentity,
+) -> CNA_Result;
+pub type cna_leaderboard_reader_get_info_fn = unsafe extern "C" fn(
+    CNA_LeaderboardReaderHandle, *mut CNA_LeaderboardReaderInfo,
+) -> CNA_Result;
+pub type cna_leaderboard_reader_page_down_fn = unsafe extern "C" fn(
+    CNA_LeaderboardReaderHandle,
+) -> CNA_Result;
+pub type cna_leaderboard_reader_page_up_fn = unsafe extern "C" fn(
+    CNA_LeaderboardReaderHandle,
+) -> CNA_Result;
+pub type cna_leaderboard_reader_read_fn = unsafe extern "C" fn(
+    *const CNA_LeaderboardIdentity, i32, i32, *mut CNA_LeaderboardReaderHandle,
+) -> CNA_Result;
+pub type cna_leaderboard_reader_read_from_gamers_fn = unsafe extern "C" fn(
+    *const CNA_LeaderboardIdentity, *const CNA_GamerHandle, u64, CNA_GamerHandle, i32, *mut CNA_LeaderboardReaderHandle,
+) -> CNA_Result;
+pub type cna_leaderboard_reader_read_from_pivot_fn = unsafe extern "C" fn(
+    *const CNA_LeaderboardIdentity, CNA_GamerHandle, i32, *mut CNA_LeaderboardReaderHandle,
+) -> CNA_Result;
+pub type cna_local_network_gamer_clear_packet_queue_ext_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle,
+) -> CNA_Result;
+pub type cna_local_network_gamer_create_ext_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, CNA_NetworkSessionHandle, *mut CNA_NetworkGamerHandle,
+) -> CNA_Result;
+pub type cna_local_network_gamer_enable_send_voice_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, CNA_NetworkGamerHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_local_network_gamer_enqueue_packet_ext_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *const CNA_NetworkEventInfo,
+) -> CNA_Result;
+pub type cna_local_network_gamer_get_is_data_available_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_local_network_gamer_get_signed_in_gamer_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut CNA_SignedInGamerHandle,
+) -> CNA_Result;
+pub type cna_local_network_gamer_receive_data_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut u8, u64, *mut CNA_NetworkGamerHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_local_network_gamer_receive_data_at_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut u8, u64, i32, *mut CNA_NetworkGamerHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_local_network_gamer_receive_data_into_packet_reader_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, CNA_PacketReaderHandle, *mut CNA_NetworkGamerHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_local_network_gamer_send_data_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *const u8, u64, CNA_SendDataOptions,
+) -> CNA_Result;
+pub type cna_local_network_gamer_send_data_range_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *const u8, u64, i32, i32, CNA_SendDataOptions,
+) -> CNA_Result;
+pub type cna_local_network_gamer_send_data_range_to_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *const u8, u64, i32, i32, CNA_SendDataOptions, CNA_NetworkGamerHandle,
+) -> CNA_Result;
+pub type cna_local_network_gamer_send_data_to_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *const u8, u64, CNA_SendDataOptions, CNA_NetworkGamerHandle,
+) -> CNA_Result;
+pub type cna_local_network_gamer_send_packet_writer_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, CNA_PacketWriterHandle, CNA_SendDataOptions,
+) -> CNA_Result;
+pub type cna_local_network_gamer_send_packet_writer_to_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, CNA_PacketWriterHandle, CNA_SendDataOptions, CNA_NetworkGamerHandle,
+) -> CNA_Result;
+pub type cna_local_network_gamer_send_party_invites_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle,
+) -> CNA_Result;
+pub type cna_net_get_last_join_error_fn = unsafe extern "C" fn(
+    *mut CNA_NetworkSessionJoinError, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_gamer_copy_machine_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut CNA_NetworkMachineHandle,
+) -> CNA_Result;
+pub type cna_network_gamer_create_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_NetworkGamerHandle,
+) -> CNA_Result;
+pub type cna_network_gamer_destroy_fn = unsafe extern "C" fn(CNA_NetworkGamerHandle) -> CNA_Result;
+pub type cna_network_gamer_get_has_left_session_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_gamer_get_has_voice_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_gamer_get_id_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut u8,
+) -> CNA_Result;
+pub type cna_network_gamer_get_is_guest_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_gamer_get_is_host_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_gamer_get_is_local_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_gamer_get_is_muted_by_local_user_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_gamer_get_is_private_slot_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_gamer_get_is_ready_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_gamer_get_is_talking_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_gamer_get_roundtrip_ticks_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut i64,
+) -> CNA_Result;
+pub type cna_network_gamer_get_session_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_network_gamer_set_has_left_session_ext_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_gamer_set_id_ext_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, u8,
+) -> CNA_Result;
+pub type cna_network_gamer_set_is_host_ext_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_gamer_set_is_ready_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_gamer_set_machine_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, CNA_NetworkMachineHandle,
+) -> CNA_Result;
+pub type cna_network_gamer_set_roundtrip_ticks_ext_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, i64,
+) -> CNA_Result;
+pub type cna_network_machine_create_fn = unsafe extern "C" fn(
+    *mut CNA_NetworkMachineHandle,
+) -> CNA_Result;
+pub type cna_network_machine_destroy_fn = unsafe extern "C" fn(
+    CNA_NetworkMachineHandle,
+) -> CNA_Result;
+pub type cna_network_machine_get_gamer_fn = unsafe extern "C" fn(
+    CNA_NetworkMachineHandle, i32, *mut CNA_NetworkGamerHandle,
+) -> CNA_Result;
+pub type cna_network_machine_get_gamer_count_fn = unsafe extern "C" fn(
+    CNA_NetworkMachineHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_network_machine_remove_from_session_fn = unsafe extern "C" fn(
+    CNA_NetworkMachineHandle,
+) -> CNA_Result;
+pub type cna_network_session_add_local_gamer_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, CNA_Handle,
+) -> CNA_Result;
+pub type cna_network_session_add_remote_gamer_ext_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, CNA_NetworkGamerHandle,
+) -> CNA_Result;
+pub type cna_network_session_copy_session_properties_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *mut CNA_NetworkSessionPropertiesHandle,
+) -> CNA_Result;
+pub type cna_network_session_copy_type_name_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_network_session_create_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionType, i32, i32, *mut CNA_NetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_network_session_create_async_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionType, i32, i32, CNA_NetworkSessionAsyncCallback, *mut c_void, *mut CNA_NetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_network_session_create_with_local_gamers_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionType, *const CNA_Handle, u64, i32, i32, CNA_NetworkSessionPropertiesHandle, *mut CNA_NetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_network_session_create_with_local_gamers_async_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionType, *const CNA_Handle, u64, i32, i32, CNA_NetworkSessionPropertiesHandle, CNA_NetworkSessionAsyncCallback, *mut c_void, *mut CNA_NetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_network_session_create_with_properties_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionType, i32, i32, i32, CNA_NetworkSessionPropertiesHandle, *mut CNA_NetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_network_session_create_with_properties_async_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionType, i32, i32, i32, CNA_NetworkSessionPropertiesHandle, CNA_NetworkSessionAsyncCallback, *mut c_void, *mut CNA_NetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_network_session_destroy_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_network_session_dispose_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_network_session_ended_event_info_init_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionEndReason, *mut CNA_NetworkSessionEndedEventInfo,
+) -> CNA_Result;
+pub type cna_network_session_end_game_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_network_session_find_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionType, i32, CNA_NetworkSessionPropertiesHandle, *mut CNA_AvailableNetworkSessionCollectionHandle,
+) -> CNA_Result;
+pub type cna_network_session_find_async_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionType, i32, CNA_NetworkSessionPropertiesHandle, CNA_NetworkSessionAsyncCallback, *mut c_void, *mut CNA_AvailableNetworkSessionCollectionHandle,
+) -> CNA_Result;
+pub type cna_network_session_find_gamer_by_id_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, u8, *mut CNA_NetworkGamerHandle,
+) -> CNA_Result;
+pub type cna_network_session_find_with_local_gamers_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionType, *const CNA_Handle, u64, CNA_NetworkSessionPropertiesHandle, *mut CNA_AvailableNetworkSessionCollectionHandle,
+) -> CNA_Result;
+pub type cna_network_session_find_with_local_gamers_async_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionType, *const CNA_Handle, u64, CNA_NetworkSessionPropertiesHandle, CNA_NetworkSessionAsyncCallback, *mut c_void, *mut CNA_AvailableNetworkSessionCollectionHandle,
+) -> CNA_Result;
+pub type cna_network_session_get_active_action_count_ext_fn = unsafe extern "C" fn(
+    *mut i32,
+) -> CNA_Result;
+pub type cna_network_session_get_allow_host_migration_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_session_get_allow_join_in_progress_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_session_get_bytes_per_second_received_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_network_session_get_bytes_per_second_sent_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_network_session_get_gamer_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, u32, i32, *mut CNA_NetworkGamerHandle,
+) -> CNA_Result;
+pub type cna_network_session_get_gamer_count_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, u32, *mut i32,
+) -> CNA_Result;
+pub type cna_network_session_get_host_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *mut CNA_NetworkGamerHandle,
+) -> CNA_Result;
+pub type cna_network_session_get_instance_count_ext_fn = unsafe extern "C" fn(
+    *mut i32,
+) -> CNA_Result;
+pub type cna_network_session_get_is_disposed_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_session_get_is_everyone_ready_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_session_get_is_host_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_session_get_max_gamers_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_network_session_get_owned_gamer_count_ext_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_network_session_get_private_gamer_slots_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_network_session_get_session_state_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *mut CNA_NetworkSessionState,
+) -> CNA_Result;
+pub type cna_network_session_get_session_type_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *mut CNA_NetworkSessionType,
+) -> CNA_Result;
+pub type cna_network_session_get_simulated_latency_ticks_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *mut i64,
+) -> CNA_Result;
+pub type cna_network_session_get_simulated_packet_loss_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_network_session_get_type_name_size_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_network_session_join_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionHandle, *mut CNA_NetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_network_session_join_async_fn = unsafe extern "C" fn(
+    CNA_AvailableNetworkSessionHandle, CNA_NetworkSessionAsyncCallback, *mut c_void, *mut CNA_NetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_network_session_join_invited_fn = unsafe extern "C" fn(
+    i32, *mut CNA_NetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_network_session_join_invited_async_fn = unsafe extern "C" fn(
+    i32, CNA_NetworkSessionAsyncCallback, *mut c_void, *mut CNA_NetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_network_session_join_invited_with_local_gamers_fn = unsafe extern "C" fn(
+    *const CNA_Handle, u64, *mut CNA_NetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_network_session_join_invited_with_local_gamers_async_fn = unsafe extern "C" fn(
+    *const CNA_Handle, u64, CNA_NetworkSessionAsyncCallback, *mut c_void, *mut CNA_NetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_network_session_properties_add_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionPropertiesHandle, CNA_OptionalInt32,
+) -> CNA_Result;
+pub type cna_network_session_properties_clear_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionPropertiesHandle,
+) -> CNA_Result;
+pub type cna_network_session_properties_contains_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionPropertiesHandle, CNA_OptionalInt32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_session_properties_copy_to_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionPropertiesHandle, *mut CNA_OptionalInt32, u64, i32, *mut u64,
+) -> CNA_Result;
+pub type cna_network_session_properties_create_fn = unsafe extern "C" fn(
+    *mut CNA_NetworkSessionPropertiesHandle,
+) -> CNA_Result;
+pub type cna_network_session_properties_create_enumerator_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionPropertiesHandle, *mut CNA_NetworkSessionPropertyEnumeratorHandle,
+) -> CNA_Result;
+pub type cna_network_session_properties_destroy_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionPropertiesHandle,
+) -> CNA_Result;
+pub type cna_network_session_properties_get_count_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionPropertiesHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_network_session_properties_get_is_read_only_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionPropertiesHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_session_properties_get_item_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionPropertiesHandle, i32, *mut CNA_OptionalInt32,
+) -> CNA_Result;
+pub type cna_network_session_properties_index_of_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionPropertiesHandle, CNA_OptionalInt32, *mut i32,
+) -> CNA_Result;
+pub type cna_network_session_properties_insert_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionPropertiesHandle, i32, CNA_OptionalInt32,
+) -> CNA_Result;
+pub type cna_network_session_properties_remove_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionPropertiesHandle, CNA_OptionalInt32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_session_properties_remove_at_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionPropertiesHandle, i32,
+) -> CNA_Result;
+pub type cna_network_session_properties_set_item_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionPropertiesHandle, i32, CNA_OptionalInt32,
+) -> CNA_Result;
+pub type cna_network_session_property_enumerator_destroy_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionPropertyEnumeratorHandle,
+) -> CNA_Result;
+pub type cna_network_session_property_enumerator_get_current_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionPropertyEnumeratorHandle, *mut CNA_OptionalInt32,
+) -> CNA_Result;
+pub type cna_network_session_property_enumerator_move_next_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionPropertyEnumeratorHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_session_property_enumerator_reset_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionPropertyEnumeratorHandle,
+) -> CNA_Result;
+pub type cna_network_session_remove_gamer_ext_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, CNA_NetworkGamerHandle, CNA_NetworkSessionEndReason,
+) -> CNA_Result;
+pub type cna_network_session_reset_ready_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_network_session_send_network_event_ext_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, *const CNA_NetworkEventInfo,
+) -> CNA_Result;
+pub type cna_network_session_set_allow_host_migration_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_session_set_allow_join_in_progress_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_network_session_set_max_gamers_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, i32,
+) -> CNA_Result;
+pub type cna_network_session_set_private_gamer_slots_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, i32,
+) -> CNA_Result;
+pub type cna_network_session_set_simulated_latency_ticks_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, i64,
+) -> CNA_Result;
+pub type cna_network_session_set_simulated_packet_loss_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, f32,
+) -> CNA_Result;
+pub type cna_network_session_start_game_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_network_session_subscribe_game_ended_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, CNA_GameEndedCallback, *mut c_void, *mut CNA_NetworkSessionEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_network_session_subscribe_gamer_joined_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, CNA_GamerJoinedCallback, *mut c_void, *mut CNA_NetworkSessionEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_network_session_subscribe_gamer_left_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, CNA_GamerLeftCallback, *mut c_void, *mut CNA_NetworkSessionEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_network_session_subscribe_game_started_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, CNA_GameStartedCallback, *mut c_void, *mut CNA_NetworkSessionEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_network_session_subscribe_host_changed_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, CNA_HostChangedCallback, *mut c_void, *mut CNA_NetworkSessionEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_network_session_subscribe_invite_accepted_fn = unsafe extern "C" fn(
+    CNA_InviteAcceptedCallback, *mut c_void, *mut CNA_NetworkSessionEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_network_session_subscribe_session_ended_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, CNA_NetworkSessionEndedCallback, *mut c_void, *mut CNA_NetworkSessionEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_network_session_subscribe_write_arbitrated_leaderboard_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, CNA_WriteLeaderboardsCallback, *mut c_void, *mut CNA_NetworkSessionEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_network_session_subscribe_write_true_skill_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, CNA_WriteLeaderboardsCallback, *mut c_void, *mut CNA_NetworkSessionEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_network_session_subscribe_write_unarbitrated_leaderboard_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, CNA_WriteLeaderboardsCallback, *mut c_void, *mut CNA_NetworkSessionEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_network_session_unsubscribe_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_network_session_update_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle,
+) -> CNA_Result;
+pub type cna_packet_reader_create_fn = unsafe extern "C" fn(
+    i32, *mut CNA_PacketReaderHandle,
+) -> CNA_Result;
+pub type cna_packet_reader_destroy_fn = unsafe extern "C" fn(CNA_PacketReaderHandle) -> CNA_Result;
+pub type cna_packet_reader_get_length_fn = unsafe extern "C" fn(
+    CNA_PacketReaderHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_packet_reader_get_position_fn = unsafe extern "C" fn(
+    CNA_PacketReaderHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_packet_reader_read_color_fn = unsafe extern "C" fn(
+    CNA_PacketReaderHandle, *mut CNA_Color,
+) -> CNA_Result;
+pub type cna_packet_reader_read_double_fn = unsafe extern "C" fn(
+    CNA_PacketReaderHandle, *mut f64,
+) -> CNA_Result;
+pub type cna_packet_reader_read_matrix_fn = unsafe extern "C" fn(
+    CNA_PacketReaderHandle, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_packet_reader_read_quaternion_fn = unsafe extern "C" fn(
+    CNA_PacketReaderHandle, *mut CNA_Quaternion,
+) -> CNA_Result;
+pub type cna_packet_reader_read_single_fn = unsafe extern "C" fn(
+    CNA_PacketReaderHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_packet_reader_read_vector2_fn = unsafe extern "C" fn(
+    CNA_PacketReaderHandle, *mut CNA_Vector2,
+) -> CNA_Result;
+pub type cna_packet_reader_read_vector3_fn = unsafe extern "C" fn(
+    CNA_PacketReaderHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_packet_reader_read_vector4_fn = unsafe extern "C" fn(
+    CNA_PacketReaderHandle, *mut CNA_Vector4,
+) -> CNA_Result;
+pub type cna_packet_reader_set_data_ext_fn = unsafe extern "C" fn(
+    CNA_PacketReaderHandle, *const u8, u64,
+) -> CNA_Result;
+pub type cna_packet_reader_set_position_fn = unsafe extern "C" fn(
+    CNA_PacketReaderHandle, i32,
+) -> CNA_Result;
+pub type cna_packet_writer_copy_data_ext_fn = unsafe extern "C" fn(
+    CNA_PacketWriterHandle, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_packet_writer_create_fn = unsafe extern "C" fn(
+    i32, *mut CNA_PacketWriterHandle,
+) -> CNA_Result;
+pub type cna_packet_writer_destroy_fn = unsafe extern "C" fn(CNA_PacketWriterHandle) -> CNA_Result;
+pub type cna_packet_writer_get_length_fn = unsafe extern "C" fn(
+    CNA_PacketWriterHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_packet_writer_get_position_fn = unsafe extern "C" fn(
+    CNA_PacketWriterHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_packet_writer_set_position_fn = unsafe extern "C" fn(
+    CNA_PacketWriterHandle, i32,
+) -> CNA_Result;
+pub type cna_packet_writer_write_color_fn = unsafe extern "C" fn(
+    CNA_PacketWriterHandle, CNA_Color,
+) -> CNA_Result;
+pub type cna_packet_writer_write_double_fn = unsafe extern "C" fn(
+    CNA_PacketWriterHandle, f64,
+) -> CNA_Result;
+pub type cna_packet_writer_write_matrix_fn = unsafe extern "C" fn(
+    CNA_PacketWriterHandle, CNA_Matrix,
+) -> CNA_Result;
+pub type cna_packet_writer_write_quaternion_fn = unsafe extern "C" fn(
+    CNA_PacketWriterHandle, CNA_Quaternion,
+) -> CNA_Result;
+pub type cna_packet_writer_write_single_fn = unsafe extern "C" fn(
+    CNA_PacketWriterHandle, f32,
+) -> CNA_Result;
+pub type cna_packet_writer_write_vector2_fn = unsafe extern "C" fn(
+    CNA_PacketWriterHandle, CNA_Vector2,
+) -> CNA_Result;
+pub type cna_packet_writer_write_vector3_fn = unsafe extern "C" fn(
+    CNA_PacketWriterHandle, CNA_Vector3,
+) -> CNA_Result;
+pub type cna_packet_writer_write_vector4_fn = unsafe extern "C" fn(
+    CNA_PacketWriterHandle, CNA_Vector4,
+) -> CNA_Result;
+pub type cna_property_dictionary_clear_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle,
+) -> CNA_Result;
+pub type cna_property_dictionary_contains_key_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_property_dictionary_copy_key_at_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, i32, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_property_dictionary_copy_string_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_property_dictionary_create_ext_fn = unsafe extern "C" fn(
+    *mut CNA_PropertyDictionaryHandle,
+) -> CNA_Result;
+pub type cna_property_dictionary_destroy_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle,
+) -> CNA_Result;
+pub type cna_property_dictionary_get_count_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_property_dictionary_get_date_time_ticks_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, *mut i64,
+) -> CNA_Result;
+pub type cna_property_dictionary_get_double_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, *mut f64,
+) -> CNA_Result;
+pub type cna_property_dictionary_get_int32_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, *mut i32,
+) -> CNA_Result;
+pub type cna_property_dictionary_get_int64_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, *mut i64,
+) -> CNA_Result;
+pub type cna_property_dictionary_get_is_read_only_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_property_dictionary_get_key_size_at_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, i32, *mut u64,
+) -> CNA_Result;
+pub type cna_property_dictionary_get_outcome_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, *mut CNA_LeaderboardOutcome,
+) -> CNA_Result;
+pub type cna_property_dictionary_get_single_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, *mut f32,
+) -> CNA_Result;
+pub type cna_property_dictionary_get_stream_size_ext_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, *mut CNA_Bool, *mut u64,
+) -> CNA_Result;
+pub type cna_property_dictionary_get_string_size_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, *mut u64,
+) -> CNA_Result;
+pub type cna_property_dictionary_get_time_span_ticks_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, *mut i64,
+) -> CNA_Result;
+pub type cna_property_dictionary_remove_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_property_dictionary_set_date_time_ticks_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, i64,
+) -> CNA_Result;
+pub type cna_property_dictionary_set_double_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, f64,
+) -> CNA_Result;
+pub type cna_property_dictionary_set_int32_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, i32,
+) -> CNA_Result;
+pub type cna_property_dictionary_set_int64_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, i64,
+) -> CNA_Result;
+pub type cna_property_dictionary_set_outcome_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, CNA_LeaderboardOutcome,
+) -> CNA_Result;
+pub type cna_property_dictionary_set_single_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, f32,
+) -> CNA_Result;
+pub type cna_property_dictionary_set_string_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, CNA_StringView,
+) -> CNA_Result;
+pub type cna_property_dictionary_set_time_span_ticks_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, i64,
+) -> CNA_Result;
+pub type cna_property_dictionary_try_get_value_kind_ext_fn = unsafe extern "C" fn(
+    CNA_PropertyDictionaryHandle, CNA_StringView, *mut CNA_Bool, *mut CNA_PropertyValueKind,
+) -> CNA_Result;
+pub type cna_quality_of_service_init_fn = unsafe extern "C" fn(
+    *mut CNA_QualityOfService,
+) -> CNA_Result;
+pub type cna_quality_of_service_init_measured_fn = unsafe extern "C" fn(
+    i64, *mut CNA_QualityOfService,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_award_achievement_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, CNA_StringView,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_begin_award_achievement_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, CNA_StringView, CNA_GamerAsyncCallback, *mut c_void,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_begin_get_achievements_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, CNA_GamerAsyncCallback, *mut c_void, *mut CNA_AchievementCollectionHandle,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_copy_gamertag_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_create_ext_fn = unsafe extern "C" fn(
+    CNA_StringView, CNA_Bool, CNA_Bool, CNA_PlayerIndex, *mut CNA_SignedInGamerHandle,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_destroy_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_get_achievements_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, *mut CNA_AchievementCollectionHandle,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_get_friends_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, *mut CNA_GamerCollectionHandle,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_get_game_defaults_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, *mut CNA_GameDefaults,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_get_gamertag_size_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_get_is_guest_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_get_is_signed_in_to_live_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_get_party_size_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_get_player_index_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, *mut CNA_PlayerIndex,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_get_presence_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, *mut CNA_GamerPresence,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_get_privileges_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, *mut CNA_GamerPrivileges,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_is_friend_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, CNA_GamerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_is_headset_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, u64, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_set_party_size_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, i32,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_set_presence_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, *const CNA_GamerPresence,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_set_presence_mode_string_ext_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerHandle, CNA_StringView,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_subscribe_signed_in_ext_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerEventCallback, *mut c_void, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_signed_in_gamer_subscribe_signed_out_ext_fn = unsafe extern "C" fn(
+    CNA_SignedInGamerEventCallback, *mut c_void, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_write_leaderboards_event_info_init_fn = unsafe extern "C" fn(
+    CNA_NetworkGamerHandle, CNA_Bool, *mut CNA_WriteLeaderboardsEventInfo,
+) -> CNA_Result;
