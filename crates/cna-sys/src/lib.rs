@@ -137,6 +137,21 @@ pub const CNA_RENDERER_FORMAT_USAGE_MIPMAPPED: CNA_RendererFormatUsageFlags = 1 
 pub const CNA_RENDERER_FORMAT_USAGE_MULTISAMPLE: CNA_RendererFormatUsageFlags = 1 << 11;
 pub const CNA_RENDERER_FORMAT_USAGE_COLOR_TRANSFER: CNA_RendererFormatUsageFlags = 1 << 12;
 pub const CNA_RENDERER_FORMAT_USAGE_ALL: CNA_RendererFormatUsageFlags = (1 << 13) - 1;
+pub const CNA_ASCII_QUANTIZE_MODE_BLACK_WHITE: CNA_AsciiQuantizeMode = 0;
+pub const CNA_ASCII_QUANTIZE_MODE_COLOR: CNA_AsciiQuantizeMode = 1;
+pub const CNA_CRT_MASK_TYPE_NONE: CNA_CRTMaskType = 0;
+pub const CNA_CRT_MASK_TYPE_APERTURE_GRILLE: CNA_CRTMaskType = 1;
+pub const CNA_CRT_MASK_TYPE_SHADOW_MASK: CNA_CRTMaskType = 2;
+pub const CNA_DITHER_MODE_NONE: CNA_DitherMode = 0;
+pub const CNA_DITHER_MODE_BAYER_4X4: CNA_DitherMode = 1;
+pub const CNA_DITHER_MODE_BAYER_8X8: CNA_DitherMode = 2;
+pub const CNA_DEPTH_EFFECT_MODE_COLOR_16_BIT: CNA_DepthEffectMode = 0;
+pub const CNA_DEPTH_EFFECT_MODE_COLOR_8_BIT: CNA_DepthEffectMode = 1;
+pub const CNA_DEPTH_EFFECT_MODE_GRAYSCALE_4_BIT: CNA_DepthEffectMode = 2;
+pub const CNA_DEPTH_EFFECT_MODE_GRAYSCALE_2_BIT: CNA_DepthEffectMode = 3;
+pub const CNA_DEPTH_EFFECT_MODE_GRAYSCALE_1_BIT: CNA_DepthEffectMode = 4;
+pub const CNA_DEPTH_EFFECT_MODE_PALETTE_256: CNA_DepthEffectMode = 5;
+pub const CNA_DEPTH_EFFECT_MODE_PALETTE_16: CNA_DepthEffectMode = 6;
 pub const CNA_CNB_ASSET_TYPE_INVALID: u32 = 0x0000_0000;
 pub const CNA_CNB_ASSET_TYPE_TEXTURE2D: u32 = 0x0000_0001;
 pub const CNA_CNB_ASSET_TYPE_TEXTURE3D: u32 = 0x0000_0002;
@@ -506,6 +521,11 @@ pub type CNA_GraphicsRendererType = u32;
 pub type CNA_GraphicsBackendCategory = u32;
 pub type CNA_GraphicsBackendMaturity = u32;
 pub type CNA_GraphicsRendererFallbackReason = u32;
+pub type CNA_AsciiPostProcessEffectHandle = CNA_Handle;
+pub type CNA_AsciiQuantizeMode = u32;
+pub type CNA_CRTMaskType = u32;
+pub type CNA_DitherMode = u32;
+pub type CNA_DepthEffectMode = u32;
 pub type CNA_CnbChunkId = u32;
 pub type CNA_CnbCompression = u32;
 pub type CNA_CnbTextureFormat = u32;
@@ -4120,4 +4140,77 @@ pub type cna_cnb_get_texture_format_name_size_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_cnb_copy_texture_format_name_fn = unsafe extern "C" fn(
     CNA_CnbTextureFormat, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+
+// --- CNAEXT graphics layer (graphics_ext.h) ---
+
+pub type cna_graphics_ext_is_available_fn = unsafe extern "C" fn(*mut CNA_Bool) -> CNA_Result;
+pub type cna_crt_effect_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_crt_effect_get_scanline_intensity_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_crt_effect_set_scanline_intensity_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, f32,
+) -> CNA_Result;
+pub type cna_crt_effect_get_curvature_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_crt_effect_set_curvature_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, f32,
+) -> CNA_Result;
+pub type cna_crt_effect_get_vignette_intensity_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_crt_effect_set_vignette_intensity_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, f32,
+) -> CNA_Result;
+pub type cna_crt_effect_get_mask_intensity_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_crt_effect_set_mask_intensity_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, f32,
+) -> CNA_Result;
+pub type cna_crt_effect_get_mask_type_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_CRTMaskType,
+) -> CNA_Result;
+pub type cna_crt_effect_set_mask_type_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_CRTMaskType,
+) -> CNA_Result;
+pub type cna_depth_effect_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_depth_effect_get_mode_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_DepthEffectMode,
+) -> CNA_Result;
+pub type cna_depth_effect_set_mode_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_DepthEffectMode,
+) -> CNA_Result;
+pub type cna_depth_effect_get_dither_mode_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_DitherMode,
+) -> CNA_Result;
+pub type cna_depth_effect_set_dither_mode_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_DitherMode,
+) -> CNA_Result;
+pub type cna_ascii_post_process_effect_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_AsciiPostProcessEffectHandle,
+) -> CNA_Result;
+pub type cna_ascii_post_process_effect_get_cell_size_fn = unsafe extern "C" fn(
+    CNA_AsciiPostProcessEffectHandle, *mut i32, *mut i32,
+) -> CNA_Result;
+pub type cna_ascii_post_process_effect_set_cell_size_fn = unsafe extern "C" fn(
+    CNA_AsciiPostProcessEffectHandle, i32, i32,
+) -> CNA_Result;
+pub type cna_ascii_post_process_effect_get_quantize_mode_fn = unsafe extern "C" fn(
+    CNA_AsciiPostProcessEffectHandle, *mut CNA_AsciiQuantizeMode,
+) -> CNA_Result;
+pub type cna_ascii_post_process_effect_set_quantize_mode_fn = unsafe extern "C" fn(
+    CNA_AsciiPostProcessEffectHandle, CNA_AsciiQuantizeMode,
+) -> CNA_Result;
+pub type cna_ascii_post_process_effect_get_last_grid_dimensions_fn = unsafe extern "C" fn(
+    CNA_AsciiPostProcessEffectHandle, *mut i32, *mut i32,
+) -> CNA_Result;
+pub type cna_ascii_post_process_effect_destroy_fn = unsafe extern "C" fn(
+    CNA_AsciiPostProcessEffectHandle,
 ) -> CNA_Result;

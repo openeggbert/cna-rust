@@ -97,6 +97,18 @@ Renderer diagnostics for a strict `GraphicsDevice`, CNA's reflection-capable
 empty `Effect`, and the integer indexers CLR collections have but Rust's
 non-overloadable method surface cannot spell inside the strict hierarchy.
 
+It also carries CNA's extended effects. A CRT or depth effect **is** an XNA
+`Effect` upstream -- CNA hands back the same handle kind -- so the projection
+returns a strict `Effect` and puts the extra knobs on extension traits, rather
+than a parallel type that could not be used where an `Effect` is expected. The
+ASCII post-processing effect has its own handle kind and so is its own owned
+type, released by `Drop`.
+
+The layer is a build option and a renderer may refuse an effect it cannot run.
+`is_available()` separates those, and the test admits a refusal only from the
+two categories that can honestly produce one. On this host's HEADLESS build all
+three effects are created and every knob round-trips through CNA.
+
 It also carries CNA's renderer capability reporting. XNA answered capability
 questions through `GraphicsProfile` alone; CNA supports far more backends than
 two profiles can describe and publishes per-feature, per-limit and per-format

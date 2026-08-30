@@ -1749,6 +1749,38 @@ impl GraphicsDevice {
         }
     }
 
+    /// Creates one of CNA's extended effects, which share the XNA `Effect`
+    /// handle kind.
+    pub(crate) fn create_extended_effect(&self, crt: bool) -> Result<sys::CNA_Handle> {
+        let device = self.state.handle()?;
+        let native = self.state.native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        let result = if crt {
+            // SAFETY: the device is live and the output is a live local.
+            unsafe { (native.runtime.crt_effect_create)(device, &mut handle) }
+        } else {
+            // SAFETY: as above.
+            unsafe { (native.runtime.depth_effect_create)(device, &mut handle) }
+        };
+        native.check(result)?;
+        Ok(handle)
+    }
+
+    pub(crate) fn create_ascii_post_process_effect(&self) -> Result<sys::CNA_Handle> {
+        let device = self.state.handle()?;
+        let native = self.state.native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device is live and the output is a live local.
+        native.check(unsafe { (native.runtime.ascii_effect_create)(device, &mut handle) })?;
+        Ok(handle)
+    }
+
+    /// The native table, for an extension that owns a CNA-only handle.
+    pub(crate) fn extended_effect_native(&self) -> Result<Arc<crate::native::Native>> {
+        self.state.handle()?;
+        Ok(Arc::clone(self.state.native()))
+    }
+
     pub(crate) fn renderer_feature_support(&self, feature: u32) -> Result<u32> {
         let handle = self.state.handle()?;
         self.state.native.renderer_feature_support(handle, feature)

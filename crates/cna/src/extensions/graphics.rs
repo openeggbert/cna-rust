@@ -12,6 +12,7 @@ use crate::graphics::{
     ModelBone, ModelBoneCollection, ModelEffectCollection, ModelMesh, ModelMeshCollection,
     ModelMeshPart, ModelMeshPartCollection, SurfaceFormat,
 };
+use crate::native::Native;
 
 /// Renderer facts queried from CNA rather than inferred from a name.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -418,5 +419,341 @@ impl RendererCapabilityExt for GraphicsDevice {
 
     fn capability_report(&self) -> Result<String> {
         GraphicsDevice::capability_report(self)
+    }
+}
+
+/// The mask a CRT effect simulates.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum CrtMaskType {
+    None,
+    ApertureGrille,
+    ShadowMask,
+    /// A mask a newer CNA introduced.
+    Unrecognized(u32),
+}
+
+/// How a depth effect quantizes what it writes.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum DepthEffectMode {
+    Color16Bit,
+    Color8Bit,
+    Grayscale4Bit,
+    Grayscale2Bit,
+    Grayscale1Bit,
+    Palette256,
+    Palette16,
+    /// A mode a newer CNA introduced.
+    Unrecognized(u32),
+}
+
+/// The dither pattern a depth effect applies.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum DitherMode {
+    None,
+    Bayer4x4,
+    Bayer8x8,
+    /// A mode a newer CNA introduced.
+    Unrecognized(u32),
+}
+
+/// How an ASCII post-process effect reduces colour.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum AsciiQuantizeMode {
+    BlackWhite,
+    Color,
+    /// A mode a newer CNA introduced.
+    Unrecognized(u32),
+}
+
+macro_rules! identity {
+    ($name:ident, $native:ty, $($variant:ident => $constant:path,)+) => {
+        impl $name {
+            const fn from_native(value: $native) -> Self {
+                match value {
+                    $($constant => Self::$variant,)+
+                    other => Self::Unrecognized(other),
+                }
+            }
+
+            const fn as_native(self) -> $native {
+                match self {
+                    $(Self::$variant => $constant,)+
+                    Self::Unrecognized(value) => value,
+                }
+            }
+        }
+    };
+}
+
+identity!(
+    CrtMaskType,
+    cna_sys::CNA_CRTMaskType,
+    None => cna_sys::CNA_CRT_MASK_TYPE_NONE,
+    ApertureGrille => cna_sys::CNA_CRT_MASK_TYPE_APERTURE_GRILLE,
+    ShadowMask => cna_sys::CNA_CRT_MASK_TYPE_SHADOW_MASK,
+);
+identity!(
+    DepthEffectMode,
+    cna_sys::CNA_DepthEffectMode,
+    Color16Bit => cna_sys::CNA_DEPTH_EFFECT_MODE_COLOR_16_BIT,
+    Color8Bit => cna_sys::CNA_DEPTH_EFFECT_MODE_COLOR_8_BIT,
+    Grayscale4Bit => cna_sys::CNA_DEPTH_EFFECT_MODE_GRAYSCALE_4_BIT,
+    Grayscale2Bit => cna_sys::CNA_DEPTH_EFFECT_MODE_GRAYSCALE_2_BIT,
+    Grayscale1Bit => cna_sys::CNA_DEPTH_EFFECT_MODE_GRAYSCALE_1_BIT,
+    Palette256 => cna_sys::CNA_DEPTH_EFFECT_MODE_PALETTE_256,
+    Palette16 => cna_sys::CNA_DEPTH_EFFECT_MODE_PALETTE_16,
+);
+identity!(
+    DitherMode,
+    cna_sys::CNA_DitherMode,
+    None => cna_sys::CNA_DITHER_MODE_NONE,
+    Bayer4x4 => cna_sys::CNA_DITHER_MODE_BAYER_4X4,
+    Bayer8x8 => cna_sys::CNA_DITHER_MODE_BAYER_8X8,
+);
+identity!(
+    AsciiQuantizeMode,
+    cna_sys::CNA_AsciiQuantizeMode,
+    BlackWhite => cna_sys::CNA_ASCII_QUANTIZE_MODE_BLACK_WHITE,
+    Color => cna_sys::CNA_ASCII_QUANTIZE_MODE_COLOR,
+);
+
+/// Whether this build contains CNA's extended graphics layer.
+///
+/// The layer is a build option. Every route below is exported in both states
+/// and refuses with `NOT_SUPPORTED` when it is compiled out, so ask this
+/// rather than reading a refusal as a renderer limitation.
+pub fn is_available() -> Result<bool> {
+    let native = crate::native::Native::process()?;
+    let mut value = cna_sys::CNA_FALSE;
+    // SAFETY: the output is a live local of the declared type.
+    native.check(unsafe { (native.runtime.graphics_ext_is_available)(&mut value) })?;
+    Ok(value != cna_sys::CNA_FALSE)
+}
+
+/// CNA's extended effects, which are XNA `Effect`s with extra knobs.
+///
+/// A CRT or depth effect is the same handle kind as a strict XNA `Effect`
+/// upstream, so it is projected as one: the knobs live here rather than in a
+/// parallel type that would not be usable where an `Effect` is expected.
+pub trait ExtendedEffectExt {
+    /// Creates CNA's CRT post-processing effect.
+    fn create_crt_effect(&self) -> Result<Effect>;
+
+    /// Creates CNA's depth-visualization effect.
+    fn create_depth_effect(&self) -> Result<Effect>;
+}
+
+impl ExtendedEffectExt for GraphicsDevice {
+    fn create_crt_effect(&self) -> Result<Effect> {
+        let handle = self.create_extended_effect(true)?;
+        Ok(Effect::adopt_extended(self, handle))
+    }
+
+    fn create_depth_effect(&self) -> Result<Effect> {
+        let handle = self.create_extended_effect(false)?;
+        Ok(Effect::adopt_extended(self, handle))
+    }
+}
+
+/// The CRT effect's own settings.
+///
+/// The trait is implemented for every `Effect`, because CNA gives a CRT effect
+/// the ordinary `Effect` handle kind; calling one of these on an effect that
+/// is not a CRT effect is refused by CNA rather than silently accepted.
+pub trait CrtEffectExt {
+    fn scanline_intensity(&self) -> Result<f32>;
+    fn set_scanline_intensity(&self, value: f32) -> Result<()>;
+    fn curvature(&self) -> Result<f32>;
+    fn set_curvature(&self, value: f32) -> Result<()>;
+    fn vignette_intensity(&self) -> Result<f32>;
+    fn set_vignette_intensity(&self, value: f32) -> Result<()>;
+    fn mask_intensity(&self) -> Result<f32>;
+    fn set_mask_intensity(&self, value: f32) -> Result<()>;
+    fn mask_type(&self) -> Result<CrtMaskType>;
+    fn set_mask_type(&self, value: CrtMaskType) -> Result<()>;
+}
+
+/// The depth effect's own settings. See [`CrtEffectExt`] for why it is a trait
+/// on every `Effect`.
+pub trait DepthEffectExt {
+    fn depth_mode(&self) -> Result<DepthEffectMode>;
+    fn set_depth_mode(&self, value: DepthEffectMode) -> Result<()>;
+    fn dither_mode(&self) -> Result<DitherMode>;
+    fn set_dither_mode(&self, value: DitherMode) -> Result<()>;
+}
+
+macro_rules! effect_float {
+    ($getter:ident, $setter:ident, $get_slot:ident, $set_slot:ident) => {
+        fn $getter(&self) -> Result<f32> {
+            let (native, handle) = self.extended_effect_target()?;
+            let mut value = 0.0;
+            // SAFETY: the handle is live and the output is a live local.
+            native.check(unsafe { (native.runtime.$get_slot)(handle, &mut value) })?;
+            Ok(value)
+        }
+
+        fn $setter(&self, value: f32) -> Result<()> {
+            let (native, handle) = self.extended_effect_target()?;
+            // SAFETY: the handle is live and the value is a plain float.
+            native.check(unsafe { (native.runtime.$set_slot)(handle, value) })
+        }
+    };
+}
+
+impl CrtEffectExt for Effect {
+    effect_float!(
+        scanline_intensity,
+        set_scanline_intensity,
+        crt_get_scanline_intensity,
+        crt_set_scanline_intensity
+    );
+    effect_float!(curvature, set_curvature, crt_get_curvature, crt_set_curvature);
+    effect_float!(
+        vignette_intensity,
+        set_vignette_intensity,
+        crt_get_vignette_intensity,
+        crt_set_vignette_intensity
+    );
+    effect_float!(
+        mask_intensity,
+        set_mask_intensity,
+        crt_get_mask_intensity,
+        crt_set_mask_intensity
+    );
+
+    fn mask_type(&self) -> Result<CrtMaskType> {
+        let (native, handle) = self.extended_effect_target()?;
+        let mut value = 0;
+        // SAFETY: the handle is live and the output is a live local.
+        native.check(unsafe { (native.runtime.crt_get_mask_type)(handle, &mut value) })?;
+        Ok(CrtMaskType::from_native(value))
+    }
+
+    fn set_mask_type(&self, value: CrtMaskType) -> Result<()> {
+        let (native, handle) = self.extended_effect_target()?;
+        // SAFETY: the handle is live and the identity is a fixed-width value.
+        native.check(unsafe { (native.runtime.crt_set_mask_type)(handle, value.as_native()) })
+    }
+}
+
+impl DepthEffectExt for Effect {
+    fn depth_mode(&self) -> Result<DepthEffectMode> {
+        let (native, handle) = self.extended_effect_target()?;
+        let mut value = 0;
+        // SAFETY: the handle is live and the output is a live local.
+        native.check(unsafe { (native.runtime.depth_get_mode)(handle, &mut value) })?;
+        Ok(DepthEffectMode::from_native(value))
+    }
+
+    fn set_depth_mode(&self, value: DepthEffectMode) -> Result<()> {
+        let (native, handle) = self.extended_effect_target()?;
+        // SAFETY: the handle is live and the identity is a fixed-width value.
+        native.check(unsafe { (native.runtime.depth_set_mode)(handle, value.as_native()) })
+    }
+
+    fn dither_mode(&self) -> Result<DitherMode> {
+        let (native, handle) = self.extended_effect_target()?;
+        let mut value = 0;
+        // SAFETY: the handle is live and the output is a live local.
+        native.check(unsafe { (native.runtime.depth_get_dither_mode)(handle, &mut value) })?;
+        Ok(DitherMode::from_native(value))
+    }
+
+    fn set_dither_mode(&self, value: DitherMode) -> Result<()> {
+        let (native, handle) = self.extended_effect_target()?;
+        // SAFETY: the handle is live and the identity is a fixed-width value.
+        native.check(unsafe { (native.runtime.depth_set_dither_mode)(handle, value.as_native()) })
+    }
+}
+
+/// CNA's ASCII post-processing effect.
+///
+/// Unlike the CRT and depth effects this has its own handle kind rather than
+/// being an XNA `Effect`, so it is its own owned type and is released by
+/// `Drop`.
+pub struct AsciiPostProcessEffect {
+    device: GraphicsDevice,
+    handle: cna_sys::CNA_AsciiPostProcessEffectHandle,
+}
+
+impl AsciiPostProcessEffect {
+    /// Creates the effect for one graphics device.
+    ///
+    /// This is a CNA concept, so it takes ordinary Rust naming rather than the
+    /// XNA parameter spelling the strict hierarchy preserves.
+    pub fn new(graphics_device: &GraphicsDevice) -> Result<Self> {
+        let handle = graphics_device.create_ascii_post_process_effect()?;
+        Ok(Self {
+            device: graphics_device.clone(),
+            handle,
+        })
+    }
+
+    fn native(&self) -> Result<Arc<Native>> {
+        self.device.extended_effect_native()
+    }
+
+    /// The character cell the effect quantizes into.
+    pub fn cell_size(&self) -> Result<(i32, i32)> {
+        let native = self.native()?;
+        let mut width = 0;
+        let mut height = 0;
+        // SAFETY: the handle is owned and both outputs are live locals.
+        native.check(unsafe {
+            (native.runtime.ascii_get_cell_size)(self.handle, &mut width, &mut height)
+        })?;
+        Ok((width, height))
+    }
+
+    /// Sets the character cell.
+    pub fn set_cell_size(&self, width: i32, height: i32) -> Result<()> {
+        let native = self.native()?;
+        // SAFETY: the handle is owned and both values are plain integers.
+        native.check(unsafe { (native.runtime.ascii_set_cell_size)(self.handle, width, height) })
+    }
+
+    /// How the effect reduces colour.
+    pub fn quantize_mode(&self) -> Result<AsciiQuantizeMode> {
+        let native = self.native()?;
+        let mut value = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        native.check(unsafe {
+            (native.runtime.ascii_get_quantize_mode)(self.handle, &mut value)
+        })?;
+        Ok(AsciiQuantizeMode::from_native(value))
+    }
+
+    /// Sets how the effect reduces colour.
+    pub fn set_quantize_mode(&self, value: AsciiQuantizeMode) -> Result<()> {
+        let native = self.native()?;
+        // SAFETY: the handle is owned and the identity is a fixed-width value.
+        native.check(unsafe {
+            (native.runtime.ascii_set_quantize_mode)(self.handle, value.as_native())
+        })
+    }
+
+    /// The grid the last draw produced, in columns and rows.
+    pub fn last_grid_dimensions(&self) -> Result<(i32, i32)> {
+        let native = self.native()?;
+        let mut columns = 0;
+        let mut rows = 0;
+        // SAFETY: the handle is owned and both outputs are live locals.
+        native.check(unsafe {
+            (native.runtime.ascii_get_last_grid_dimensions)(self.handle, &mut columns, &mut rows)
+        })?;
+        Ok((columns, rows))
+    }
+}
+
+impl Drop for AsciiPostProcessEffect {
+    fn drop(&mut self) {
+        if let Ok(native) = self.device.extended_effect_native() {
+            // SAFETY: the handle is owned by this value and released once.
+            let _ = unsafe { (native.runtime.ascii_effect_destroy)(self.handle) };
+        }
     }
 }

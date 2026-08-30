@@ -249,6 +249,26 @@ impl Effect {
         Ok(Self::from_handle(graphicsDevice, handle))
     }
 
+    /// The native table and live handle an extended-effect knob needs.
+    pub(crate) fn extended_effect_target(
+        &self,
+    ) -> Result<(Arc<crate::native::Native>, sys::CNA_Handle)> {
+        let handle = self.handle()?;
+        Ok((self.state.device().extended_effect_native()?, handle))
+    }
+
+    /// Adopts an `Effect` handle CNA's extended graphics layer produced.
+    ///
+    /// A CRT or depth effect **is** an XNA `Effect` upstream: the route hands
+    /// back the same handle kind, so the extension exposes its extra knobs
+    /// rather than a parallel type.
+    pub(crate) fn adopt_extended(
+        graphics_device: &GraphicsDevice,
+        handle: sys::CNA_Handle,
+    ) -> Self {
+        Self::from_handle(graphics_device, handle)
+    }
+
     pub(crate) fn create_empty(graphics_device: &GraphicsDevice) -> Result<Self> {
         let mut handle = sys::CNA_INVALID_HANDLE;
         graphics_device
