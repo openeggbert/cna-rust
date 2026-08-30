@@ -13,7 +13,6 @@ use super::runtime::RuntimeApi;
 
 #[derive(Debug)]
 pub(crate) struct Native {
-    #[cfg(unix)]
     pub(super) _library: Library,
     pub(super) audio: AudioApi,
     pub(crate) media: MediaApi,
@@ -580,18 +579,19 @@ impl Native {
     }
 
     pub(crate) fn load() -> Result<Arc<Self>> {
-        #[cfg(unix)]
+        #[cfg(any(unix, windows))]
         {
-            Self::load_unix().map(Arc::new)
+            Self::load_platform().map(Arc::new)
         }
-        #[cfg(not(unix))]
+        #[cfg(not(any(unix, windows)))]
         {
             Err(CnaError::UnsupportedPlatform)
         }
     }
 
-    #[cfg(unix)]
-    fn load_unix() -> Result<Self> {
+    /// Opens the first candidate library the platform loader accepts.
+    #[cfg(any(unix, windows))]
+    fn load_platform() -> Result<Self> {
         let candidates = library_candidates();
         let mut diagnostics = Vec::new();
         for candidate in &candidates {
@@ -606,7 +606,7 @@ impl Native {
         })
     }
 
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     fn from_library(library: Library) -> Result<Self> {
         macro_rules! symbol {
             ($name:literal, $ty:ty) => {{

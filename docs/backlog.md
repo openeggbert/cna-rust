@@ -63,7 +63,7 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 
 | ID | Subject | Target | Status |
 |---|---|---|---|
-| RUST-PLATFORM-001 | Windows dynamic loader | `LoadLibraryW`/`GetProcAddress`, compile-verified | READY |
+| RUST-PLATFORM-001 | Windows dynamic loader | source complete; no Windows Rust target on this host, so `COMPILE_NOT_VERIFIED_PLATFORM` | DONE |
 | RUST-PLATFORM-002 | macOS loader | already `#[cfg(unix)]`; needs a runtime run | BLOCKED_PLATFORM |
 | RUST-PLATFORM-003 | WebAssembly | re-measure the canonical wasm C ABI route | READY |
 | RUST-PACKAGE-001 | `cargo package` file list, notices, no native binary | clean package | READY |

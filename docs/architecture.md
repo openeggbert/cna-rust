@@ -28,7 +28,7 @@ safe bridge is grouped by concern:
 
 - `native/api.rs`: symbol inventory and the loading gate;
 - `native/abi.rs`: the canonical ABI admission policy;
-- `native/loader.rs`: dynamic-library ownership and Unix loading;
+- `native/loader.rs`: dynamic-library ownership, Unix and Windows loading;
 - `native/game.rs`, `graphics.rs`, `display.rs`, `window.rs`, `input.rs`,
   `device_manager.rs`, `storage.rs`, `audio.rs`, and `media.rs`: typed facade calls;
 - `native/fault.rs`: feature-gated, test-only failure injection;
@@ -39,8 +39,15 @@ comparison: a different major is always rejected, an experimental `0.x` minor
 must equal the reviewed one because CNA ships incompatible change as a minor
 increment, a stable major admits a higher minor, and a higher patch is always
 admitted. See [abi-migration-evidence.md](abi-migration-evidence.md).
-There is no fake backend fallback. Unix is runtime-tested and unsupported
-loaders return a typed error.
+There is no fake backend fallback. Unix is runtime-tested; Windows is
+implemented in source over `LoadLibraryW`/`GetProcAddress`/`FreeLibrary` but no
+Windows Rust target exists on this host, so it is neither compiled nor run
+here. A target with neither loader returns a typed error rather than pretending
+to load. The Windows path encoding goes through a helper compiled on every
+host, so the mistake most likely to occur there -- an interior NUL truncating a
+path, a missing terminator, or a lossy `str` conversion corrupting an unpaired
+surrogate -- is unit-tested everywhere rather than only where the loader can be
+built.
 
 The ABI verifier derives full C prototypes from Clang's view of canonical CNA
 headers and compares them with every reviewed `cna-sys` function type. It
