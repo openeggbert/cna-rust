@@ -1924,12 +1924,35 @@ fn write_matrix(bytes: &mut Vec<u8>, value: Matrix) {
     }
 }
 
+/// Locates CNA's legal conformance Effect bytecode.
+///
+/// The path was previously relative to this crate's manifest, which assumed
+/// one sibling checkout layout and broke the moment the crate was vendored
+/// into a generated project. `CNA_ROOT` is the input the loader already
+/// documents, so the fixture follows it; the sibling layout stays as the last
+/// resort for a source checkout that sets nothing.
+fn conformance_effect_path() -> PathBuf {
+    const RELATIVE: &str = "modules/renderers/fna3d/effects/CnaConformanceEffect.fxb";
+    if let Some(explicit) = std::env::var_os("CNA_CONFORMANCE_EFFECT") {
+        return PathBuf::from(explicit);
+    }
+    if let Some(root) = std::env::var_os("CNA_ROOT") {
+        return PathBuf::from(root).join(RELATIVE);
+    }
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../../cna")
+        .join(RELATIVE)
+}
+
 fn effect_xnb() -> Vec<u8> {
-    let effect_code = fs::read(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../../cna/modules/renderers/fna3d/effects/CnaConformanceEffect.fxb"),
-    )
-    .expect("read CNA's legal conformance Effect bytecode fixture");
+    let path = conformance_effect_path();
+    let effect_code = fs::read(&path).unwrap_or_else(|error| {
+        panic!(
+            "read CNA's legal conformance Effect bytecode fixture at {}: {error}; \
+             set CNA_ROOT to the CNA checkout or CNA_CONFORMANCE_EFFECT to the file",
+            path.display()
+        )
+    });
     let mut payload = Vec::new();
     write_7bit(&mut payload, 1);
     write_xnb_string(&mut payload, "Microsoft.Xna.Framework.Content.EffectReader");
