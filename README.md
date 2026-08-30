@@ -200,6 +200,9 @@ XNA_REFERENCE_PATH=/path/to/xna4/windows \
 
 python3 tools/api-compat/verify.py --leak-only
 
+python3 -m unittest discover -s tools/api-compat/tests
+python3 -m unittest discover -s tools/native-abi/tests
+
 python3 tools/native-abi/verify.py \
   --cna-root /path/to/cna \
   --library /path/to/libcna_c_api.so

@@ -172,6 +172,18 @@ def prototype_probes(cna_root: Path, symbols: dict[str, int]) -> tuple[int, int,
     return len(symbols), measurements, findings
 
 
+def unaudited_declarations(expected: set[str]) -> list[dict]:
+    """Reports any disagreement between the cna-sys aliases and the manifest."""
+    declared = set(rust_function_declarations())
+    return [
+        {"code": "UNAUDITED_DECLARATION", "symbol": name}
+        for name in sorted(declared - expected)
+    ] + [
+        {"code": "MISSING_DECLARATION", "symbol": name}
+        for name in sorted(expected - declared)
+    ]
+
+
 def elf_exports(library: Path) -> set[str]:
     output = subprocess.run(
         ["nm", "-D", "--defined-only", str(library)], check=True, text=True, capture_output=True
@@ -335,6 +347,11 @@ def main() -> int:
             findings.append({"code": "MISSING_HEADER_SYMBOL", "symbol": name})
         elif headers[name] != arity:
             findings.append({"code": "HEADER_ARITY_MISMATCH", "symbol": name, "expected": arity, "actual": headers[name]})
+    # A declaration `cna-sys` carries but the manifest omits is invisible to
+    # every check below it: no prototype, no arity, no export. That is a real
+    # bug this repository has already shipped once, so the two sets must agree
+    # exactly rather than the manifest merely being a subset.
+    findings.extend(unaudited_declarations(set(expected)))
 
     c_probe, rust_probe = abi_probes(Path(args.cna_root), manifest)
     for key in sorted(c_probe.keys() | rust_probe.keys()):
@@ -373,6 +390,8 @@ def main() -> int:
         "expectedAbiVersion": manifest["abiVersion"],
         "nativeAbiVersion": actual_version,
         "missingHeaderSymbols": sum(x["code"] == "MISSING_HEADER_SYMBOL" for x in findings),
+        "unauditedDeclarations": sum(x["code"] == "UNAUDITED_DECLARATION" for x in findings),
+        "missingDeclarations": sum(x["code"] == "MISSING_DECLARATION" for x in findings),
         "arityMismatches": sum(x["code"] == "HEADER_ARITY_MISMATCH" for x in findings),
         "cRustProbeMeasurements": len(c_probe.keys() | rust_probe.keys()),
         "cRustProbeMismatches": sum(x["code"] == "C_RUST_ABI_PROBE_MISMATCH" for x in findings),
