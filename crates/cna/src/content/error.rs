@@ -17,6 +17,15 @@ impl SerializationInfo {
             message: message.to_owned(),
         }
     }
+
+    pub(crate) fn message(&self) -> &str {
+        &self.message
+    }
+
+    /// Replaces the serialized message, as a CLR `GetObjectData` override does.
+    pub fn SetMessage(&mut self, value: &str) {
+        self.message = value.to_owned();
+    }
 }
 
 /// Portable subset of CLR streaming context retained by the mapped exception
@@ -30,6 +39,10 @@ impl StreamingContext {
     #[must_use]
     pub const fn from_state(state: i32) -> Self {
         Self { state }
+    }
+
+    pub(crate) const fn state(self) -> i32 {
+        self.state
     }
 }
 

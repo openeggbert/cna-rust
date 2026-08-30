@@ -77,14 +77,16 @@
     "Microsoft.Xna.Framework.Graphics.DynamicVertexBuffer": "VertexBufferBase",
     "Microsoft.Xna.Framework.Graphics.DynamicIndexBuffer": "IndexBufferBase",
     "Microsoft.Xna.Framework.Graphics.RenderTarget2D": "Texture2DBase",
-    "Microsoft.Xna.Framework.Graphics.RenderTargetCube": "TextureCubeBase"
-    ,"Microsoft.Xna.Framework.Audio.DynamicSoundEffectInstance": "SoundEffectInstanceBase"
-    ,"Microsoft.Xna.Framework.Graphics.EffectMaterial": "EffectBase"
-    ,"Microsoft.Xna.Framework.Graphics.BasicEffect": "EffectBase"
-    ,"Microsoft.Xna.Framework.Graphics.AlphaTestEffect": "EffectBase"
-    ,"Microsoft.Xna.Framework.Graphics.DualTextureEffect": "EffectBase"
-    ,"Microsoft.Xna.Framework.Graphics.EnvironmentMapEffect": "EffectBase"
-    ,"Microsoft.Xna.Framework.Graphics.SkinnedEffect": "EffectBase"
+    "Microsoft.Xna.Framework.Graphics.RenderTargetCube": "TextureCubeBase",
+    "Microsoft.Xna.Framework.Audio.DynamicSoundEffectInstance": "SoundEffectInstanceBase",
+    "Microsoft.Xna.Framework.Graphics.EffectMaterial": "EffectBase",
+    "Microsoft.Xna.Framework.Graphics.BasicEffect": "EffectBase",
+    "Microsoft.Xna.Framework.Graphics.AlphaTestEffect": "EffectBase",
+    "Microsoft.Xna.Framework.Graphics.DualTextureEffect": "EffectBase",
+    "Microsoft.Xna.Framework.Graphics.EnvironmentMapEffect": "EffectBase",
+    "Microsoft.Xna.Framework.Graphics.SkinnedEffect": "EffectBase",
+    "Microsoft.Xna.Framework.GamerServices.NetworkNotAvailableException": "NetworkExceptionBase",
+    "Microsoft.Xna.Framework.Net.NetworkSessionJoinException": "NetworkExceptionBase"
   },
   "ignoredClrInterfaces": [
     "System.IComparable",
@@ -331,27 +333,27 @@
     "Microsoft.Xna.Framework.Graphics.PresentationParameters::*",
     "Microsoft.Xna.Framework.GraphicsDeviceInformation::*",
     "Microsoft.Xna.Framework.Graphics.SamplerStateCollection::*",
-    "Microsoft.Xna.Framework.Graphics.TextureCollection::*"
-    ,"Microsoft.Xna.Framework.Graphics.DirectionalLight::*"
-    ,"Microsoft.Xna.Framework.Audio.Microphone::*"
-    ,"Microsoft.Xna.Framework.Media.Album::*"
-    ,"Microsoft.Xna.Framework.Media.AlbumCollection::*"
-    ,"Microsoft.Xna.Framework.Media.Artist::*"
-    ,"Microsoft.Xna.Framework.Media.ArtistCollection::*"
-    ,"Microsoft.Xna.Framework.Media.Genre::*"
-    ,"Microsoft.Xna.Framework.Media.GenreCollection::*"
-    ,"Microsoft.Xna.Framework.Media.MediaLibrary::*"
-    ,"Microsoft.Xna.Framework.Media.MediaQueue::*"
-    ,"Microsoft.Xna.Framework.Media.Picture::*"
-    ,"Microsoft.Xna.Framework.Media.PictureAlbum::*"
-    ,"Microsoft.Xna.Framework.Media.PictureAlbumCollection::*"
-    ,"Microsoft.Xna.Framework.Media.PictureCollection::*"
-    ,"Microsoft.Xna.Framework.Media.Playlist::*"
-    ,"Microsoft.Xna.Framework.Media.PlaylistCollection::*"
-    ,"Microsoft.Xna.Framework.Media.Song::*"
-    ,"Microsoft.Xna.Framework.Media.SongCollection::*"
-    ,"Microsoft.Xna.Framework.Media.Video::*"
-    ,"Microsoft.Xna.Framework.Media.VideoPlayer::*"
+    "Microsoft.Xna.Framework.Graphics.TextureCollection::*",
+    "Microsoft.Xna.Framework.Graphics.DirectionalLight::*",
+    "Microsoft.Xna.Framework.Audio.Microphone::*",
+    "Microsoft.Xna.Framework.Media.Album::*",
+    "Microsoft.Xna.Framework.Media.AlbumCollection::*",
+    "Microsoft.Xna.Framework.Media.Artist::*",
+    "Microsoft.Xna.Framework.Media.ArtistCollection::*",
+    "Microsoft.Xna.Framework.Media.Genre::*",
+    "Microsoft.Xna.Framework.Media.GenreCollection::*",
+    "Microsoft.Xna.Framework.Media.MediaLibrary::*",
+    "Microsoft.Xna.Framework.Media.MediaQueue::*",
+    "Microsoft.Xna.Framework.Media.Picture::*",
+    "Microsoft.Xna.Framework.Media.PictureAlbum::*",
+    "Microsoft.Xna.Framework.Media.PictureAlbumCollection::*",
+    "Microsoft.Xna.Framework.Media.PictureCollection::*",
+    "Microsoft.Xna.Framework.Media.Playlist::*",
+    "Microsoft.Xna.Framework.Media.PlaylistCollection::*",
+    "Microsoft.Xna.Framework.Media.Song::*",
+    "Microsoft.Xna.Framework.Media.SongCollection::*",
+    "Microsoft.Xna.Framework.Media.Video::*",
+    "Microsoft.Xna.Framework.Media.VideoPlayer::*"
   ],
   "parameterTypeOverrides": {
     "Microsoft.Xna.Framework.Content.ContentManager::.ctor::serviceProvider": "Arc<dyn ServiceProvider>",
@@ -377,21 +379,22 @@
     "Microsoft.Xna.Framework.Graphics.GraphicsDevice::SetRenderTarget::renderTarget": "Option<&Graphics::RenderTargetCube>",
     "Microsoft.Xna.Framework.Graphics.SpriteBatch::DrawString::text": "&str",
     "Microsoft.Xna.Framework.Graphics.SpriteBatch::Begin::effect": "Option<&Graphics::Effect>",
-    "Microsoft.Xna.Framework.Graphics.SpriteFont::MeasureString::text": "&str"
-    ,"Microsoft.Xna.Framework.Graphics.BasicEffect::Texture::value": "Option<Arc<Graphics::Texture2D>>"
-    ,"Microsoft.Xna.Framework.Graphics.AlphaTestEffect::Texture::value": "Option<Arc<Graphics::Texture2D>>"
-    ,"Microsoft.Xna.Framework.Graphics.DualTextureEffect::Texture::value": "Option<Arc<Graphics::Texture2D>>"
-    ,"Microsoft.Xna.Framework.Graphics.DualTextureEffect::Texture2::value": "Option<Arc<Graphics::Texture2D>>"
-    ,"Microsoft.Xna.Framework.Graphics.EnvironmentMapEffect::Texture::value": "Option<Arc<Graphics::Texture2D>>"
-    ,"Microsoft.Xna.Framework.Graphics.EnvironmentMapEffect::EnvironmentMap::value": "Option<Arc<Graphics::TextureCube>>"
-    ,"Microsoft.Xna.Framework.Graphics.SkinnedEffect::Texture::value": "Option<Arc<Graphics::Texture2D>>"
-    ,"Microsoft.Xna.Framework.Graphics.Model::Tag::value": "Option<Arc<dyn Any+Send+Sync>>"
-    ,"Microsoft.Xna.Framework.Graphics.ModelMesh::Tag::value": "Option<Arc<dyn Any+Send+Sync>>"
-    ,"Microsoft.Xna.Framework.Graphics.ModelMeshPart::Tag::value": "Option<Arc<dyn Any+Send+Sync>>"
-    ,"Microsoft.Xna.Framework.Media.MediaLibrary::.ctor::mediaSource": "&Media::MediaSource"
-    ,"Microsoft.Xna.Framework.Media.Song::FromUri::uri": "&str"
-    ,"Microsoft.Xna.Framework.Media.MediaPlayer::GetVisualizationData::visualizationData": "&mut Media::VisualizationData"
-    ,"Microsoft.Xna.Framework.Media.VideoPlayer::Play::video": "Arc<Media::Video>"
+    "Microsoft.Xna.Framework.Graphics.SpriteFont::MeasureString::text": "&str",
+    "Microsoft.Xna.Framework.Graphics.BasicEffect::Texture::value": "Option<Arc<Graphics::Texture2D>>",
+    "Microsoft.Xna.Framework.Graphics.AlphaTestEffect::Texture::value": "Option<Arc<Graphics::Texture2D>>",
+    "Microsoft.Xna.Framework.Graphics.DualTextureEffect::Texture::value": "Option<Arc<Graphics::Texture2D>>",
+    "Microsoft.Xna.Framework.Graphics.DualTextureEffect::Texture2::value": "Option<Arc<Graphics::Texture2D>>",
+    "Microsoft.Xna.Framework.Graphics.EnvironmentMapEffect::Texture::value": "Option<Arc<Graphics::Texture2D>>",
+    "Microsoft.Xna.Framework.Graphics.EnvironmentMapEffect::EnvironmentMap::value": "Option<Arc<Graphics::TextureCube>>",
+    "Microsoft.Xna.Framework.Graphics.SkinnedEffect::Texture::value": "Option<Arc<Graphics::Texture2D>>",
+    "Microsoft.Xna.Framework.Graphics.Model::Tag::value": "Option<Arc<dyn Any+Send+Sync>>",
+    "Microsoft.Xna.Framework.Graphics.ModelMesh::Tag::value": "Option<Arc<dyn Any+Send+Sync>>",
+    "Microsoft.Xna.Framework.Graphics.ModelMeshPart::Tag::value": "Option<Arc<dyn Any+Send+Sync>>",
+    "Microsoft.Xna.Framework.Media.MediaLibrary::.ctor::mediaSource": "&Media::MediaSource",
+    "Microsoft.Xna.Framework.Media.Song::FromUri::uri": "&str",
+    "Microsoft.Xna.Framework.Media.MediaPlayer::GetVisualizationData::visualizationData": "&mut Media::VisualizationData",
+    "Microsoft.Xna.Framework.Media.VideoPlayer::Play::video": "Arc<Media::Video>",
+    "Microsoft.Xna.Framework.Net.NetworkSessionJoinException::GetObjectData::info": "&mut SerializationInfo"
   },
   "returnTypeOverrides": {
     "Microsoft.Xna.Framework.Content.ContentManager::ServiceProvider": "Arc<dyn ServiceProvider>",
@@ -437,97 +440,97 @@
     "Microsoft.Xna.Framework.Graphics.DisplayModeCollection::Item": "Vec<Graphics::DisplayMode>",
     "Microsoft.Xna.Framework.Graphics.GraphicsDevice::Indices": "Option<Graphics::IndexBuffer>",
     "Microsoft.Xna.Framework.Graphics.RenderTargetBinding::RenderTarget": "&dyn Graphics::Texture",
-    "Microsoft.Xna.Framework.Graphics.SpriteFont::Characters": "&[char]"
-    ,"Microsoft.Xna.Framework.Graphics.Effect::Parameters": "Arc<Graphics::EffectParameterCollection>"
-    ,"Microsoft.Xna.Framework.Graphics.Effect::Techniques": "Arc<Graphics::EffectTechniqueCollection>"
-    ,"Microsoft.Xna.Framework.Graphics.Effect::CurrentTechnique": "Arc<Graphics::EffectTechnique>"
-    ,"Microsoft.Xna.Framework.Graphics.EffectParameter::Elements": "Arc<Graphics::EffectParameterCollection>"
-    ,"Microsoft.Xna.Framework.Graphics.EffectParameter::StructureMembers": "Arc<Graphics::EffectParameterCollection>"
-    ,"Microsoft.Xna.Framework.Graphics.EffectParameter::Annotations": "Arc<Graphics::EffectAnnotationCollection>"
-    ,"Microsoft.Xna.Framework.Graphics.EffectAnnotationCollection::Item": "Option<Arc<Graphics::EffectAnnotation>>"
-    ,"Microsoft.Xna.Framework.Graphics.EffectAnnotationCollection::GetEnumerator": "IntoIter<Arc<Graphics::EffectAnnotation>>"
-    ,"Microsoft.Xna.Framework.Graphics.EffectParameterCollection::Item": "Option<Arc<Graphics::EffectParameter>>"
-    ,"Microsoft.Xna.Framework.Graphics.EffectParameterCollection::GetParameterBySemantic": "Option<Arc<Graphics::EffectParameter>>"
-    ,"Microsoft.Xna.Framework.Graphics.EffectParameterCollection::GetEnumerator": "IntoIter<Arc<Graphics::EffectParameter>>"
-    ,"Microsoft.Xna.Framework.Graphics.EffectPass::Annotations": "Arc<Graphics::EffectAnnotationCollection>"
-    ,"Microsoft.Xna.Framework.Graphics.EffectPassCollection::Item": "Option<Arc<Graphics::EffectPass>>"
-    ,"Microsoft.Xna.Framework.Graphics.EffectPassCollection::GetEnumerator": "IntoIter<Arc<Graphics::EffectPass>>"
-    ,"Microsoft.Xna.Framework.Graphics.EffectTechnique::Annotations": "Arc<Graphics::EffectAnnotationCollection>"
-    ,"Microsoft.Xna.Framework.Graphics.EffectTechnique::Passes": "Arc<Graphics::EffectPassCollection>"
-    ,"Microsoft.Xna.Framework.Graphics.EffectTechniqueCollection::Item": "Option<Arc<Graphics::EffectTechnique>>"
-    ,"Microsoft.Xna.Framework.Graphics.EffectTechniqueCollection::GetEnumerator": "IntoIter<Arc<Graphics::EffectTechnique>>"
-    ,"Microsoft.Xna.Framework.Graphics.EffectParameter::GetValueTexture2D": "Option<Arc<dyn Graphics::Texture>>"
-    ,"Microsoft.Xna.Framework.Graphics.EffectParameter::GetValueTextureCube": "Option<Arc<dyn Graphics::Texture>>"
-    ,"Microsoft.Xna.Framework.Graphics.EffectParameter::GetValueTexture3D": "Option<Arc<dyn Graphics::Texture>>"
-    ,"Microsoft.Xna.Framework.Graphics.BasicEffect::Texture": "Option<Arc<Graphics::Texture2D>>"
-    ,"Microsoft.Xna.Framework.Graphics.AlphaTestEffect::Texture": "Option<Arc<Graphics::Texture2D>>"
-    ,"Microsoft.Xna.Framework.Graphics.DualTextureEffect::Texture": "Option<Arc<Graphics::Texture2D>>"
-    ,"Microsoft.Xna.Framework.Graphics.DualTextureEffect::Texture2": "Option<Arc<Graphics::Texture2D>>"
-    ,"Microsoft.Xna.Framework.Graphics.EnvironmentMapEffect::Texture": "Option<Arc<Graphics::Texture2D>>"
-    ,"Microsoft.Xna.Framework.Graphics.EnvironmentMapEffect::EnvironmentMap": "Option<Arc<Graphics::TextureCube>>"
-    ,"Microsoft.Xna.Framework.Graphics.SkinnedEffect::Texture": "Option<Arc<Graphics::Texture2D>>"
-    ,"Microsoft.Xna.Framework.Graphics.Model::Tag": "Option<Arc<dyn Any+Send+Sync>>"
-    ,"Microsoft.Xna.Framework.Graphics.ModelBone::Parent": "Option<Arc<Self>>"
-    ,"Microsoft.Xna.Framework.Graphics.ModelMesh::Tag": "Option<Arc<dyn Any+Send+Sync>>"
-    ,"Microsoft.Xna.Framework.Graphics.ModelMeshPart::Tag": "Option<Arc<dyn Any+Send+Sync>>"
-    ,"Microsoft.Xna.Framework.Graphics.ModelMeshPart::Effect": "Option<Arc<dyn EffectBase>>"
-    ,"Microsoft.Xna.Framework.Graphics.ModelEffectCollection+Enumerator::Current": "Arc<dyn EffectBase>"
-    ,"Microsoft.Xna.Framework.Audio.AudioEngine::RendererDetails": "Vec<Audio::RendererDetail>"
-    ,"Microsoft.Xna.Framework.Audio.Microphone::All": "Vec<Arc<Self>>"
-    ,"Microsoft.Xna.Framework.Audio.Microphone::Default": "Option<Arc<Self>>"
-    ,"Microsoft.Xna.Framework.Media.Album::Artist": "Option<Arc<Media::Artist>>"
-    ,"Microsoft.Xna.Framework.Media.Album::Genre": "Option<Arc<Media::Genre>>"
-    ,"Microsoft.Xna.Framework.Media.Album::Songs": "Arc<Media::SongCollection>"
-    ,"Microsoft.Xna.Framework.Media.Artist::Albums": "Arc<Media::AlbumCollection>"
-    ,"Microsoft.Xna.Framework.Media.Artist::Songs": "Arc<Media::SongCollection>"
-    ,"Microsoft.Xna.Framework.Media.Genre::Albums": "Arc<Media::AlbumCollection>"
-    ,"Microsoft.Xna.Framework.Media.Genre::Songs": "Arc<Media::SongCollection>"
-    ,"Microsoft.Xna.Framework.Media.Playlist::Songs": "Arc<Media::SongCollection>"
-    ,"Microsoft.Xna.Framework.Media.Song::Album": "Option<Arc<Media::Album>>"
-    ,"Microsoft.Xna.Framework.Media.Song::Artist": "Option<Arc<Media::Artist>>"
-    ,"Microsoft.Xna.Framework.Media.Song::Genre": "Option<Arc<Media::Genre>>"
-    ,"Microsoft.Xna.Framework.Media.Picture::Album": "Option<Arc<Media::PictureAlbum>>"
-    ,"Microsoft.Xna.Framework.Media.PictureAlbum::Parent": "Option<Arc<Self>>"
-    ,"Microsoft.Xna.Framework.Media.PictureAlbum::Albums": "Arc<Media::PictureAlbumCollection>"
-    ,"Microsoft.Xna.Framework.Media.PictureAlbum::Pictures": "Arc<Media::PictureCollection>"
-    ,"Microsoft.Xna.Framework.Media.MediaLibrary::Songs": "Arc<Media::SongCollection>"
-    ,"Microsoft.Xna.Framework.Media.MediaLibrary::Albums": "Arc<Media::AlbumCollection>"
-    ,"Microsoft.Xna.Framework.Media.MediaLibrary::Artists": "Arc<Media::ArtistCollection>"
-    ,"Microsoft.Xna.Framework.Media.MediaLibrary::Genres": "Arc<Media::GenreCollection>"
-    ,"Microsoft.Xna.Framework.Media.MediaLibrary::Playlists": "Arc<Media::PlaylistCollection>"
-    ,"Microsoft.Xna.Framework.Media.MediaLibrary::Pictures": "Arc<Media::PictureCollection>"
-    ,"Microsoft.Xna.Framework.Media.MediaLibrary::SavedPictures": "Arc<Media::PictureCollection>"
-    ,"Microsoft.Xna.Framework.Media.MediaLibrary::RootPictureAlbum": "Option<Arc<Media::PictureAlbum>>"
-    ,"Microsoft.Xna.Framework.Media.MediaLibrary::MediaSource": "Arc<Media::MediaSource>"
-    ,"Microsoft.Xna.Framework.Media.MediaLibrary::SavePicture": "Arc<Media::Picture>"
-    ,"Microsoft.Xna.Framework.Media.MediaLibrary::SavePictureWithNameAndSource": "Arc<Media::Picture>"
-    ,"Microsoft.Xna.Framework.Media.MediaLibrary::GetPictureFromToken": "Option<Arc<Media::Picture>>"
-    ,"Microsoft.Xna.Framework.Media.MediaSource::GetAvailableMediaSources": "Vec<Arc<Self>>"
-    ,"Microsoft.Xna.Framework.Media.MediaPlayer::Queue": "Arc<Media::MediaQueue>"
-    ,"Microsoft.Xna.Framework.Media.MediaQueue::ActiveSong": "Option<Arc<Media::Song>>"
-    ,"Microsoft.Xna.Framework.Media.MediaQueue::Item": "Arc<Media::Song>"
-    ,"Microsoft.Xna.Framework.Media.AlbumCollection::Item": "Arc<Media::Album>"
-    ,"Microsoft.Xna.Framework.Media.AlbumCollection::GetEnumerator": "IntoIter<Arc<Media::Album>>"
-    ,"Microsoft.Xna.Framework.Media.ArtistCollection::Item": "Arc<Media::Artist>"
-    ,"Microsoft.Xna.Framework.Media.ArtistCollection::GetEnumerator": "IntoIter<Arc<Media::Artist>>"
-    ,"Microsoft.Xna.Framework.Media.GenreCollection::Item": "Arc<Media::Genre>"
-    ,"Microsoft.Xna.Framework.Media.GenreCollection::GetEnumerator": "IntoIter<Arc<Media::Genre>>"
-    ,"Microsoft.Xna.Framework.Media.SongCollection::Item": "Arc<Media::Song>"
-    ,"Microsoft.Xna.Framework.Media.SongCollection::GetEnumerator": "IntoIter<Arc<Media::Song>>"
-    ,"Microsoft.Xna.Framework.Media.PlaylistCollection::Item": "Arc<Media::Playlist>"
-    ,"Microsoft.Xna.Framework.Media.PlaylistCollection::GetEnumerator": "IntoIter<Arc<Media::Playlist>>"
-    ,"Microsoft.Xna.Framework.Media.PictureCollection::Item": "Arc<Media::Picture>"
-    ,"Microsoft.Xna.Framework.Media.PictureCollection::GetEnumerator": "IntoIter<Arc<Media::Picture>>"
-    ,"Microsoft.Xna.Framework.Media.PictureAlbumCollection::Item": "Arc<Media::PictureAlbum>"
-    ,"Microsoft.Xna.Framework.Media.PictureAlbumCollection::GetEnumerator": "IntoIter<Arc<Media::PictureAlbum>>"
-    ,"Microsoft.Xna.Framework.Media.VideoPlayer::Video": "Option<Arc<Media::Video>>"
-    ,"Microsoft.Xna.Framework.Media.VideoPlayer::GetTexture": "Option<Graphics::Texture2D>"
-    ,"Microsoft.Xna.Framework.Media.Album::GetAlbumArt": "Box<dyn Read+Send>"
-    ,"Microsoft.Xna.Framework.Media.Album::GetThumbnail": "Box<dyn Read+Send>"
-    ,"Microsoft.Xna.Framework.Media.Picture::GetImage": "Box<dyn Read+Send>"
-    ,"Microsoft.Xna.Framework.Media.Picture::GetThumbnail": "Box<dyn Read+Send>"
-    ,"Microsoft.Xna.Framework.Media.VisualizationData::Frequencies": "&[f32]"
-    ,"Microsoft.Xna.Framework.Media.VisualizationData::Samples": "&[f32]"
+    "Microsoft.Xna.Framework.Graphics.SpriteFont::Characters": "&[char]",
+    "Microsoft.Xna.Framework.Graphics.Effect::Parameters": "Arc<Graphics::EffectParameterCollection>",
+    "Microsoft.Xna.Framework.Graphics.Effect::Techniques": "Arc<Graphics::EffectTechniqueCollection>",
+    "Microsoft.Xna.Framework.Graphics.Effect::CurrentTechnique": "Arc<Graphics::EffectTechnique>",
+    "Microsoft.Xna.Framework.Graphics.EffectParameter::Elements": "Arc<Graphics::EffectParameterCollection>",
+    "Microsoft.Xna.Framework.Graphics.EffectParameter::StructureMembers": "Arc<Graphics::EffectParameterCollection>",
+    "Microsoft.Xna.Framework.Graphics.EffectParameter::Annotations": "Arc<Graphics::EffectAnnotationCollection>",
+    "Microsoft.Xna.Framework.Graphics.EffectAnnotationCollection::Item": "Option<Arc<Graphics::EffectAnnotation>>",
+    "Microsoft.Xna.Framework.Graphics.EffectAnnotationCollection::GetEnumerator": "IntoIter<Arc<Graphics::EffectAnnotation>>",
+    "Microsoft.Xna.Framework.Graphics.EffectParameterCollection::Item": "Option<Arc<Graphics::EffectParameter>>",
+    "Microsoft.Xna.Framework.Graphics.EffectParameterCollection::GetParameterBySemantic": "Option<Arc<Graphics::EffectParameter>>",
+    "Microsoft.Xna.Framework.Graphics.EffectParameterCollection::GetEnumerator": "IntoIter<Arc<Graphics::EffectParameter>>",
+    "Microsoft.Xna.Framework.Graphics.EffectPass::Annotations": "Arc<Graphics::EffectAnnotationCollection>",
+    "Microsoft.Xna.Framework.Graphics.EffectPassCollection::Item": "Option<Arc<Graphics::EffectPass>>",
+    "Microsoft.Xna.Framework.Graphics.EffectPassCollection::GetEnumerator": "IntoIter<Arc<Graphics::EffectPass>>",
+    "Microsoft.Xna.Framework.Graphics.EffectTechnique::Annotations": "Arc<Graphics::EffectAnnotationCollection>",
+    "Microsoft.Xna.Framework.Graphics.EffectTechnique::Passes": "Arc<Graphics::EffectPassCollection>",
+    "Microsoft.Xna.Framework.Graphics.EffectTechniqueCollection::Item": "Option<Arc<Graphics::EffectTechnique>>",
+    "Microsoft.Xna.Framework.Graphics.EffectTechniqueCollection::GetEnumerator": "IntoIter<Arc<Graphics::EffectTechnique>>",
+    "Microsoft.Xna.Framework.Graphics.EffectParameter::GetValueTexture2D": "Option<Arc<dyn Graphics::Texture>>",
+    "Microsoft.Xna.Framework.Graphics.EffectParameter::GetValueTextureCube": "Option<Arc<dyn Graphics::Texture>>",
+    "Microsoft.Xna.Framework.Graphics.EffectParameter::GetValueTexture3D": "Option<Arc<dyn Graphics::Texture>>",
+    "Microsoft.Xna.Framework.Graphics.BasicEffect::Texture": "Option<Arc<Graphics::Texture2D>>",
+    "Microsoft.Xna.Framework.Graphics.AlphaTestEffect::Texture": "Option<Arc<Graphics::Texture2D>>",
+    "Microsoft.Xna.Framework.Graphics.DualTextureEffect::Texture": "Option<Arc<Graphics::Texture2D>>",
+    "Microsoft.Xna.Framework.Graphics.DualTextureEffect::Texture2": "Option<Arc<Graphics::Texture2D>>",
+    "Microsoft.Xna.Framework.Graphics.EnvironmentMapEffect::Texture": "Option<Arc<Graphics::Texture2D>>",
+    "Microsoft.Xna.Framework.Graphics.EnvironmentMapEffect::EnvironmentMap": "Option<Arc<Graphics::TextureCube>>",
+    "Microsoft.Xna.Framework.Graphics.SkinnedEffect::Texture": "Option<Arc<Graphics::Texture2D>>",
+    "Microsoft.Xna.Framework.Graphics.Model::Tag": "Option<Arc<dyn Any+Send+Sync>>",
+    "Microsoft.Xna.Framework.Graphics.ModelBone::Parent": "Option<Arc<Self>>",
+    "Microsoft.Xna.Framework.Graphics.ModelMesh::Tag": "Option<Arc<dyn Any+Send+Sync>>",
+    "Microsoft.Xna.Framework.Graphics.ModelMeshPart::Tag": "Option<Arc<dyn Any+Send+Sync>>",
+    "Microsoft.Xna.Framework.Graphics.ModelMeshPart::Effect": "Option<Arc<dyn EffectBase>>",
+    "Microsoft.Xna.Framework.Graphics.ModelEffectCollection+Enumerator::Current": "Arc<dyn EffectBase>",
+    "Microsoft.Xna.Framework.Audio.AudioEngine::RendererDetails": "Vec<Audio::RendererDetail>",
+    "Microsoft.Xna.Framework.Audio.Microphone::All": "Vec<Arc<Self>>",
+    "Microsoft.Xna.Framework.Audio.Microphone::Default": "Option<Arc<Self>>",
+    "Microsoft.Xna.Framework.Media.Album::Artist": "Option<Arc<Media::Artist>>",
+    "Microsoft.Xna.Framework.Media.Album::Genre": "Option<Arc<Media::Genre>>",
+    "Microsoft.Xna.Framework.Media.Album::Songs": "Arc<Media::SongCollection>",
+    "Microsoft.Xna.Framework.Media.Artist::Albums": "Arc<Media::AlbumCollection>",
+    "Microsoft.Xna.Framework.Media.Artist::Songs": "Arc<Media::SongCollection>",
+    "Microsoft.Xna.Framework.Media.Genre::Albums": "Arc<Media::AlbumCollection>",
+    "Microsoft.Xna.Framework.Media.Genre::Songs": "Arc<Media::SongCollection>",
+    "Microsoft.Xna.Framework.Media.Playlist::Songs": "Arc<Media::SongCollection>",
+    "Microsoft.Xna.Framework.Media.Song::Album": "Option<Arc<Media::Album>>",
+    "Microsoft.Xna.Framework.Media.Song::Artist": "Option<Arc<Media::Artist>>",
+    "Microsoft.Xna.Framework.Media.Song::Genre": "Option<Arc<Media::Genre>>",
+    "Microsoft.Xna.Framework.Media.Picture::Album": "Option<Arc<Media::PictureAlbum>>",
+    "Microsoft.Xna.Framework.Media.PictureAlbum::Parent": "Option<Arc<Self>>",
+    "Microsoft.Xna.Framework.Media.PictureAlbum::Albums": "Arc<Media::PictureAlbumCollection>",
+    "Microsoft.Xna.Framework.Media.PictureAlbum::Pictures": "Arc<Media::PictureCollection>",
+    "Microsoft.Xna.Framework.Media.MediaLibrary::Songs": "Arc<Media::SongCollection>",
+    "Microsoft.Xna.Framework.Media.MediaLibrary::Albums": "Arc<Media::AlbumCollection>",
+    "Microsoft.Xna.Framework.Media.MediaLibrary::Artists": "Arc<Media::ArtistCollection>",
+    "Microsoft.Xna.Framework.Media.MediaLibrary::Genres": "Arc<Media::GenreCollection>",
+    "Microsoft.Xna.Framework.Media.MediaLibrary::Playlists": "Arc<Media::PlaylistCollection>",
+    "Microsoft.Xna.Framework.Media.MediaLibrary::Pictures": "Arc<Media::PictureCollection>",
+    "Microsoft.Xna.Framework.Media.MediaLibrary::SavedPictures": "Arc<Media::PictureCollection>",
+    "Microsoft.Xna.Framework.Media.MediaLibrary::RootPictureAlbum": "Option<Arc<Media::PictureAlbum>>",
+    "Microsoft.Xna.Framework.Media.MediaLibrary::MediaSource": "Arc<Media::MediaSource>",
+    "Microsoft.Xna.Framework.Media.MediaLibrary::SavePicture": "Arc<Media::Picture>",
+    "Microsoft.Xna.Framework.Media.MediaLibrary::SavePictureWithNameAndSource": "Arc<Media::Picture>",
+    "Microsoft.Xna.Framework.Media.MediaLibrary::GetPictureFromToken": "Option<Arc<Media::Picture>>",
+    "Microsoft.Xna.Framework.Media.MediaSource::GetAvailableMediaSources": "Vec<Arc<Self>>",
+    "Microsoft.Xna.Framework.Media.MediaPlayer::Queue": "Arc<Media::MediaQueue>",
+    "Microsoft.Xna.Framework.Media.MediaQueue::ActiveSong": "Option<Arc<Media::Song>>",
+    "Microsoft.Xna.Framework.Media.MediaQueue::Item": "Arc<Media::Song>",
+    "Microsoft.Xna.Framework.Media.AlbumCollection::Item": "Arc<Media::Album>",
+    "Microsoft.Xna.Framework.Media.AlbumCollection::GetEnumerator": "IntoIter<Arc<Media::Album>>",
+    "Microsoft.Xna.Framework.Media.ArtistCollection::Item": "Arc<Media::Artist>",
+    "Microsoft.Xna.Framework.Media.ArtistCollection::GetEnumerator": "IntoIter<Arc<Media::Artist>>",
+    "Microsoft.Xna.Framework.Media.GenreCollection::Item": "Arc<Media::Genre>",
+    "Microsoft.Xna.Framework.Media.GenreCollection::GetEnumerator": "IntoIter<Arc<Media::Genre>>",
+    "Microsoft.Xna.Framework.Media.SongCollection::Item": "Arc<Media::Song>",
+    "Microsoft.Xna.Framework.Media.SongCollection::GetEnumerator": "IntoIter<Arc<Media::Song>>",
+    "Microsoft.Xna.Framework.Media.PlaylistCollection::Item": "Arc<Media::Playlist>",
+    "Microsoft.Xna.Framework.Media.PlaylistCollection::GetEnumerator": "IntoIter<Arc<Media::Playlist>>",
+    "Microsoft.Xna.Framework.Media.PictureCollection::Item": "Arc<Media::Picture>",
+    "Microsoft.Xna.Framework.Media.PictureCollection::GetEnumerator": "IntoIter<Arc<Media::Picture>>",
+    "Microsoft.Xna.Framework.Media.PictureAlbumCollection::Item": "Arc<Media::PictureAlbum>",
+    "Microsoft.Xna.Framework.Media.PictureAlbumCollection::GetEnumerator": "IntoIter<Arc<Media::PictureAlbum>>",
+    "Microsoft.Xna.Framework.Media.VideoPlayer::Video": "Option<Arc<Media::Video>>",
+    "Microsoft.Xna.Framework.Media.VideoPlayer::GetTexture": "Option<Graphics::Texture2D>",
+    "Microsoft.Xna.Framework.Media.Album::GetAlbumArt": "Box<dyn Read+Send>",
+    "Microsoft.Xna.Framework.Media.Album::GetThumbnail": "Box<dyn Read+Send>",
+    "Microsoft.Xna.Framework.Media.Picture::GetImage": "Box<dyn Read+Send>",
+    "Microsoft.Xna.Framework.Media.Picture::GetThumbnail": "Box<dyn Read+Send>",
+    "Microsoft.Xna.Framework.Media.VisualizationData::Frequencies": "&[f32]",
+    "Microsoft.Xna.Framework.Media.VisualizationData::Samples": "&[f32]"
   },
   "contextInjectedMembers": {
     "Microsoft.Xna.Framework.Graphics.GraphicsAdapter::UseReferenceDevice": [
@@ -752,156 +755,256 @@
   },
   "genericBoundOverrides": {
     "Microsoft.Xna.Framework.Content.ContentManager::Load": {
-      "T": ["ContentLoadable"]
+      "T": [
+        "ContentLoadable"
+      ]
     },
     "Microsoft.Xna.Framework.Content.ContentManager::ReadAsset": {
-      "T": ["ContentLoadable"]
+      "T": [
+        "ContentLoadable"
+      ]
     },
     "Microsoft.Xna.Framework.Content.ContentReader::ReadExternalReference": {
-      "T": ["ContentLoadable"]
+      "T": [
+        "ContentLoadable"
+      ]
     },
     "Microsoft.Xna.Framework.Content.ContentReader::ReadObject": {
-      "T": ["ContentLoadable"]
+      "T": [
+        "ContentLoadable"
+      ]
     },
     "Microsoft.Xna.Framework.Content.ContentReader::ReadObjectWithExistingInstance": {
-      "T": ["ContentLoadable"]
+      "T": [
+        "ContentLoadable"
+      ]
     },
     "Microsoft.Xna.Framework.Content.ContentReader::ReadObjectWithTypeReader": {
-      "T": ["ContentLoadable"]
+      "T": [
+        "ContentLoadable"
+      ]
     },
     "Microsoft.Xna.Framework.Content.ContentReader::ReadObjectWithTypeReaderAndExistingInstance": {
-      "T": ["ContentLoadable"]
+      "T": [
+        "ContentLoadable"
+      ]
     },
     "Microsoft.Xna.Framework.Content.ContentReader::ReadRawObject": {
-      "T": ["ContentLoadable"]
+      "T": [
+        "ContentLoadable"
+      ]
     },
     "Microsoft.Xna.Framework.Content.ContentReader::ReadRawObjectWithExistingInstance": {
-      "T": ["ContentLoadable"]
+      "T": [
+        "ContentLoadable"
+      ]
     },
     "Microsoft.Xna.Framework.Content.ContentReader::ReadRawObjectWithTypeReader": {
-      "T": ["ContentLoadable"]
+      "T": [
+        "ContentLoadable"
+      ]
     },
     "Microsoft.Xna.Framework.Content.ContentReader::ReadRawObjectWithTypeReaderAndExistingInstance": {
-      "T": ["ContentLoadable"]
+      "T": [
+        "ContentLoadable"
+      ]
     },
     "Microsoft.Xna.Framework.Content.ContentReader::ReadSharedResource": {
-      "T": ["ContentLoadable"]
+      "T": [
+        "ContentLoadable"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.VertexBuffer::SetData": {
-      "T": ["VertexData"]
+      "T": [
+        "VertexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.VertexBuffer::SetDataWithDataAndStartIndexAndElementCount": {
-      "T": ["VertexData"]
+      "T": [
+        "VertexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.VertexBuffer::SetDataWithOffsetInBytesAndDataAndStartIndexAndElementCountAndVertexStride": {
-      "T": ["VertexData"]
+      "T": [
+        "VertexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.VertexBuffer::GetData": {
-      "T": ["VertexData"]
+      "T": [
+        "VertexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.VertexBuffer::GetDataWithDataAndStartIndexAndElementCount": {
-      "T": ["VertexData"]
+      "T": [
+        "VertexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.VertexBuffer::GetDataWithOffsetInBytesAndDataAndStartIndexAndElementCountAndVertexStride": {
-      "T": ["VertexData"]
+      "T": [
+        "VertexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.DynamicVertexBuffer::SetData": {
-      "T": ["VertexData"]
+      "T": [
+        "VertexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.DynamicVertexBuffer::SetDataWithOffsetInBytesAndDataAndStartIndexAndElementCountAndVertexStrideAndOptions": {
-      "T": ["VertexData"]
+      "T": [
+        "VertexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.IndexBuffer::SetData": {
-      "T": ["IndexData"]
+      "T": [
+        "IndexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.IndexBuffer::SetDataWithDataAndStartIndexAndElementCount": {
-      "T": ["IndexData"]
+      "T": [
+        "IndexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.IndexBuffer::SetDataWithOffsetInBytesAndDataAndStartIndexAndElementCount": {
-      "T": ["IndexData"]
+      "T": [
+        "IndexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.IndexBuffer::GetData": {
-      "T": ["IndexData"]
+      "T": [
+        "IndexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.IndexBuffer::GetDataWithDataAndStartIndexAndElementCount": {
-      "T": ["IndexData"]
+      "T": [
+        "IndexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.IndexBuffer::GetDataWithOffsetInBytesAndDataAndStartIndexAndElementCount": {
-      "T": ["IndexData"]
+      "T": [
+        "IndexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.DynamicIndexBuffer::SetData": {
-      "T": ["IndexData"]
+      "T": [
+        "IndexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.DynamicIndexBuffer::SetDataWithOffsetInBytesAndDataAndStartIndexAndElementCountAndOptions": {
-      "T": ["IndexData"]
+      "T": [
+        "IndexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.GraphicsDevice::DrawUserPrimitives": {
-      "T": ["VertexData"]
+      "T": [
+        "VertexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.GraphicsDevice::DrawUserPrimitivesWithPrimitiveTypeAndVertexDataAndVertexOffsetAndPrimitiveCountAndVertexDeclaration": {
-      "T": ["VertexData"]
+      "T": [
+        "VertexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.GraphicsDevice::DrawUserIndexedPrimitives": {
-      "T": ["VertexData"]
+      "T": [
+        "VertexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.GraphicsDevice::DrawUserIndexedPrimitivesWithPrimitiveTypeAndVertexDataAndVertexOffsetAndNumVerticesAndIndexDataAndIndexOffsetAndPrimitiveCount": {
-      "T": ["VertexData"]
+      "T": [
+        "VertexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.GraphicsDevice::DrawUserIndexedPrimitivesWithPrimitiveTypeAndVertexDataAndVertexOffsetAndNumVerticesAndIndexDataAndIndexOffsetAndPrimitiveCountAndVertexDeclarationAsPrimitiveTypeAnd0ArrayAndInt32AndInt32AndInt32ArrayAndInt32AndInt32AndVertexDeclaration": {
-      "T": ["VertexData"]
+      "T": [
+        "VertexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.GraphicsDevice::DrawUserIndexedPrimitivesWithPrimitiveTypeAndVertexDataAndVertexOffsetAndNumVerticesAndIndexDataAndIndexOffsetAndPrimitiveCountAndVertexDeclarationAsPrimitiveTypeAnd0ArrayAndInt32AndInt32AndInt16ArrayAndInt32AndInt32AndVertexDeclaration": {
-      "T": ["VertexData"]
+      "T": [
+        "VertexData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.GraphicsDevice::GetBackBufferData": {
-      "T": ["BackBufferData"]
+      "T": [
+        "BackBufferData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.GraphicsDevice::GetBackBufferDataWithData": {
-      "T": ["BackBufferData"]
+      "T": [
+        "BackBufferData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.GraphicsDevice::GetBackBufferDataWithDataAndStartIndexAndElementCount": {
-      "T": ["BackBufferData"]
+      "T": [
+        "BackBufferData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.TextureCube::SetData": {
-      "T": ["CubeTextureData"]
+      "T": [
+        "CubeTextureData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.TextureCube::SetDataWithCubeMapFaceAndDataAndStartIndexAndElementCount": {
-      "T": ["CubeTextureData"]
+      "T": [
+        "CubeTextureData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.TextureCube::SetDataWithCubeMapFaceAndLevelAndRectAndDataAndStartIndexAndElementCount": {
-      "T": ["CubeTextureData"]
+      "T": [
+        "CubeTextureData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.TextureCube::GetData": {
-      "T": ["CubeTextureData"]
+      "T": [
+        "CubeTextureData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.TextureCube::GetDataWithCubeMapFaceAndDataAndStartIndexAndElementCount": {
-      "T": ["CubeTextureData"]
+      "T": [
+        "CubeTextureData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.TextureCube::GetDataWithCubeMapFaceAndLevelAndRectAndDataAndStartIndexAndElementCount": {
-      "T": ["CubeTextureData"]
+      "T": [
+        "CubeTextureData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.Texture3D::SetData": {
-      "T": ["Texture3DData"]
+      "T": [
+        "Texture3DData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.Texture3D::SetDataWithDataAndStartIndexAndElementCount": {
-      "T": ["Texture3DData"]
+      "T": [
+        "Texture3DData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.Texture3D::SetDataWithLevelAndLeftAndTopAndRightAndBottomAndFrontAndBackAndDataAndStartIndexAndElementCount": {
-      "T": ["Texture3DData"]
+      "T": [
+        "Texture3DData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.Texture3D::GetData": {
-      "T": ["Texture3DData"]
+      "T": [
+        "Texture3DData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.Texture3D::GetDataWithDataAndStartIndexAndElementCount": {
-      "T": ["Texture3DData"]
+      "T": [
+        "Texture3DData"
+      ]
     },
     "Microsoft.Xna.Framework.Graphics.Texture3D::GetDataWithLevelAndLeftAndTopAndRightAndBottomAndFrontAndBackAndDataAndStartIndexAndElementCount": {
-      "T": ["Texture3DData"]
+      "T": [
+        "Texture3DData"
+      ]
     }
   },
   "typeGenericBoundOverrides": {
     "Microsoft.Xna.Framework.Content.ContentTypeReader`1": {
-      "T": ["ContentLoadable"]
+      "T": [
+        "ContentLoadable"
+      ]
     }
   },
   "projectedParameterTypeOverrides": {

@@ -15,6 +15,16 @@ use cna::Microsoft::Xna::Framework::Content::{
     ContentLoadException, ContentSerializerAttribute, ContentSerializerCollectionItemNameAttribute,
     ContentSerializerRuntimeTypeAttribute, ContentSerializerTypeVersionAttribute,
 };
+use cna::{SerializationInfo, StreamingContext};
+use cna::Microsoft::Xna::Framework::GamerServices::{
+    AvatarAnimationPreset, AvatarBodyType, AvatarBone, GameDifficulty, GamerPresenceMode,
+    GamerPrivilegeException, GamerZone, LeaderboardKey, NetworkException,
+    NetworkNotAvailableException, NotificationPosition,
+};
+use cna::Microsoft::Xna::Framework::Net::{
+    NetworkSessionEndReason, NetworkSessionJoinError, NetworkSessionJoinException,
+    NetworkSessionState, NetworkSessionType, SendDataOptions,
+};
 use cna::Microsoft::Xna::Framework::Design::{
     BoundingBoxConverter, BoundingSphereConverter, ColorConverter, MathTypeConverter,
     MatrixConverter, PlaneConverter, PointConverter, QuaternionConverter, RayConverter,
@@ -2118,5 +2128,72 @@ fn pinned_xna_math_observations() {
     observe!(visualization.Frequencies().len(), 256);
     observe!(visualization.Samples().len(), 256);
 
-    assert_eq!(observations, 215);
+    // Wider Windows runtime profile value identities. GamerServices, Avatar and
+    // Net declare these in Microsoft metadata; the values below are read from
+    // the pinned reference assemblies, not from any CNA runtime.
+    observe!(GamerZone::Unknown as i32, 0);
+    observe!(GamerZone::Underground as i32, 4);
+    observe!(GameDifficulty::Easy as i32, 0);
+    observe!(GameDifficulty::Hard as i32, 2);
+    observe!(AvatarBodyType::Male as i32, 1);
+    observe!(AvatarBone::Root as i32, 0);
+    observe!(AvatarBone::FingerThumb3Right as i32, 70);
+    observe!(AvatarAnimationPreset::Stand0 as i32, 0);
+    observe!(AvatarAnimationPreset::MaleYawn as i32, 30);
+    observe!(GamerPresenceMode::None as i32, 0);
+    observe!(GamerPresenceMode::CornflowerBlue as i32, 59);
+    observe!(NotificationPosition::Center as i32, 4);
+    observe!(LeaderboardKey::BestTimeRecent as i32, 3);
+    observe!(NetworkSessionType::LocalWithLeaderboards as i32, 4);
+    observe!(NetworkSessionState::Ended as i32, 2);
+    observe!(NetworkSessionEndReason::Disconnected as i32, 3);
+    observe!(NetworkSessionJoinError::SessionFull as i32, 2);
+
+    // SendDataOptions is the profile's one [Flags] identity. XNA's own named
+    // ReliableInOrder is exactly Reliable | InOrder, which the projection's
+    // operators must reproduce rather than approximate.
+    observe!(SendDataOptions::None, SendDataOptions::None);
+    observe!(
+        SendDataOptions::Reliable | SendDataOptions::InOrder,
+        SendDataOptions::ReliableInOrder
+    );
+    observe!(
+        SendDataOptions::ReliableInOrder & SendDataOptions::Reliable,
+        SendDataOptions::Reliable
+    );
+
+    // Exception identities carry XNA's message and inner-exception shape. The
+    // serialization constructor is projected because Microsoft declares it.
+    let inner = NetworkException::from_message("inner");
+    observe!(
+        NetworkNotAvailableException::from_message_and_inner_exception("outer", &inner).to_string(),
+        "outer: inner".to_owned()
+    );
+    observe!(
+        GamerPrivilegeException::from_info_and_context(
+            SerializationInfo::from_message("restored"),
+            StreamingContext::from_state(7),
+        )
+        .to_string(),
+        "restored".to_owned()
+    );
+    let mut joined = NetworkSessionJoinException::from_message_and_join_error(
+        "no room",
+        NetworkSessionJoinError::SessionFull,
+    );
+    observe!(joined.JoinError(), NetworkSessionJoinError::SessionFull);
+    joined.SetJoinError(NetworkSessionJoinError::SessionNotJoinable);
+    observe!(joined.JoinError(), NetworkSessionJoinError::SessionNotJoinable);
+    let mut restored = SerializationInfo::from_message("before");
+    joined.GetObjectData(&mut restored, StreamingContext::from_state(0));
+    observe!(
+        NetworkSessionJoinException::from_info_and_context(
+            restored,
+            StreamingContext::from_state(0)
+        )
+        .to_string(),
+        "no room".to_owned()
+    );
+
+    assert_eq!(observations, 240);
 }

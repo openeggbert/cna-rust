@@ -9,8 +9,10 @@ mod audio;
 mod game;
 mod graphics;
 mod input;
+mod gamer_services;
 mod media;
 mod native;
+mod net;
 mod packed;
 mod storage;
 mod value;
@@ -31,6 +33,7 @@ pub use design::{
     DesignPropertyDescriptor, DesignPropertyValue, DesignType, DesignValue, MathTypeConverterBase,
 };
 pub use error::{CnaError, Result};
+pub use gamer_services::NetworkExceptionBase;
 pub use game::{
     run, run_for_frames, GameComponentBase, GameComponentCollectionExt, GameComponentRuntime,
     GameState, GameStateAccess, LaunchParametersExt, ServiceProvider,
@@ -157,6 +160,24 @@ pub mod Microsoft {
             #[allow(non_snake_case)]
             pub mod GamerServices {
                 pub use crate::game::GamerServicesComponent;
+                pub use crate::gamer_services::{
+                    AvatarAnimationPreset, AvatarBodyType, AvatarBone, AvatarEye, AvatarEyebrow,
+                    AvatarMouth, AvatarRendererState, ControllerSensitivity, GameDifficulty,
+                    GameUpdateRequiredException, GamerPresenceMode, GamerPrivilegeException,
+                    GamerPrivilegeSetting, GamerServicesNotAvailableException, GamerZone,
+                    GuideAlreadyVisibleException, LeaderboardKey, LeaderboardOutcome,
+                    MessageBoxIcon, NetworkException, NetworkNotAvailableException,
+                    NotificationPosition, RacingCameraAngle,
+                };
+            }
+
+            #[allow(non_snake_case)]
+            pub mod Net {
+                pub use crate::net::{
+                    NetworkSessionEndReason, NetworkSessionJoinError,
+                    NetworkSessionJoinException, NetworkSessionState, NetworkSessionType,
+                    SendDataOptions,
+                };
             }
 
             #[allow(non_snake_case)]

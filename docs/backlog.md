@@ -24,7 +24,8 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-XNA-001 | Measure the complete retained XNA 4.0 corpus | 17 SHA-256-admitted Microsoft assemblies | explicit per-profile inventory | `tools/api-compat/verify.py --profile` | DONE |
 | RUST-XNA-002 | Fix `!0[]` generic-array parsing in the reference extractor | CLR metadata | the Content Pipeline profile measures | pipeline profile run | DONE |
 | RUST-XNA-005 | Scope measurement by profile so a wider profile can land incrementally | 17-assembly superset | `UNEXPECTED_TYPE` means no XNA assembly declares it | all four profile runs | DONE |
-| RUST-XNA-003 | GamerServices + Avatar + Net: 74 missing types | `xna40-windows-full` profile | strict zero on the complete runtime profile | full-profile verifier | READY |
+| RUST-XNA-003 | GamerServices + Avatar + Net value identities: 22 enums, 7 exceptions | `xna40-windows-full` profile | 74 -> 45 missing types, no other diagnostic | full-profile verifier, behaviour corpus | DONE |
+| RUST-XNA-006 | GamerServices + Avatar + Net object model: 45 remaining types | `xna40-windows-full` profile | strict zero on the complete runtime profile | full-profile verifier, native stress | READY |
 | RUST-XNA-004 | Content Pipeline: 125 missing design-time types | `xna40-windows-pipeline` profile | decide whether a design-time profile belongs in this crate | pipeline verifier | READY |
 
 ## Behaviour
