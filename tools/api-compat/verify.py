@@ -24,6 +24,11 @@ EXTRACTOR = ROOT / "tools/api-compat/extractor/XnaContractExtractor.cs"
 def arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--reference-dir", default=os.environ.get("XNA_REFERENCE_PATH") or os.environ.get("XNA_REFERENCE_DIR"))
+    parser.add_argument(
+        "--profile",
+        default=PROFILE,
+        help="reference profile to measure; defaults to the selected XNA 4.0 Windows runtime",
+    )
     parser.add_argument("--rustdoc")
     parser.add_argument("--output")
     parser.add_argument("--report-only", action="store_true")
@@ -401,10 +406,16 @@ def mapped_type_path(value: str, rules: dict) -> str:
 
 
 def generic_parameter_name(value: str, type_generics: list[dict], method_generics: list[dict]) -> str | None:
-    if value.startswith("!!"):
+    """Resolves a bare `!N`/`!!N` generic-parameter reference to its declared name.
+
+    A decorated reference such as `!0[]` or `!0&` is deliberately not matched
+    here: the caller strips the array, pointer and by-reference suffixes and
+    recurses, so only the undecorated form reaches this function.
+    """
+    if value.startswith("!!") and value[2:].isdigit():
         position = int(value[2:])
         return method_generics[position]["name"] if position < len(method_generics) else f"M{position}"
-    if value.startswith("!"):
+    if value.startswith("!") and value[1:].isdigit():
         position = int(value[1:])
         return type_generics[position]["name"] if position < len(type_generics) else f"T{position}"
     return None
@@ -1320,7 +1331,7 @@ def scoreboard(expected: dict[str, dict], findings: list[dict]) -> list[dict]:
 
 def main() -> int:
     args = arguments()
-    profile = json.loads(PROFILE.read_text(encoding="utf-8"))
+    profile = json.loads(Path(args.profile).read_text(encoding="utf-8"))
     rules = json.loads(RULES.read_text(encoding="utf-8"))
     if rules["allowlist"]:
         raise ValueError("mapping allowlist must remain empty")

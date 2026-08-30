@@ -598,10 +598,11 @@ impl Native {
         let get_abi_version = symbol!("cna_get_abi_version", sys::cna_get_abi_version_fn);
         // SAFETY: the symbol has the audited zero-argument ABI declaration.
         let actual = unsafe { get_abi_version() };
-        if actual != sys::CNA_ABI_VERSION {
+        if let Err(rejection) = super::abi::admit(actual) {
             return Err(CnaError::AbiVersionMismatch {
                 expected: sys::CNA_ABI_VERSION,
                 actual,
+                reason: rejection.reason(),
             });
         }
 

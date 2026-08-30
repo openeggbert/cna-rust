@@ -1,24 +1,27 @@
-# CNA-Rust selected-profile plan
+# CNA-Rust plan
 
-Status date: 2026-08-23
+Status date: 2026-08-30
 
-Scope: Microsoft XNA Framework 4.0 Windows runtime Rust projection over the
-canonical CNA C ABI 0.7. Microsoft XNA metadata/IL/reference behavior governs
-the public contract; canonical CNA headers govern the native ABI. Other CNA
-bindings are engineering evidence, not contract authority.
+Scope: a Rust projection of Microsoft XNA Framework 4.0 over the canonical CNA
+C ABI, plus a separately namespaced safe Rust API for CNA's own modern
+capabilities. Microsoft XNA metadata/IL/reference behavior governs the public
+XNA contract; canonical CNA headers govern the native ABI. Other CNA bindings
+are engineering evidence, not contract authority.
 
 ## Governing constraints
 
-- Bind only `cna_*` C ABI 0.7 symbols; never C++ ABI or ABI 0.8.
+- Bind only `cna_*` C ABI symbols; never the C++ ABI.
 - Never hide a missing CNA semantic with fake Rust state, catalog data, audio,
-  or video frames.
+  video frames, hardware or placeholder resources.
 - Keep strict structural completeness distinct from runtime/backend/platform
   qualification.
-- Keep wider GamerServices/Avatar, Net, Content Pipeline, Xbox, and Windows
-  Phone outside this profile.
-- Do not reopen completed families without a concrete regression.
+- Never place a CNA-only concept inside `cna::Microsoft::Xna::Framework`.
+- Do not reopen a completed family without a concrete regression.
 
-## Final strict measurement
+## Phase 1 (complete) — the selected Windows runtime profile
+
+The seven-assembly Microsoft XNA 4.0 Windows runtime profile reached strict
+structural zero and remains a hard regression gate:
 
 ```text
 REFERENCE_TYPES=257
@@ -28,148 +31,96 @@ ACTUAL_RUST_TYPES=259
 TOTAL_DIAGNOSTICS=0
 MISSING_TYPES=0
 MISSING_MEMBERS=0
+ALLOWLIST=0
+UNMEASURED_CATEGORIES=0
 ```
 
-All measured categories are zero:
+Every measured mapping and safety category is zero: constructor, overload,
+property, event, base projection, trait, interface, parameter, return type,
+generic, generic bound, ref/out, enum value, flags, delegate, disposal, type
+kind, unexpected type/member, internal type leak, raw handle leak, and public
+unsafe API. Normal strict and leak-only both exit zero.
 
-```text
-CONSTRUCTOR_MAPPING_MISMATCH  OVERLOAD_MAPPING_MISMATCH
-PROPERTY_MAPPING_MISMATCH     EVENT_MAPPING_MISMATCH
-BASE_PROJECTION_MISMATCH      TRAIT_MISMATCH
-INTERFACE_MISMATCH            PARAMETER_MISMATCH
-RETURN_TYPE_MISMATCH          GENERIC_MISMATCH
-GENERIC_BOUND_MISMATCH        REF_OUT_MISMATCH
-ENUM_VALUE_MISMATCH           FLAGS_MISMATCH
-DELEGATE_MISMATCH             DISPOSAL_MISMATCH
-UNEXPECTED_TYPES              UNEXPECTED_MEMBERS
-TYPE_KIND_MISMATCH            INTERNAL_TYPE_LEAK
-RAW_HANDLE_LEAK               PUBLIC_UNSAFE_API
-ALLOWLIST                     UNMEASURED_CATEGORIES
-```
+Completed dependency families: Graphics, Content/XNB, LZX, Framework/core,
+Input/Touch/Gesture, Storage, GamerServicesComponent, Design, Audio/XACT, and
+Media/Video.
 
-Normal strict and leak-only both exit zero. The selected XNA 4.0 Windows
-runtime Rust projection is structurally complete.
+## Phase 2 (complete) — migration to the live CNA ABI
 
-```text
-MEDIA_MILESTONE_COMPLETE=true
-STRICT_ZERO=true
-```
+The binding moved from the historical ABI 0.7 development baseline to the live
+CNA development tree at ABI 0.20.0. The reviewed slice survived thirteen minor
+versions with zero prototype, layout, callback, constant or export differences;
+what changed was the version gate, one unaudited declaration, and the fact that
+the canonical surface outside the slice was unaccounted for. Full evidence is
+in [docs/abi-migration-evidence.md](docs/abi-migration-evidence.md).
 
-## Completed dependency families
+The upstream C API build blocker recorded by Phase 1 is closed: the unmodified
+canonical checkout builds.
 
-| Family | Local diagnostics |
+## Phase 3 (current) — beyond the selected profile
+
+Phase 1's policy of staying inside the selected profile has been superseded.
+The selected profile stays frozen at strict zero as a regression gate, and work
+now proceeds on four fronts at once.
+
+### 3a. The complete retained XNA 4.0 corpus
+
+Seventeen legally retained original Microsoft assemblies are admitted by
+SHA-256 and measured as explicit profiles rather than merged into one:
+
+| Profile | Assemblies | Reference types | Reference members | Missing Rust types |
+|---|---:|---:|---:|---:|
+| `xna40-windows-runtime` (selected) | 7 | 257 | 2,964 | 0 |
+| `xna40-windows-full` | 10 | 331 | 3,640 | 74 |
+| `xna40-windows-pipeline` | 7 | 128 | 743 | 125 |
+| `xna40-windows-superset` (discovery) | 17 | 459 | 4,383 | 199 |
+
+Every type the Rust projection already declares matches the superset's expected
+contract exactly: the only diagnostic in any wider profile is `MISSING_TYPE`.
+The 74-type runtime gap is GamerServices, Avatar and Net; the 125-type gap is
+the design-time Content Pipeline.
+
+No Windows Phone or Xbox 360 reference assembly is present on this host, so
+those profiles do not exist here rather than being claimed untested.
+
+### 3b. Runtime and behaviour evidence
+
+Structural zero is not runtime completion. Every historical ABI-0.7 blocker is
+re-measured against the live ABI before it may be carried forward.
+
+### 3c. Full canonical C API accounting
+
+All 4,051 canonical routes carry exactly one classification and there are no
+unexplained holes. See
+[docs/c-api-classification.md](docs/c-api-classification.md).
+
+| Category | Routes |
 |---|---:|
-| Graphics | 0 |
-| Content/XNB | 0 |
-| LZX | 0 |
-| Framework/core | 0 |
-| Input/Touch/Gesture | 0 |
-| Storage | 0 |
-| GamerServicesComponent | 0 |
-| Design | 0 |
-| Audio/XACT | 0 |
-| Media/Video | 0 |
+| `RUST_SYS_BOUND` | 731 |
+| `CNA_EXTENSION_BACKING` | 1,919 |
+| `STRICT_XNA_BACKING` | 627 |
+| `MANAGED_BY_DESIGN` | 598 |
+| `UPSTREAM_NOT_USEFUL_TO_RUST` | 130 |
+| `TOOLING_ONLY` | 42 |
+| `PLATFORM_ONLY` | 3 |
+| `DEFERRED_RUNTIME` | 1 |
+| `INTERNAL_RUNTIME_ONLY` | 0 |
+| `UNMAPPED_REQUIRES_REVIEW` | 0 |
 
-The final Media family consists of exactly 24 types:
+### 3d. Modern CNA API under `cna::extensions`
 
-```text
-Album                         AlbumCollection
-Artist                        ArtistCollection
-Genre                         GenreCollection
-MediaLibrary                  MediaPlayer
-MediaQueue                    MediaSource
-MediaSourceType               MediaState
-Picture                       PictureAlbum
-PictureAlbumCollection        PictureCollection
-Playlist                      PlaylistCollection
-Song                          SongCollection
-Video                         VideoPlayer
-VideoSoundtrackType           VisualizationData
-```
+1,919 canonical routes back CNA concepts XNA 4.0 does not have. They are
+exposed as safe, idiomatic Rust under `cna::extensions`, never inside the
+strict XNA hierarchy, and never as raw `cna_*` calls.
 
-They form one real graph rather than structural shells: seven read-only native
-collection facades, stable related-object identities, generation-safe owners,
-real MediaLibrary/source/Song routes, process-global MediaPlayer state, stable
-MediaQueue identity, owner-thread events, visualization, Video content/native
-metadata, and VideoPlayer control/disposal behavior.
+## Ownership, threading and safety rules
 
-## Media ownership and lifecycle
+Unchanged from Phase 1 and re-verified on the live ABI. Every native-backed
+handle carries one measured ownership policy; `Drop` never replaces observable
+`Dispose` semantics; no raw handle or public `unsafe` reaches the safe API;
+no Rust panic unwinds through C.
 
-Media's synchronized process runtime admits one active Game and monotonically
-numbers native generations. All Media native resources are generation-bound;
-Game destruction invalidates stale handles, queue/song facades, and pending
-events before parent destruction. Scalar MediaPlayer settings and event
-subscriptions remain process-global. Wrong-thread releases keep their handles
-for owner-thread retry. No global raw pointer or `static mut` is exposed.
+## Backlog
 
-Song, Artist, Album, Genre, Playlist, Picture, PictureAlbum, collections,
-MediaLibrary, MediaSource, Video, and VideoPlayer have one owned native handle.
-MediaPlayer is PROCESS_GLOBAL; MediaQueue is its non-owning stable per-
-generation facade; VisualizationData is MANAGED_VALUE. A GetTexture frame is
-PARENT_OWNED by VideoPlayer. ABI 0.7 provides no stable frame identity or
-invalidation generation, so Rust never wraps or destroys that handle and
-returns explicit UnsupportedRuntime if one is reported.
-
-Detailed evidence is in [docs/media-video-evidence.md](docs/media-video-evidence.md)
-and the generated
-[docs/runtime-capabilities.md](docs/runtime-capabilities.md).
-
-## Measured final evidence
-
-| Evidence | Audio handoff | Final |
-|---|---:|---:|
-| named XNA-derived observations | 205 | 215 |
-| assertions including final count | 206 | 216 |
-| behavior failures | 0 | 0 |
-| reviewed ABI functions | 528 | 730 |
-| prototype type positions | 1,862 | 2,492 |
-| independent C/Rust measurements | 1,004 | 1,028 |
-| layouts | 61 | 62 |
-| callbacks | 6 | 7 |
-| constants | 253 | 262 |
-| ABI mismatches/missing symbols | 0 | 0 |
-
-Dedicated Media stress covers at least 20 MediaLibrary, 20 Song, 20
-MediaPlayer/Game, 20 queue-generation, 20 Video, 20 VideoPlayer, 20 frame-route,
-and 50 callback-delivery cycles. It includes explicit Dispose, Drop, double
-Dispose, wrong-thread retry, shutdown/recreation, stale resources, callback
-panic/self-removal/reentrancy, and backend-blocked frame acquisition.
-
-```text
-NATIVE_CRASHES=0
-OBSERVED_DOUBLE_FREE=0
-OBSERVED_UAF=0
-SANITIZER_STATUS=NOT_RUN
-```
-
-`SANITIZER_STATUS` remains `NOT_RUN` because no instrumented exact ABI-0.7 CNA
-artifact was used.
-
-## Runtime qualification, not structural gaps
-
-- Populated music catalog relationships and removable/network sources:
-  `PLATFORM_PENDING`.
-- Deterministic picture bytes/tokens/SavePicture and nested album providers:
-  `PLATFORM_PENDING`. The host's 21 real Picture entries were exercised.
-- Real visualization spectrum on the dummy audio backend: `BACKEND_BLOCKED`.
-- Authored video decode/frame production: `BACKEND_BLOCKED` and
-  `ASSET_PENDING`; no pixels are fabricated.
-- Stable VideoPlayer frame Texture2D identity/generation:
-  `UPSTREAM_CNA_BLOCKED`.
-- Physical microphone capture and authored XACT playback remain respectively
-  hardware/asset pending.
-- Repeated Game frame hosting still needs an upstream core callback-context
-  rebinding route.
-
-Canonical CNA HEAD is
-`1bb2145d99ed572dd4eb15009c34e2e5f410fcf0`. Its unmodified C API build remains
-blocked at `CnaCApiCoreExt.cpp:250` (`49 == 50`). Qualified runtime evidence
-uses ABI 0.7 artifact SHA-256
-`6dcefcadb7aa0233da98682bdbc343581a9f1e754a09c641078d1bef97afd7ca`.
-
-## Post-zero state
-
-There are no remaining selected-profile API families. Work now moves to
-maintenance, runtime/platform qualification, upstream CNA blocker
-reconciliation, packaging/release qualification, and real-game testing. Do
-not begin a future profile merely to extend this milestone.
+`docs/backlog.md` holds the durable task list. Planning is not the deliverable:
+a ready task is implemented, qualified and committed rather than described.

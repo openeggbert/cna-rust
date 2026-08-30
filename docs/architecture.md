@@ -7,7 +7,7 @@ Rust game
   -> cna::Microsoft::Xna::Framework::*   strict XNA projection
   -> private family modules              value/input/game/content/graphics/audio/media
   -> crate-private native bridge         typed safe calls over dynamic symbols
-  -> cna_sys                             raw ABI 0.7 declarations
+  -> cna_sys                             raw ABI 0.20 declarations
   -> CNA stable C ABI                    cna_* only
   -> CNA C++
 ```
@@ -21,19 +21,24 @@ concepts remain under `cna::extensions`.
 
 ## Native boundary and ABI evidence
 
-`cna-sys` contains the reviewed ABI-0.7 slice: fixed-width aliases, exact
-semantic handle typedefs, `repr(C)` structures, callbacks, constants, and 730
+`cna-sys` contains the reviewed ABI-0.20 slice: fixed-width aliases, exact
+semantic handle typedefs, `repr(C)` structures, callbacks, constants, and 731
 function-pointer declarations. The
 safe bridge is grouped by concern:
 
-- `native/api.rs`: exact version gate and symbol inventory;
+- `native/api.rs`: symbol inventory and the loading gate;
+- `native/abi.rs`: the canonical ABI admission policy;
 - `native/loader.rs`: dynamic-library ownership and Unix loading;
 - `native/game.rs`, `graphics.rs`, `display.rs`, `window.rs`, `input.rs`,
   `device_manager.rs`, `storage.rs`, `audio.rs`, and `media.rs`: typed facade calls;
 - `native/fault.rs`: feature-gated, test-only failure injection;
 - `native/error.rs`: CNA error extraction.
 
-The loader accepts exactly `0x00000700`; it does not silently accept ABI 0.8.
+The loader applies CNA's own versioning contract rather than a single constant
+comparison: a different major is always rejected, an experimental `0.x` minor
+must equal the reviewed one because CNA ships incompatible change as a minor
+increment, a stable major admits a higher minor, and a higher patch is always
+admitted. See [abi-migration-evidence.md](abi-migration-evidence.md).
 There is no fake backend fallback. Unix is runtime-tested and unsupported
 loaders return a typed error.
 
@@ -41,7 +46,7 @@ The ABI verifier derives full C prototypes from Clang's view of canonical CNA
 headers and compares them with every reviewed `cna-sys` function type. It
 measures return and parameter types, scalar width/signedness, pointer depth and
 constness, callback/struct pointers, and boolean/enum representations. The
-current pass checks 730 functions and 2,492 prototype type positions.
+current pass checks 731 functions and 2,496 prototype type positions.
 Independent C and Rust probes make 1,028 measurements across 62 structures,
 seven callback signatures, scalar representations, and 262 constants, with zero
 mismatches.

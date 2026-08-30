@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "abiVersion": 1792,
+  "abiVersion": 5120,
   "symbols": {
     "cna_get_abi_version": 0,
     "cna_error_get_last_message_size": 1,
@@ -129,6 +129,7 @@
     "cna_render_target_cube_create": 3,
     "cna_render_target_get_info": 2,
     "cna_render_target_destroy": 1,
+    "cna_vertex_declaration_create": 3,
     "cna_vertex_declaration_create_with_stride": 4,
     "cna_vertex_declaration_destroy": 1,
     "cna_vertex_buffer_binding_init": 4,

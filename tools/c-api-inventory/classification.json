@@ -1,0 +1,345 @@
+{
+  "schemaVersion": 1,
+  "documentation": "docs/c-api-classification.md",
+  "rules": [
+    {
+      "id": "tooling-hooks",
+      "category": "TOOLING_ONLY",
+      "names": [
+        "*_for_tests_ext",
+        "*_test_backend_ext",
+        "*_get_test_log_ext",
+        "*_set_test_state_ext",
+        "*_set_test_frame_ext"
+      ],
+      "rationale": "CNA's own test seams; a binding that called them would fake runtime state"
+    },
+    {
+      "id": "native-os-handles",
+      "category": "PLATFORM_ONLY",
+      "names": [
+        "*_native_window_handle",
+        "cna_native_window_handle_init",
+        "cna_game_window_get_native_window_ext",
+        "*_native_monitor_handle"
+      ],
+      "rationale": "raw operating-system handles; exposing one would be a public raw-handle leak"
+    },
+    {
+      "id": "clr-type-names",
+      "category": "UPSTREAM_NOT_USEFUL_TO_RUST",
+      "names": [
+        "*type_name*"
+      ],
+      "rationale": "CLR Type.FullName reflection; Rust has no System.Type projection"
+    },
+    {
+      "id": "engine-layer",
+      "category": "CNA_EXTENSION_BACKING",
+      "header": "engine_layer.h",
+      "rationale": "CNAEXT engine layer; belongs under cna::extensions, never inside strict XNA"
+    },
+    {
+      "id": "cnb-container",
+      "category": "CNA_EXTENSION_BACKING",
+      "header": "cnb.h",
+      "rationale": "modern CNA .cnb content container and its asset schemas"
+    },
+    {
+      "id": "graphics-ext",
+      "category": "CNA_EXTENSION_BACKING",
+      "header": "graphics_ext.h",
+      "rationale": "CNAEXT post-processing and PBR material layer beyond XNA 4.0"
+    },
+    {
+      "id": "core-ext",
+      "category": "CNA_EXTENSION_BACKING",
+      "header": "core_ext.h",
+      "rationale": "CNA logging, platform identity and renderer-selection runtime"
+    },
+    {
+      "id": "sensors",
+      "category": "CNA_EXTENSION_BACKING",
+      "header": "sensors.h",
+      "rationale": "Microsoft.Devices.Sensors is not part of the XNA 4.0 Windows corpus; CNA exposes it as a device extension"
+    },
+    {
+      "id": "devices",
+      "category": "CNA_EXTENSION_BACKING",
+      "header": "devices.h",
+      "rationale": "CNA device layer: power, locale, clipboard, dialogs, tray, camera, vibration"
+    },
+    {
+      "id": "input-haptics",
+      "category": "CNA_EXTENSION_BACKING",
+      "header": "input_haptics.h",
+      "rationale": "force-feedback devices have no XNA 4.0 counterpart"
+    },
+    {
+      "id": "input-joystick",
+      "category": "CNA_EXTENSION_BACKING",
+      "header": "input_joystick.h",
+      "rationale": "raw joystick enumeration has no XNA 4.0 counterpart"
+    },
+    {
+      "id": "input-text",
+      "category": "CNA_EXTENSION_BACKING",
+      "header": "input_text.h",
+      "rationale": "text-input events have no XNA 4.0 counterpart"
+    },
+    {
+      "id": "input-devices",
+      "category": "CNA_EXTENSION_BACKING",
+      "header": "input_devices.h",
+      "rationale": "device hot-plug, clipboard and sensor enumeration beyond XNA 4.0"
+    },
+    {
+      "id": "input-cursor",
+      "category": "CNA_EXTENSION_BACKING",
+      "header": "input_cursor.h",
+      "rationale": "mouse-cursor objects have no XNA 4.0 counterpart"
+    },
+    {
+      "id": "reflective-content",
+      "category": "CNA_EXTENSION_BACKING",
+      "names": [
+        "cna_object_dictionary_*",
+        "cna_reflective_type_*"
+      ],
+      "rationale": "CNA's reflective reader and processor-written object dictionary are CNA concepts"
+    },
+    {
+      "id": "modern-effects",
+      "category": "CNA_EXTENSION_BACKING",
+      "names": [
+        "cna_pbr_effect_*",
+        "cna_skinned_pbr_*",
+        "cna_shader_effect_*",
+        "cna_color_matrix_*",
+        "cna_environment_map_*",
+        "cna_texture_transform_*",
+        "cna_effect_material_*"
+      ],
+      "rationale": "PBR, custom shader sources and material extras are CNAEXT effect concepts"
+    },
+    {
+      "id": "modern-models",
+      "category": "CNA_EXTENSION_BACKING",
+      "names": [
+        "cna_skinned_model_*",
+        "cna_skinning_data_*",
+        "cna_morph_target_*",
+        "cna_animation_player_*",
+        "cna_model_animations_*"
+      ],
+      "rationale": "skinning, morph targets and animation playback are CNAEXT model concepts"
+    },
+    {
+      "id": "value-semantics",
+      "category": "MANAGED_BY_DESIGN",
+      "names": [
+        "*_init",
+        "*_init_*",
+        "*_clone",
+        "*_equals",
+        "*_not_equals",
+        "*_get_hash_code",
+        "*_get_string_size",
+        "*_get_string_byte_count",
+        "*_copy_string"
+      ],
+      "rationale": "construction, equality, hashing and ToString of XNA value types are exact managed Rust behaviour"
+    },
+    {
+      "id": "managed-value-families",
+      "category": "MANAGED_BY_DESIGN",
+      "names": [
+        "cna_viewport_*",
+        "cna_display_mode_*",
+        "cna_presentation_parameters_*",
+        "cna_keyboard_state_*",
+        "cna_mouse_state_*",
+        "cna_gamepad_state_get_*",
+        "cna_gamepad_buttons_*",
+        "cna_gamepad_dpad_*",
+        "cna_gamepad_thumb_sticks_*",
+        "cna_gamepad_triggers_*",
+        "cna_gamepad_apply_dead_zone",
+        "cna_gamepad_exclude_axis_dead_zone",
+        "cna_touch_state_*",
+        "cna_touch_location_*",
+        "cna_gesture_sample_*",
+        "cna_touch_capabilities_*",
+        "cna_vertex_element_*",
+        "cna_vertex_value_*",
+        "cna_vertex_type_*",
+        "cna_render_target_usage_preserves_contents",
+        "cna_primitive_type_get_vertex_count",
+        "cna_texture_get_block_size_squared",
+        "cna_texture_get_format_size",
+        "cna_texture_get_pixel_store_alignment"
+      ],
+      "rationale": "these XNA value types and helpers are projected as exact managed Rust values"
+    },
+    {
+      "id": "managed-math",
+      "category": "MANAGED_BY_DESIGN",
+      "headers": [
+        "vectors.h",
+        "matrix.h",
+        "quaternion.h",
+        "math.h",
+        "geometry.h",
+        "curve.h",
+        "color.h",
+        "packed_vectors.h",
+        "vertex_values.h"
+      ],
+      "rationale": "XNA math is deterministic managed IL; the Rust value types reimplement it exactly and are measured by the behaviour corpus"
+    },
+    {
+      "id": "cna-only-extension-routes",
+      "category": "CNA_EXTENSION_BACKING",
+      "names": [
+        "*_ext"
+      ],
+      "rationale": "an _ext route on an XNA family names behaviour XNA 4.0 does not have"
+    },
+    {
+      "id": "cna-only-on-xna-families",
+      "category": "CNA_EXTENSION_BACKING",
+      "names": [
+        "cna_graphics_device_get_unsupported_3d_call_behavior",
+        "cna_graphics_device_set_unsupported_3d_call_behavior",
+        "cna_graphics_device_set_depth_test_enabled",
+        "cna_graphics_device_set_blend_enabled",
+        "cna_graphics_device_set_depth_write_enabled",
+        "cna_graphics_device_set_context_recovery_enabled",
+        "cna_graphics_device_set_current_effect",
+        "cna_graphics_device_get_tracked_resource_count",
+        "cna_graphics_device_unbind_texture",
+        "cna_occlusion_query_has_renderer",
+        "cna_texture_get_info",
+        "cna_texture_validate_format",
+        "cna_texture_validate_get_data_format",
+        "cna_texture2d_create_standalone",
+        "cna_texture2d_create_cpu_only_rgba8",
+        "cna_texture2d_get_storage_info",
+        "cna_content_manager_register_builtin_loaders",
+        "cna_content_manager_refresh_content_manifest",
+        "cna_content_manager_get_manifest_entry*",
+        "cna_content_manager_copy_manifest_*",
+        "cna_content_manager_get_xnb_reader_usage*",
+        "cna_content_manager_copy_xnb_reader_usage_name",
+        "cna_song_create",
+        "cna_song_create_with_duration",
+        "cna_song_set_duration",
+        "cna_song_set_play_count",
+        "cna_song_collection_create",
+        "cna_video_create",
+        "cna_video_set_duration",
+        "cna_video_get_has_graphics_device",
+        "cna_media_queue_add",
+        "cna_media_queue_clear",
+        "cna_audio_get_capabilities",
+        "cna_graphics_adapters_refresh",
+        "cna_game_clear",
+        "cna_game_launch_parameters_add"
+      ],
+      "rationale": "a CNA-only knob, diagnostic or authoring route on an otherwise XNA family; XNA 4.0 has no counterpart"
+    },
+    {
+      "id": "wider-xna-gamer-services",
+      "category": "STRICT_XNA_BACKING",
+      "headers": [
+        "gamer_services.h"
+      ],
+      "rationale": "backs Microsoft.Xna.Framework.GamerServices and .Avatar, a wider XNA 4.0 profile"
+    },
+    {
+      "id": "wider-xna-net",
+      "category": "STRICT_XNA_BACKING",
+      "headers": [
+        "net.h",
+        "net_sessions.h",
+        "net_gamers.h"
+      ],
+      "rationale": "backs Microsoft.Xna.Framework.Net, a wider XNA 4.0 profile"
+    },
+    {
+      "id": "strict-xna-remainder",
+      "category": "STRICT_XNA_BACKING",
+      "headers": [
+        "audio.h",
+        "content.h",
+        "content_readers.h",
+        "display.h",
+        "effects.h",
+        "graphics.h",
+        "graphics_device.h",
+        "graphics_resource.h",
+        "graphics_state.h",
+        "index_resources.h",
+        "input.h",
+        "input_gamepad.h",
+        "input_keyboard.h",
+        "input_mouse.h",
+        "input_touch.h",
+        "media.h",
+        "media_library.h",
+        "media_player.h",
+        "models.h",
+        "render_target.h",
+        "runtime.h",
+        "runtime_components.h",
+        "runtime_graphics_manager.h",
+        "runtime_window.h",
+        "storage.h",
+        "texture.h",
+        "texture_volume.h",
+        "vertex_resources.h",
+        "video.h",
+        "xact.h"
+      ],
+      "rationale": "backs a Microsoft XNA 4.0 member the Rust projection declares; binding it is a runtime-fidelity improvement"
+    }
+  ],
+  "overrides": {
+    "cna_error_get_last_info": {
+      "category": "DEFERRED_RUNTIME",
+      "rationale": "structured error identity; the CnaError projection should adopt it so a CNA cause can carry an XNA exception identity"
+    },
+    "cna_game_get_content_manager_ext": {
+      "category": "STRICT_XNA_BACKING",
+      "rationale": "backs XNA Game.Content"
+    },
+    "cna_game_set_content_manager_ext": {
+      "category": "STRICT_XNA_BACKING",
+      "rationale": "backs XNA Game.Content"
+    },
+    "cna_game_services_contains_ext": {
+      "category": "STRICT_XNA_BACKING",
+      "rationale": "backs XNA GameServiceContainer lookup"
+    },
+    "cna_game_services_remove_ext": {
+      "category": "STRICT_XNA_BACKING",
+      "rationale": "backs XNA GameServiceContainer.RemoveService"
+    },
+    "cna_video_player_get_frame_ext": {
+      "category": "STRICT_XNA_BACKING",
+      "rationale": "carries the frame identity and generation XNA VideoPlayer.GetTexture needs; the historical ABI-0.7 blocker"
+    },
+    "cna_model_get_content_tag_dictionary_ext": {
+      "category": "STRICT_XNA_BACKING",
+      "rationale": "backs XNA Model.Tag written by a content processor"
+    },
+    "cna_model_get_content_tag_foreign_object_ext": {
+      "category": "STRICT_XNA_BACKING",
+      "rationale": "backs XNA Model.Tag written by a content processor"
+    },
+    "cna_title_container_read_ext": {
+      "category": "STRICT_XNA_BACKING",
+      "rationale": "backs XNA TitleContainer.OpenStream"
+    }
+  }
+}

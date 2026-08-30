@@ -1,0 +1,41 @@
+{
+  "name": "XNA 4.0 Windows superset (discovery)",
+  "referenceAssemblies": [
+    "Microsoft.Xna.Framework.Avatar.dll",
+    "Microsoft.Xna.Framework.Content.Pipeline.AudioImporters.dll",
+    "Microsoft.Xna.Framework.Content.Pipeline.EffectImporter.dll",
+    "Microsoft.Xna.Framework.Content.Pipeline.FBXImporter.dll",
+    "Microsoft.Xna.Framework.Content.Pipeline.TextureImporter.dll",
+    "Microsoft.Xna.Framework.Content.Pipeline.VideoImporters.dll",
+    "Microsoft.Xna.Framework.Content.Pipeline.XImporter.dll",
+    "Microsoft.Xna.Framework.Content.Pipeline.dll",
+    "Microsoft.Xna.Framework.Game.dll",
+    "Microsoft.Xna.Framework.GamerServices.dll",
+    "Microsoft.Xna.Framework.Graphics.dll",
+    "Microsoft.Xna.Framework.Input.Touch.dll",
+    "Microsoft.Xna.Framework.Net.dll",
+    "Microsoft.Xna.Framework.Storage.dll",
+    "Microsoft.Xna.Framework.Video.dll",
+    "Microsoft.Xna.Framework.Xact.dll",
+    "Microsoft.Xna.Framework.dll"
+  ],
+  "referenceSha256": {
+    "Microsoft.Xna.Framework.Avatar.dll": "b3c70bbe469000b9e11507cc63b88d54a4e0bc5c27afc826d66e0aee51640871",
+    "Microsoft.Xna.Framework.Content.Pipeline.AudioImporters.dll": "1daca08f4e4f12da5ff095e7861e7702fd41f761a8c2ece5ee714894b7684165",
+    "Microsoft.Xna.Framework.Content.Pipeline.EffectImporter.dll": "9f30ac3db23c14afce527ac18fdf29905dcd7bad48273a88b3040c918b789c8d",
+    "Microsoft.Xna.Framework.Content.Pipeline.FBXImporter.dll": "01a22ab5ed7a08f0e4b7a856fe73b1e3fa12a8789026d43125bedb7edcf93f91",
+    "Microsoft.Xna.Framework.Content.Pipeline.TextureImporter.dll": "3b418ce4a72f1d090563363530a9fc0859b0d6a9c637a500dab1a4901696eba6",
+    "Microsoft.Xna.Framework.Content.Pipeline.VideoImporters.dll": "8768d9992c303af401fed6af20eb4d3548bed48a9c05f125f22e278b2fc0b492",
+    "Microsoft.Xna.Framework.Content.Pipeline.XImporter.dll": "ccb90834938ee0ab129f0a9089cff8dcd7827759d05cd86ea97e70be1b1928e8",
+    "Microsoft.Xna.Framework.Content.Pipeline.dll": "1ea481da62eb9e66bad8589df83f173725e62d22362801e1264cd02347721c69",
+    "Microsoft.Xna.Framework.Game.dll": "b5dffdd8125abef2a4507ba4e1d2f11062143f0a63d48fe4f298b95ad746a1f0",
+    "Microsoft.Xna.Framework.GamerServices.dll": "7c6effed97aa25a95c5e095d9c261f5581e402180cc073271a367b9eef79c8af",
+    "Microsoft.Xna.Framework.Graphics.dll": "560080fc39021c611ca9d076dcebed312faf6d7d1413c2dc523683ea635e9f55",
+    "Microsoft.Xna.Framework.Input.Touch.dll": "b0585224c18022c3661057ae79544644c10f33f1dc529678364f3d6b25151c25",
+    "Microsoft.Xna.Framework.Net.dll": "39739dbf5f6ba02e1d0b02ed404f6fe0692497848bc1a6a25be132d47ed9c151",
+    "Microsoft.Xna.Framework.Storage.dll": "798f678e9ae3d9afc3bed66c30123bc9634fb923b6d200188344b618e608cbb8",
+    "Microsoft.Xna.Framework.Video.dll": "17538b1ca9d48a993e2cd88c96b436df08e7abb4aec5d4758eb21feb580d6e06",
+    "Microsoft.Xna.Framework.Xact.dll": "a14d5364dca7cf49fb90639e87ba04d52b59a700dc9198efa5707ce8eae28f0a",
+    "Microsoft.Xna.Framework.dll": "38e7093f52d7474bbc6256906519781a1210d7da50a1c667b52716fcf49ca130"
+  }
+}

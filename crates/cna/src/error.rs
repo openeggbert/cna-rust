@@ -13,8 +13,15 @@ pub enum CnaError {
         /// Platform loader diagnostics.
         details: String,
     },
-    /// The library ABI does not exactly match this experimental binding.
-    AbiVersionMismatch { expected: u32, actual: u32 },
+    /// The library ABI is not admissible for this reviewed binding.
+    ///
+    /// `reason` names the canonical rule from CNA's ABI versioning contract
+    /// that the library's reported version violates.
+    AbiVersionMismatch {
+        expected: u32,
+        actual: u32,
+        reason: &'static str,
+    },
     /// A required C ABI symbol is absent from the selected library.
     MissingSymbol(&'static str),
     /// CNA returned a non-success result.
@@ -40,9 +47,19 @@ impl fmt::Display for CnaError {
                 formatter,
                 "CNA native library unavailable; set CNA_NATIVE_LIBRARY to the exact library path or CNA_NATIVE_DIR to its directory; searched {searched:?}: {details}"
             ),
-            Self::AbiVersionMismatch { expected, actual } => write!(
+            Self::AbiVersionMismatch {
+                expected,
+                actual,
+                reason,
+            } => write!(
                 formatter,
-                "CNA ABI version mismatch: Rust declarations require {expected:#010x}, library reports {actual:#010x}"
+                "CNA ABI version mismatch: Rust declarations were reviewed against {}.{}.{}, library reports {}.{}.{} ({reason})",
+                cna_sys::cna_abi_version_major(*expected),
+                cna_sys::cna_abi_version_minor(*expected),
+                cna_sys::cna_abi_version_patch(*expected),
+                cna_sys::cna_abi_version_major(*actual),
+                cna_sys::cna_abi_version_minor(*actual),
+                cna_sys::cna_abi_version_patch(*actual),
             ),
             Self::MissingSymbol(symbol) => write!(formatter, "CNA library is missing required symbol {symbol}"),
             Self::Native { code, message } => write!(formatter, "CNA error {code}: {message}"),

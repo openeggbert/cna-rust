@@ -18,3 +18,12 @@
 *.swp
 .DS_Store
 Thumbs.db
+
+# Out-of-tree CNA native build (see plan.md)
+/build/
+/build-probe/
+/build-consumer/
+
+# Python bytecode from the verification tools
+__pycache__/
+*.pyc

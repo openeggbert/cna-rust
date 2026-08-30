@@ -1,7 +1,7 @@
 //! Raw declarations for the reviewed CNA C ABI runtime/2D slice.
 //!
 //! These layouts and function-pointer types are derived from CNA's canonical
-//! `modules/c-api/include/CNA/C` headers at ABI 0.7.0. The crate deliberately
+//! `modules/c-api/include/CNA/C` headers at ABI 0.20.0. The crate deliberately
 //! does not add linker directives: the safe crate resolves a user-selected CNA
 //! shared library at runtime and checks its ABI version before loading symbols.
 
@@ -11,7 +11,47 @@
 use core::ffi::{c_char, c_void};
 
 pub const BINDINGS_AVAILABLE: bool = true;
-pub const CNA_ABI_VERSION: u32 = 0x0000_0700;
+
+/// Packs an ABI version the way canonical `CNA_ABI_VERSION_ENCODE` does.
+///
+/// The representation is fixed by `docs/c-api/ABI_VERSIONING.md`: major in bits
+/// 31..16, minor in bits 15..8, patch in bits 7..0.
+#[must_use]
+pub const fn cna_abi_version_encode(major: u32, minor: u32, patch: u32) -> u32 {
+    ((major & 0xFFFF) << 16) | ((minor & 0xFF) << 8) | (patch & 0xFF)
+}
+
+/// Extracts the major component of an encoded ABI version.
+#[must_use]
+pub const fn cna_abi_version_major(version: u32) -> u32 {
+    (version >> 16) & 0xFFFF
+}
+
+/// Extracts the minor component of an encoded ABI version.
+#[must_use]
+pub const fn cna_abi_version_minor(version: u32) -> u32 {
+    (version >> 8) & 0xFF
+}
+
+/// Extracts the patch component of an encoded ABI version.
+#[must_use]
+pub const fn cna_abi_version_patch(version: u32) -> u32 {
+    version & 0xFF
+}
+
+/// Major component of the reviewed canonical ABI (`CNA_ABI_VERSION_MAJOR`).
+pub const CNA_ABI_VERSION_MAJOR: u32 = 0;
+/// Minor component of the reviewed canonical ABI (`CNA_ABI_VERSION_MINOR`).
+pub const CNA_ABI_VERSION_MINOR: u32 = 20;
+/// Patch component of the reviewed canonical ABI (`CNA_ABI_VERSION_PATCH`).
+pub const CNA_ABI_VERSION_PATCH: u32 = 0;
+
+/// The exact canonical ABI version these declarations were reviewed against.
+pub const CNA_ABI_VERSION: u32 = cna_abi_version_encode(
+    CNA_ABI_VERSION_MAJOR,
+    CNA_ABI_VERSION_MINOR,
+    CNA_ABI_VERSION_PATCH,
+);
 pub const CNA_RESULT_SUCCESS: CNA_Result = 0;
 pub const CNA_RESULT_INVALID_ARGUMENT: CNA_Result = 1;
 pub const CNA_RESULT_INVALID_HANDLE: CNA_Result = 2;

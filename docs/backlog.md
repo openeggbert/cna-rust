@@ -1,0 +1,68 @@
+# CNA-Rust backlog
+
+Durable task list. Each entry records the exact identity, its authority, the
+current state, the target, any blocker, the qualification, and status.
+
+Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
+`BLOCKED_PLATFORM`, `BLOCKED_HARDWARE`, `BLOCKED_ASSET`.
+
+## ABI
+
+| ID | Subject | Authority | Target | Tests | Status |
+|---|---|---|---|---|---|
+| RUST-ABI-001 | Migrate the reviewed slice from ABI 0.7 to live 0.20 | canonical headers | zero prototype/layout/constant findings | `tools/native-abi/verify.py` | DONE |
+| RUST-ABI-002 | Replace the constant version gate with CNA's versioning contract | `docs/c-api/ABI_VERSIONING.md` | major/minor/patch policy, `0.x` exact minor | `native::abi` unit tests | DONE |
+| RUST-ABI-003 | Audit `cna_vertex_declaration_create`, declared but unmeasured | canonical headers | present in the ABI manifest | ABI verifier | DONE |
+| RUST-ABI-004 | Classify all 4,051 canonical routes | canonical headers | zero `UNMAPPED_REQUIRES_REVIEW` | `tools/c-api-inventory/inventory.py` | DONE |
+| RUST-ABI-005 | Adopt `cna_error_get_last_info` for structured error identity | `core.h`, `docs/c-api/ERRORS.md` | `CnaError` carries the CNA error category | behaviour corpus | READY |
+| RUST-ABI-006 | Mutation tests for the new ABI gate and manifest | this repository | a wrong version, arity or prototype fails | verifier mutation suite | READY |
+
+## XNA surface
+
+| ID | Subject | Authority | Target | Tests | Status |
+|---|---|---|---|---|---|
+| RUST-XNA-001 | Measure the complete retained XNA 4.0 corpus | 17 SHA-256-admitted Microsoft assemblies | explicit per-profile inventory | `tools/api-compat/verify.py --profile` | DONE |
+| RUST-XNA-002 | Fix `!0[]` generic-array parsing in the reference extractor | CLR metadata | the Content Pipeline profile measures | pipeline profile run | DONE |
+| RUST-XNA-003 | GamerServices + Avatar + Net: 74 missing types | `xna40-windows-full` profile | strict zero on the complete runtime profile | full-profile verifier | READY |
+| RUST-XNA-004 | Content Pipeline: 125 missing design-time types | `xna40-windows-pipeline` profile | decide whether a design-time profile belongs in this crate | pipeline verifier | READY |
+
+## Behaviour
+
+| ID | Subject | Prior state | Live measurement | Status |
+|---|---|---|---|---|
+| RUST-BEHAVIOR-001 | Unmodified canonical C API build | blocked at `CnaCApiCoreExt.cpp:250` (`49 == 50`) | builds; ABI 0.20.0 moved the renderer maximum to 49 | DONE |
+| RUST-BEHAVIOR-002 | `SoundEffectInstance.Apply3D` with several listeners | `UPSTREAM_CNA_BLOCKED`: CNA refused every count but one | ABI 0.9.0 accepts any positive count | READY |
+| RUST-BEHAVIOR-003 | `VideoPlayer` frame identity and generation | `UPSTREAM_CNA_BLOCKED`: no stable identity | `cna_video_player_get_frame_ext` exists since 0.9.0 | READY |
+| RUST-BEHAVIOR-004 | Repeated `Game` frame callback-context rebinding | `UPSTREAM_CNA_BLOCKED` | re-measure against the live core routes | READY |
+| RUST-BEHAVIOR-005 | `AudioEngine` renderer id and look-ahead | ignored by CNA | re-measure | READY |
+| RUST-BEHAVIOR-006 | `GraphicsDeviceManager.RankDevices` | no candidate-ranking route | re-measure | READY |
+| RUST-BEHAVIOR-007 | Media catalogs, picture tokens and `SavePicture` | `PLATFORM_PENDING` | re-measure | READY |
+| RUST-BEHAVIOR-008 | Visualization spectrum on the dummy backend | `BACKEND_BLOCKED` | unchanged until a real audio backend is qualified | BLOCKED_HARDWARE |
+| RUST-BEHAVIOR-009 | Authored video decode | `BACKEND_BLOCKED`, `ASSET_PENDING` | needs a legal deterministic fixture | BLOCKED_ASSET |
+
+## Extensions
+
+| ID | Subject | Canonical authority | Status |
+|---|---|---|---|
+| RUST-EXT-001 | Renderer selection, availability and fallback chain | `core_ext.h` | READY |
+| RUST-EXT-002 | Logging sink and minimum level | `core_ext.h` | READY |
+| RUST-EXT-003 | Renderer capability report, limits and feature support | `graphics.h`, `graphics_device.h` | READY |
+| RUST-EXT-004 | Post-processing effects: CRT, depth, ASCII | `graphics_ext.h` | READY |
+| RUST-EXT-005 | PBR material and render-pipeline settings | `graphics_ext.h` | READY |
+| RUST-EXT-006 | `.cnb` container: open, metadata, Texture2D, Model | `cnb.h` | READY |
+| RUST-EXT-007 | Device layer: power, locale, clipboard, display info | `devices.h` | READY |
+| RUST-EXT-008 | Modern input: haptics, joystick, text input, cursor | `input_*.h` | READY |
+| RUST-EXT-009 | Sensors: accelerometer, compass, gyroscope | `sensors.h` | READY |
+| RUST-EXT-010 | CNAEXT engine layer, 857 routes | `engine_layer.h` | READY |
+
+## Platform and packaging
+
+| ID | Subject | Target | Status |
+|---|---|---|---|
+| RUST-PLATFORM-001 | Windows dynamic loader | `LoadLibraryW`/`GetProcAddress`, compile-verified | READY |
+| RUST-PLATFORM-002 | macOS loader | already `#[cfg(unix)]`; needs a runtime run | BLOCKED_PLATFORM |
+| RUST-PLATFORM-003 | WebAssembly | re-measure the canonical wasm C ABI route | READY |
+| RUST-PACKAGE-001 | `cargo package` file list, notices, no native binary | clean package | READY |
+| RUST-PACKAGE-002 | MSRV 1.74 evidence | toolchain not installed; source audit only | BLOCKED_PLATFORM |
+| RUST-TEMPLATE-001 | Template against the live artifact | 60/600 frames on ABI 0.20 | READY |
+| RUST-TEMPLATE-002 | Template modern-extension canary | one opt-in smoke route | READY |

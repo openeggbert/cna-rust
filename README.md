@@ -15,7 +15,7 @@ cna::Microsoft::Xna::Framework::*
   -> safe Rust facades
   -> audited private bridge
   -> cna_sys
-  -> CNA ABI 0.7 cna_* symbols
+  -> CNA ABI 0.20 cna_* symbols
   -> CNA C++
 ```
 
@@ -149,11 +149,12 @@ may retain a raw binding. User `UnloadContent` remains exactly once and is
 separate from internal pre-destroy child cleanup. ContentManager owns loaded
 resources, not the native Game.
 
-Canonical CNA HEAD `1bb2145d99ed572dd4eb15009c34e2e5f410fcf0` still fails an
-unmodified C API build at `CnaCApiCoreExt.cpp:250`: the renderer identity
-assertion reduces to `49 == 50`. The CNA checkout was not modified. Runtime
-evidence therefore uses the labelled experimental ABI-0.7 HEADLESS artifact;
-the Rust loader continues to reject ABI 0.8.
+The unmodified canonical CNA checkout now builds its C API. The previous
+milestone's blocker at `CnaCApiCoreExt.cpp:250` -- a renderer identity
+assertion reducing to `49 == 50` -- is exactly what ABI 0.20.0 repaired when it
+removed eleven renderer identities and moved `CNA_GRAPHICS_RENDERER_MAXIMUM`
+from 50 to 49. Runtime evidence uses an out-of-tree HEADLESS build of that
+checkout; see [docs/abi-migration-evidence.md](docs/abi-migration-evidence.md).
 
 | Platform | Status | Evidence |
 |---|---|---|
@@ -165,7 +166,7 @@ the Rust loader continues to reject ABI 0.8.
 
 ## Native setup
 
-Supply a CNA C API library matching ABI 0.7:
+Supply a CNA C API library matching ABI 0.20:
 
 ```text
 CNA_NATIVE_LIBRARY=/absolute/path/to/libcna_c_api.so
