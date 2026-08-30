@@ -1,4 +1,4 @@
-//! Native XNA Storage calls over the reviewed CNA ABI 0.7 slice.
+//! Native XNA Storage calls over the reviewed CNA ABI 0.20 slice.
 
 use core::ffi::c_void;
 

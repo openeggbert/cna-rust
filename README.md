@@ -73,14 +73,16 @@ hierarchy and deliberate CNA extensions.
 - `GraphicsDeviceManager` is Game-associated, publishes the manager/device
   services, retains CNA's Game-owned device, synchronizes preferences, and
   bridges preparing/device lifecycle events without constructing a second
-  device. CNA ABI 0.7 has no candidate-ranking route, so `RankDevices` is an
-  explicit backend blocker.
+  device. Re-measured on ABI 0.20: `runtime_graphics_manager.h` still has no
+  candidate-ranking route, so `RankDevices` remains an explicit backend
+  blocker.
 - Touch/Gesture uses reviewed CNA state, capability, panel, and gesture routes.
   HEADLESS reports no touch hardware and no queued gesture; none is fabricated.
 - Storage maps synchronous CNA selectors into deterministic one-shot Begin/End
   results and routes all container/filesystem/stream work through CNA. Managed
-  path containment closes a qualified ABI-0.7 traversal gap; device/container/
-  stream ownership and disposing callbacks are tested.
+  path containment closes a traversal gap the canonical container routes still
+  do not state; device/container/stream ownership and disposing callbacks are
+  tested.
 - `GamerServicesComponent` participates in normal GameComponent lifecycle
   without expanding the selected profile into Gamer, Guide, Avatar, or network
   services.
@@ -91,7 +93,7 @@ hierarchy and deliberate CNA extensions.
   ABI route is exposed. Six converters accept XNA component strings; six
   deliberately reject string input while retaining value-string output.
 - All nineteen Audio types are complete. SoundEffect, instances, dynamic PCM,
-  microphone facades, and XACT use reviewed ABI-0.7 routes with explicit
+  microphone facades, and XACT use reviewed ABI-0.20 routes with explicit
   ownership and the existing owner-thread FrameworkDispatcher. Multi-listener
   Apply3D reaches its canonical route, with CNA's single-gain-pair mixer as the
   remaining fidelity limit; renderer/look-ahead fidelity and malformed-bank
@@ -100,7 +102,7 @@ hierarchy and deliberate CNA extensions.
 - All 24 Media types are complete as one ownership-safe graph. MediaLibrary,
   seven read-only collection facades, Song, MediaSource, process-global
   MediaPlayer/MediaQueue, owner-thread events, fixed visualization buffers,
-  Video, and VideoPlayer use reviewed CNA ABI-0.7 routes. Catalog population,
+  Video, and VideoPlayer use reviewed CNA ABI-0.20 routes. Catalog population,
   picture providers, decoded video, and assets retain explicit platform,
   backend, or asset qualifications. GetTexture wraps a decoded frame in a
   borrowed `Texture2D` that is never destroyed by Rust and is refused once a
@@ -231,8 +233,8 @@ mapping transforms CLR concepts before comparison; it does not compare raw C#
 syntax to Rust syntax or imply other XNA profiles are selected.
 
 `tools/native-stress/run-sanitized.sh` is an optional ASan/UBSan path for a
-separately instrumented exact ABI-0.7 CNA library. Sanitizer status for this
-run is `not-run`; native crash absence is not allocator-level leak proof.
+separately instrumented exact ABI-0.20 CNA library. Sanitizer status for this
+run is `NOT_RUN`; native crash absence is not allocator-level leak proof.
 
 See the [normative mapping](docs/xna-rust-mapping.md),
 [architecture](docs/architecture.md), [Graphics evidence](docs/graphics-evidence.md),

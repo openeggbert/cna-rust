@@ -19,7 +19,7 @@ mod volume_texture_data_sealed {
     pub trait Sealed {}
 }
 
-/// Safe element contract for the exact ABI-0.7 `Texture3D` transfer route.
+/// Safe element contract for the exact ABI-0.20 `Texture3D` transfer route.
 pub trait Texture3DData: volume_texture_data_sealed::Sealed + Copy + Send + Sync + 'static {
     #[doc(hidden)]
     fn to_color(self) -> Color;

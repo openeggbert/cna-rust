@@ -168,7 +168,7 @@ fn run_inner<G: Game>(game: &mut G, mode: RunMode) -> Result<()> {
     let unsubscribe_result = unsubscribe_events(&mut state);
     let manager_cleanup_result = state.game.game_state().dispose_graphics_device_manager();
 
-    // ABI 0.7 checks for owned children before native Shutdown sends the
+    // ABI 0.20 checks for owned children before native Shutdown sends the
     // user's Exiting/UnloadContent lifecycle callbacks. Release registered
     // native children here without synthesizing a second user callback.
     let content_cleanup_result = state.game.game_state().cleanup_content();
@@ -181,7 +181,7 @@ fn run_inner<G: Game>(game: &mut G, mode: RunMode) -> Result<()> {
 
     // Keep the durable device identity alive while native destruction delivers
     // CNA's one user-visible UnloadContent callback. Native children have
-    // already been released, so the ABI 0.7 ownership precondition is met.
+    // already been released, so the ABI 0.20 ownership precondition is met.
     let destroy_result = native.destroy_game(handle);
     // No native operation is possible after destroy returns (including its
     // failure path). Invalidate exactly once and emit the managed Disposing

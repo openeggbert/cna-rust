@@ -937,7 +937,7 @@ impl GraphicsDeviceManager {
     pub fn RankDevices(&self, foundDevices: &mut Vec<GraphicsDeviceInformation>) -> Result<()> {
         let _ = foundDevices;
         Err(CnaError::UnsupportedRuntime(
-            "CNA ABI 0.7 does not expose GraphicsDeviceManager device-candidate ranking",
+            "CNA ABI 0.20 does not expose GraphicsDeviceManager device-candidate ranking",
         ))
     }
 

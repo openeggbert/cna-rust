@@ -20,7 +20,7 @@ mod cube_texture_data_sealed {
     pub trait Sealed {}
 }
 
-/// Safe element contract for ABI-0.7 cube-texture transfers.
+/// Safe element contract for ABI-0.20 cube-texture transfers.
 ///
 /// CNA currently exposes only exact `Color` texels for this resource family.
 pub trait CubeTextureData: cube_texture_data_sealed::Sealed + Copy + Send + Sync + 'static {

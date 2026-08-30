@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "scope": "Microsoft XNA 4.0 Windows Audio/XACT and Media/Video projection, plus every cna::extensions family",
-  "qualifiedArtifactSha256": "195924825a12290cdd2244fc845e119295de515cf27d1f6b31e1ecc84e93f05d",
+  "qualifiedArtifactSha256": "092b2d80a775f39a6ad872d084bc09492576c82ac33641faeb4a3036c7fc347b",
   "abiVersion": "0.20",
   "rows": [
     {
@@ -321,7 +321,7 @@
         "VERIFIED_NATIVE",
         "PLATFORM_PENDING"
       ],
-      "evidence": "ABI 0.7 compiler/export probes pass on Linux x86-64; other operating-system/architecture binaries were not measured in this run."
+      "evidence": "ABI 0.20 compiler/export probes pass on Linux x86-64; other operating-system/architecture binaries were not measured in this run."
     },
     {
       "capability": "CLR Audio exception delivery",

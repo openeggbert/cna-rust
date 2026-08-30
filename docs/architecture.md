@@ -115,7 +115,7 @@ same provider identity is returned.
 ## Lifecycle and teardown
 
 `Game` is the user lifecycle trait and `GameContext<'callback>` exposes the
-host-owned portion needed during callbacks. CNA ABI 0.7's frame hooks now drive
+host-owned portion needed during callbacks. CNA ABI 0.20's frame hooks now drive
 `Initialize`, `BeginRun`, `BeginDraw`, `EndDraw`, and `EndRun` in addition to
 the original content/update/draw/shutdown callbacks. A measured one-frame run
 has this user-visible order:
@@ -140,7 +140,7 @@ Disposed event
 still proceed. Panic in either ordinary lifecycle callbacks or `BeginDraw` is
 caught before returning through C and becomes `CnaError::Callback`.
 
-CNA ABI 0.7 rejects `cna_game_destroy` while owned child handles remain, but
+CNA ABI 0.20 rejects `cna_game_destroy` while owned child handles remain, but
 CNA itself emits the shutdown lifecycle during destruction. The host therefore
 performs an internal child-release pass after `cna_game_run` and before
 `cna_game_destroy`. That pass invokes neither user `UnloadContent` nor public
@@ -191,7 +191,7 @@ Storage is independent of Game and has strict native ownership:
 CNA synchronously and return a concrete one-shot result retaining state and
 origin identity. Every filesystem and stream operation remains behind CNA;
 `std::fs` is not a backend. Rust validates XNA child-path containment before
-native dispatch because ABI 0.7's `RelativePath` copies valid UTF-8 but does
+native dispatch because ABI 0.20's `RelativePath` copies valid UTF-8 but does
 not enforce all traversal rules. Container Dispose closes streams, observes
 CNA's synchronous Disposing event exactly once, then unregisters/destroys in
 child-first order.
@@ -284,7 +284,7 @@ pre-destroy cleanup do not synthesize the user event.
 `Texture` composes `GraphicsResource`. `Texture2D` completes the selected
 profile's mapped constructors, stream overloads, bounds/format/level metadata,
 generic full/rectangle/mip transfers, PNG/JPEG encoding, and disposal. Data
-routes accept only layouts CNA ABI 0.7 can represent exactly; they validate
+routes accept only layouts CNA ABI 0.20 can represent exactly; they validate
 dimensions, mip/rectangle/window bounds, format/type compatibility, disposed
 parents/children, bad streams, and construction rollback.
 
@@ -474,15 +474,18 @@ VideoPlayer, 20 frame-route, and 50 callback-delivery cycles, including
 wrong-thread retry, stale generations, panic, self-removal, reentrancy, and
 Game recreation. Absence of a crash is not a leak proof.
 `tools/native-stress/run-sanitized.sh` is an optional path requiring a
-separately instrumented exact ABI-0.7 CNA library. Sanitizer status is
+separately instrumented exact ABI-0.20 CNA library. Sanitizer status is
 `not-run`; no sanitizer pass is claimed for the current run.
 
 ## Current blockers and dependency order
 
-Canonical CNA HEAD `1bb2145d99ed572dd4eb15009c34e2e5f410fcf0` still fails
-its unmodified C API build at `CnaCApiCoreExt.cpp:250`: the renderer identity
-assertion reduces to `49 == 50`. Runtime evidence therefore uses the clearly
-labelled experimental ABI-0.7 HEADLESS library.
+The historical unmodified-build blocker is closed. Canonical CNA HEAD
+`1bb2145d99ed572dd4eb15009c34e2e5f410fcf0` failed its C API build at
+`CnaCApiCoreExt.cpp:250`, where the renderer identity assertion reduced to
+`49 == 50`; ABI 0.20.0 removed eleven renderer identities and moved
+`CNA_GRAPHICS_RENDERER_MAXIMUM` to 49, which is exactly that assertion. Runtime
+evidence now uses an out-of-tree build of an unmodified canonical checkout,
+labelled experimental ABI-0.20 HEADLESS.
 
 The selected XNA 4.0 Windows runtime Rust projection is structurally complete:
 all 259 expected Rust types are present and every strict diagnostic is zero.

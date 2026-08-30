@@ -1,4 +1,4 @@
-//! Audited Audio/XACT calls over the canonical CNA ABI 0.7 table.
+//! Audited Audio/XACT calls over the canonical CNA ABI 0.20 table.
 
 use core::ffi::c_void;
 use core::mem::size_of;
@@ -115,7 +115,7 @@ impl AudioApi {
     pub(super) fn load(library: &Library) -> Result<Self> {
         macro_rules! symbol {
             ($name:literal, $ty:ty) => {{
-                // SAFETY: each name and type is copied from the canonical ABI 0.7 header.
+                // SAFETY: each name and type is copied from the canonical ABI 0.20 header.
                 unsafe { library.symbol::<$ty>($name)? }
             }};
         }

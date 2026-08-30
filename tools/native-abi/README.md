@@ -20,21 +20,24 @@ python3 tools/native-abi/verify.py \
   --library /path/to/libcna_c_api.so
 ```
 
-Current reviewed ABI-0.7 evidence is:
+Current reviewed ABI-0.20 evidence is:
 
 ```text
-reviewed functions                   730
-prototype functions checked          730
-prototype type measurements         2492
-layout types                          62
-callback signatures                    7
-constants                            262
-all C/Rust measurements             1028
+reviewed functions                   886
+prototype functions checked          886
+prototype type measurements         3019
+layout types                          71
+callback signatures                    8
+constants                            397
+all C/Rust measurements             1236
 mismatches                             0
 ```
 
-The 730-function slice is intentionally smaller than CNA's 2,861 exported C
-functions. It is a reviewed foundation, not a completeness claim. Every new
-safe native facade route must add its raw declaration and enter this manifest.
-The checked library must report exactly ABI `0x00000700`; ABI 0.8 is not
-accepted implicitly. Current ELF/runtime evidence is Linux x86-64 only.
+The 886-function slice is intentionally smaller than CNA's 4,051 exported C
+functions. It is a reviewed foundation, not a completeness claim; every
+canonical route outside it carries an explicit classification in
+`tools/c-api-inventory/classification.json`. Every new safe native facade route
+must add its raw declaration and enter this manifest. The version gate follows
+CNA's own `0.x` policy from `docs/c-api/ABI_VERSIONING.md`: the checked library
+must report exactly minor 20, because a `0.x` minor bump is a breaking change.
+Current ELF/runtime evidence is Linux x86-64 only.

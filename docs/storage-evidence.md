@@ -30,7 +30,7 @@ wildcard enumeration, all OpenFile forms, stream read/write/seek/length/
 flush/capability operations, and disposal use only canonical
 `cna_storage_*` routes. The Rust layer never bypasses CNA with `std::fs`.
 
-The qualified ABI-0.7 C adapter's `RelativePath` currently validates UTF-8 but
+The qualified ABI-0.20 C adapter's `RelativePath` currently validates UTF-8 but
 does not itself reject parent traversal for every container child route. Rust
 therefore enforces XNA containment before native dispatch. It rejects absolute
 and drive/UNC paths, root escapes, empty child names, and multi-component

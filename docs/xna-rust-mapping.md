@@ -96,7 +96,7 @@ Audio uses the same explicit-context rule. `SoundEffect` and
 `DynamicSoundEffectInstance` constructors, `SoundEffect.FromStream`, the four
 process-global `SoundEffect` settings, microphone enumeration/default lookup,
 `AudioEngine` constructors, and `FrameworkDispatcher.Update` receive
-`game: &GameContext`. CNA ABI 0.7 requires a game handle for ownership or thread
+`game: &GameContext`. CNA ABI 0.20 requires a game handle for ownership or thread
 affinity, while CNA-Rust intentionally has no ambient current-game singleton.
 Calls that can reach native Audio/XACT state return `Result`; the pure
 binary32 sample arithmetic and cached disposed/value properties remain
@@ -163,7 +163,7 @@ they never destroy a parent-owned handle.
 `DynamicSoundEffectInstance : SoundEffectInstance` is projected through the
 crate-root `SoundEffectInstanceBase` contract and one composed instance state;
 there is never a second native owner. `AudioCategory` is a CLR value type, but
-its ABI-0.7 representation is an owned category handle tied to an engine. Its
+its ABI-0.20 representation is an owned category handle tied to an engine. Its
 Rust value is consequently non-`Copy`; `Clone`/equality preserve category value
 semantics by sharing the one safe facade rather than duplicating native
 ownership.
@@ -199,7 +199,7 @@ to Rust `TypeId` and providers to shared typed `Arc` identities; services are
 owned by one game and are never global.
 
 `Game.RunOneFrame` is a strict trait member, while the current native host can
-safely execute it only as one complete owned session. CNA ABI 0.7 retains its
+safely execute it only as one complete owned session. CNA ABI 0.20 retains its
 creation-time callback context and exposes no rebinding route, so arbitrary
 repeated ticks cannot safely retain a borrowed Rust game. The implementation
 must fail explicitly rather than manufacture a `'static` reference. This is a
@@ -342,7 +342,7 @@ The XNA Storage `Begin*`/`End*` pattern maps to a concrete crate-root
 `StorageAsyncResult`, not CLR `IAsyncResult`, a thread pool, or a fabricated
 pending task. A Begin method returns `Result<StorageAsyncResult>`, receives an
 optional one-shot `StorageAsyncCallback`, and retains an optional
-`StorageAsyncState` (`Arc<dyn Any + Send + Sync>`). CNA 0.7 completes these
+`StorageAsyncState` (`Arc<dyn Any + Send + Sync>`). CNA 0.20 completes these
 operations synchronously, so the callback runs exactly once before Begin
 returns. The result still records completion and enforces the observable CLR
 End rules: End is one-shot, a result is valid only for its originating

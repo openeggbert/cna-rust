@@ -1048,7 +1048,7 @@ impl IndexBuffer {
         validate_options(options, self.dynamic)?;
         if offset != 0 && options != SetDataOptions::None {
             return Err(CnaError::InvalidInput(
-                "CNA ABI 0.7 cannot combine an index-buffer byte offset with Discard or NoOverwrite",
+                "CNA ABI 0.20 cannot combine an index-buffer byte offset with Discard or NoOverwrite",
             ));
         }
         let transfer = sys::CNA_IndexBufferTransfer {
@@ -1099,7 +1099,7 @@ impl IndexBuffer {
         let range_len = range.len();
         if offset != 0 {
             return Err(CnaError::InvalidInput(
-                "CNA ABI 0.7 index readback cannot represent a nonzero buffer offset",
+                "CNA ABI 0.20 index readback cannot represent a nonzero buffer offset",
             ));
         }
         let transfer = sys::CNA_IndexBufferTransfer {

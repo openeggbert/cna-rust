@@ -32,7 +32,7 @@ mod back_buffer_data_sealed {
     pub trait Sealed {}
 }
 
-/// Safe element contract for the ABI-0.7 RGBA8 back-buffer transfer route.
+/// Safe element contract for the ABI-0.20 RGBA8 back-buffer transfer route.
 ///
 /// The trait is sealed because CNA currently guarantees only XNA `Color`
 /// readback. Broader XNA element formats are rejected structurally instead of
@@ -1675,7 +1675,7 @@ impl GraphicsDevice {
             || overrideWindowHandle != WindowHandle::default()
         {
             return Err(CnaError::UnsupportedRuntime(
-                "CNA ABI 0.7 exposes only whole-backbuffer presentation to the current window",
+                "CNA ABI 0.20 exposes only whole-backbuffer presentation to the current window",
             ));
         }
         self.PresentWithNoArguments()

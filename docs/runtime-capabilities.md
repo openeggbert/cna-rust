@@ -5,7 +5,7 @@ Generated from `tools/runtime-capabilities/capabilities.json`; do not edit by ha
 Scope: Microsoft XNA 4.0 Windows Audio/XACT and Media/Video projection, plus every cna::extensions family
 
 Qualified CNA ABI: `0.20`
-Qualified artifact SHA-256: `195924825a12290cdd2244fc845e119295de515cf27d1f6b31e1ecc84e93f05d`
+Qualified artifact SHA-256: `092b2d80a775f39a6ad872d084bc09492576c82ac33641faeb4a3036c7fc347b`
 
 | Capability | Strict | Runtime status | Evidence |
 |---|---:|---|---|
@@ -42,7 +42,7 @@ Qualified artifact SHA-256: `195924825a12290cdd2244fc845e119295de515cf27d1f6b31e
 | Video decode | complete | `BACKEND_BLOCKED`, `ASSET_PENDING` | HEADLESS accepts the metadata/control object but produces no decoded frame for the deliberately missing project-authored media path. No proprietary asset or synthetic pixels are used. |
 | VideoPlayer.GetTexture | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE`, `BACKEND_BLOCKED` | GetTexture now calls cna_video_player_get_frame_ext and wraps a decoded frame in a borrowed Texture2D that never destroys the handle. HEADLESS decodes nothing, so the measured answer is the canonical no-frame Ok(None) rather than a fabricated texture; a real decoder backend is what remains to exercise the wrapped path. |
 | Video frame texture lifetime | complete | `VERIFIED_MANAGED`, `VERIFIED_NATIVE` | CNA's frame texture is valid only until the next call on its player, which the Rust view models by counting player calls: a stale frame Texture2D refuses in Rust one call before CNA would answer INVALID_HANDLE, and Dispose and Drop both invalidate outstanding borrows. The monotonic frame generation and presentation time are published as cna::extensions::media, never inside the strict XNA hierarchy. |
-| Native ABI platform coverage | complete | `VERIFIED_NATIVE`, `PLATFORM_PENDING` | ABI 0.7 compiler/export probes pass on Linux x86-64; other operating-system/architecture binaries were not measured in this run. |
+| Native ABI platform coverage | complete | `VERIFIED_NATIVE`, `PLATFORM_PENDING` | ABI 0.20 compiler/export probes pass on Linux x86-64; other operating-system/architecture binaries were not measured in this run. |
 | CLR Audio exception delivery | complete | `VERIFIED_MANAGED`, `LANGUAGE_MAPPING_LIMITATION` | The three public exception identities are projected as marker/error values; ordinary Rust operations use Result<T, CnaError> per the established mapping instead of CLR throw semantics. |
 
 `strictComplete` records API/ownership implementation completeness; it does not upgrade pending or blocked runtime semantics.
