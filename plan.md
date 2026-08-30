@@ -80,6 +80,13 @@ contract exactly: the only diagnostic in any wider profile is `MISSING_TYPE`.
 The 74-type runtime gap is GamerServices, Avatar and Net; the 125-type gap is
 the design-time Content Pipeline.
 
+Measurement is profile-scoped. A Rust type some other retained XNA assembly
+declares belongs to a profile this run is not measuring and is not a
+diagnostic; `UNEXPECTED_TYPE` therefore means what it should -- a type **no**
+Microsoft XNA 4.0 assembly declares. That is what lets a wider profile be
+implemented incrementally without the selected profile's strict gate reporting
+the new types as inventions.
+
 No Windows Phone or Xbox 360 reference assembly is present on this host, so
 those profiles do not exist here rather than being claimed untested.
 

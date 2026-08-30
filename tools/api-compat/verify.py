@@ -17,6 +17,11 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE = ROOT / "tools/api-compat/profiles/xna40-windows-runtime.json"
+# Every retained Microsoft XNA 4.0 assembly on this host. It defines what
+# "unexpected" means: a Rust type declared by *some* XNA assembly belongs to a
+# profile this run is not measuring, while a type no XNA assembly declares is
+# an invention and always a diagnostic.
+SCOPE_PROFILE = ROOT / "tools/api-compat/profiles/xna40-windows-superset.json"
 RULES = ROOT / "tools/api-compat/mapping-rules.json"
 EXTRACTOR = ROOT / "tools/api-compat/extractor/XnaContractExtractor.cs"
 
@@ -28,6 +33,11 @@ def arguments() -> argparse.Namespace:
         "--profile",
         default=PROFILE,
         help="reference profile to measure; defaults to the selected XNA 4.0 Windows runtime",
+    )
+    parser.add_argument(
+        "--scope-profile",
+        default=SCOPE_PROFILE,
+        help="profile defining which Rust types belong to another XNA profile rather than being unexpected",
     )
     parser.add_argument("--rustdoc")
     parser.add_argument("--output")
@@ -53,7 +63,9 @@ def validate_references(directory: Path, profile: dict) -> None:
 
 def extract_reference(directory: Path, profile: dict, temporary: Path) -> dict:
     executable = temporary / "xna-contract.exe"
-    output = temporary / "xna-contract.json"
+    # One run per profile, so a second profile in the same run cannot read the
+    # first one's output.
+    output = temporary / f"xna-contract-{len(profile['referenceAssemblies'])}.json"
     run(["mcs", "-r:System.Web.Extensions", f"-out:{executable}", str(EXTRACTOR)])
     run(["mono", str(executable), str(directory), str(output), *profile["referenceAssemblies"]])
     return json.loads(output.read_text(encoding="utf-8"))
@@ -920,6 +932,25 @@ def mapped_members(contract_type: dict, rules: dict, reference_types: dict[str, 
     return result
 
 
+def reference_type_paths(reference: dict, rules: dict) -> set[str]:
+    """Rust paths for every type a reference profile declares, names only.
+
+    This deliberately mirrors the path formula in `expected_contract` without
+    building member contracts: the caller needs to know which Rust types some
+    XNA assembly declares, not what their members should be.
+    """
+    renames = rules["genericTypeRenames"]
+    return {
+        "cna::"
+        + renames.get(value["name"], value["name"])
+        .replace("+", "::")
+        .replace(".", "::")
+        .replace("`1", "")
+        .replace("`2", "")
+        for value in reference["types"]
+    }
+
+
 def expected_contract(reference: dict, rules: dict) -> dict[str, dict]:
     expected: dict[str, dict] = {}
     reference_types = {value["name"]: value for value in reference["types"]}
@@ -1250,11 +1281,17 @@ def compare_relations(
         ))
 
 
-def compare(expected: dict[str, dict], actual: dict[str, dict], rules: dict) -> list[dict]:
+def compare(
+    expected: dict[str, dict],
+    actual: dict[str, dict],
+    rules: dict,
+    out_of_scope: set[str] | None = None,
+) -> list[dict]:
     findings: list[dict] = []
+    out_of_scope = out_of_scope or set()
     for name in sorted(expected.keys() - actual.keys()):
         findings.append(finding("MISSING_TYPE", name))
-    for name in sorted(actual.keys() - expected.keys()):
+    for name in sorted(actual.keys() - expected.keys() - out_of_scope):
         findings.append(finding("UNEXPECTED_TYPE", name))
     for name in sorted(expected.keys() & actual.keys()):
         wanted, present = expected[name], actual[name]
@@ -1360,8 +1397,16 @@ def main() -> int:
             validate_references(reference_dir, profile)
             reference = extract_reference(reference_dir, profile, temporary)
             expected = expected_contract(reference, rules)
+            scope_path = Path(args.scope_profile)
+            if scope_path.is_file() and scope_path != Path(args.profile):
+                scope = json.loads(scope_path.read_text(encoding="utf-8"))
+                validate_references(reference_dir, scope)
+                scope_reference = extract_reference(reference_dir, scope, temporary)
+                out_of_scope = reference_type_paths(scope_reference, rules) - set(expected)
+            else:
+                out_of_scope = set()
             probe_flag_values(expected, actual, temporary)
-            findings = compare(expected, actual, rules)
+            findings = compare(expected, actual, rules, out_of_scope)
         counts = collections.Counter(value["code"] for value in findings)
         category_counts = collections.Counter(
             category for value in findings for category in value.get("categories", [value["code"]])
@@ -1382,6 +1427,7 @@ def main() -> int:
             "referenceMembers": None if args.leak_only else sum(len(t["members"]) for t in reference["types"]),
             "expectedRustTypes": len(expected),
             "actualRustTypes": len(actual),
+            "outOfProfileRustTypes": 0 if args.leak_only else len(out_of_scope & set(actual)),
             "totalDiagnostics": len(findings),
             "counts": dict(sorted(counts.items())),
             "categoryCounts": {
