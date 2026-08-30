@@ -66,7 +66,8 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 |---|---|---|---|
 | RUST-PLATFORM-001 | Windows dynamic loader | source complete; no Windows Rust target on this host, so `COMPILE_NOT_VERIFIED_PLATFORM` | DONE |
 | RUST-PLATFORM-002 | macOS loader | already `#[cfg(unix)]`; needs a runtime run | BLOCKED_PLATFORM |
-| RUST-PLATFORM-003 | WebAssembly | re-measure the canonical wasm C ABI route | READY |
+| RUST-PLATFORM-003 | WebAssembly | re-measured: CNA's wasm C ABI exists (4,053 names); Rust has no wasm target here and the binding has no static-linkage mode | BLOCKED_PLATFORM |
+| RUST-PLATFORM-004 | Static-linkage mode so `Native` can be filled from `extern "C"` declarations | the prerequisite for any WebAssembly route | READY |
 | RUST-PACKAGE-001 | `cargo package` file list, notices, no native binary | LICENSE and NOTICE.md now ship with each crate; an outside consumer builds from the packaged file set alone | DONE |
 | RUST-PACKAGE-003 | `cargo package -p cna-rust` needs `cna-rust-sys` published first | publish order recorded | BLOCKED_UPSTREAM |
 | RUST-PACKAGE-002 | MSRV 1.74 evidence | toolchain not installed; source audit only | BLOCKED_PLATFORM |

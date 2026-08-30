@@ -161,8 +161,10 @@ checkout; see [docs/abi-migration-evidence.md](docs/abi-migration-evidence.md).
 | Linux x86-64, HEADLESS | Experimental runtime verified | 60/600 native frames with the qualification above |
 | Windows | Loader implemented, not compiled here | `LoadLibraryW`/`GetProcAddress`/`FreeLibrary` are in the source. No Windows Rust target is installed on this host, so nothing here compiles or runs a Windows binary. The path encoding is unit-tested on every host, and the loader body type-checks on Linux against stubbed OS pieces. |
 | macOS | Loader shared with Unix, not run | The `#[cfg(unix)]` loader covers macOS in source; no macOS host was available |
-| WebAssembly | Unsupported | No compatible CNA WASM C ABI verified |
+| WebAssembly | Blocked in this binding | CNA's WebAssembly C ABI exists and is current; the Rust side has no wasm target installed here and no static-linkage mode. See [docs/platform-evidence.md](docs/platform-evidence.md) |
 | Android | Unsupported | No native lifecycle/window/input integration verified |
+
+Full platform evidence: [docs/platform-evidence.md](docs/platform-evidence.md).
 
 ## Native setup
 
