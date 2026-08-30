@@ -13,6 +13,7 @@ mod graphics;
 mod input;
 mod loader;
 pub(crate) mod media;
+pub(crate) mod runtime;
 mod storage;
 mod window;
 

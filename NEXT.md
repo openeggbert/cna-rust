@@ -16,12 +16,12 @@ LIBRARY_EXPORTS=4051
 
 REVIEWED_SYMBOLS_REMOVED=0
 REVIEWED_SYMBOLS_ARITY_CHANGED=0
-ABI_FUNCTIONS=732
-PROTOTYPE_TYPE_POSITIONS=2499
-C_RUST_MEASUREMENTS=1038
-LAYOUTS=63
+ABI_FUNCTIONS=767
+PROTOTYPE_TYPE_POSITIONS=2598
+C_RUST_MEASUREMENTS=1066
+LAYOUTS=64
 CALLBACKS=7
-CONSTANTS=263
+CONSTANTS=285
 ABI_FINDINGS=0
 
 CANONICAL_ROUTES=4051
@@ -33,6 +33,11 @@ EXPECTED_RUST_TYPES=259
 ACTUAL_RUST_TYPES=259
 TOTAL_DIAGNOSTICS=0
 ```
+
+The first modern `cna::extensions` family is complete: CNA's process-level
+runtime identity and renderer selection, 35 canonical routes with a native
+regression test and an opt-in template canary. See
+[docs/extensions.md](docs/extensions.md).
 
 Two historical `UPSTREAM_CNA_BLOCKED` rows are closed by measurement rather
 than by assertion: multi-listener `Apply3D` now reaches its canonical route,
@@ -53,9 +58,8 @@ builds its C API, because ABI 0.20.0 is exactly the version that moved
 Work the backlog in [docs/backlog.md](docs/backlog.md). The highest-value ready
 items, in order:
 
-1. Implement the first modern `cna::extensions` family from `core_ext.h` and
-   `graphics.h` capability reporting, which is safe, additive and outside the
-   strict XNA hierarchy.
+1. Continue `cna::extensions`: logging sink and level, renderer capability
+   reporting, then the `.cnb` content vertical slice.
 2. Close the 74-type `xna40-windows-full` gap: GamerServices, Avatar and Net.
 3. Windows loader source support, packaging qualification, and the template's
    modern-extension canary.

@@ -1,0 +1,160 @@
+//! Audited CNA runtime-identity and renderer-selection calls.
+//!
+//! Every route here is process-global upstream and needs no `Game`: CNA's
+//! renderer choice has to be made before the first graphics device exists,
+//! which is before a game has anywhere natural to keep it.
+
+use cna_sys as sys;
+
+use crate::error::{CnaError, Result};
+
+use super::loader::Library;
+
+#[derive(Debug)]
+pub(crate) struct RuntimeApi {
+    pub(crate) platform_get_current: sys::cna_platform_get_current_fn,
+    pub(crate) platform_get_is_apple: sys::cna_platform_get_is_apple_ext_fn,
+    pub(crate) platform_get_is_mobile: sys::cna_platform_get_is_mobile_ext_fn,
+    pub(crate) platform_get_name_size: sys::cna_platform_get_current_name_size_ext_fn,
+    pub(crate) platform_copy_name: sys::cna_platform_copy_current_name_ext_fn,
+    pub(crate) desktop_os_get_current: sys::cna_desktop_os_get_current_fn,
+    pub(crate) backend_get_category: sys::cna_graphics_backend_get_category_fn,
+    pub(crate) backend_get_current_category: sys::cna_graphics_backend_get_current_category_fn,
+    pub(crate) backend_category_name_size: sys::cna_graphics_backend_category_get_name_size_fn,
+    pub(crate) backend_category_copy_name: sys::cna_graphics_backend_category_copy_name_fn,
+    pub(crate) backend_get_maturity: sys::cna_graphics_backend_get_maturity_fn,
+    pub(crate) backend_get_current_maturity: sys::cna_graphics_backend_get_current_maturity_fn,
+    pub(crate) backend_maturity_name_size: sys::cna_graphics_backend_maturity_get_name_size_fn,
+    pub(crate) backend_maturity_copy_name: sys::cna_graphics_backend_maturity_copy_name_fn,
+    pub(crate) renderer_set_preferred: sys::cna_graphics_renderer_set_preferred_ext_fn,
+    pub(crate) renderer_set_preferred_by_name:
+        sys::cna_graphics_renderer_set_preferred_by_name_ext_fn,
+    pub(crate) renderer_get_selected: sys::cna_graphics_renderer_get_selected_ext_fn,
+    pub(crate) renderer_get_active: sys::cna_graphics_renderer_get_active_ext_fn,
+    pub(crate) renderer_get_is_latched: sys::cna_graphics_renderer_get_is_latched_ext_fn,
+    pub(crate) renderer_available_count: sys::cna_graphics_renderer_get_available_count_ext_fn,
+    pub(crate) renderer_copy_available: sys::cna_graphics_renderer_copy_available_ext_fn,
+    pub(crate) renderer_get_is_available: sys::cna_graphics_renderer_get_is_available_ext_fn,
+    pub(crate) renderer_set_fallback_chain: sys::cna_graphics_renderer_set_fallback_chain_ext_fn,
+    pub(crate) renderer_set_automatic_fallback:
+        sys::cna_graphics_renderer_set_automatic_fallback_ext_fn,
+    pub(crate) renderer_get_automatic_fallback:
+        sys::cna_graphics_renderer_get_automatic_fallback_ext_fn,
+    pub(crate) renderer_fallback_count: sys::cna_graphics_renderer_get_fallback_count_ext_fn,
+    pub(crate) renderer_fallback_at: sys::cna_graphics_renderer_get_fallback_at_ext_fn,
+    pub(crate) renderer_fallback_message_size:
+        sys::cna_graphics_renderer_fallback_get_message_size_ext_fn,
+    pub(crate) renderer_fallback_copy_message:
+        sys::cna_graphics_renderer_fallback_copy_message_ext_fn,
+    pub(crate) renderer_fallback_reason_name_size:
+        sys::cna_graphics_renderer_fallback_reason_get_name_size_ext_fn,
+    pub(crate) renderer_fallback_reason_copy_name:
+        sys::cna_graphics_renderer_fallback_reason_copy_name_ext_fn,
+    pub(crate) renderer_try_parse_name: sys::cna_graphics_renderer_try_parse_name_ext_fn,
+    pub(crate) renderer_get_current_type: sys::cna_graphics_renderer_get_current_type_fn,
+    pub(crate) renderer_current_name_size: sys::cna_graphics_renderer_get_current_name_size_fn,
+    pub(crate) renderer_copy_current_name: sys::cna_graphics_renderer_copy_current_name_fn,
+}
+
+impl RuntimeApi {
+    pub(super) fn load(library: &Library) -> Result<Self> {
+        macro_rules! symbol {
+            ($name:literal, $ty:ty) => {{
+                // SAFETY: each name and type is derived from the canonical header
+                // declaration by tools/native-abi/generate.py and re-verified by
+                // tools/native-abi/verify.py against Clang's view of that header.
+                unsafe { library.symbol::<$ty>($name)? }
+            }};
+        }
+        Ok(Self {
+            platform_get_current: symbol!("cna_platform_get_current", _),
+            platform_get_is_apple: symbol!("cna_platform_get_is_apple_ext", _),
+            platform_get_is_mobile: symbol!("cna_platform_get_is_mobile_ext", _),
+            platform_get_name_size: symbol!("cna_platform_get_current_name_size_ext", _),
+            platform_copy_name: symbol!("cna_platform_copy_current_name_ext", _),
+            desktop_os_get_current: symbol!("cna_desktop_os_get_current", _),
+            backend_get_category: symbol!("cna_graphics_backend_get_category", _),
+            backend_get_current_category: symbol!("cna_graphics_backend_get_current_category", _),
+            backend_category_name_size: symbol!("cna_graphics_backend_category_get_name_size", _),
+            backend_category_copy_name: symbol!("cna_graphics_backend_category_copy_name", _),
+            backend_get_maturity: symbol!("cna_graphics_backend_get_maturity", _),
+            backend_get_current_maturity: symbol!("cna_graphics_backend_get_current_maturity", _),
+            backend_maturity_name_size: symbol!("cna_graphics_backend_maturity_get_name_size", _),
+            backend_maturity_copy_name: symbol!("cna_graphics_backend_maturity_copy_name", _),
+            renderer_set_preferred: symbol!("cna_graphics_renderer_set_preferred_ext", _),
+            renderer_set_preferred_by_name: symbol!(
+                "cna_graphics_renderer_set_preferred_by_name_ext",
+                _
+            ),
+            renderer_get_selected: symbol!("cna_graphics_renderer_get_selected_ext", _),
+            renderer_get_active: symbol!("cna_graphics_renderer_get_active_ext", _),
+            renderer_get_is_latched: symbol!("cna_graphics_renderer_get_is_latched_ext", _),
+            renderer_available_count: symbol!("cna_graphics_renderer_get_available_count_ext", _),
+            renderer_copy_available: symbol!("cna_graphics_renderer_copy_available_ext", _),
+            renderer_get_is_available: symbol!("cna_graphics_renderer_get_is_available_ext", _),
+            renderer_set_fallback_chain: symbol!(
+                "cna_graphics_renderer_set_fallback_chain_ext",
+                _
+            ),
+            renderer_set_automatic_fallback: symbol!(
+                "cna_graphics_renderer_set_automatic_fallback_ext",
+                _
+            ),
+            renderer_get_automatic_fallback: symbol!(
+                "cna_graphics_renderer_get_automatic_fallback_ext",
+                _
+            ),
+            renderer_fallback_count: symbol!("cna_graphics_renderer_get_fallback_count_ext", _),
+            renderer_fallback_at: symbol!("cna_graphics_renderer_get_fallback_at_ext", _),
+            renderer_fallback_message_size: symbol!(
+                "cna_graphics_renderer_fallback_get_message_size_ext",
+                _
+            ),
+            renderer_fallback_copy_message: symbol!(
+                "cna_graphics_renderer_fallback_copy_message_ext",
+                _
+            ),
+            renderer_fallback_reason_name_size: symbol!(
+                "cna_graphics_renderer_fallback_reason_get_name_size_ext",
+                _
+            ),
+            renderer_fallback_reason_copy_name: symbol!(
+                "cna_graphics_renderer_fallback_reason_copy_name_ext",
+                _
+            ),
+            renderer_try_parse_name: symbol!("cna_graphics_renderer_try_parse_name_ext", _),
+            renderer_get_current_type: symbol!("cna_graphics_renderer_get_current_type", _),
+            renderer_current_name_size: symbol!("cna_graphics_renderer_get_current_name_size", _),
+            renderer_copy_current_name: symbol!("cna_graphics_renderer_copy_current_name", _),
+        })
+    }
+}
+
+/// Reads a CNA UTF-8 string through its canonical size/copy pair.
+pub(crate) fn read_string(
+    check: impl Fn(sys::CNA_Result) -> Result<()>,
+    size: impl Fn(*mut u64) -> sys::CNA_Result,
+    copy: impl Fn(*mut core::ffi::c_char, u64, *mut u64) -> sys::CNA_Result,
+) -> Result<String> {
+    let mut bytes = 0_u64;
+    check(size(&mut bytes))?;
+    let capacity =
+        usize::try_from(bytes).map_err(|_| CnaError::InvalidInput("CNA text is too large"))?;
+    if capacity == 0 {
+        return Ok(String::new());
+    }
+    let mut buffer = vec![0_u8; capacity];
+    let mut written = 0_u64;
+    check(copy(
+        buffer.as_mut_ptr().cast::<core::ffi::c_char>(),
+        bytes,
+        &mut written,
+    ))?;
+    let written =
+        usize::try_from(written).map_err(|_| CnaError::InvalidInput("CNA text is too large"))?;
+    buffer.truncate(written.min(capacity));
+    while buffer.last() == Some(&0) {
+        buffer.pop();
+    }
+    String::from_utf8(buffer).map_err(|_| CnaError::InvalidInput("CNA text is not valid UTF-8"))
+}

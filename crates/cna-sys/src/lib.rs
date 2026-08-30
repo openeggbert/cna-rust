@@ -80,6 +80,31 @@ pub const CNA_VIDEO_SOUNDTRACK_TYPE_DIALOG: CNA_VideoSoundtrackType = 1;
 pub const CNA_VIDEO_SOUNDTRACK_TYPE_MUSIC_AND_DIALOG: CNA_VideoSoundtrackType = 2;
 pub const CNA_VISUALIZATION_DATA_SIZE: u32 = 256;
 pub const CNA_VIDEO_FRAME_EXT_STRUCT_VERSION: u32 = 1;
+pub const CNA_GRAPHICS_RENDERER_FALLBACK_RECORD_STRUCT_VERSION: u32 = 1;
+pub const CNA_PLATFORM_DESKTOP: CNA_Platform = 0;
+pub const CNA_PLATFORM_ANDROID: CNA_Platform = 1;
+pub const CNA_PLATFORM_IOS: CNA_Platform = 2;
+pub const CNA_PLATFORM_WEB: CNA_Platform = 3;
+pub const CNA_DESKTOP_OS_WINDOWS: CNA_DesktopOS = 0;
+pub const CNA_DESKTOP_OS_LINUX: CNA_DesktopOS = 1;
+pub const CNA_DESKTOP_OS_MACOSX: CNA_DesktopOS = 2;
+pub const CNA_DESKTOP_OS_OTHER: CNA_DesktopOS = 3;
+pub const CNA_GRAPHICS_BACKEND_CATEGORY_NATIVE: CNA_GraphicsBackendCategory = 0;
+pub const CNA_GRAPHICS_BACKEND_CATEGORY_TRANSLATION_LAYER: CNA_GraphicsBackendCategory = 1;
+pub const CNA_GRAPHICS_BACKEND_CATEGORY_SOFTWARE: CNA_GraphicsBackendCategory = 2;
+pub const CNA_GRAPHICS_BACKEND_CATEGORY_WEB: CNA_GraphicsBackendCategory = 3;
+pub const CNA_GRAPHICS_BACKEND_CATEGORY_DIAGNOSTIC: CNA_GraphicsBackendCategory = 4;
+pub const CNA_GRAPHICS_BACKEND_MATURITY_PRODUCTION: CNA_GraphicsBackendMaturity = 0;
+pub const CNA_GRAPHICS_BACKEND_MATURITY_SUPPORTED: CNA_GraphicsBackendMaturity = 1;
+pub const CNA_GRAPHICS_BACKEND_MATURITY_EXPERIMENTAL: CNA_GraphicsBackendMaturity = 2;
+pub const CNA_GRAPHICS_BACKEND_MATURITY_HISTORICAL: CNA_GraphicsBackendMaturity = 3;
+pub const CNA_GRAPHICS_BACKEND_MATURITY_DEPRECATED: CNA_GraphicsBackendMaturity = 4;
+pub const CNA_GRAPHICS_RENDERER_FALLBACK_NOT_COMPILED_IN: CNA_GraphicsRendererFallbackReason = 0;
+pub const CNA_GRAPHICS_RENDERER_FALLBACK_PROBE_UNAVAILABLE: CNA_GraphicsRendererFallbackReason = 1;
+pub const CNA_GRAPHICS_RENDERER_FALLBACK_INITIALIZATION_FAILED: CNA_GraphicsRendererFallbackReason =
+    2;
+pub const CNA_GRAPHICS_RENDERER_FALLBACK_WINDOW_KIND_CONFLICT: CNA_GraphicsRendererFallbackReason =
+    3;
 pub const CNA_DISPLAY_ORIENTATION_DEFAULT: CNA_DisplayOrientation = 0;
 pub const CNA_DISPLAY_ORIENTATION_LANDSCAPE_LEFT: CNA_DisplayOrientation = 1;
 pub const CNA_DISPLAY_ORIENTATION_LANDSCAPE_RIGHT: CNA_DisplayOrientation = 2;
@@ -399,6 +424,11 @@ pub type CNA_ErrorCategory = u32;
 pub type CNA_GraphicsCapability = u32;
 pub type CNA_GraphicsCapabilityFlags = u64;
 pub type CNA_GraphicsRendererType = u32;
+pub type CNA_GraphicsBackendCategory = u32;
+pub type CNA_GraphicsBackendMaturity = u32;
+pub type CNA_GraphicsRendererFallbackReason = u32;
+pub type CNA_Platform = u32;
+pub type CNA_DesktopOS = u32;
 pub type CNA_SurfaceFormat = u32;
 pub type CNA_TextureDataType = u32;
 pub type CNA_TextureImageFormat = u32;
@@ -1081,6 +1111,15 @@ pub struct CNA_RendererInfo {
     pub capability_flags: CNA_GraphicsCapabilityFlags,
     pub renderer_type: CNA_GraphicsRendererType,
     pub max_texture_dimension: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_GraphicsRendererFallbackRecord {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub r#type: CNA_GraphicsRendererType,
+    pub reason: CNA_GraphicsRendererFallbackReason,
 }
 
 #[repr(C)]
@@ -3658,3 +3697,101 @@ mod layout_tests {
         );
     }
 }
+
+// --- CNA runtime identity and renderer selection (core_ext.h) ---
+
+pub type cna_platform_get_current_fn = unsafe extern "C" fn(*mut CNA_Platform) -> CNA_Result;
+pub type cna_platform_get_is_apple_ext_fn = unsafe extern "C" fn(*mut CNA_Bool) -> CNA_Result;
+pub type cna_platform_get_is_mobile_ext_fn = unsafe extern "C" fn(*mut CNA_Bool) -> CNA_Result;
+pub type cna_platform_get_current_name_size_ext_fn = unsafe extern "C" fn(*mut u64) -> CNA_Result;
+pub type cna_platform_copy_current_name_ext_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_desktop_os_get_current_fn = unsafe extern "C" fn(*mut CNA_DesktopOS) -> CNA_Result;
+pub type cna_graphics_backend_get_category_fn = unsafe extern "C" fn(
+    CNA_GraphicsRendererType, *mut CNA_GraphicsBackendCategory,
+) -> CNA_Result;
+pub type cna_graphics_backend_get_current_category_fn = unsafe extern "C" fn(
+    *mut CNA_GraphicsBackendCategory,
+) -> CNA_Result;
+pub type cna_graphics_backend_category_get_name_size_fn = unsafe extern "C" fn(
+    CNA_GraphicsBackendCategory, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_backend_category_copy_name_fn = unsafe extern "C" fn(
+    CNA_GraphicsBackendCategory, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_backend_get_maturity_fn = unsafe extern "C" fn(
+    CNA_GraphicsRendererType, *mut CNA_GraphicsBackendMaturity,
+) -> CNA_Result;
+pub type cna_graphics_backend_get_current_maturity_fn = unsafe extern "C" fn(
+    *mut CNA_GraphicsBackendMaturity,
+) -> CNA_Result;
+pub type cna_graphics_backend_maturity_get_name_size_fn = unsafe extern "C" fn(
+    CNA_GraphicsBackendMaturity, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_backend_maturity_copy_name_fn = unsafe extern "C" fn(
+    CNA_GraphicsBackendMaturity, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_renderer_set_preferred_ext_fn = unsafe extern "C" fn(
+    CNA_GraphicsRendererType,
+) -> CNA_Result;
+pub type cna_graphics_renderer_set_preferred_by_name_ext_fn = unsafe extern "C" fn(
+    CNA_StringView,
+) -> CNA_Result;
+pub type cna_graphics_renderer_get_selected_ext_fn = unsafe extern "C" fn(
+    *mut CNA_GraphicsRendererType,
+) -> CNA_Result;
+pub type cna_graphics_renderer_get_active_ext_fn = unsafe extern "C" fn(
+    *mut CNA_GraphicsRendererType,
+) -> CNA_Result;
+pub type cna_graphics_renderer_get_is_latched_ext_fn = unsafe extern "C" fn(
+    *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_graphics_renderer_get_available_count_ext_fn = unsafe extern "C" fn(
+    *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_renderer_copy_available_ext_fn = unsafe extern "C" fn(
+    *mut CNA_GraphicsRendererType, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_renderer_get_is_available_ext_fn = unsafe extern "C" fn(
+    CNA_GraphicsRendererType, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_graphics_renderer_set_fallback_chain_ext_fn = unsafe extern "C" fn(
+    *const CNA_GraphicsRendererType, u64,
+) -> CNA_Result;
+pub type cna_graphics_renderer_set_automatic_fallback_ext_fn = unsafe extern "C" fn(
+    CNA_Bool,
+) -> CNA_Result;
+pub type cna_graphics_renderer_get_automatic_fallback_ext_fn = unsafe extern "C" fn(
+    *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_graphics_renderer_get_fallback_count_ext_fn = unsafe extern "C" fn(
+    *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_renderer_get_fallback_at_ext_fn = unsafe extern "C" fn(
+    u64, *mut CNA_GraphicsRendererFallbackRecord,
+) -> CNA_Result;
+pub type cna_graphics_renderer_fallback_get_message_size_ext_fn = unsafe extern "C" fn(
+    u64, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_renderer_fallback_copy_message_ext_fn = unsafe extern "C" fn(
+    u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_renderer_fallback_reason_get_name_size_ext_fn = unsafe extern "C" fn(
+    CNA_GraphicsRendererFallbackReason, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_renderer_fallback_reason_copy_name_ext_fn = unsafe extern "C" fn(
+    CNA_GraphicsRendererFallbackReason, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_renderer_try_parse_name_ext_fn = unsafe extern "C" fn(
+    CNA_StringView, *mut CNA_GraphicsRendererType, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_graphics_renderer_get_current_type_fn = unsafe extern "C" fn(
+    *mut CNA_GraphicsRendererType,
+) -> CNA_Result;
+pub type cna_graphics_renderer_get_current_name_size_fn = unsafe extern "C" fn(
+    *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_renderer_copy_current_name_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;

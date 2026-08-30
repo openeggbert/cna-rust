@@ -256,6 +256,15 @@ def abi_probes(cna_root: Path, manifest: dict) -> tuple[dict[str, int], dict[str
             f"[dependencies]\ncna_sys = {{ package = \"cna-rust-sys\", path = {json.dumps(str(ROOT / 'crates/cna-sys'))} }}\n",
             encoding="utf-8",
         )
+        # A canonical field may spell a Rust keyword; `type` on the renderer
+        # fallback record is the current case. The probe needs the raw form.
+        keywords = {
+            "type", "ref", "match", "move", "box", "fn", "impl", "mod", "self",
+            "as", "in", "loop", "static", "struct", "trait", "use", "where",
+        }
+        def rust_field(value: str) -> str:
+            return f"r#{value}" if value in keywords else value
+
         rust_lines = [
             "use cna_sys::*;",
             "use core::mem::{align_of, size_of, MaybeUninit};",
@@ -284,7 +293,8 @@ def abi_probes(cna_root: Path, manifest: dict) -> tuple[dict[str, int], dict[str
             )
             for field in fields:
                 rust_lines.append(
-                    f'  println!("layout.{type_name}.{field}={{}}", offset_of!({type_name}, {field}));'
+                    f'  println!("layout.{type_name}.{field}={{}}", '
+                    f'offset_of!({type_name}, {rust_field(field)}));'
                 )
         for type_name in manifest.get("scalarTypes", []):
             rust_lines.append(

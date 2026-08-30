@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+"""Emits cna-sys function-pointer declarations from the canonical C headers.
+
+The reviewed native surface is too large for unchecked transcription. This
+tool asks Clang what a canonical prototype actually is and prints the exact
+`cna-sys` alias for it, so a new family enters the crate as a mechanical
+derivation rather than as hand-typed pointer depth and signedness.
+
+It prints; it never edits `crates/cna-sys/src/lib.rs`. The declarations are
+reviewed and pasted deliberately, and `tools/native-abi/verify.py` is what
+proves the result still matches the headers.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[2]
+
+# Canonical C spellings that have an exact fixed-width Rust counterpart.
+PRIMITIVES = {
+    "uint8_t": "u8", "int8_t": "i8", "uint16_t": "u16", "int16_t": "i16",
+    "uint32_t": "u32", "int32_t": "i32", "uint64_t": "u64", "int64_t": "i64",
+    "float": "f32", "double": "f64", "char": "c_char", "void": "c_void",
+}
+
+
+def arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--cna-root", default=os.environ.get("CNA_ROOT"))
+    parser.add_argument("symbols", nargs="+", help="canonical cna_* function names")
+    parser.add_argument("--manifest", action="store_true", help="print ABI manifest entries instead")
+    return parser.parse_args()
+
+
+def declarations(cna_root: Path, symbols: list[str]) -> dict[str, dict]:
+    """Asks Clang for each named function's exact canonical declaration."""
+    with tempfile.TemporaryDirectory(prefix="cna-rust-generate-") as name:
+        source = Path(name) / "probe.c"
+        source.write_text('#include "CNA/C/cna.h"\n', encoding="utf-8")
+        result = {}
+        for symbol in symbols:
+            completed = subprocess.run(
+                [
+                    os.environ.get("CLANG", "clang"), "-std=c11",
+                    "-I", str(cna_root / "modules/c-api/include"),
+                    "-Xclang", "-ast-dump=json",
+                    "-Xclang", f"-ast-dump-filter={symbol}",
+                    "-fsyntax-only", str(source),
+                ],
+                check=True, text=True, capture_output=True,
+            )
+            decoder = json.JSONDecoder()
+            text, position = completed.stdout, 0
+            while position < len(text):
+                while position < len(text) and text[position].isspace():
+                    position += 1
+                if position == len(text):
+                    break
+                value, position = decoder.raw_decode(text, position)
+                if value.get("kind") == "FunctionDecl" and value.get("name") == symbol:
+                    result[symbol] = {
+                        "return": value["type"]["qualType"].split(" (", 1)[0],
+                        "parameters": [
+                            child["type"]["qualType"]
+                            for child in value.get("inner", [])
+                            if child.get("kind") == "ParmVarDecl"
+                        ],
+                    }
+                    break
+            if symbol not in result:
+                raise ValueError(f"no canonical declaration for {symbol}")
+        return result
+
+
+def rust_type(value: str) -> str:
+    """Translates one canonical C type to its exact cna-sys spelling."""
+    value = " ".join(value.replace("*", " * ").split())
+    pointers = value.count("*")
+    pointee_const = value.startswith("const ")
+    base = value.replace("*", "").replace("const", "").strip()
+    base = PRIMITIVES.get(base, base)
+    for _ in range(pointers):
+        base = f"*{'const' if pointee_const else 'mut'} {base}"
+        pointee_const = False
+    return base
+
+
+def main() -> int:
+    args = arguments()
+    if not args.cna_root:
+        raise ValueError("CNA_ROOT/--cna-root is required")
+    found = declarations(Path(args.cna_root), args.symbols)
+    for symbol in args.symbols:
+        value = found[symbol]
+        if args.manifest:
+            print(f'    "{symbol}": {len(value["parameters"])},')
+            continue
+        parameters = ", ".join(rust_type(item) for item in value["parameters"])
+        returns = rust_type(value["return"])
+        signature = f'unsafe extern "C" fn({parameters})'
+        if returns != "c_void":
+            signature += f" -> {returns}"
+        line = f"pub type {symbol}_fn = {signature};"
+        if len(line) <= 100:
+            print(line)
+        else:
+            print(f"pub type {symbol}_fn = unsafe extern \"C\" fn(")
+            print(f"    {parameters},")
+            print(f") -> {returns};" if returns != "c_void" else ");")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except (ValueError, OSError, subprocess.CalledProcessError) as error:
+        print(f"ABI generator: {error}", file=sys.stderr)
+        raise SystemExit(2)

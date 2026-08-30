@@ -1,6 +1,6 @@
 //! Audited CNA function table and ABI-version-checked loading.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use cna_sys as sys;
 
@@ -9,6 +9,7 @@ use crate::error::{CnaError, Result};
 use super::loader::{library_candidates, Library};
 use super::audio::AudioApi;
 use super::media::MediaApi;
+use super::runtime::RuntimeApi;
 
 #[derive(Debug)]
 pub(crate) struct Native {
@@ -16,6 +17,7 @@ pub(crate) struct Native {
     pub(super) _library: Library,
     pub(super) audio: AudioApi,
     pub(crate) media: MediaApi,
+    pub(crate) runtime: RuntimeApi,
     pub(super) error_get_last_message_size: sys::cna_error_get_last_message_size_fn,
     pub(super) error_copy_last_message: sys::cna_error_copy_last_message_fn,
     pub(super) game_create: sys::cna_game_create_fn,
@@ -558,6 +560,25 @@ pub(crate) struct Native {
 }
 
 impl Native {
+    /// Returns the process-wide table, loading the library on first use.
+    ///
+    /// CNA's runtime-identity and renderer-selection routes are process-global
+    /// and must be reachable before a `Game` exists, so they cannot go through
+    /// a game-owned table. Only a successful load is cached: a failure stays
+    /// retryable, because the caller may not have pointed at a library yet.
+    pub(crate) fn process() -> Result<Arc<Self>> {
+        static PROCESS: Mutex<Option<Arc<Native>>> = Mutex::new(None);
+        let mut cached = PROCESS
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(native) = cached.as_ref() {
+            return Ok(Arc::clone(native));
+        }
+        let native = Self::load()?;
+        *cached = Some(Arc::clone(&native));
+        Ok(native)
+    }
+
     pub(crate) fn load() -> Result<Arc<Self>> {
         #[cfg(unix)]
         {
@@ -607,6 +628,7 @@ impl Native {
         }
 
         Ok(Self {
+            runtime: RuntimeApi::load(&library)?,
             error_get_last_message_size: symbol!(
                 "cna_error_get_last_message_size",
                 sys::cna_error_get_last_message_size_fn
