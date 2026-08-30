@@ -341,6 +341,21 @@ impl Gamer {
         Self { gamer }
     }
 
+    /// A gamer-base facade over a handle this call does not own.
+    ///
+    /// Every `cna_gamer_*` route accepts a network gamer or a signed-in gamer
+    /// handle, because the canonical surface belongs to the gamer base they
+    /// derive from. The facade reads through the handle and releases nothing.
+    pub(crate) fn from_borrowed_handle(
+        runtime: GamerServicesRuntime,
+        handle: sys::CNA_Handle,
+    ) -> Self {
+        Self::from_core(GamerCore::borrowed(
+            OwnedHandle::borrowed_view(runtime),
+            handle,
+        ))
+    }
+
     /// XNA `Gamer.Gamertag`.
     ///
     /// # Errors
@@ -638,6 +653,17 @@ gamer_base!(SignedInGamer);
 impl SignedInGamer {
     pub(crate) fn from_core(gamer: GamerCore) -> Self {
         Self { gamer }
+    }
+
+    /// Adopts a signed-in gamer view handle CNA answered.
+    ///
+    /// The view is the caller's to release; releasing it releases the view and
+    /// not the gamer, which is what `cna_signed_in_gamer_destroy` documents.
+    pub(crate) fn from_signed_in_view(
+        runtime: GamerServicesRuntime,
+        handle: sys::CNA_Handle,
+    ) -> Self {
+        Self::from_core(GamerCore::adopt_signed_in(runtime, handle))
     }
 
     fn api(&self) -> &crate::native::gamer_services::GamerServicesApi {
@@ -1576,7 +1602,29 @@ impl<T: Clone> GamerCollection<T> {
         }
     }
 
+    /// A collection over facades the caller already holds.
+    ///
+    /// The Net rosters answer one gamer at a time rather than through a
+    /// collection handle, so their collection is built from those facades and
+    /// owns no handle of its own.
+    pub(crate) fn from_values(values: Vec<T>) -> Self {
+        Self {
+            owner: OwnedHandle::borrowed_view(GamerServicesRuntime::open_or_panic()),
+            cache: Mutex::new(values.into_iter().map(Some).collect()),
+            element: |_, _| unreachable!("a value-backed gamer collection reads its cache"),
+        }
+    }
+
     fn count(&self) -> Result<i32> {
+        if self.owner.is_borrowed_view() {
+            return i32::try_from(
+                self.cache
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .len(),
+            )
+            .map_err(|_| CnaError::InvalidInput("the gamer collection is too large"));
+        }
         let handle = self.owner.get()?;
         let mut value = 0;
         // SAFETY: the handle is live and the output is initialized.

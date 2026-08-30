@@ -93,7 +93,9 @@
     "Microsoft.Xna.Framework.GamerServices.SignedInGamer": "GamerBase",
     "Microsoft.Xna.Framework.GamerServices.FriendGamer": "GamerBase",
     "Microsoft.Xna.Framework.GamerServices.SignedInGamerCollection": "GamerCollectionBase",
-    "Microsoft.Xna.Framework.GamerServices.FriendCollection": "GamerCollectionBase"
+    "Microsoft.Xna.Framework.GamerServices.FriendCollection": "GamerCollectionBase",
+    "Microsoft.Xna.Framework.Net.NetworkGamer": "GamerBase",
+    "Microsoft.Xna.Framework.Net.LocalNetworkGamer": "NetworkGamerBase"
   },
   "ignoredClrInterfaces": [
     "System.IComparable",
@@ -309,7 +311,14 @@
     "Microsoft.Xna.Framework.GamerServices.AvatarDescription::*",
     "Microsoft.Xna.Framework.GamerServices.AvatarAnimation::*",
     "Microsoft.Xna.Framework.GamerServices.AvatarRenderer::*",
-    "Microsoft.Xna.Framework.GamerServices.IAvatarAnimation::*"
+    "Microsoft.Xna.Framework.GamerServices.IAvatarAnimation::*",
+    "Microsoft.Xna.Framework.Net.NetworkSession::*",
+    "Microsoft.Xna.Framework.Net.NetworkGamer::*",
+    "Microsoft.Xna.Framework.Net.LocalNetworkGamer::*",
+    "Microsoft.Xna.Framework.Net.NetworkMachine::*",
+    "Microsoft.Xna.Framework.Net.AvailableNetworkSession::*",
+    "Microsoft.Xna.Framework.Net.AvailableNetworkSessionCollection::*",
+    "Microsoft.Xna.Framework.Net.QualityOfService::*"
   ],
   "fallibleExclusions": [
     "Microsoft.Xna.Framework.Content.ContentReader::ContentManager",
@@ -351,7 +360,19 @@
     "Microsoft.Xna.Framework.GamerServices.AvatarRenderer::Finalize",
     "Microsoft.Xna.Framework.GamerServices.AvatarRenderer::BoneCount",
     "Microsoft.Xna.Framework.GamerServices.AvatarDescription::AddChangedHandler",
-    "Microsoft.Xna.Framework.GamerServices.AvatarDescription::RemoveChangedHandler"
+    "Microsoft.Xna.Framework.GamerServices.AvatarDescription::RemoveChangedHandler",
+    "Microsoft.Xna.Framework.Net.NetworkSession::Finalize",
+    "Microsoft.Xna.Framework.Net.NetworkSession::MaxSupportedGamers",
+    "Microsoft.Xna.Framework.Net.NetworkSession::MaxPreviousGamers",
+    "Microsoft.Xna.Framework.Net.AvailableNetworkSessionCollection::Finalize",
+    "Microsoft.Xna.Framework.Net.QualityOfService::*",
+    "Microsoft.Xna.Framework.Net.GamerJoinedEventArgs::*",
+    "Microsoft.Xna.Framework.Net.GamerLeftEventArgs::*",
+    "Microsoft.Xna.Framework.Net.HostChangedEventArgs::*",
+    "Microsoft.Xna.Framework.Net.NetworkSessionEndedEventArgs::*",
+    "Microsoft.Xna.Framework.Net.WriteLeaderboardsEventArgs::*",
+    "Microsoft.Xna.Framework.Net.GameStartedEventArgs::*",
+    "Microsoft.Xna.Framework.Net.GameEndedEventArgs::*"
   ],
   "mutableReceiverMembers": [
     "*::Dispose",
@@ -433,7 +454,14 @@
     "Microsoft.Xna.Framework.GamerServices.AvatarDescription::*",
     "Microsoft.Xna.Framework.GamerServices.AvatarAnimation::*",
     "Microsoft.Xna.Framework.GamerServices.AvatarRenderer::*",
-    "Microsoft.Xna.Framework.GamerServices.IAvatarAnimation::*"
+    "Microsoft.Xna.Framework.GamerServices.IAvatarAnimation::*",
+    "Microsoft.Xna.Framework.Net.NetworkSession::*",
+    "Microsoft.Xna.Framework.Net.NetworkGamer::*",
+    "Microsoft.Xna.Framework.Net.LocalNetworkGamer::*",
+    "Microsoft.Xna.Framework.Net.NetworkMachine::*",
+    "Microsoft.Xna.Framework.Net.AvailableNetworkSession::*",
+    "Microsoft.Xna.Framework.Net.AvailableNetworkSessionCollection::*",
+    "Microsoft.Xna.Framework.Net.QualityOfService::*"
   ],
   "parameterTypeOverrides": {
     "Microsoft.Xna.Framework.Content.ContentManager::.ctor::serviceProvider": "Arc<dyn ServiceProvider>",
@@ -565,7 +593,35 @@
     "Microsoft.Xna.Framework.GamerServices.AvatarRenderer::.ctor::avatarDescription": "&GamerServices::AvatarDescription",
     "Microsoft.Xna.Framework.GamerServices.AvatarRenderer::Draw::animation": "&GamerServices::AvatarAnimation",
     "Microsoft.Xna.Framework.GamerServices.AvatarRenderer::Draw::bones": "&[Matrix]",
-    "Microsoft.Xna.Framework.GamerServices.AvatarDescription::Changed::handler": "Box<dyn EventHandler>"
+    "Microsoft.Xna.Framework.GamerServices.AvatarDescription::Changed::handler": "Box<dyn EventHandler>",
+    "Microsoft.Xna.Framework.Net.NetworkSession::Create::sessionProperties": "&Net::NetworkSessionProperties",
+    "Microsoft.Xna.Framework.Net.NetworkSession::Create::localGamers": "&[GamerServices::SignedInGamer]",
+    "Microsoft.Xna.Framework.Net.NetworkSession::Find::searchProperties": "&Net::NetworkSessionProperties",
+    "Microsoft.Xna.Framework.Net.NetworkSession::Find::localGamers": "&[GamerServices::SignedInGamer]",
+    "Microsoft.Xna.Framework.Net.NetworkSession::Join::availableSession": "&Net::AvailableNetworkSession",
+    "Microsoft.Xna.Framework.Net.NetworkSession::JoinInvited::localGamers": "&[GamerServices::SignedInGamer]",
+    "Microsoft.Xna.Framework.Net.NetworkSession::AddLocalGamer::gamer": "&GamerServices::SignedInGamer",
+    "Microsoft.Xna.Framework.Net.LocalNetworkGamer::EnableSendVoice::remoteGamer": "&Net::NetworkGamer",
+    "Microsoft.Xna.Framework.Net.LocalNetworkGamer::SendData::data": "&[u8]",
+    "Microsoft.Xna.Framework.Net.LocalNetworkGamer::SendData::recipient": "&Net::NetworkGamer",
+    "Microsoft.Xna.Framework.Net.LocalNetworkGamer::ReceiveData::data": "&mut [u8]",
+    "Microsoft.Xna.Framework.Net.LocalNetworkGamer::ReceiveData::sender": "&mut Option<Net::NetworkGamer>",
+    "Microsoft.Xna.Framework.Net.GamerJoinedEventArgs::.ctor::gamer": "&Net::NetworkGamer",
+    "Microsoft.Xna.Framework.Net.GamerLeftEventArgs::.ctor::gamer": "&Net::NetworkGamer",
+    "Microsoft.Xna.Framework.Net.HostChangedEventArgs::.ctor::oldHost": "&Net::NetworkGamer",
+    "Microsoft.Xna.Framework.Net.HostChangedEventArgs::.ctor::newHost": "&Net::NetworkGamer",
+    "Microsoft.Xna.Framework.Net.NetworkSession::BeginCreate::callback": "Option<GamerAsyncCallback>",
+    "Microsoft.Xna.Framework.Net.NetworkSession::BeginCreate::asyncState": "GamerAsyncState",
+    "Microsoft.Xna.Framework.Net.NetworkSession::EndCreate::result": "&GamerAsyncResult",
+    "Microsoft.Xna.Framework.Net.NetworkSession::BeginFind::callback": "Option<GamerAsyncCallback>",
+    "Microsoft.Xna.Framework.Net.NetworkSession::BeginFind::asyncState": "GamerAsyncState",
+    "Microsoft.Xna.Framework.Net.NetworkSession::EndFind::result": "&GamerAsyncResult",
+    "Microsoft.Xna.Framework.Net.NetworkSession::BeginJoin::callback": "Option<GamerAsyncCallback>",
+    "Microsoft.Xna.Framework.Net.NetworkSession::BeginJoin::asyncState": "GamerAsyncState",
+    "Microsoft.Xna.Framework.Net.NetworkSession::EndJoin::result": "&GamerAsyncResult",
+    "Microsoft.Xna.Framework.Net.NetworkSession::BeginJoinInvited::callback": "Option<GamerAsyncCallback>",
+    "Microsoft.Xna.Framework.Net.NetworkSession::BeginJoinInvited::asyncState": "GamerAsyncState",
+    "Microsoft.Xna.Framework.Net.NetworkSession::EndJoinInvited::result": "&GamerAsyncResult"
   },
   "returnTypeOverrides": {
     "Microsoft.Xna.Framework.Content.ContentManager::ServiceProvider": "Arc<dyn ServiceProvider>",
@@ -749,7 +805,28 @@
     "Microsoft.Xna.Framework.GamerServices.AvatarRenderer::ParentBones": "Vec<i32>",
     "Microsoft.Xna.Framework.GamerServices.AvatarRenderer::BindPose": "Vec<Matrix>",
     "Microsoft.Xna.Framework.GamerServices.AvatarAnimation::BoneTransforms": "Vec<Matrix>",
-    "Microsoft.Xna.Framework.GamerServices.IAvatarAnimation::BoneTransforms": "Vec<Matrix>"
+    "Microsoft.Xna.Framework.GamerServices.IAvatarAnimation::BoneTransforms": "Vec<Matrix>",
+    "Microsoft.Xna.Framework.Net.NetworkSession::AllGamers": "GamerServices::GamerCollection<Net::NetworkGamer>",
+    "Microsoft.Xna.Framework.Net.NetworkSession::RemoteGamers": "GamerServices::GamerCollection<Net::NetworkGamer>",
+    "Microsoft.Xna.Framework.Net.NetworkSession::PreviousGamers": "GamerServices::GamerCollection<Net::NetworkGamer>",
+    "Microsoft.Xna.Framework.Net.NetworkSession::LocalGamers": "GamerServices::GamerCollection<Net::LocalNetworkGamer>",
+    "Microsoft.Xna.Framework.Net.NetworkSession::Host": "Net::NetworkGamer",
+    "Microsoft.Xna.Framework.Net.NetworkSession::FindGamerById": "Option<Net::NetworkGamer>",
+    "Microsoft.Xna.Framework.Net.NetworkSession::SessionProperties": "Net::NetworkSessionProperties",
+    "Microsoft.Xna.Framework.Net.NetworkMachine::Gamers": "GamerServices::GamerCollection<Net::NetworkGamer>",
+    "Microsoft.Xna.Framework.Net.NetworkGamer::Session": "Net::NetworkSession",
+    "Microsoft.Xna.Framework.Net.NetworkGamer::Machine": "Net::NetworkMachine",
+    "Microsoft.Xna.Framework.Net.LocalNetworkGamer::SignedInGamer": "GamerServices::SignedInGamer",
+    "Microsoft.Xna.Framework.Net.AvailableNetworkSession::SessionProperties": "Net::NetworkSessionProperties",
+    "Microsoft.Xna.Framework.Net.AvailableNetworkSession::QualityOfService": "Net::QualityOfService",
+    "Microsoft.Xna.Framework.Net.NetworkSession::BeginCreate": "GamerAsyncResult",
+    "Microsoft.Xna.Framework.Net.NetworkSession::BeginCreateWithSessionTypeAndMaxLocalGamersAndMaxGamersAndPrivateGamerSlotsAndSessionPropertiesAndCallbackAndAsyncState": "GamerAsyncResult",
+    "Microsoft.Xna.Framework.Net.NetworkSession::BeginCreateWithSessionTypeAndLocalGamersAndMaxGamersAndPrivateGamerSlotsAndSessionPropertiesAndCallbackAndAsyncState": "GamerAsyncResult",
+    "Microsoft.Xna.Framework.Net.NetworkSession::BeginFind": "GamerAsyncResult",
+    "Microsoft.Xna.Framework.Net.NetworkSession::BeginFindWithSessionTypeAndLocalGamersAndSearchPropertiesAndCallbackAndAsyncState": "GamerAsyncResult",
+    "Microsoft.Xna.Framework.Net.NetworkSession::BeginJoin": "GamerAsyncResult",
+    "Microsoft.Xna.Framework.Net.NetworkSession::BeginJoinInvited": "GamerAsyncResult",
+    "Microsoft.Xna.Framework.Net.NetworkSession::BeginJoinInvitedWithLocalGamersAndCallbackAndAsyncState": "GamerAsyncResult"
   },
   "contextInjectedMembers": {
     "Microsoft.Xna.Framework.Graphics.GraphicsAdapter::UseReferenceDevice": [
@@ -1248,7 +1325,10 @@
     "Microsoft.Xna.Framework.Content.ContentReader::ReadSharedResource::fixup": "Box<dyn FnOnce+Send>",
     "Microsoft.Xna.Framework.Content.ContentTypeReader::Read::existingInstance": "Option<Arc<dyn Any+Send+Sync>>",
     "Microsoft.Xna.Framework.Content.ContentTypeReader`1::Read::existingInstance": "Option<Arc<dyn Any+Send+Sync>>",
-    "Microsoft.Xna.Framework.Content.ContentTypeReader`1::ReadWithInputAndExistingInstance::existingInstance": "Option<Arc<T>>"
+    "Microsoft.Xna.Framework.Content.ContentTypeReader`1::ReadWithInputAndExistingInstance::existingInstance": "Option<Arc<T>>",
+    "Microsoft.Xna.Framework.Net.LocalNetworkGamer::SendDataWithDataAndOptions::data": "&Net::PacketWriter",
+    "Microsoft.Xna.Framework.Net.LocalNetworkGamer::SendDataWithDataAndOptionsAndRecipientAsPacketWriterAndSendDataOptionsAndNetworkGamer::data": "&Net::PacketWriter",
+    "Microsoft.Xna.Framework.Net.LocalNetworkGamer::ReceiveDataWithDataAndSender::data": "&mut Net::PacketReader"
   },
   "eventProjection": {
     "receiver": "&Self",

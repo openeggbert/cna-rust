@@ -31,7 +31,7 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-XNA-004c | `AvatarExpression`, `LeaderboardIdentity`, `NetworkSessionProperties` | `xna40-windows-full` profile | exact CLR value shape | behaviour corpus | DONE |
 | RUST-XNA-006a | GamerServices object model: gamers, collections, profiles, achievements, leaderboards, Guide, dispatcher | `xna40-windows-full` profile | 40 -> 18 missing types, no other diagnostic | full-profile verifier, `gamer_services_native` | DONE |
 | RUST-XNA-006b | Avatar object model: `AvatarDescription`, `AvatarAnimation`, `IAvatarAnimation`, `AvatarRenderer` | `xna40-windows-full` profile | 18 -> 14 missing types, no other diagnostic | full-profile verifier, `gamer_services_native` | DONE |
-| RUST-XNA-006c | Net object model: `NetworkSession` and its 13 companions | `xna40-windows-full` profile | 14 -> 0 missing types | full-profile verifier, native corpus | READY |
+| RUST-XNA-006c | Net object model: `NetworkSession` and its 13 companions | `xna40-windows-full` profile | 14 -> 0 missing types, strict zero on the complete runtime profile | full-profile verifier, `net_native` | DONE |
 | RUST-XNA-004 | Content Pipeline: 125 missing design-time types | `xna40-windows-pipeline` profile | decide whether a design-time profile belongs in this crate | pipeline verifier | READY |
 
 ## Behaviour
@@ -47,6 +47,9 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-BEHAVIOR-007 | Media catalogs, picture tokens and `SavePicture` | `PLATFORM_PENDING` | re-measure | READY |
 | RUST-BEHAVIOR-008 | Visualization spectrum on the dummy backend | `BACKEND_BLOCKED` | unchanged until a real audio backend is qualified | BLOCKED_HARDWARE |
 | RUST-BEHAVIOR-009 | Authored video decode | `BACKEND_BLOCKED`, `ASSET_PENDING` | needs a legal deterministic fixture | BLOCKED_ASSET |
+| RUST-BEHAVIOR-010 | `NetworkGamer`'s inherited `Gamer` members | not reachable | measured: `cna_gamer_*` refuses a network gamer handle, so `Gamertag`, `DisplayName`, `Tag`, `GetProfile` and `ToString` report CNA's refusal | BLOCKED_UPSTREAM |
+| RUST-BEHAVIOR-011 | `LocalNetworkGamer.SignedInGamer` | not reachable | measured: `cna_local_network_gamer_get_signed_in_gamer` answers `NOT_SUPPORTED` -- "Signed-in gamers have no C representation yet" | BLOCKED_UPSTREAM |
+| RUST-BEHAVIOR-012 | A second machine in a session | `NO_LIVE_PEER` | one process can admit a peer only through CNA's own injection routes; a real remote participant needs two hosts | BLOCKED_PLATFORM |
 
 ## Extensions
 

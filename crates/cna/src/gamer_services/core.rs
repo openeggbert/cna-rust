@@ -51,6 +51,15 @@ pub(crate) struct GamerServicesRuntime {
 }
 
 impl GamerServicesRuntime {
+    /// The process CNA library, for a facade constructed where no failure can
+    /// be reported.
+    ///
+    /// Only reachable once a call has already opened the library successfully,
+    /// because every path that builds such a facade is downstream of one.
+    pub(crate) fn open_or_panic() -> Self {
+        Self::open().expect("the CNA library is already open on this path")
+    }
+
     /// Opens, or reuses, the process CNA library.
     pub(crate) fn open() -> Result<Self> {
         Ok(Self {
@@ -129,6 +138,15 @@ impl OwnedHandle {
         (handle != 0)
             .then_some(handle)
             .ok_or(CnaError::InvalidInput("the gamer-services object is disposed"))
+    }
+
+    /// Whether this owner holds nothing and only bounds a borrow.
+    pub(crate) fn is_borrowed_view(&self) -> bool {
+        *self
+            .handle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            == BORROWED_VIEW
     }
 
     pub(crate) fn is_released(&self) -> bool {

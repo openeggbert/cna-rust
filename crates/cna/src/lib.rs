@@ -39,6 +39,7 @@ pub use gamer_services::{
     GamerAsyncCallback, GamerAsyncResult, GamerAsyncState, GamerBase, GamerCollectionBase,
     NetworkExceptionBase, PropertyValueKind,
 };
+pub use net::{NetworkGamerBase, ReadOnlyCollectionBase};
 pub use game::{
     run, run_for_frames, GameComponentBase, GameComponentCollectionExt, GameComponentRuntime,
     GameState, GameStateAccess, LaunchParametersExt, ServiceProvider,
@@ -192,10 +193,16 @@ pub mod Microsoft {
             #[allow(non_snake_case)]
             pub mod Net {
                 pub use crate::net::{
-                    NetworkSessionEndReason, NetworkSessionJoinError,
+                    AvailableNetworkSession, AvailableNetworkSessionCollection,
+                    GameEndedEventArgs, GameStartedEventArgs, GamerJoinedEventArgs,
+                    GamerLeftEventArgs, HostChangedEventArgs, LocalNetworkGamer, NetworkGamer,
+                    NetworkMachine, NetworkSession,
+                    NetworkSessionEndReason, NetworkSessionEndedEventArgs,
+                    NetworkSessionJoinError,
                     NetworkSessionJoinException, NetworkSessionProperties, NetworkSessionState,
                     NetworkSessionType,
-                    PacketReader, PacketWriter, SendDataOptions,
+                    PacketReader, PacketWriter, QualityOfService, SendDataOptions,
+                    WriteLeaderboardsEventArgs,
                 };
             }
 

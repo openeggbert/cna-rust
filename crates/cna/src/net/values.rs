@@ -47,6 +47,42 @@ pub enum NetworkSessionState {
     Ended = 2,
 }
 
+impl NetworkSessionEndReason {
+    pub(crate) fn from_native(value: u32) -> Option<Self> {
+        match value {
+            0 => Some(Self::ClientSignedOut),
+            1 => Some(Self::HostEndedSession),
+            2 => Some(Self::RemovedByHost),
+            3 => Some(Self::Disconnected),
+            _ => None,
+        }
+    }
+}
+
+impl NetworkSessionType {
+    pub(crate) fn from_native(value: u32) -> Option<Self> {
+        match value {
+            0 => Some(Self::Local),
+            1 => Some(Self::SystemLink),
+            2 => Some(Self::PlayerMatch),
+            3 => Some(Self::Ranked),
+            4 => Some(Self::LocalWithLeaderboards),
+            _ => None,
+        }
+    }
+}
+
+impl NetworkSessionState {
+    pub(crate) fn from_native(value: u32) -> Option<Self> {
+        match value {
+            0 => Some(Self::Lobby),
+            1 => Some(Self::Playing),
+            2 => Some(Self::Ended),
+            _ => None,
+        }
+    }
+}
+
 /// XNA `Microsoft.Xna.Framework.Net.NetworkSessionType`.
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -64,6 +100,10 @@ pub enum NetworkSessionType {
 pub struct SendDataOptions(i32);
 
 impl SendDataOptions {
+    pub(crate) const fn bits(self) -> u32 {
+        u32::from_ne_bytes(self.0.to_ne_bytes())
+    }
+
     pub const None: Self = Self(0);
     pub const Reliable: Self = Self(1);
     pub const InOrder: Self = Self(2);
@@ -310,7 +350,7 @@ impl PacketWriter {
 
     /// The bytes written so far. Reached through `cna::extensions::net`,
     /// because XNA keeps this internal to its network session.
-    pub(super) fn bytes(&self) -> &[u8] {
+    pub(crate) fn bytes(&self) -> &[u8] {
         &self.buffer
     }
 }
@@ -345,7 +385,7 @@ impl PacketReader {
 
     /// Fills the reader with one received packet. Reached through
     /// `cna::extensions::net`, because XNA's network session owns this path.
-    pub(super) fn fill(&mut self, bytes: &[u8]) {
+    pub(crate) fn fill(&mut self, bytes: &[u8]) {
         self.buffer.clear();
         self.buffer.extend_from_slice(bytes);
         self.position = 0;

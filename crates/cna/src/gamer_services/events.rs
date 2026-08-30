@@ -433,6 +433,125 @@ unsafe extern "C" fn avatar_changed_trampoline(_context: *mut c_void) {
     }
 }
 
+static INVITE_ACCEPTED: OnceLock<(
+    Mutex<Vec<(u64, Arc<Mutex<Box<dyn EventHandler<InviteAcceptedEventArgs>>>>)>>,
+    Mutex<Option<sys::CNA_Handle>>,
+)> = OnceLock::new();
+
+fn invite_accepted() -> &'static (
+    Mutex<Vec<(u64, Arc<Mutex<Box<dyn EventHandler<InviteAcceptedEventArgs>>>>)>>,
+    Mutex<Option<sys::CNA_Handle>>,
+) {
+    INVITE_ACCEPTED.get_or_init(|| (Mutex::new(Vec::new()), Mutex::new(None)))
+}
+
+unsafe extern "C" fn invite_accepted_trampoline(
+    info: *const sys::CNA_InviteAcceptedEventInfo,
+    _context: *mut c_void,
+) {
+    if info.is_null() {
+        return;
+    }
+    // SAFETY: CNA passes a live record for the duration of the callback; the
+    // projection copies the handle out rather than retaining the pointer.
+    let (handle, current) = unsafe { ((*info).gamer, (*info).is_current_session != 0) };
+    let Ok(registry) = registry() else {
+        return;
+    };
+    if handle == 0 {
+        return;
+    }
+    // The gamer belongs to CNA, so the facade borrows it for this call.
+    let borrow = OwnedHandle::borrowed_view(registry.runtime.clone());
+    let gamer = SignedInGamer::from_core(GamerCore::borrowed(borrow, handle));
+    let handlers = invite_accepted()
+        .0
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    for (_, handler) in handlers {
+        let args = InviteAcceptedEventArgs::new(&gamer, current);
+        let mut guard = handler
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // Contained: a panicking handler must not unwind into CNA.
+        let _ = catch_unwind(AssertUnwindSafe(|| guard.invoke(&() as &dyn Any, args)));
+    }
+}
+
+pub(crate) fn add_invite_accepted(
+    handler: Box<dyn EventHandler<InviteAcceptedEventArgs>>,
+) -> u64 {
+    let Ok(registry) = registry() else {
+        return 0;
+    };
+    let state = invite_accepted();
+    {
+        let mut subscription = state
+            .1
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if subscription.is_none() {
+            let mut handle = 0;
+            // SAFETY: the trampoline is a plain C function and the output is live.
+            let result = registry.runtime.check(unsafe {
+                (registry
+                    .runtime
+                    .native()
+                    .net
+                    .network_session_subscribe_invite_accepted)(
+                    Some(invite_accepted_trampoline),
+                    core::ptr::null_mut(),
+                    &mut handle,
+                )
+            });
+            match result {
+                Ok(()) => *subscription = Some(handle),
+                // XNA's `+=` cannot fail; the refusal surfaces from the
+                // dispatcher's Update like every other one here.
+                Err(error) => remember(registry, Err(error)),
+            }
+        }
+    }
+    let registration = next_registration(registry);
+    state
+        .0
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .push((registration, Arc::new(Mutex::new(handler))));
+    registration
+}
+
+pub(crate) fn remove_invite_accepted(registration: u64) -> bool {
+    let Ok(registry) = registry() else {
+        return false;
+    };
+    let state = invite_accepted();
+    let (removed, empty) = {
+        let mut handlers = state
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let before = handlers.len();
+        handlers.retain(|(value, _)| *value != registration);
+        (before != handlers.len(), handlers.is_empty())
+    };
+    if empty {
+        let taken = state
+            .1
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take();
+        if let Some(handle) = taken {
+            // SAFETY: the registration came from the subscribe route above.
+            let _ = registry
+                .runtime
+                .check(unsafe { (registry.runtime.native().net.network_session_unsubscribe)(handle) });
+        }
+    }
+    removed
+}
+
 pub(crate) fn add_avatar_description_changed(handler: Box<dyn EventHandler>) -> Result<u64> {
     let registry = registry()?;
     let state = avatar_changed();
