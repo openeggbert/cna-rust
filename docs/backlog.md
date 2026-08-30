@@ -84,3 +84,34 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-TEMPLATE-001 | Template against the live artifact | 60/600 frames on ABI 0.20 | DONE |
 | RUST-TEMPLATE-002 | Template modern-extension canary | `--extensions-smoke` | DONE |
 | RUST-TEMPLATE-003 | Generated standalone project on the live ABI | workspace tests, 60/600 frames, extension canary, no developer path | DONE |
+
+## Qualification, 2026-08-31
+
+Run against the HEADLESS ABI 0.20 artifact with SHA-256
+`092b2d80a775f39a6ad872d084bc09492576c82ac33641faeb4a3036c7fc347b`, built out
+of tree from `cnanext` at `17b5a90a` and `sharp-runtimenext` at `4a49afb0`.
+
+| Gate | Result |
+|---|---|
+| `cargo check --workspace --all-targets` | PASS, no warnings |
+| `cargo build` (template, generated project) | PASS |
+| `cargo test --workspace --all-features` | PASS: 45 suites, 115 assertions, 0 failures |
+| `cargo doc --workspace --no-deps` | PASS, no warnings |
+| native ABI verifier | PASS: 1,326 functions, 4,574 prototype positions, 1,845 C/Rust measurements, 98 layouts, 19 callbacks, 665 constants, 1,119 symbol acquisitions, 0 findings, 0 unaudited |
+| ABI mutation tests | PASS: 27 |
+| API-compat mutation tests | PASS: 28 |
+| canonical route inventory | PASS: 4,054 canonical, 1,326 bound, 0 unmapped, 0 unused rules |
+| runtime capability provenance | PASS: 35 rows, artifact and ABI confirmed |
+| selected XNA profile (strict) | PASS: 0 diagnostics |
+| complete XNA runtime profile | PASS: 0 diagnostics, 0 missing types |
+| Content Pipeline profile | 125 missing types (product-boundary decision, `RUST-XNA-004`) |
+| superset discovery profile | 125 missing types, all of them the pipeline |
+| leak verifier | PASS: 0 |
+| MSRV source audit | PASS |
+| packaged-source consumer | PASS: 5 sys files, 148 crate files, 0 workspace path leaks |
+| template 60 / 600 frames / `--extensions-smoke` | PASS |
+| generated standalone project: build, 60, 600, `--extensions-smoke` | PASS |
+| `git diff --check`, both writable repositories | clean |
+| MSRV 1.74 runtime | NOT_RUN -- no 1.74 toolchain on this host |
+| `rustfmt`, `clippy` | NOT_AVAILABLE |
+| sanitizers | NOT_RUN -- no instrumented artifact was built |
