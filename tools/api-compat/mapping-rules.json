@@ -1175,14 +1175,15 @@
     "Microsoft.Xna.Framework.Graphics.Texture": "trait"
   },
   "nonCopyStructProjections": [
-    "Microsoft.Xna.Framework.Audio.RendererDetail",
     "Microsoft.Xna.Framework.Audio.AudioCategory",
-    "Microsoft.Xna.Framework.Graphics.VertexBufferBinding",
-    "Microsoft.Xna.Framework.Graphics.RenderTargetBinding",
+    "Microsoft.Xna.Framework.Audio.RendererDetail",
+    "Microsoft.Xna.Framework.GamerServices.LeaderboardIdentity",
     "Microsoft.Xna.Framework.Graphics.ModelBoneCollection+Enumerator",
     "Microsoft.Xna.Framework.Graphics.ModelEffectCollection+Enumerator",
     "Microsoft.Xna.Framework.Graphics.ModelMeshCollection+Enumerator",
-    "Microsoft.Xna.Framework.Graphics.ModelMeshPartCollection+Enumerator"
+    "Microsoft.Xna.Framework.Graphics.ModelMeshPartCollection+Enumerator",
+    "Microsoft.Xna.Framework.Graphics.RenderTargetBinding",
+    "Microsoft.Xna.Framework.Graphics.VertexBufferBinding"
   ],
   "genericTypeRenames": {
     "Microsoft.Xna.Framework.Graphics.ModelBoneCollection+Enumerator": "Microsoft.Xna.Framework.Graphics.ModelBoneCollectionEnumerator",

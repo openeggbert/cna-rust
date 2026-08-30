@@ -406,6 +406,12 @@ def mapped_type_path(value: str, rules: dict) -> str:
     base, arguments = split_generic_arguments(value)
     if base in rules["primitiveTypes"]:
         return rules["primitiveTypes"][base]
+    # `Nullable<T>` is projected as `Option<T>` wherever it appears, including
+    # inside an interface's generic argument. Leaving it out here made an
+    # IList<int?> ask for `AsRef<[Nullable<i32>]>`, a type no projection would
+    # ever produce.
+    if base == "System.Nullable`1" and arguments:
+        return "Option<" + mapped_type_path(arguments[0], rules) + ">"
     renamed = rules["genericTypeRenames"].get(base, base).replace("+", "::")
     if renamed.startswith("Microsoft.Xna.Framework."):
         name = renamed[len("Microsoft.Xna.Framework."):].replace(".", "::")

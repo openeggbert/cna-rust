@@ -11,6 +11,7 @@
 use core::fmt;
 use core::ops::{BitAnd, BitOr, BitOrAssign};
 use std::error::Error;
+use std::vec::IntoIter;
 
 use crate::content::{SerializationInfo, StreamingContext};
 use crate::error::{CnaError, Result};
@@ -466,5 +467,72 @@ impl Disposable for PacketReader {
         self.buffer = Vec::new();
         self.position = 0;
         self.disposed = true;
+    }
+}
+
+/// XNA `Microsoft.Xna.Framework.Net.NetworkSessionProperties`.
+///
+/// Exactly eight slots, fixed by XNA: `Count` is a constant 8 and an index
+/// outside it is refused rather than growing the collection. Each slot is
+/// `Option<i32>` because XNA's element type is `int?`, and an unset slot is
+/// `None` rather than a zero that would read as a real value.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct NetworkSessionProperties {
+    data: [Option<i32>; Self::PROPERTY_COUNT],
+}
+
+impl NetworkSessionProperties {
+    const PROPERTY_COUNT: usize = 8;
+
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub const fn Count(&self) -> i32 {
+        Self::PROPERTY_COUNT as i32
+    }
+
+    /// The slot at `index`.
+    ///
+    /// # Panics
+    ///
+    /// Outside the eight slots, as XNA's `ArgumentOutOfRangeException` does.
+    /// This follows `TouchCollection`, the qualified precedent for an XNA
+    /// indexer: an out-of-range index is a caller bug in both languages.
+    #[must_use]
+    pub fn Item(&self, index: i32) -> Option<i32> {
+        self.data[Self::slot(index)]
+    }
+
+    /// Sets the slot at `index`.
+    ///
+    /// # Panics
+    ///
+    /// Outside the eight slots, as XNA does.
+    pub fn SetItem(&mut self, index: i32, value: Option<i32>) {
+        let slot = Self::slot(index);
+        self.data[slot] = value;
+    }
+
+    /// Iterates the eight slots in order.
+    #[must_use]
+    pub fn GetEnumerator(&self) -> IntoIter<Option<i32>> {
+        self.data.to_vec().into_iter()
+    }
+
+    fn slot(index: i32) -> usize {
+        assert!(
+            index >= 0 && (index as usize) < Self::PROPERTY_COUNT,
+            "index is out of range"
+        );
+        index as usize
+    }
+}
+
+impl AsRef<[Option<i32>]> for NetworkSessionProperties {
+    fn as_ref(&self) -> &[Option<i32>] {
+        &self.data
     }
 }

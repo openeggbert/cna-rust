@@ -451,3 +451,120 @@ xna_exception!(
     "The network is not available.",
     NetworkExceptionBase
 );
+
+/// XNA `Microsoft.Xna.Framework.GamerServices.AvatarExpression`.
+///
+/// A plain value: five independent facial choices with no runtime behind them.
+///
+/// A default expression is each field's zero, exactly as a default-constructed
+/// CLR struct produces.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct AvatarExpression {
+    mouth: AvatarMouth,
+    left_eye: AvatarEye,
+    right_eye: AvatarEye,
+    left_eyebrow: AvatarEyebrow,
+    right_eyebrow: AvatarEyebrow,
+}
+
+impl Default for AvatarExpression {
+    fn default() -> Self {
+        Self {
+            mouth: AvatarMouth::Neutral,
+            left_eye: AvatarEye::Neutral,
+            right_eye: AvatarEye::Neutral,
+            left_eyebrow: AvatarEyebrow::Neutral,
+            right_eyebrow: AvatarEyebrow::Neutral,
+        }
+    }
+}
+
+impl AvatarExpression {
+    #[must_use]
+    pub const fn Mouth(&self) -> AvatarMouth {
+        self.mouth
+    }
+
+    pub fn SetMouth(&mut self, value: AvatarMouth) {
+        self.mouth = value;
+    }
+
+    #[must_use]
+    pub const fn LeftEye(&self) -> AvatarEye {
+        self.left_eye
+    }
+
+    pub fn SetLeftEye(&mut self, value: AvatarEye) {
+        self.left_eye = value;
+    }
+
+    #[must_use]
+    pub const fn RightEye(&self) -> AvatarEye {
+        self.right_eye
+    }
+
+    pub fn SetRightEye(&mut self, value: AvatarEye) {
+        self.right_eye = value;
+    }
+
+    #[must_use]
+    pub const fn LeftEyebrow(&self) -> AvatarEyebrow {
+        self.left_eyebrow
+    }
+
+    pub fn SetLeftEyebrow(&mut self, value: AvatarEyebrow) {
+        self.left_eyebrow = value;
+    }
+
+    #[must_use]
+    pub const fn RightEyebrow(&self) -> AvatarEyebrow {
+        self.right_eyebrow
+    }
+
+    pub fn SetRightEyebrow(&mut self, value: AvatarEyebrow) {
+        self.right_eyebrow = value;
+    }
+}
+
+/// XNA `Microsoft.Xna.Framework.GamerServices.LeaderboardIdentity`.
+///
+/// `Create` stores the key's **name**, not its numeric value: XNA calls
+/// `LeaderboardKey.ToString()`, so the identity carries the spelling.
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+pub struct LeaderboardIdentity {
+    key: String,
+    game_mode: i32,
+}
+
+impl LeaderboardIdentity {
+    #[must_use]
+    pub fn Create(key: LeaderboardKey, gameMode: i32) -> Self {
+        Self {
+            key: format!("{key:?}"),
+            game_mode: gameMode,
+        }
+    }
+
+    #[must_use]
+    pub fn CreateWithKey(key: LeaderboardKey) -> Self {
+        Self::Create(key, 0)
+    }
+
+    #[must_use]
+    pub fn Key(&self) -> String {
+        self.key.clone()
+    }
+
+    pub fn SetKey(&mut self, value: &str) {
+        self.key = value.to_owned();
+    }
+
+    #[must_use]
+    pub const fn GameMode(&self) -> i32 {
+        self.game_mode
+    }
+
+    pub fn SetGameMode(&mut self, value: i32) {
+        self.game_mode = value;
+    }
+}

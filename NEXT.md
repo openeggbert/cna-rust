@@ -60,7 +60,7 @@ items, in order:
 
 1. Continue `cna::extensions`: `.cnb` Model and the loader registry, then
    modern input and sensors.
-2. Close the remaining 43-type `xna40-windows-full` gap: the GamerServices,
+2. Close the remaining 40-type `xna40-windows-full` gap: the GamerServices,
    Avatar and Net object model over `gamer_services.h` and `net*.h`.
 3. Windows loader source support, packaging qualification, and the template's
    modern-extension canary.

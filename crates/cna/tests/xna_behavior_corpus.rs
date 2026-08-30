@@ -17,15 +17,17 @@ use cna::Microsoft::Xna::Framework::Content::{
 };
 use cna::{SerializationInfo, StreamingContext};
 use cna::Microsoft::Xna::Framework::GamerServices::{
-    AvatarAnimationPreset, AvatarBodyType, AvatarBone, GameDifficulty, GamerPresenceMode,
-    GamerPrivilegeException, GamerZone, LeaderboardKey, NetworkException,
-    NetworkNotAvailableException, NotificationPosition,
+    AvatarAnimationPreset, AvatarBodyType, AvatarBone, AvatarExpression, AvatarEyebrow,
+    AvatarMouth, GameDifficulty, GamerPresenceMode, GamerPrivilegeException, GamerZone,
+    LeaderboardIdentity, LeaderboardKey, NetworkException, NetworkNotAvailableException,
+    NotificationPosition,
 };
 use cna::extensions::net::{FillPacket, PacketBytes};
 use cna::Disposable;
 use cna::Microsoft::Xna::Framework::Net::{
     NetworkSessionEndReason, NetworkSessionJoinError, NetworkSessionJoinException,
-    NetworkSessionState, NetworkSessionType, PacketReader, PacketWriter, SendDataOptions,
+    NetworkSessionProperties, NetworkSessionState, NetworkSessionType, PacketReader, PacketWriter,
+    SendDataOptions,
 };
 use cna::Microsoft::Xna::Framework::Design::{
     BoundingBoxConverter, BoundingSphereConverter, ColorConverter, MathTypeConverter,
@@ -2240,5 +2242,35 @@ fn pinned_xna_math_observations() {
     observe!(writer.Length(), 0);
     observe!(writer.WriteWithValueAsSingle(1.0).is_err(), true);
 
-    assert_eq!(observations, 251);
+    // Wider-profile value types. LeaderboardIdentity stores the key's *name*,
+    // because XNA's Create calls LeaderboardKey.ToString() rather than keeping
+    // the numeric value.
+    let identity = LeaderboardIdentity::Create(LeaderboardKey::BestTimeRecent, 3);
+    observe!(identity.Key(), "BestTimeRecent".to_owned());
+    observe!(identity.GameMode(), 3);
+    observe!(
+        LeaderboardIdentity::CreateWithKey(LeaderboardKey::BestScoreLifeTime).GameMode(),
+        0
+    );
+
+    // A default AvatarExpression is each field's zero, as a default-constructed
+    // CLR struct produces.
+    let expression = AvatarExpression::default();
+    observe!(expression.Mouth(), AvatarMouth::Neutral);
+    observe!(expression.LeftEyebrow(), AvatarEyebrow::Neutral);
+
+    // NetworkSessionProperties is exactly eight slots, and an unset one is
+    // None rather than a zero that would read as a real value.
+    let mut properties = NetworkSessionProperties::new();
+    observe!(properties.Count(), 8);
+    observe!(properties.Item(0), None);
+    properties.SetItem(7, Some(-1));
+    observe!(properties.Item(7), Some(-1));
+    observe!(properties.GetEnumerator().count(), 8);
+    observe!(
+        catch_unwind(AssertUnwindSafe(|| properties.Item(8))).is_err(),
+        true
+    );
+
+    assert_eq!(observations, 261);
 }

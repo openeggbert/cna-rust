@@ -163,13 +163,14 @@ pub mod Microsoft {
             pub mod GamerServices {
                 pub use crate::game::GamerServicesComponent;
                 pub use crate::gamer_services::{
-                    AvatarAnimationPreset, AvatarBodyType, AvatarBone, AvatarEye, AvatarEyebrow,
+                    AvatarAnimationPreset, AvatarBodyType, AvatarBone, AvatarExpression, AvatarEye,
+                    AvatarEyebrow,
                     AvatarMouth, AvatarRendererState, ControllerSensitivity, GameDifficulty,
                     GameUpdateRequiredException, GamerPresenceMode, GamerPrivilegeException,
                     GamerPrivilegeSetting, GamerServicesNotAvailableException, GamerZone,
-                    GuideAlreadyVisibleException, LeaderboardKey, LeaderboardOutcome,
-                    MessageBoxIcon, NetworkException, NetworkNotAvailableException,
-                    NotificationPosition, RacingCameraAngle,
+                    GuideAlreadyVisibleException, LeaderboardIdentity, LeaderboardKey,
+                    LeaderboardOutcome, MessageBoxIcon, NetworkException,
+                    NetworkNotAvailableException, NotificationPosition, RacingCameraAngle,
                 };
             }
 
@@ -177,7 +178,8 @@ pub mod Microsoft {
             pub mod Net {
                 pub use crate::net::{
                     NetworkSessionEndReason, NetworkSessionJoinError,
-                    NetworkSessionJoinException, NetworkSessionState, NetworkSessionType,
+                    NetworkSessionJoinException, NetworkSessionProperties, NetworkSessionState,
+                    NetworkSessionType,
                     PacketReader, PacketWriter, SendDataOptions,
                 };
             }
