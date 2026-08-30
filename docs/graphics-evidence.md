@@ -155,14 +155,23 @@ assertions including the final count, and zero failures. The new Model, stock
 effect, and query evidence is native-dependent and therefore remains in native
 stress instead of being mislabeled as a platform-neutral observation.
 
-Canonical CNA HEAD remains
-`1bb2145d99ed572dd4eb15009c34e2e5f410fcf0`. Its unmodified C API build blocker
-is still `CnaCApiCoreExt.cpp:250`, renderer identity `49 == 50`; CNA was not
-modified. Arbitrary repeated borrowed-game `RunOneFrame`/`Tick` also remains
-blocked because ABI 0.7 has no callback user-data rebinding operation. The
-minimum upstream fix is an explicitly owned callback context whose lifetime
-spans repeated ticks, or a reviewed operation that atomically rebinds callback
-user data before each call.
+The unmodified canonical CNA checkout now builds its C API; the
+`CnaCApiCoreExt.cpp:250` renderer-identity blocker was repaired by ABI 0.20.0
+itself. CNA was not modified.
+
+Arbitrary repeated ticking of one live borrowed game was re-measured on ABI
+0.20 and the shape of the gap is unchanged: `CNA_GameCallbacks` is copied
+during `cna_game_create` and no route rebinds its `context` afterwards.
+`cna_game_set_frame_hooks_ext` does rebind its own table's context, but that
+table carries Initialize/BeginRun/EndRun/BeginDraw/EndDraw, not Update and
+Draw.
+
+Worth stating precisely, because the previous milestone left it implicit: XNA's
+own `Game.RunOneFrame` delegates to a host that does not exist until `Run`
+creates one, so it does nothing when called outside a running host. The Rust
+projection's self-contained single-frame session is therefore a deliberate
+mapping rather than a workaround, and what remains genuinely missing is
+repeated ticking of one live game from Rust.
 
 The sibling template source was not changed. Its tests plus fresh 60- and
 600-frame HEADLESS runs pass. A fresh generated consumer vendors both binding

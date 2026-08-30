@@ -100,9 +100,10 @@
       "strictComplete": true,
       "statuses": [
         "VERIFIED_MANAGED",
-        "UPSTREAM_CNA_BLOCKED"
+        "VERIFIED_NATIVE",
+        "BACKEND_BLOCKED"
       ],
-      "evidence": "Constructor shape and XNA validation are preserved, but CNA ABI 0.7 ignores rendererId and lookAheadTime."
+      "evidence": "Re-measured on ABI 0.20: the constructor shape and XNA validation are preserved and the canonical renderer-carrying route is called, but CNA still accepts and ignores both rendererId and lookAheadTime. Upstream now states this as a backend fact rather than an omission -- CNA has exactly one audio backend, so there is nothing for a renderer id to select between and no scheduling look-ahead to configure."
     },
     {
       "capability": "AudioCategory",
