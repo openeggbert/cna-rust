@@ -14,7 +14,7 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-ABI-002 | Replace the constant version gate with CNA's versioning contract | `docs/c-api/ABI_VERSIONING.md` | major/minor/patch policy, `0.x` exact minor | `native::abi` unit tests | DONE |
 | RUST-ABI-003 | Audit `cna_vertex_declaration_create`, declared but unmeasured | canonical headers | present in the ABI manifest | ABI verifier | DONE |
 | RUST-ABI-004 | Classify all 4,051 canonical routes | canonical headers | zero `UNMAPPED_REQUIRES_REVIEW` | `tools/c-api-inventory/inventory.py` | DONE |
-| RUST-ABI-005 | Adopt `cna_error_get_last_info` for structured error identity | `core.h`, `docs/c-api/ERRORS.md` | `CnaError` carries the CNA error category | behaviour corpus | READY |
+| RUST-ABI-005 | Adopt `cna_error_get_last_info` for structured error identity | `core.h`, `docs/c-api/ERRORS.md` | `CnaError::Native` carries `ErrorCategory` | native stress asserts the reported category | DONE |
 | RUST-ABI-006 | Mutation tests for the ABI gate and manifest | this repository | a wrong version, arity, width, signedness, pointer depth, constness, semantic handle or descriptor fails | `tools/native-abi/tests` | DONE |
 
 ## XNA surface

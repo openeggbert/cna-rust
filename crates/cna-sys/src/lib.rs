@@ -70,6 +70,21 @@ pub const CNA_RESULT_BUFFER_TOO_SMALL: CNA_Result = 14;
 pub const CNA_FALSE: CNA_Bool = 0;
 pub const CNA_TRUE: CNA_Bool = 1;
 pub const CNA_INVALID_HANDLE: CNA_Handle = 0;
+pub const CNA_ERROR_INFO_STRUCT_VERSION: u32 = 1;
+pub const CNA_ERROR_CATEGORY_NONE: CNA_ErrorCategory = 0;
+pub const CNA_ERROR_CATEGORY_ARGUMENT: CNA_ErrorCategory = 1;
+pub const CNA_ERROR_CATEGORY_HANDLE: CNA_ErrorCategory = 2;
+pub const CNA_ERROR_CATEGORY_STATE: CNA_ErrorCategory = 3;
+pub const CNA_ERROR_CATEGORY_MEMORY: CNA_ErrorCategory = 4;
+pub const CNA_ERROR_CATEGORY_IO: CNA_ErrorCategory = 5;
+pub const CNA_ERROR_CATEGORY_NOT_SUPPORTED: CNA_ErrorCategory = 6;
+pub const CNA_ERROR_CATEGORY_PLATFORM: CNA_ErrorCategory = 7;
+pub const CNA_ERROR_CATEGORY_THREAD: CNA_ErrorCategory = 8;
+pub const CNA_ERROR_CATEGORY_CALLBACK: CNA_ErrorCategory = 9;
+pub const CNA_ERROR_CATEGORY_RANGE: CNA_ErrorCategory = 10;
+pub const CNA_ERROR_CATEGORY_ENCODING: CNA_ErrorCategory = 11;
+pub const CNA_ERROR_CATEGORY_INTERNAL: CNA_ErrorCategory = 12;
+pub const CNA_ERROR_CATEGORY_SHUTTING_DOWN: CNA_ErrorCategory = 13;
 pub const CNA_MEDIA_STATE_STOPPED: CNA_MediaState = 0;
 pub const CNA_MEDIA_STATE_PLAYING: CNA_MediaState = 1;
 pub const CNA_MEDIA_STATE_PAUSED: CNA_MediaState = 2;
@@ -1580,6 +1595,7 @@ pub struct CNA_CueInfo {
 }
 
 pub type cna_get_abi_version_fn = unsafe extern "C" fn() -> u32;
+pub type cna_error_get_last_info_fn = unsafe extern "C" fn(*mut CNA_ErrorInfo) -> CNA_Result;
 pub type cna_error_get_last_message_size_fn = unsafe extern "C" fn(*mut u64) -> CNA_Result;
 pub type cna_error_copy_last_message_fn =
     unsafe extern "C" fn(*mut c_char, u64, *mut u64) -> CNA_Result;

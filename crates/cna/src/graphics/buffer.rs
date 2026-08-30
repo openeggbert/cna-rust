@@ -13,7 +13,7 @@ use std::sync::Arc;
 use cna_sys as sys;
 
 use crate::content::{ContentDisposable, ContentLoadable};
-use crate::error::{CnaError, Result};
+use crate::error::{CnaError, ErrorCategory, Result};
 use crate::extensions::events::{EventArgs, EventHandler};
 
 use super::resource::{EventHandlers, ResourceKind, ResourceState};
@@ -342,6 +342,7 @@ impl VertexBuffer {
             let _ = native.destroy_vertex_buffer(handle);
             return Err(CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "CNA returned inconsistent vertex-buffer metadata".to_owned(),
             });
         }
@@ -953,6 +954,7 @@ impl IndexBuffer {
             let _ = device.state.native().destroy_index_buffer(handle);
             return Err(CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "CNA returned inconsistent index-buffer metadata".to_owned(),
             });
         }
@@ -1138,6 +1140,7 @@ impl IndexBuffer {
         if required != range_len as u64 {
             return Err(CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "CNA returned an inconsistent index readback count".to_owned(),
             });
         }

@@ -14,7 +14,7 @@ use std::thread::ThreadId;
 use cna_sys as sys;
 
 use crate::content::{SerializationInfo, StreamingContext};
-use crate::error::{CnaError, Result};
+use crate::error::{CnaError, ErrorCategory, Result};
 use crate::extensions::events::{EventArgs, EventHandler};
 use crate::graphics::resource::EventHandlers;
 use crate::input::PlayerIndex;
@@ -813,6 +813,7 @@ impl StorageContainer {
             if !self.state.native_dispose_observed.load(Ordering::Acquire) {
                 return Err(CnaError::Native {
                     code: sys::CNA_RESULT_INVALID_STATE,
+                    category: ErrorCategory::None,
                     message: "CNA did not synchronously raise StorageContainer.Disposing"
                         .to_owned(),
                 });

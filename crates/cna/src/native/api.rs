@@ -17,6 +17,7 @@ pub(crate) struct Native {
     pub(super) audio: AudioApi,
     pub(crate) media: MediaApi,
     pub(crate) runtime: RuntimeApi,
+    pub(super) error_get_last_info: sys::cna_error_get_last_info_fn,
     pub(super) error_get_last_message_size: sys::cna_error_get_last_message_size_fn,
     pub(super) error_copy_last_message: sys::cna_error_copy_last_message_fn,
     pub(super) game_create: sys::cna_game_create_fn,
@@ -639,6 +640,10 @@ impl Native {
 
         Ok(Self {
             runtime: RuntimeApi::load(&library)?,
+            error_get_last_info: symbol!(
+                "cna_error_get_last_info",
+                sys::cna_error_get_last_info_fn
+            ),
             error_get_last_message_size: symbol!(
                 "cna_error_get_last_message_size",
                 sys::cna_error_get_last_message_size_fn

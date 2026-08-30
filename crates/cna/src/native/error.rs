@@ -2,7 +2,7 @@
 
 use cna_sys as sys;
 
-use crate::error::{CnaError, Result};
+use crate::error::{CnaError, ErrorCategory, Result};
 
 use super::Native;
 
@@ -13,8 +13,28 @@ impl Native {
         }
         Err(CnaError::Native {
             code: result,
+            category: self.last_error_category(),
             message: self.last_error_message(),
         })
+    }
+
+    /// CNA's own classification of the last failure on this thread.
+    ///
+    /// Reading it must not disturb the message: the canonical route refuses an
+    /// invalid descriptor without overwriting the thread-local diagnostic, so
+    /// an unreadable category degrades to `None` rather than costing the text.
+    fn last_error_category(&self) -> ErrorCategory {
+        let mut info = sys::CNA_ErrorInfo {
+            struct_size: core::mem::size_of::<sys::CNA_ErrorInfo>() as u32,
+            struct_version: sys::CNA_ERROR_INFO_STRUCT_VERSION,
+            ..sys::CNA_ErrorInfo::default()
+        };
+        // SAFETY: the descriptor is a caller-owned versioned output whose
+        // prefix this build declares exactly.
+        if unsafe { (self.error_get_last_info)(&mut info) } != sys::CNA_RESULT_SUCCESS {
+            return ErrorCategory::None;
+        }
+        ErrorCategory::from_native(info.category)
     }
 
     fn last_error_message(&self) -> String {

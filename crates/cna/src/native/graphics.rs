@@ -4,7 +4,7 @@
 
 use cna_sys as sys;
 
-use crate::error::{CnaError, Result};
+use crate::error::{CnaError, ErrorCategory, Result};
 
 use super::Native;
 
@@ -2118,11 +2118,13 @@ impl Native {
         if copied != count {
             return Err(CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "CNA changed an effect text value between count and copy".to_owned(),
             });
         }
         String::from_utf8(bytes).map_err(|_| CnaError::Native {
             code: sys::CNA_RESULT_ENCODING,
+            category: ErrorCategory::None,
             message: "CNA returned invalid UTF-8 effect text".to_owned(),
         })
     }
@@ -2287,6 +2289,7 @@ impl Native {
         })?;
         values.truncate(usize::try_from(actual).map_err(|_| CnaError::Native {
             code: sys::CNA_RESULT_OVERFLOW,
+            category: ErrorCategory::None,
             message: "CNA returned an oversized effect array count".to_owned(),
         })?);
         Ok(values)

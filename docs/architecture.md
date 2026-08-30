@@ -32,7 +32,7 @@ safe bridge is grouped by concern:
 - `native/game.rs`, `graphics.rs`, `display.rs`, `window.rs`, `input.rs`,
   `device_manager.rs`, `storage.rs`, `audio.rs`, and `media.rs`: typed facade calls;
 - `native/fault.rs`: feature-gated, test-only failure injection;
-- `native/error.rs`: CNA error extraction.
+- `native/error.rs`: CNA error extraction, including the structured category.
 
 The loader applies CNA's own versioning contract rather than a single constant
 comparison: a different major is always rejected, an experimental `0.x` minor

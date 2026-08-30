@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex, Weak};
 
 use cna_sys as sys;
 
-use crate::error::{CnaError, Result};
+use crate::error::{CnaError, ErrorCategory, Result};
 use crate::extensions::events::{EventArgs, EventHandler};
 use crate::extensions::window::WindowHandle;
 use crate::graphics::resource::EventHandlers;
@@ -137,6 +137,7 @@ impl GraphicsDeviceInformation {
         {
             return Err(CnaError::Native {
                 code: sys::CNA_RESULT_INVALID_STATE,
+                category: ErrorCategory::None,
                 message: "CNA supplied an incompatible GraphicsDeviceInformation structure"
                     .to_owned(),
             });
@@ -148,6 +149,7 @@ impl GraphicsDeviceInformation {
         {
             return Err(CnaError::Native {
                 code: sys::CNA_RESULT_INVALID_STATE,
+                category: ErrorCategory::None,
                 message: "CNA supplied invalid presentation parameters".to_owned(),
             });
         }
@@ -1093,6 +1095,7 @@ fn graphics_preferences(value: NativeGraphicsPreferences) -> Result<GraphicsPref
         preferred_back_buffer_format: SurfaceFormat::from_native(value.back_buffer_format)
             .ok_or_else(|| CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "CNA returned an unknown preferred back-buffer format".to_owned(),
             })?,
         preferred_back_buffer_width: value.back_buffer_width,
@@ -1114,6 +1117,7 @@ fn graphics_profile(value: u32) -> Result<GraphicsProfile> {
         sys::CNA_GRAPHICS_PROFILE_HI_DEF => Ok(GraphicsProfile::HiDef),
         _ => Err(CnaError::Native {
             code: sys::CNA_RESULT_INTERNAL,
+            category: ErrorCategory::None,
             message: "CNA returned an unknown graphics profile".to_owned(),
         }),
     }
@@ -1127,6 +1131,7 @@ fn depth_format(value: u32) -> Result<DepthFormat> {
         sys::CNA_DEPTH_FORMAT_DEPTH24_STENCIL8 => Ok(DepthFormat::Depth24Stencil8),
         _ => Err(CnaError::Native {
             code: sys::CNA_RESULT_INTERNAL,
+            category: ErrorCategory::None,
             message: "CNA returned an unknown depth/stencil format".to_owned(),
         }),
     }

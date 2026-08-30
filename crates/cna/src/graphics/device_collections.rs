@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex, Weak};
 
 use cna_sys as sys;
 
-use crate::error::{CnaError, Result};
+use crate::error::{CnaError, ErrorCategory, Result};
 
 use super::device::DeviceState;
 use super::{GraphicsDevice, SamplerState, Texture};
@@ -102,6 +102,7 @@ impl SamplerStateCollection {
         let value = Arc::new(SamplerState::from_native(native, &device).ok_or_else(|| {
             CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "CNA returned invalid SamplerState identities".to_owned(),
             }
         })?);

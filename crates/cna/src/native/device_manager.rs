@@ -4,7 +4,7 @@ use core::ffi::c_void;
 
 use cna_sys as sys;
 
-use crate::error::{CnaError, Result};
+use crate::error::{CnaError, ErrorCategory, Result};
 
 use super::Native;
 
@@ -32,6 +32,7 @@ impl Native {
         if manager == sys::CNA_INVALID_HANDLE {
             return Err(CnaError::Native {
                 code: sys::CNA_RESULT_INVALID_STATE,
+                category: ErrorCategory::None,
                 message: "CNA returned an invalid GraphicsDeviceManager handle".to_owned(),
             });
         }

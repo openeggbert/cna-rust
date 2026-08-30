@@ -9,7 +9,7 @@ use std::vec::IntoIter;
 
 use cna_sys as sys;
 
-use crate::error::{CnaError, Result};
+use crate::error::{CnaError, ErrorCategory, Result};
 use crate::extensions::window::WindowHandle;
 
 use super::device::DeviceState;
@@ -139,6 +139,7 @@ impl GraphicsAdapter {
         }
         Err(CnaError::Native {
             code: sys::CNA_RESULT_INVALID_STATE,
+            category: ErrorCategory::None,
             message: "CNA enumerated no default graphics adapter".to_owned(),
         })
     }
@@ -198,6 +199,7 @@ impl GraphicsAdapter {
                 .map(|value| {
                     DisplayMode::from_native(value).ok_or_else(|| CnaError::Native {
                         code: sys::CNA_RESULT_INTERNAL,
+                        category: ErrorCategory::None,
                         message: "CNA returned an unknown display-mode format".to_owned(),
                     })
                 })
@@ -208,6 +210,7 @@ impl GraphicsAdapter {
         }
         self.supported_display_modes.get().ok_or(CnaError::Native {
             code: sys::CNA_RESULT_INTERNAL,
+            category: ErrorCategory::None,
             message: "supported display-mode identity could not be initialized".to_owned(),
         })
     }
@@ -220,12 +223,14 @@ impl GraphicsAdapter {
                 .graphics_adapter_current_display_mode(device.handle()?, self.index)?;
             let value = DisplayMode::from_native(native).ok_or_else(|| CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "CNA returned an unknown current display-mode format".to_owned(),
             })?;
             let _ = self.current_display_mode.set(value);
         }
         self.current_display_mode.get().ok_or(CnaError::Native {
             code: sys::CNA_RESULT_INTERNAL,
+            category: ErrorCategory::None,
             message: "current display-mode identity could not be initialized".to_owned(),
         })
     }
@@ -351,6 +356,7 @@ impl GraphicsAdapter {
         *selected_format =
             SurfaceFormat::from_native(value.format).ok_or_else(|| CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "CNA selected an unknown surface format".to_owned(),
             })?;
         *selected_depth_format = match value.depth_format {
@@ -361,6 +367,7 @@ impl GraphicsAdapter {
             _ => {
                 return Err(CnaError::Native {
                     code: sys::CNA_RESULT_INTERNAL,
+                    category: ErrorCategory::None,
                     message: "CNA selected an unknown depth format".to_owned(),
                 })
             }

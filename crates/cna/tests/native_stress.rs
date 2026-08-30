@@ -40,8 +40,8 @@ use cna::Microsoft::Xna::Framework::{
 };
 use cna::{
     run_for_frames, CnaError, EffectAnnotationDescriptor, EffectParameterDescriptor,
-    EffectTechniqueDescriptor, GameComponentCollectionExt, GameComponentRuntime, GameState,
-    GameStateAccess, Result, VertexData,
+    EffectTechniqueDescriptor, ErrorCategory, GameComponentCollectionExt, GameComponentRuntime,
+    GameState, GameStateAccess, Result, VertexData,
 };
 
 const CHILD_CASE: &str = "CNA_RUST_NATIVE_STRESS_CHILD";
@@ -2453,9 +2453,12 @@ impl Game for BufferTransferGame {
 }
 
 fn assert_missing_effect(result: Result<()>) {
+    // The category is CNA's own classification, read from the same
+    // thread-local diagnostic as the message; asserting it here is what proves
+    // the binding reads a real value rather than defaulting to None.
     assert!(matches!(
         result,
-        Err(CnaError::Native { code: 12, message })
+        Err(CnaError::Native { code: 12, category: ErrorCategory::Internal, message })
             if message.contains("no effect has been applied")
     ));
 }
@@ -2463,13 +2466,20 @@ fn assert_missing_effect(result: Result<()>) {
 fn assert_headless_readback_unsupported(result: Result<()>) {
     assert!(matches!(
         result,
-        Err(CnaError::Native { code: 6, message })
+        Err(CnaError::Native { code: 6, category: ErrorCategory::NotSupported, message })
             if message.contains("Headless renderer does not rasterize")
     ));
 }
 
 fn assert_native_not_supported(result: Result<()>) {
-    assert!(matches!(result, Err(CnaError::Native { code: 6, .. })));
+    assert!(matches!(
+        result,
+        Err(CnaError::Native {
+            code: 6,
+            category: ErrorCategory::NotSupported,
+            ..
+        })
+    ));
 }
 
 #[derive(Default)]

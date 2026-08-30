@@ -34,7 +34,7 @@ pub use design::{
     DesignPropertyDescriptor, DesignPropertyValue, DesignType, DesignValue, MathTypeConverterBase,
 };
 pub use disposal::Disposable;
-pub use error::{CnaError, Result};
+pub use error::{CnaError, ErrorCategory, Result};
 pub use gamer_services::NetworkExceptionBase;
 pub use game::{
     run, run_for_frames, GameComponentBase, GameComponentCollectionExt, GameComponentRuntime,

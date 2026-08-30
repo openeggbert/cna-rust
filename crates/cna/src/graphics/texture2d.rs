@@ -13,7 +13,7 @@ use std::sync::Arc;
 use cna_sys as sys;
 
 use crate::content::{ContentDisposable, ContentLoadable};
-use crate::error::{CnaError, Result};
+use crate::error::{CnaError, ErrorCategory, Result};
 use crate::extensions::events::EventHandler;
 use crate::value::Rectangle;
 
@@ -132,6 +132,7 @@ impl Texture2D {
             .read_to_end(&mut bytes)
             .map_err(|error| CnaError::Native {
                 code: sys::CNA_RESULT_IO,
+                category: ErrorCategory::None,
                 message: error.to_string(),
             })?;
         if bytes.is_empty() {
@@ -449,6 +450,7 @@ impl Texture2D {
             .write_all(&bytes[..copied])
             .map_err(|error| CnaError::Native {
                 code: sys::CNA_RESULT_IO,
+                category: ErrorCategory::None,
                 message: error.to_string(),
             })
     }

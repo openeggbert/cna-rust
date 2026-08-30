@@ -6,7 +6,7 @@ use core::mem::size_of;
 
 use cna_sys as sys;
 
-use crate::error::{CnaError, Result};
+use crate::error::{CnaError, ErrorCategory, Result};
 
 use super::Native;
 
@@ -92,6 +92,7 @@ impl Native {
         debug_assert_eq!(copied, byte_count);
         String::from_utf8(bytes).map_err(|_| CnaError::Native {
             code: sys::CNA_RESULT_ENCODING,
+            category: ErrorCategory::None,
             message: "CNA returned a non-UTF-8 adapter string".to_owned(),
         })
     }

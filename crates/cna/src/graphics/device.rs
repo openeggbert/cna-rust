@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use cna_sys as sys;
 
-use crate::error::{CnaError, Result};
+use crate::error::{CnaError, ErrorCategory, Result};
 use crate::extensions::events::{EventArgs, EventHandler};
 use crate::extensions::window::WindowHandle;
 use crate::native::Native;
@@ -306,6 +306,7 @@ impl GraphicsDevice {
             sys::CNA_GRAPHICS_DEVICE_STATUS_NOT_RESET => Ok(GraphicsDeviceStatus::NotReset),
             _ => Err(CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "CNA returned an unknown GraphicsDeviceStatus".to_owned(),
             }),
         }
@@ -320,6 +321,7 @@ impl GraphicsDevice {
             .get(index as usize)
             .ok_or(CnaError::Native {
                 code: sys::CNA_RESULT_INVALID_STATE,
+                category: ErrorCategory::None,
                 message: "graphics-device adapter index is outside the current adapter set"
                     .to_owned(),
             })
@@ -339,6 +341,7 @@ impl GraphicsDevice {
             sys::CNA_GRAPHICS_PROFILE_HI_DEF => Ok(GraphicsProfile::HiDef),
             _ => Err(CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "CNA returned an unknown GraphicsProfile".to_owned(),
             }),
         }
@@ -365,6 +368,7 @@ impl GraphicsDevice {
         {
             return Err(CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "CNA returned invalid PresentationParameters identities".to_owned(),
             });
         }
@@ -385,11 +389,13 @@ impl GraphicsDevice {
             .display_mode(self.state.handle()?, &mut native)?;
         let value = DisplayMode::from_native(native).ok_or_else(|| CnaError::Native {
             code: sys::CNA_RESULT_INTERNAL,
+            category: ErrorCategory::None,
             message: "CNA returned an unknown display surface format".to_owned(),
         })?;
         let _ = self.state.display_mode.set(value);
         self.state.display_mode.get().ok_or(CnaError::Native {
             code: sys::CNA_RESULT_INTERNAL,
+            category: ErrorCategory::None,
             message: "display-mode identity could not be initialized".to_owned(),
         })
     }
@@ -637,6 +643,7 @@ impl GraphicsDevice {
             Arc::new(
                 BlendState::from_native(native, self).ok_or_else(|| CnaError::Native {
                     code: sys::CNA_RESULT_INTERNAL,
+                    category: ErrorCategory::None,
                     message: "CNA returned invalid BlendState identities".to_owned(),
                 })?,
             );
@@ -682,6 +689,7 @@ impl GraphicsDevice {
         let value = Arc::new(DepthStencilState::from_native(native, self).ok_or_else(|| {
             CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "CNA returned invalid DepthStencilState identities".to_owned(),
             }
         })?);
@@ -727,6 +735,7 @@ impl GraphicsDevice {
         let value = Arc::new(RasterizerState::from_native(native, self).ok_or_else(|| {
             CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "CNA returned invalid RasterizerState identities".to_owned(),
             }
         })?);
@@ -768,6 +777,7 @@ impl GraphicsDevice {
             None if native_handle == sys::CNA_INVALID_HANDLE => Ok(None),
             _ => Err(CnaError::Native {
                 code: sys::CNA_RESULT_INVALID_STATE,
+                category: ErrorCategory::None,
                 message:
                     "native index-buffer binding changed outside CNA-Rust's safe identity registry"
                         .to_owned(),
@@ -821,6 +831,7 @@ impl GraphicsDevice {
         if copied != count {
             return Err(CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "CNA returned inconsistent vertex binding counts".to_owned(),
             });
         }
@@ -834,6 +845,7 @@ impl GraphicsDevice {
         if first != expected_first {
             return Err(CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "CNA returned inconsistent first vertex-buffer identity".to_owned(),
             });
         }
@@ -846,6 +858,7 @@ impl GraphicsDevice {
         if cached.len() != native_bindings.len() {
             return Err(CnaError::Native {
                 code: sys::CNA_RESULT_INVALID_STATE,
+                category: ErrorCategory::None,
                 message: "native vertex bindings changed outside CNA-Rust's safe identity registry"
                     .to_owned(),
             });
@@ -857,6 +870,7 @@ impl GraphicsDevice {
             {
                 return Err(CnaError::Native {
                     code: sys::CNA_RESULT_INVALID_STATE,
+                    category: ErrorCategory::None,
                     message: "native vertex binding identity differs from CNA-Rust's safe registry"
                         .to_owned(),
                 });
@@ -1642,6 +1656,7 @@ impl GraphicsDevice {
         {
             return Err(CnaError::Native {
                 code: sys::CNA_RESULT_INVALID_STATE,
+                category: ErrorCategory::None,
                 message: "native render-target bindings changed outside CNA-Rust's safe identity registry"
                     .to_owned(),
             });

@@ -15,7 +15,7 @@ use std::vec::IntoIter;
 use cna_sys as sys;
 
 use crate::content::{ContentDisposable, ContentLoadable};
-use crate::error::{CnaError, Result};
+use crate::error::{CnaError, ErrorCategory, Result};
 use crate::extensions::events::EventHandler;
 use crate::value::{Matrix, Quaternion, Vector2, Vector3, Vector4};
 
@@ -54,6 +54,7 @@ impl EffectParameterClass {
             sys::CNA_EFFECT_PARAMETER_CLASS_STRUCT => Ok(Self::Struct),
             _ => Err(CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "CNA returned an unknown effect parameter class".to_owned(),
             }),
         }
@@ -90,6 +91,7 @@ impl EffectParameterType {
             sys::CNA_EFFECT_PARAMETER_TYPE_TEXTURE_CUBE => Ok(Self::TextureCube),
             _ => Err(CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "CNA returned an unknown effect parameter type".to_owned(),
             }),
         }
@@ -432,6 +434,7 @@ impl Effect {
         {
             return Err(CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "CNA cloned only part of a reflected Effect graph".to_owned(),
             });
         }
@@ -537,6 +540,7 @@ impl Effect {
             .Item(&name)?
             .ok_or_else(|| CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "current effect technique is absent from Techniques".to_owned(),
             })
     }
@@ -1234,6 +1238,7 @@ impl EffectParameter {
         if texture_handle(retained.as_ref(), self.state.owner.device())? != native_handle {
             return Err(CnaError::Native {
                 code: sys::CNA_RESULT_INTERNAL,
+                category: ErrorCategory::None,
                 message: "Effect texture identity changed outside the safe wrapper".to_owned(),
             });
         }
@@ -1602,6 +1607,7 @@ fn collection_count(state: &EffectViewState, kind: u8) -> Result<usize> {
     )
     .map_err(|_| CnaError::Native {
         code: sys::CNA_RESULT_OVERFLOW,
+        category: ErrorCategory::None,
         message: "effect collection count exceeds Rust address space".to_owned(),
     })
 }
@@ -1632,6 +1638,7 @@ fn verified_cached_lookup<T>(found: bool, cached: Option<Arc<T>>) -> Result<Opti
     } else {
         Err(CnaError::Native {
             code: sys::CNA_RESULT_INTERNAL,
+            category: ErrorCategory::None,
             message: "CNA effect lookup disagreed with the stable Rust collection cache".to_owned(),
         })
     }
@@ -1640,6 +1647,7 @@ fn verified_cached_lookup<T>(found: bool, cached: Option<Arc<T>>) -> Result<Opti
 fn checked_count(count: usize) -> Result<i32> {
     i32::try_from(count).map_err(|_| CnaError::Native {
         code: sys::CNA_RESULT_OVERFLOW,
+        category: ErrorCategory::None,
         message: "effect collection count exceeds XNA Int32".to_owned(),
     })
 }

@@ -305,10 +305,6 @@
     }
   ],
   "overrides": {
-    "cna_error_get_last_info": {
-      "category": "DEFERRED_RUNTIME",
-      "rationale": "structured error identity; the CnaError projection should adopt it so a CNA cause can carry an XNA exception identity"
-    },
     "cna_game_get_content_manager_ext": {
       "category": "STRICT_XNA_BACKING",
       "rationale": "backs XNA Game.Content"
