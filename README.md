@@ -204,6 +204,10 @@ python3 tools/native-abi/verify.py \
   --cna-root /path/to/cna \
   --library /path/to/libcna_c_api.so
 
+# Fails if the recorded evidence names a different artifact than this one.
+python3 tools/runtime-capabilities/generate.py --check \
+  --library /path/to/libcna_c_api.so
+
 CNA_ROOT=/path/to/cna python3 tools/c-api-inventory/inventory.py
 
 # Builds an outside consumer from exactly the files the crates would ship.
