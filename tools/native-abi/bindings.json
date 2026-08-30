@@ -735,6 +735,22 @@
     "cna_video_player_resume": 1,
     "cna_video_player_dispose": 1,
     "cna_video_player_destroy": 1,
+    "cna_devices_ext_is_available": 1,
+    "cna_power_get_state_ext": 2,
+    "cna_power_get_battery_percent_ext": 2,
+    "cna_power_get_seconds_remaining_ext": 2,
+    "cna_system_info_get_logical_cpu_core_count_ext": 2,
+    "cna_system_info_get_system_ram_megabytes_ext": 2,
+    "cna_locale_get_preferred_count_ext": 2,
+    "cna_locale_get_language_size_at_ext": 3,
+    "cna_locale_copy_language_at_ext": 5,
+    "cna_locale_get_country_size_at_ext": 3,
+    "cna_locale_copy_country_at_ext": 5,
+    "cna_display_info_get_content_scale_ext": 2,
+    "cna_display_info_get_safe_area_ext": 2,
+    "cna_clipboard_get_text_size": 2,
+    "cna_clipboard_copy_text": 4,
+    "cna_clipboard_set_text": 2,
     "cna_graphics_device_get_renderer_feature_support_ext": 3,
     "cna_graphics_device_get_renderer_limit_ext": 4,
     "cna_graphics_device_get_surface_format_support_ext": 4,
@@ -951,7 +967,9 @@
     "CNA_RENDERER_FORMAT_USAGE_STORAGE_WRITE", "CNA_RENDERER_FORMAT_USAGE_STORAGE_ATOMIC",
     "CNA_RENDERER_FORMAT_USAGE_TRANSFER_SOURCE", "CNA_RENDERER_FORMAT_USAGE_TRANSFER_DESTINATION",
     "CNA_RENDERER_FORMAT_USAGE_MIPMAPPED", "CNA_RENDERER_FORMAT_USAGE_MULTISAMPLE",
-    "CNA_RENDERER_FORMAT_USAGE_COLOR_TRANSFER", "CNA_RENDERER_FORMAT_USAGE_ALL"
+    "CNA_RENDERER_FORMAT_USAGE_COLOR_TRANSFER", "CNA_RENDERER_FORMAT_USAGE_ALL",
+    "CNA_POWER_STATE_ERROR", "CNA_POWER_STATE_UNKNOWN", "CNA_POWER_STATE_ON_BATTERY",
+    "CNA_POWER_STATE_NO_BATTERY", "CNA_POWER_STATE_CHARGING", "CNA_POWER_STATE_CHARGED"
   ],
   "callbackSignatures": {
     "CNA_LogSinkCallback": {

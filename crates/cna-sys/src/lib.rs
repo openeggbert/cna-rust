@@ -137,6 +137,12 @@ pub const CNA_RENDERER_FORMAT_USAGE_MIPMAPPED: CNA_RendererFormatUsageFlags = 1 
 pub const CNA_RENDERER_FORMAT_USAGE_MULTISAMPLE: CNA_RendererFormatUsageFlags = 1 << 11;
 pub const CNA_RENDERER_FORMAT_USAGE_COLOR_TRANSFER: CNA_RendererFormatUsageFlags = 1 << 12;
 pub const CNA_RENDERER_FORMAT_USAGE_ALL: CNA_RendererFormatUsageFlags = (1 << 13) - 1;
+pub const CNA_POWER_STATE_ERROR: CNA_PowerState = 0;
+pub const CNA_POWER_STATE_UNKNOWN: CNA_PowerState = 1;
+pub const CNA_POWER_STATE_ON_BATTERY: CNA_PowerState = 2;
+pub const CNA_POWER_STATE_NO_BATTERY: CNA_PowerState = 3;
+pub const CNA_POWER_STATE_CHARGING: CNA_PowerState = 4;
+pub const CNA_POWER_STATE_CHARGED: CNA_PowerState = 5;
 pub const CNA_PLATFORM_DESKTOP: CNA_Platform = 0;
 pub const CNA_PLATFORM_ANDROID: CNA_Platform = 1;
 pub const CNA_PLATFORM_IOS: CNA_Platform = 2;
@@ -483,6 +489,7 @@ pub type CNA_GraphicsRendererType = u32;
 pub type CNA_GraphicsBackendCategory = u32;
 pub type CNA_GraphicsBackendMaturity = u32;
 pub type CNA_GraphicsRendererFallbackReason = u32;
+pub type CNA_PowerState = u32;
 pub type CNA_RendererFeature = u32;
 pub type CNA_RendererFeatureSupport = u32;
 pub type CNA_RendererLimit = u32;
@@ -3913,3 +3920,48 @@ pub type cna_graphics_device_copy_capability_report_ext_fn = unsafe extern "C" f
 pub type cna_graphics_device_get_shader_dialect_ext_fn = unsafe extern "C" fn(
     CNA_Handle, *mut CNA_ShaderDialect,
 ) -> CNA_Result;
+
+// --- CNA device layer (devices.h, input_devices.h) ---
+
+pub type cna_devices_ext_is_available_fn = unsafe extern "C" fn(*mut CNA_Bool) -> CNA_Result;
+pub type cna_power_get_state_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PowerState,
+) -> CNA_Result;
+pub type cna_power_get_battery_percent_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut i32,
+) -> CNA_Result;
+pub type cna_power_get_seconds_remaining_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut i32,
+) -> CNA_Result;
+pub type cna_system_info_get_logical_cpu_core_count_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut i32,
+) -> CNA_Result;
+pub type cna_system_info_get_system_ram_megabytes_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut i32,
+) -> CNA_Result;
+pub type cna_locale_get_preferred_count_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut u64,
+) -> CNA_Result;
+pub type cna_locale_get_language_size_at_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_locale_copy_language_at_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_locale_get_country_size_at_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_locale_copy_country_at_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_display_info_get_content_scale_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut f32,
+) -> CNA_Result;
+pub type cna_display_info_get_safe_area_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Rectangle,
+) -> CNA_Result;
+pub type cna_clipboard_get_text_size_fn = unsafe extern "C" fn(CNA_Handle, *mut u64) -> CNA_Result;
+pub type cna_clipboard_copy_text_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_clipboard_set_text_fn = unsafe extern "C" fn(CNA_Handle, CNA_StringView) -> CNA_Result;

@@ -55,7 +55,7 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-EXT-004 | Post-processing effects: CRT, depth, ASCII | `graphics_ext.h` | READY |
 | RUST-EXT-005 | PBR material and render-pipeline settings | `graphics_ext.h` | READY |
 | RUST-EXT-006 | `.cnb` container: open, metadata, Texture2D, Model | `cnb.h` | READY |
-| RUST-EXT-007 | Device layer: power, locale, clipboard, display info | `devices.h` | READY |
+| RUST-EXT-007 | Device layer: power, locale, clipboard, display info | `devices.h` | DONE |
 | RUST-EXT-008 | Modern input: haptics, joystick, text input, cursor | `input_*.h` | READY |
 | RUST-EXT-009 | Sensors: accelerometer, compass, gyroscope | `sensors.h` | READY |
 | RUST-EXT-010 | CNAEXT engine layer, 857 routes | `engine_layer.h` | READY |

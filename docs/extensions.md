@@ -134,6 +134,28 @@ into one texture in place and publishes a monotonic counter instead.
 in. These are language projections rather than CNA concepts, and they live here
 so the strict hierarchy contains only members Microsoft declared.
 
+### `devices` — power, system facts, locale, display and clipboard
+
+CNA's device layer, none of which XNA 4.0 has. Every route takes the same
+callback-scoped `GameContext` the strict context-injected members take, because
+CNA reaches the host platform through the game's platform binding.
+
+The layer is a build option, and that distinction is preserved rather than
+hidden: every route is exported in both states, and the ones the layer
+implements refuse with `NOT_SUPPORTED` when it is compiled out.
+`is_available()` is how a caller tells "this build has no device layer" from
+"this host has no such device", and the test holds the answers to whichever
+standard CNA reports.
+
+Two answers are `Option` because CNA's canonical answer for "unknown" would
+otherwise read as a real value: a battery percentage and a remaining time, and
+the display content scale, whose canonical zero means "no native window" rather
+than a scale of zero.
+
+`set_clipboard_text` succeeds when the request was made, which is not the same
+as the clipboard changing -- a headless session, or a browser that requires a
+user gesture, may ignore it. The projection does not pretend otherwise.
+
 ### `net` — the packet buffers XNA keeps internal
 
 XNA's `NetworkSession` reaches a `PacketWriter`'s bytes through an `internal`
