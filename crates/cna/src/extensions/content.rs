@@ -24,6 +24,7 @@ use cna_sys as sys;
 
 use crate::error::{CnaError, Result};
 use crate::graphics::{GraphicsDevice, SurfaceFormat};
+use crate::value::{Rectangle, Vector3};
 use crate::native::runtime::read_string;
 use crate::native::Native;
 
@@ -461,6 +462,33 @@ impl CnbDocument {
         self.native
             .check(unsafe { (self.native.runtime.cnb_decode_model)(self.handle, &mut handle) })?;
         Ok(CnbModel {
+            native: Arc::clone(&self.native),
+            handle,
+        })
+    }
+
+    /// Decodes the document's compiled sprite font.
+    pub fn decode_sprite_font(&self) -> Result<CnbSpriteFont> {
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the document handle is owned and live; the output is a live
+        // local that receives a newly owned font handle.
+        self.native.check(unsafe {
+            (self.native.runtime.cnb_decode_sprite_font)(self.handle, &mut handle)
+        })?;
+        Ok(CnbSpriteFont {
+            native: Arc::clone(&self.native),
+            handle,
+        })
+    }
+
+    /// Decodes the document's compiled sound effect.
+    pub fn decode_sound_effect(&self) -> Result<CnbSoundEffect> {
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: as above, receiving a newly owned sound handle.
+        self.native.check(unsafe {
+            (self.native.runtime.cnb_decode_sound_effect)(self.handle, &mut handle)
+        })?;
+        Ok(CnbSoundEffect {
             native: Arc::clone(&self.native),
             handle,
         })
@@ -1874,4 +1902,405 @@ impl Drop for CnbResolvedLoader {
         // SAFETY: the handle is owned by this value and released exactly once.
         let _ = unsafe { (self.native.runtime.cnb_loader_destroy)(self.handle) };
     }
+}
+
+/// One glyph of a compiled sprite font.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CnbGlyph {
+    /// The character this glyph draws, as XNA's UTF-16 code unit.
+    pub character: u16,
+    /// The glyph's source rectangle inside the atlas.
+    pub glyph_bounds: Rectangle,
+    /// The per-glyph cropping and offset rectangle.
+    pub cropping: Rectangle,
+    /// Left bearing, glyph width and right bearing.
+    pub kerning: Vector3,
+}
+
+/// A compiled sprite font's metrics, without its glyphs or its atlas.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CnbSpriteFontInfo {
+    pub glyph_count: u64,
+    pub line_spacing: i32,
+    pub spacing: f32,
+    /// The fallback glyph, or `None` when a missing character is an error.
+    ///
+    /// XNA distinguishes these: a font without a default character throws on a
+    /// character it has no glyph for, and one with a default substitutes it.
+    /// The container stores the two separately for that reason, and this keeps
+    /// them apart rather than encoding "no default" as some particular char.
+    pub default_character: Option<u16>,
+}
+
+/// A compiled sprite font: metrics, glyphs and an atlas.
+#[derive(Debug)]
+pub struct CnbSpriteFont {
+    native: Arc<Native>,
+    handle: sys::CNA_CnbSpriteFontDataHandle,
+}
+
+impl CnbSpriteFont {
+    /// Starts an empty font to author.
+    pub fn new() -> Result<Self> {
+        let native = Native::process()?;
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the output is a live local receiving a newly owned handle.
+        native.check(unsafe { (native.runtime.cnb_sprite_font_create)(&mut handle) })?;
+        Ok(Self { native, handle })
+    }
+
+    /// Sets the font's metrics. `glyph_count` is ignored here, as upstream says.
+    pub fn set_info(&self, info: CnbSpriteFontInfo) -> Result<()> {
+        let native = sys::CNA_CnbSpriteFontInfo {
+            struct_size: core::mem::size_of::<sys::CNA_CnbSpriteFontInfo>() as u32,
+            struct_version: sys::CNA_CNB_SPRITE_FONT_INFO_STRUCT_VERSION,
+            glyph_count: 0,
+            line_spacing: info.line_spacing,
+            spacing: info.spacing,
+            default_character: info.default_character.unwrap_or(0),
+            has_default_character: u8::from(info.default_character.is_some()),
+            reserved: [0; 5],
+        };
+        // SAFETY: the descriptor is a live local CNA copies during the call.
+        self.native
+            .check(unsafe { (self.native.runtime.cnb_sprite_font_set_info)(self.handle, &native) })
+    }
+
+    /// The font's metrics and glyph count.
+    pub fn info(&self) -> Result<CnbSpriteFontInfo> {
+        let mut info = sys::CNA_CnbSpriteFontInfo {
+            struct_size: core::mem::size_of::<sys::CNA_CnbSpriteFontInfo>() as u32,
+            struct_version: sys::CNA_CNB_SPRITE_FONT_INFO_STRUCT_VERSION,
+            ..sys::CNA_CnbSpriteFontInfo::default()
+        };
+        // SAFETY: the descriptor is a caller-owned versioned output.
+        self.native
+            .check(unsafe { (self.native.runtime.cnb_sprite_font_get_info)(self.handle, &mut info) })?;
+        Ok(CnbSpriteFontInfo {
+            glyph_count: info.glyph_count,
+            line_spacing: info.line_spacing,
+            spacing: info.spacing,
+            default_character: (info.has_default_character != sys::CNA_FALSE)
+                .then_some(info.default_character),
+        })
+    }
+
+    /// Appends a glyph and answers its index.
+    pub fn add_glyph(&self, glyph: CnbGlyph) -> Result<u64> {
+        let native = glyph.to_native();
+        let mut index = 0_u64;
+        // SAFETY: the descriptor is a live local CNA copies; the output is a
+        // live local.
+        self.native.check(unsafe {
+            (self.native.runtime.cnb_sprite_font_add_glyph)(self.handle, &native, &mut index)
+        })?;
+        Ok(index)
+    }
+
+    /// One glyph by index.
+    pub fn glyph(&self, index: u64) -> Result<CnbGlyph> {
+        let mut native = sys::CNA_SpriteFontGlyph {
+            struct_size: core::mem::size_of::<sys::CNA_SpriteFontGlyph>() as u32,
+            struct_version: 1,
+            glyph_bounds: sys::CNA_Rectangle::default(),
+            cropping: sys::CNA_Rectangle::default(),
+            character: 0,
+            reserved: 0,
+            kerning: sys::CNA_Vector3::default(),
+        };
+        // SAFETY: the descriptor is a caller-owned versioned output.
+        self.native.check(unsafe {
+            (self.native.runtime.cnb_sprite_font_get_glyph)(self.handle, index, &mut native)
+        })?;
+        Ok(CnbGlyph::from_native(native))
+    }
+
+    /// Sets the atlas the glyph rectangles index into.
+    ///
+    /// The texture data is copied into the font, so the caller keeps its own.
+    pub fn set_atlas(&self, atlas: &CnbTextureData) -> Result<()> {
+        // SAFETY: both handles are owned and live for the call.
+        self.native.check(unsafe {
+            (self.native.runtime.cnb_sprite_font_set_atlas)(self.handle, atlas.handle)
+        })
+    }
+
+    /// The font's atlas, as a newly owned texture.
+    pub fn atlas(&self) -> Result<CnbTextureData> {
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the output is a live local receiving a newly owned handle.
+        self.native.check(unsafe {
+            (self.native.runtime.cnb_sprite_font_copy_atlas)(self.handle, &mut handle)
+        })?;
+        Ok(CnbTextureData {
+            native: Arc::clone(&self.native),
+            handle,
+        })
+    }
+
+    /// Encodes the font as a complete `.cnb` document.
+    pub fn encode(&self, content_name: &str) -> Result<Vec<u8>> {
+        encode_document(&self.native, content_name, |view, destination, capacity, written| {
+            // SAFETY: the handle is owned and the destination is either null
+            // with zero capacity or a live buffer of exactly `capacity` bytes.
+            unsafe {
+                (self.native.runtime.cnb_encode_sprite_font)(
+                    self.handle,
+                    view,
+                    destination,
+                    capacity,
+                    written,
+                )
+            }
+        })
+    }
+}
+
+impl Drop for CnbSpriteFont {
+    fn drop(&mut self) {
+        // SAFETY: the handle is owned by this value and released exactly once.
+        let _ = unsafe { (self.native.runtime.cnb_sprite_font_destroy)(self.handle) };
+    }
+}
+
+impl CnbGlyph {
+    fn to_native(self) -> sys::CNA_SpriteFontGlyph {
+        sys::CNA_SpriteFontGlyph {
+            struct_size: core::mem::size_of::<sys::CNA_SpriteFontGlyph>() as u32,
+            struct_version: 1,
+            glyph_bounds: sys::CNA_Rectangle {
+                x: self.glyph_bounds.X,
+                y: self.glyph_bounds.Y,
+                width: self.glyph_bounds.Width,
+                height: self.glyph_bounds.Height,
+            },
+            cropping: sys::CNA_Rectangle {
+                x: self.cropping.X,
+                y: self.cropping.Y,
+                width: self.cropping.Width,
+                height: self.cropping.Height,
+            },
+            character: self.character,
+            reserved: 0,
+            kerning: sys::CNA_Vector3 {
+                x: self.kerning.X,
+                y: self.kerning.Y,
+                z: self.kerning.Z,
+            },
+        }
+    }
+
+    const fn from_native(value: sys::CNA_SpriteFontGlyph) -> Self {
+        Self {
+            character: value.character,
+            glyph_bounds: Rectangle {
+                X: value.glyph_bounds.x,
+                Y: value.glyph_bounds.y,
+                Width: value.glyph_bounds.width,
+                Height: value.glyph_bounds.height,
+            },
+            cropping: Rectangle {
+                X: value.cropping.x,
+                Y: value.cropping.y,
+                Width: value.cropping.width,
+                Height: value.cropping.height,
+            },
+            kerning: Vector3 {
+                X: value.kerning.x,
+                Y: value.kerning.y,
+                Z: value.kerning.z,
+            },
+        }
+    }
+}
+
+/// How a compiled sound's samples are encoded.
+///
+/// CNA's own identity: schema 1 writes `Pcm16`, and the rest exist for later
+/// schemas. An unknown value is reported rather than mapped onto the nearest
+/// format this build happens to know.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum CnbAudioFormat {
+    Unknown,
+    Pcm16,
+    Pcm8,
+    PcmFloat32,
+    Adpcm,
+}
+
+impl CnbAudioFormat {
+    const fn from_native(value: sys::CNA_CnbAudioFormat) -> Option<Self> {
+        Some(match value {
+            sys::CNA_CNB_AUDIO_FORMAT_UNKNOWN => Self::Unknown,
+            sys::CNA_CNB_AUDIO_FORMAT_PCM16 => Self::Pcm16,
+            sys::CNA_CNB_AUDIO_FORMAT_PCM8 => Self::Pcm8,
+            sys::CNA_CNB_AUDIO_FORMAT_PCM_FLOAT32 => Self::PcmFloat32,
+            sys::CNA_CNB_AUDIO_FORMAT_ADPCM => Self::Adpcm,
+            _ => return None,
+        })
+    }
+
+    const fn to_native(self) -> sys::CNA_CnbAudioFormat {
+        match self {
+            Self::Unknown => sys::CNA_CNB_AUDIO_FORMAT_UNKNOWN,
+            Self::Pcm16 => sys::CNA_CNB_AUDIO_FORMAT_PCM16,
+            Self::Pcm8 => sys::CNA_CNB_AUDIO_FORMAT_PCM8,
+            Self::PcmFloat32 => sys::CNA_CNB_AUDIO_FORMAT_PCM_FLOAT32,
+            Self::Adpcm => sys::CNA_CNB_AUDIO_FORMAT_ADPCM,
+        }
+    }
+}
+
+/// A compiled sound's encoding, rate, shape and loop region.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CnbSoundEffectInfo {
+    pub format: CnbAudioFormat,
+    pub sample_rate: u32,
+    pub channels: u32,
+    /// Sample frames, that is, samples per channel.
+    pub frame_count: u32,
+    /// The loop region, or `None` when the sound does not loop.
+    ///
+    /// The container encodes "no loop" as a zero length rather than as an
+    /// absent field, and this keeps the distinction rather than handing back a
+    /// zero-length region a caller could loop on forever.
+    pub loop_region: Option<(u32, u32)>,
+}
+
+/// A compiled sound effect: its shape and its samples.
+#[derive(Debug)]
+pub struct CnbSoundEffect {
+    native: Arc<Native>,
+    handle: sys::CNA_CnbSoundEffectDataHandle,
+}
+
+impl CnbSoundEffect {
+    /// Builds a sound from its shape and its raw sample bytes.
+    pub fn new(info: CnbSoundEffectInfo, samples: &[u8]) -> Result<Self> {
+        let native = Native::process()?;
+        let (loop_start, loop_length) = info.loop_region.unwrap_or((0, 0));
+        let descriptor = sys::CNA_CnbSoundEffectInfo {
+            struct_size: core::mem::size_of::<sys::CNA_CnbSoundEffectInfo>() as u32,
+            struct_version: sys::CNA_CNB_SOUND_EFFECT_INFO_STRUCT_VERSION,
+            format: info.format.to_native(),
+            sample_rate: info.sample_rate,
+            channels: info.channels,
+            frame_count: info.frame_count,
+            loop_start,
+            loop_length,
+        };
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the descriptor and samples are borrowed for the call with the
+        // slice's own length; the output is a live local.
+        native.check(unsafe {
+            (native.runtime.cnb_sound_effect_create)(
+                &descriptor,
+                if samples.is_empty() {
+                    core::ptr::null()
+                } else {
+                    samples.as_ptr()
+                },
+                samples.len() as u64,
+                &mut handle,
+            )
+        })?;
+        Ok(Self { native, handle })
+    }
+
+    /// The sound's shape.
+    pub fn info(&self) -> Result<CnbSoundEffectInfo> {
+        let mut info = sys::CNA_CnbSoundEffectInfo {
+            struct_size: core::mem::size_of::<sys::CNA_CnbSoundEffectInfo>() as u32,
+            struct_version: sys::CNA_CNB_SOUND_EFFECT_INFO_STRUCT_VERSION,
+            ..sys::CNA_CnbSoundEffectInfo::default()
+        };
+        // SAFETY: the descriptor is a caller-owned versioned output.
+        self.native.check(unsafe {
+            (self.native.runtime.cnb_sound_effect_get_info)(self.handle, &mut info)
+        })?;
+        let format = CnbAudioFormat::from_native(info.format).ok_or(
+            CnaError::UnsupportedRuntime("this .cnb sound names an audio format this build does not know"),
+        )?;
+        Ok(CnbSoundEffectInfo {
+            format,
+            sample_rate: info.sample_rate,
+            channels: info.channels,
+            frame_count: info.frame_count,
+            loop_region: (info.loop_length != 0).then_some((info.loop_start, info.loop_length)),
+        })
+    }
+
+    /// The sound's raw sample bytes.
+    pub fn samples(&self) -> Result<Vec<u8>> {
+        let api = &self.native.runtime;
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the size.
+        accept_size_probe(&self.native, unsafe {
+            (api.cnb_sound_effect_copy_samples)(self.handle, core::ptr::null_mut(), 0, &mut required)
+        })?;
+        let capacity = usize::try_from(required)
+            .map_err(|_| CnaError::InvalidInput("sample block is too large"))?;
+        let mut bytes = vec![0_u8; capacity];
+        let mut written = 0_u64;
+        // SAFETY: `bytes` holds exactly `required` writable bytes for the call.
+        self.native.check(unsafe {
+            (api.cnb_sound_effect_copy_samples)(
+                self.handle,
+                if capacity == 0 {
+                    core::ptr::null_mut()
+                } else {
+                    bytes.as_mut_ptr()
+                },
+                required,
+                &mut written,
+            )
+        })?;
+        let written = usize::try_from(written)
+            .map_err(|_| CnaError::InvalidInput("sample block is too large"))?;
+        bytes.truncate(written.min(capacity));
+        Ok(bytes)
+    }
+
+    /// Encodes the sound as a complete `.cnb` document.
+    pub fn encode(&self, content_name: &str) -> Result<Vec<u8>> {
+        encode_document(&self.native, content_name, |view, destination, capacity, written| {
+            // SAFETY: as for the sprite font encode above.
+            unsafe {
+                (self.native.runtime.cnb_encode_sound_effect)(
+                    self.handle,
+                    view,
+                    destination,
+                    capacity,
+                    written,
+                )
+            }
+        })
+    }
+}
+
+impl Drop for CnbSoundEffect {
+    fn drop(&mut self) {
+        // SAFETY: the handle is owned by this value and released exactly once.
+        let _ = unsafe { (self.native.runtime.cnb_sound_effect_destroy)(self.handle) };
+    }
+}
+
+/// The canonical size-probe-then-copy shape every `.cnb` encode route uses.
+fn encode_document(
+    native: &Arc<Native>,
+    content_name: &str,
+    mut encode: impl FnMut(sys::CNA_StringView, *mut u8, u64, *mut u64) -> sys::CNA_Result,
+) -> Result<Vec<u8>> {
+    let view = string_view(content_name);
+    let mut required = 0_u64;
+    accept_size_probe(native, encode(view, core::ptr::null_mut(), 0, &mut required))?;
+    let capacity = usize::try_from(required)
+        .map_err(|_| CnaError::InvalidInput("encoded document is too large"))?;
+    let mut bytes = vec![0_u8; capacity];
+    let mut written = 0_u64;
+    native.check(encode(view, bytes.as_mut_ptr(), required, &mut written))?;
+    let written = usize::try_from(written)
+        .map_err(|_| CnaError::InvalidInput("encoded document is too large"))?;
+    bytes.truncate(written.min(capacity));
+    Ok(bytes)
 }

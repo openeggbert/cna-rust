@@ -426,3 +426,25 @@ claiming coverage it does not have.
 `cna_cnb_loader_invoke` with no content manager answers `INVALID_HANDLE` rather
 than manufacturing one, which is what upstream intends: a placeholder manager
 would install the built-in loaders as a side effect of an invoke.
+
+## `.cnb` SpriteFont and SoundEffect (RUST-EXT-013c, 2026-08-31)
+
+Both complete the container's read/write surface for the asset types a Rust
+game is most likely to ship. A font round-trips its metrics, its glyphs and its
+atlas; a sound round-trips its encoding, rate, shape, loop region and every
+sample byte.
+
+Two places where the container distinguishes "absent" from "a particular
+value", and where collapsing them would be a real bug, are kept apart:
+
+- `default_character` is `Option<u16>`. XNA throws on a character a font has no
+  glyph for **unless** the font declares a fallback, so "no fallback" is not the
+  same as "the fallback happens to be `\0`".
+- `loop_region` is `Option<(u32, u32)>`. The container writes "no loop" as a
+  zero length; handing that back as a zero-length region would give a caller a
+  region it could loop on forever.
+
+CNA validates more than the shape: encoding a font whose declared fallback
+glyph is not one of the font's own characters is refused, because such a font
+would substitute nothing and draw a hole. A test asserts that refusal rather
+than only the happy path.

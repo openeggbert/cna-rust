@@ -190,6 +190,13 @@ pub const CNA_CNB_READ_LIMITS_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_METADATA_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_TEXTURE_INFO_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_MODEL_INFO_STRUCT_VERSION: u32 = 1;
+pub const CNA_CNB_SPRITE_FONT_INFO_STRUCT_VERSION: u32 = 1;
+pub const CNA_CNB_SOUND_EFFECT_INFO_STRUCT_VERSION: u32 = 1;
+pub const CNA_CNB_AUDIO_FORMAT_UNKNOWN: CNA_CnbAudioFormat = 0;
+pub const CNA_CNB_AUDIO_FORMAT_PCM16: CNA_CnbAudioFormat = 1;
+pub const CNA_CNB_AUDIO_FORMAT_PCM8: CNA_CnbAudioFormat = 2;
+pub const CNA_CNB_AUDIO_FORMAT_PCM_FLOAT32: CNA_CnbAudioFormat = 3;
+pub const CNA_CNB_AUDIO_FORMAT_ADPCM: CNA_CnbAudioFormat = 4;
 pub const CNA_CNB_MODEL_BONE_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_MODEL_PART_INFO_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_MATERIAL_INFO_STRUCT_VERSION: u32 = 1;
@@ -584,6 +591,9 @@ pub type CNA_CnbTextureDataHandle = CNA_Handle;
 pub type CNA_CnbModelDataHandle = CNA_Handle;
 pub type CNA_CnbLoaderHandle = CNA_Handle;
 pub type CNA_CnbWriterHandle = CNA_Handle;
+pub type CNA_CnbSpriteFontDataHandle = CNA_Handle;
+pub type CNA_CnbSoundEffectDataHandle = CNA_Handle;
+pub type CNA_CnbAudioFormat = u32;
 pub type CNA_CnbEffectKind = u32;
 pub type CNA_CnbMaterialTextureSlot = u32;
 pub type CNA_PowerState = u32;
@@ -1373,6 +1383,32 @@ pub struct CNA_ContentManagerCreateInfo {
     pub struct_version: u32,
     pub root_directory: CNA_StringView,
     pub reserved: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbSpriteFontInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub glyph_count: u64,
+    pub line_spacing: i32,
+    pub spacing: f32,
+    pub default_character: CNA_Char16,
+    pub has_default_character: CNA_Bool,
+    pub reserved: [u8; 5],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbSoundEffectInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub format: CNA_CnbAudioFormat,
+    pub sample_rate: u32,
+    pub channels: u32,
+    pub frame_count: u32,
+    pub loop_start: u32,
+    pub loop_length: u32,
 }
 
 #[repr(C)]
@@ -4355,6 +4391,54 @@ pub type cna_cnb_texture_data_get_level_count_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_cnb_texture_data_copy_level_fn = unsafe extern "C" fn(
     CNA_CnbTextureDataHandle, u64, u64, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_sprite_font_data_create_fn = unsafe extern "C" fn(
+    *mut CNA_CnbSpriteFontDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_sprite_font_data_destroy_fn = unsafe extern "C" fn(
+    CNA_CnbSpriteFontDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_sprite_font_data_set_info_fn = unsafe extern "C" fn(
+    CNA_CnbSpriteFontDataHandle, *const CNA_CnbSpriteFontInfo,
+) -> CNA_Result;
+pub type cna_cnb_sprite_font_data_get_info_fn = unsafe extern "C" fn(
+    CNA_CnbSpriteFontDataHandle, *mut CNA_CnbSpriteFontInfo,
+) -> CNA_Result;
+pub type cna_cnb_sprite_font_data_add_glyph_fn = unsafe extern "C" fn(
+    CNA_CnbSpriteFontDataHandle, *const CNA_SpriteFontGlyph, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_sprite_font_data_get_glyph_fn = unsafe extern "C" fn(
+    CNA_CnbSpriteFontDataHandle, u64, *mut CNA_SpriteFontGlyph,
+) -> CNA_Result;
+pub type cna_cnb_sprite_font_data_set_atlas_fn = unsafe extern "C" fn(
+    CNA_CnbSpriteFontDataHandle, CNA_CnbTextureDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_sprite_font_data_copy_atlas_fn = unsafe extern "C" fn(
+    CNA_CnbSpriteFontDataHandle, *mut CNA_CnbTextureDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_encode_sprite_font_fn = unsafe extern "C" fn(
+    CNA_CnbSpriteFontDataHandle, CNA_StringView, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_decode_sprite_font_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut CNA_CnbSpriteFontDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_sound_effect_data_create_fn = unsafe extern "C" fn(
+    *const CNA_CnbSoundEffectInfo, *const u8, u64, *mut CNA_CnbSoundEffectDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_sound_effect_data_destroy_fn = unsafe extern "C" fn(
+    CNA_CnbSoundEffectDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_sound_effect_data_get_info_fn = unsafe extern "C" fn(
+    CNA_CnbSoundEffectDataHandle, *mut CNA_CnbSoundEffectInfo,
+) -> CNA_Result;
+pub type cna_cnb_sound_effect_data_copy_samples_fn = unsafe extern "C" fn(
+    CNA_CnbSoundEffectDataHandle, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_encode_sound_effect_fn = unsafe extern "C" fn(
+    CNA_CnbSoundEffectDataHandle, CNA_StringView, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_decode_sound_effect_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut CNA_CnbSoundEffectDataHandle,
 ) -> CNA_Result;
 pub type cna_cnb_writer_create_fn = unsafe extern "C" fn(
     u32, u32, *mut CNA_CnbWriterHandle,

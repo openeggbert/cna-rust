@@ -9,9 +9,11 @@ use std::sync::Arc;
 
 use cna::extensions::content::{
     AssetTypeId, CnbDocument, CnbEffectKind, CnbLoader, CnbLoaderRegistry, CnbMaterial,
-    CnbMaterialTexture, CnbModel, CnbModelPart, CnbTextureData, CnbWriter, NativeContentManager,
-    ReadLimits,
+    CnbAudioFormat, CnbGlyph, CnbMaterialTexture, CnbModel, CnbModelPart, CnbSoundEffect,
+    CnbSoundEffectInfo, CnbSpriteFont, CnbSpriteFontInfo, CnbTextureData, CnbWriter,
+    NativeContentManager, ReadLimits,
 };
+use cna::Microsoft::Xna::Framework::{Rectangle, Vector3};
 use cna::Microsoft::Xna::Framework::Graphics::{
     GraphicsDevice, GraphicsProfile, PresentationParameters,
 };
@@ -761,4 +763,216 @@ fn a_loader_lookup_without_a_document_finds_nothing_when_nothing_is_registered()
         "",
         "nothing registered names nothing"
     );
+}
+
+#[test]
+fn a_sprite_font_survives_a_cnb_round_trip_with_its_exact_glyphs() {
+    if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
+        return;
+    }
+    let font = CnbSpriteFont::new().expect("start a font");
+    font.set_info(CnbSpriteFontInfo {
+        glyph_count: 0,
+        line_spacing: 23,
+        spacing: 1.5,
+        // CNA requires the fallback glyph to be one the font actually has, so
+        // this is the first authored character rather than an arbitrary one.
+        default_character: Some(u16::from(b'A')),
+    })
+    .expect("metrics");
+
+    // Distinguishable glyphs: a glyph read back with a neighbour's rectangle
+    // or kerning is visible rather than plausible.
+    let authored: Vec<CnbGlyph> = "Aq\u{00e9}\u{4e2d}"
+        .encode_utf16()
+        .enumerate()
+        .map(|(ordinal, character)| {
+            let ordinal = ordinal as i32;
+            CnbGlyph {
+                character,
+                glyph_bounds: Rectangle::new(ordinal * 10, 4, 8 + ordinal, 12 + ordinal),
+                cropping: Rectangle::new(ordinal, -ordinal, 3 + ordinal, 5 + ordinal),
+                kerning: Vector3::from_x_and_y_and_z(
+                    ordinal as f32 * 0.5,
+                    7.25 + ordinal as f32,
+                    -1.5 - ordinal as f32,
+                ),
+            }
+        })
+        .collect();
+    for (ordinal, glyph) in authored.iter().enumerate() {
+        assert_eq!(
+            font.add_glyph(*glyph).expect("add glyph"),
+            ordinal as u64,
+            "glyphs are appended in order"
+        );
+    }
+
+    // An atlas the glyph rectangles index into.
+    let (width, height, rgba) = rgba_fixture();
+    let atlas = CnbTextureData::from_rgba8(width, height, &rgba).expect("atlas");
+    font.set_atlas(&atlas).expect("set atlas");
+
+    let bytes = font.encode("font round trip").expect("encode");
+    let document = CnbDocument::parse(&bytes, "font.cnb", ReadLimits::default()).expect("parse");
+    assert_eq!(
+        document.asset_type().expect("asset type"),
+        AssetTypeId::SPRITE_FONT
+    );
+    let decoded = document.decode_sprite_font().expect("decode font");
+
+    let info = decoded.info().expect("decoded metrics");
+    assert_eq!(info.glyph_count, authored.len() as u64);
+    assert_eq!(info.line_spacing, 23);
+    assert_eq!(info.spacing, 1.5);
+    assert_eq!(info.default_character, Some(u16::from(b'A')));
+
+    for (ordinal, expected) in authored.iter().enumerate() {
+        let glyph = decoded.glyph(ordinal as u64).expect("decoded glyph");
+        assert_eq!(glyph, *expected, "glyph {ordinal} survives exactly");
+    }
+
+    // The atlas comes back as its own owned texture with the same pixels.
+    let decoded_atlas = decoded.atlas().expect("decoded atlas");
+    let atlas_info = decoded_atlas.info().expect("atlas info");
+    assert_eq!((atlas_info.width, atlas_info.height), (width, height));
+    assert_eq!(
+        decoded_atlas.level_bytes(0, 0).expect("atlas pixels"),
+        rgba,
+        "the atlas pixels survive the round trip"
+    );
+}
+
+#[test]
+fn a_fallback_glyph_the_font_does_not_have_is_refused() {
+    if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
+        return;
+    }
+    // A default character with no glyph would substitute nothing, so CNA
+    // refuses it at encode time rather than producing a font that draws a hole.
+    let font = CnbSpriteFont::new().expect("font");
+    font.set_info(CnbSpriteFontInfo {
+        glyph_count: 0,
+        line_spacing: 10,
+        spacing: 0.0,
+        default_character: Some(u16::from(b'?')),
+    })
+    .expect("metrics");
+    font.add_glyph(CnbGlyph {
+        character: u16::from(b'x'),
+        glyph_bounds: Rectangle::new(0, 0, 1, 1),
+        cropping: Rectangle::new(0, 0, 1, 1),
+        kerning: Vector3::from_x_and_y_and_z(0.0, 1.0, 0.0),
+    })
+    .expect("one glyph that is not '?'");
+    let (width, height, rgba) = rgba_fixture();
+    font.set_atlas(&CnbTextureData::from_rgba8(width, height, &rgba).expect("atlas"))
+        .expect("atlas");
+    let refused = font.encode("missing fallback");
+    assert!(
+        matches!(&refused, Err(CnaError::Native { message, .. })
+            if message.contains("default character is not one of the font's characters")),
+        "a fallback glyph the font lacks must be refused, got {refused:?}"
+    );
+}
+
+#[test]
+fn a_font_without_a_default_character_stays_without_one() {
+    if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
+        return;
+    }
+    // XNA throws on a missing character when a font has no default and
+    // substitutes when it has one, so "absent" must not become "some
+    // particular character".
+    let font = CnbSpriteFont::new().expect("font");
+    font.set_info(CnbSpriteFontInfo {
+        glyph_count: 0,
+        line_spacing: 10,
+        spacing: 0.0,
+        default_character: None,
+    })
+    .expect("metrics");
+    font.add_glyph(CnbGlyph {
+        character: u16::from(b'x'),
+        glyph_bounds: Rectangle::new(0, 0, 1, 1),
+        cropping: Rectangle::new(0, 0, 1, 1),
+        kerning: Vector3::from_x_and_y_and_z(0.0, 1.0, 0.0),
+    })
+    .expect("one glyph");
+    let (width, height, rgba) = rgba_fixture();
+    font.set_atlas(&CnbTextureData::from_rgba8(width, height, &rgba).expect("atlas"))
+        .expect("atlas");
+
+    let bytes = font.encode("no default").expect("encode");
+    let document = CnbDocument::parse(&bytes, "no-default.cnb", ReadLimits::default()).expect("parse");
+    let decoded = document.decode_sprite_font().expect("decode");
+    assert_eq!(
+        decoded.info().expect("metrics").default_character,
+        None,
+        "a font with no fallback glyph keeps none"
+    );
+}
+
+#[test]
+fn a_sound_effect_survives_a_cnb_round_trip_with_its_exact_samples() {
+    if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
+        return;
+    }
+    // A stereo PCM16 ramp: every frame differs, so a sample that moves shows.
+    let frames = 64_u32;
+    let channels = 2_u32;
+    let mut samples = Vec::with_capacity((frames * channels * 2) as usize);
+    for frame in 0..frames {
+        for channel in 0..channels {
+            let value = (frame as i16)
+                .wrapping_mul(257)
+                .wrapping_add(channel as i16 * 13);
+            samples.extend_from_slice(&value.to_le_bytes());
+        }
+    }
+    let info = CnbSoundEffectInfo {
+        format: CnbAudioFormat::Pcm16,
+        sample_rate: 22_050,
+        channels,
+        frame_count: frames,
+        loop_region: Some((8, 40)),
+    };
+    let sound = CnbSoundEffect::new(info, &samples).expect("build sound");
+    assert_eq!(sound.info().expect("authored info"), info);
+
+    let bytes = sound.encode("sound round trip").expect("encode");
+    let document = CnbDocument::parse(&bytes, "sound.cnb", ReadLimits::default()).expect("parse");
+    assert_eq!(
+        document.asset_type().expect("asset type"),
+        AssetTypeId::SOUND_EFFECT
+    );
+    let decoded = document.decode_sound_effect().expect("decode sound");
+    assert_eq!(decoded.info().expect("decoded info"), info);
+    assert_eq!(
+        decoded.samples().expect("decoded samples"),
+        samples,
+        "every sample byte survives"
+    );
+}
+
+#[test]
+fn a_sound_without_a_loop_reports_no_loop_rather_than_an_empty_one() {
+    if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
+        return;
+    }
+    // The container writes "no loop" as a zero length. Handing that back as a
+    // zero-length region would be a region a caller could loop on forever.
+    let samples = vec![0_u8; 32];
+    let info = CnbSoundEffectInfo {
+        format: CnbAudioFormat::Pcm16,
+        sample_rate: 8_000,
+        channels: 1,
+        frame_count: 16,
+        loop_region: None,
+    };
+    let sound = CnbSoundEffect::new(info, &samples).expect("build");
+    let bytes = sound.encode("no loop").expect("encode");
+    let document = CnbDocument::parse(&bytes, "no-loop.cnb", ReadLimits::default()).expect("parse");
+    let decoded = document.decode_sound_effect().expect("decode");
+    assert_eq!(decoded.info().expect("info").loop_region, None);
 }
