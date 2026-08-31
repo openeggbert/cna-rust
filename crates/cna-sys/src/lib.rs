@@ -1813,6 +1813,13 @@ pub type cna_game_window_end_screen_device_change_fn =
     unsafe extern "C" fn(CNA_Handle, CNA_StringView, i32, i32) -> CNA_Result;
 pub type cna_game_get_graphics_device_fn =
     unsafe extern "C" fn(CNA_Handle, *mut CNA_Handle) -> CNA_Result;
+pub type cna_graphics_device_create_fn = unsafe extern "C" fn(
+    u32,
+    u32,
+    *const CNA_PresentationParameters,
+    *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_graphics_device_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
 pub type cna_graphics_device_get_status_fn =
     unsafe extern "C" fn(CNA_Handle, *mut CNA_GraphicsDeviceStatus) -> CNA_Result;
 pub type cna_graphics_device_get_graphics_profile_fn =

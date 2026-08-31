@@ -85,6 +85,17 @@ impl GraphicsAdapter {
         }
     }
 
+    /// The canonical adapter index `cna_graphics_device_create` takes.
+    ///
+    /// Both adapter shapes carry one: a placeholder names the index it stands
+    /// for, and an enumerated adapter names the index it was enumerated at.
+    /// CNA validates the index itself and refuses an out-of-range one, so this
+    /// does not re-enumerate -- an independent device is created before there
+    /// is any device to enumerate through.
+    pub(crate) const fn independent_construction_index(&self) -> Result<u32> {
+        Ok(self.index)
+    }
+
     pub(crate) fn same_identity(&self, other: &Self) -> bool {
         (self.placeholder && other.placeholder && self.index == other.index)
             || (!self.placeholder

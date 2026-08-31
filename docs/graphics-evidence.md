@@ -242,3 +242,107 @@ vertex landed in slot one with slots zero and two unchanged; the per-player
 keyboard snapshot is proved by checking all four slots against `GetState`; the
 clear masks are proved by executing each of them and by CNA still rejecting a
 non-finite depth through the safe wrapper.
+
+## Independent `GraphicsDevice` construction (RUST-ABI-008, 2026-08-31)
+
+XNA's public `GraphicsDevice` constructor refused for the whole life of this
+binding, and the message still named ABI 0.7. ABI 0.21 has
+`cna_graphics_device_create`, so the refusal is gone and the constructor is
+real. What it needed was not a message change but an ownership model.
+
+### The XNA contract, re-derived from IL
+
+Measured from the admitted `Microsoft.Xna.Framework.Graphics.dll`
+(`560080fc39021c611ca9d076dcebed312faf6d7d1413c2dc523683ea635e9f55`), not from
+memory or from MonoGame. There is exactly one public constructor,
+`GraphicsDevice(GraphicsAdapter adapter, GraphicsProfile graphicsProfile,
+PresentationParameters presentationParameters)`, and its validation order is
+**not** its parameter order:
+
+1. `presentationParameters` null -> `ArgumentNullException`;
+2. `adapter` null -> `ArgumentNullException`;
+3. `_deviceType` and `_graphicsProfile` are stored;
+4. `ProfileCapabilities.GetInstance` rejects an unknown profile with
+   `ArgumentOutOfRangeException("graphicsProfile")`;
+5. `adapter.IsProfileSupported` failing raises `NotSupportedException`;
+6. `CreateDevice`, then `presentationParameters.Clone()` **twice** -- the
+   caller's object is never retained.
+
+Disposal is equally specific. `Dispose()` calls `Dispose(true)`, which reaches
+`~GraphicsDevice`: it returns immediately when `isDisposed` is set, otherwise
+`!GraphicsDevice` sets `isDisposed`, calls
+`DeviceResourceManager.ReleaseAllDeviceResources()`, releases the declarations
+and the device, and only then is `Disposing` raised -- once.
+
+### What CNA actually does
+
+Measured on the live artifact with `build-probe/abi008_probe.c`, whose calls
+each complete on their own statement: C does not order `printf` argument
+evaluation, and reading an out-parameter in the same `printf` that fills it
+reports the value from before the call. An earlier draft of the probe did
+exactly that and produced three "findings" that were entirely artefacts.
+
+Working as documented: construction with no `Game` in the process; exact
+preservation of the requested profile, back-buffer size, formats and
+`headless_ext`; `Clear`, `Present`, `Reset` and back-buffer info; real child
+textures whose pixels round-trip exactly; two devices alive at once with each
+usable while the other lives; destruction of one leaving the other intact; and
+`INVALID_HANDLE` for a second destroy or any use after one.
+
+Three deviations from `graphics_device.h`'s own text were measured:
+
+| Documented | Measured | Effect here |
+|---|---|---|
+| "Resources remember which device made them: mixing one device's resource into another device's call is refused" | `cna_graphics_device_set_texture` **accepts** a foreign texture and the slot then reports it bound | the projection refuses it itself, as it already did; the refusal is now load-bearing rather than redundant |
+| resources on a caller-created device "are released with it" | after `cna_graphics_device_destroy` the child still answers `cna_texture2d_get_info` and is still destroyable | `Dispose` releases the children first, which is also XNA's order |
+| `cna_graphics_resource_get_graphics_device` names a resource's device | answers `INVALID_HANDLE` for a resource of a caller-created device | none: the projection answers `GraphicsResource.GraphicsDevice` from its own retained device and never calls that route |
+
+None of the three is worked around by pretending; each is absorbed by doing the
+XNA-correct thing on the Rust side.
+
+### Ownership
+
+`DeviceState` carries a `DeviceOwner` rather than a flag beside the handle, so
+nothing can reach the handle without saying which case it is in:
+
+- `DeviceOwner::Game` -- the handle is borrowed at callback entry and dropped
+  at callback exit, and disposal is refused because `cna_game_destroy` performs
+  it;
+- `DeviceOwner::Independent` -- the handle lives from construction to disposal
+  and does not depend on a callback, and this crate destroys it.
+
+A child resource holds a `GraphicsDevice` clone, so an independent device
+outlives every child: dropping the caller's last handle while a texture is live
+keeps the device alive until the texture goes. `Dispose` is single-shot through
+one atomic swap rather than an `IsDisposed` pre-check, because a second guard
+would hide a regression in the first and would not survive a race.
+
+`PresentationParameters.DeviceWindowHandle` is the one thing that cannot be
+honoured: XNA presents an independently created device to that window and
+`cna_graphics_device_create` takes no window at all. A non-default handle is
+refused rather than silently dropped.
+
+### Mutation controls
+
+The case is `independent-graphics-device` in `native_stress`. Planted defects
+and whether the test catches them:
+
+| Mutation | Caught |
+|---|---|
+| device disposal stops releasing its resources | yes |
+| single-shot guard weakened from `swap` to `store` (`Disposing` twice) | yes |
+| `Disposing` raised before the release instead of after | yes |
+| constructor ignores the requested `GraphicsProfile` | yes |
+| constructor ignores the requested `PresentationParameters` | yes |
+| cross-device texture refusal removed | yes |
+| `Dispose` never destroys the native device | **no** |
+| `leave_callback` clears an independent device's handle | **no** |
+| `Drop` destroys a game-owned device too | **no** |
+
+The three survivors are recorded rather than hidden. A native handle this crate
+failed to destroy is invisible through the safe API -- the wrapper has already
+forgotten it -- so a leak needs the sanitizer path, not an assertion. The other
+two are guards on invariants that are unreachable by construction: only the
+game host calls `leave_callback`, and only on its own device, and a game
+device's `DeviceState` never drops holding a live handle. They are kept because
+the failure they prevent would be silent, not because a test proves them.

@@ -73,7 +73,7 @@ hierarchy and deliberate CNA extensions.
 - `GraphicsDeviceManager` is Game-associated, publishes the manager/device
   services, retains CNA's Game-owned device, synchronizes preferences, and
   bridges preparing/device lifecycle events without constructing a second
-  device. Re-measured on ABI 0.20: `runtime_graphics_manager.h` still has no
+  device. Re-measured on ABI 0.21: `runtime_graphics_manager.h` still has no
   candidate-ranking route, so `RankDevices` remains an explicit backend
   blocker.
 - Touch/Gesture uses reviewed CNA state, capability, panel, and gesture routes.

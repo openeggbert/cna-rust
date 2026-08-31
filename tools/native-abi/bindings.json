@@ -40,6 +40,8 @@
     "cna_game_window_begin_screen_device_change": 2,
     "cna_game_window_end_screen_device_change": 4,
     "cna_game_get_graphics_device": 2,
+    "cna_graphics_device_create": 4,
+    "cna_graphics_device_destroy": 1,
     "cna_graphics_device_get_status": 2,
     "cna_graphics_device_get_graphics_profile": 2,
     "cna_graphics_device_get_presentation_parameters": 2,

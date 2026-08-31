@@ -50,10 +50,38 @@ impl BackBufferData for Color {
     }
 }
 
-/// Shared validity and child-resource registry for one game-owned device.
+/// How a `DeviceState` relates to CNA's native graphics device.
+///
+/// The two cases differ in where the handle comes from, in how long it stays
+/// valid, and in who destroys it, so they are one enum rather than a boolean
+/// beside the handle: nothing can reach the handle without also saying which
+/// case it is in, and a future third case has one place to go.
+enum DeviceOwner {
+    /// A `Game` owns CNA's device. `cna_game_get_graphics_device` lends the
+    /// handle for the duration of one callback and it is invalid outside one,
+    /// so this state never destroys it -- `cna_game_destroy` does.
+    Game { game: sys::CNA_Handle },
+    /// This state created the device with `cna_graphics_device_create` and is
+    /// the only thing that may destroy it. The handle is valid from
+    /// construction until disposal and does not depend on a callback, because
+    /// there is no game whose callback it could depend on.
+    Independent,
+}
+
+impl DeviceOwner {
+    /// The owning game, for the few routes that genuinely need one.
+    const fn game(&self) -> Option<sys::CNA_Handle> {
+        match self {
+            Self::Game { game } => Some(*game),
+            Self::Independent => None,
+        }
+    }
+}
+
+/// Shared validity and child-resource registry for one graphics device.
 pub(super) struct DeviceState {
     native: Arc<Native>,
-    game: sys::CNA_Handle,
+    owner: DeviceOwner,
     handle: Mutex<sys::CNA_Handle>,
     alive: AtomicBool,
     resources: Mutex<Vec<Weak<ResourceState>>>,
@@ -89,6 +117,11 @@ impl DeviceState {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         if handle == sys::CNA_INVALID_HANDLE {
+            // Only a game's device has a handle that is valid at some moments
+            // and not others. An independent device holds its handle for its
+            // whole life and `ensure_alive` above has already ruled out the
+            // one thing that clears it, so reaching here means the game is
+            // between callbacks.
             Err(CnaError::InvalidInput(
                 "graphics-device operations require an active game callback",
             ))
@@ -107,8 +140,13 @@ impl DeviceState {
 
     fn enter_callback(&self) -> Result<()> {
         self.ensure_alive()?;
+        let Some(game) = self.owner.game() else {
+            // Only a game host enters callbacks, and it only ever holds its
+            // own device. An independent device has no borrow to refresh.
+            return Ok(());
+        };
         let mut handle = sys::CNA_INVALID_HANDLE;
-        self.native.borrow_graphics_device(self.game, &mut handle)?;
+        self.native.borrow_graphics_device(game, &mut handle)?;
         *self
             .handle
             .lock()
@@ -117,6 +155,15 @@ impl DeviceState {
     }
 
     fn leave_callback(&self) {
+        if self.owner.game().is_none() {
+            // Guards an invariant rather than an observed behaviour: the game
+            // host is the only caller and only ever holds its own device, so
+            // this branch is unreachable today. It is here because clearing an
+            // independent device's handle would dispose it in all but name --
+            // nothing would ever restore it -- and that failure would be
+            // silent.
+            return;
+        }
         *self
             .handle
             .lock()
@@ -229,6 +276,39 @@ impl DeviceState {
         self.leave_callback();
         self.alive.swap(false, Ordering::AcqRel)
     }
+
+    /// Releases an independently created device in XNA's order.
+    ///
+    /// XNA's `!GraphicsDevice` sets `isDisposed`, releases every device
+    /// resource, then tears the device down; `~GraphicsDevice` raises
+    /// `Disposing` afterwards. Releasing the resources first is not only
+    /// XNA's order but the only correct one here: CNA's
+    /// `cna_graphics_device_destroy` was measured to leave a caller-created
+    /// device's resources alive and still destroyable, so a device destroyed
+    /// with live children would strand their handles.
+    fn release_independent(&self, device: &GraphicsDevice) -> Result<()> {
+        if !self.alive.swap(false, Ordering::AcqRel) {
+            return Ok(());
+        }
+        let resources = self.dispose_resources();
+        let handle = core::mem::replace(
+            &mut *self
+                .handle
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            sys::CNA_INVALID_HANDLE,
+        );
+        let destroyed = if handle == sys::CNA_INVALID_HANDLE {
+            Ok(())
+        } else {
+            self.native.destroy_graphics_device(handle)
+        };
+        let _ = self.disposing.emit(device, EventArgs);
+        // A failure to release a child is reported, but only after the device
+        // itself has been destroyed and the event raised: leaving the device
+        // alive because one resource refused would leak the larger object.
+        resources.and(destroyed)
+    }
 }
 
 /// Durable safe identity for a game-owned XNA graphics device.
@@ -243,11 +323,24 @@ pub struct GraphicsDevice {
 #[allow(non_snake_case)]
 impl GraphicsDevice {
     pub(crate) fn bind(native: &Arc<Native>, game: sys::CNA_Handle) -> Self {
+        Self::with_owner(
+            native,
+            DeviceOwner::Game { game },
+            sys::CNA_INVALID_HANDLE,
+        )
+    }
+
+    /// Builds the shared state for either owner.
+    ///
+    /// Both owners share every field but the two that differ, so they are
+    /// built here rather than in two constructors that would have to be kept
+    /// identical by hand.
+    fn with_owner(native: &Arc<Native>, owner: DeviceOwner, handle: sys::CNA_Handle) -> Self {
         Self {
             state: Arc::new(DeviceState {
                 native: Arc::clone(native),
-                game,
-                handle: Mutex::new(sys::CNA_INVALID_HANDLE),
+                owner,
+                handle: Mutex::new(handle),
                 alive: AtomicBool::new(true),
                 resources: Mutex::new(Vec::new()),
                 presentation_parameters: PresentationParameters::new(),
@@ -276,15 +369,49 @@ impl GraphicsDevice {
         }
     }
 
+    /// XNA's public `GraphicsDevice(adapter, graphicsProfile, presentationParameters)`.
+    ///
+    /// The device this returns is owned, not borrowed: it exists outside any
+    /// `Game`, stays usable between callbacks because there are none, and is
+    /// released by `Dispose` or by dropping the last clone.
+    ///
+    /// Validation follows the order the reference constructor's IL performs,
+    /// which is not the order the parameters are declared in:
+    /// `presentationParameters` is checked before `adapter`, and the profile
+    /// is only rejected afterwards, by `ProfileCapabilities.GetInstance`.
+    ///
+    /// `presentationParameters` is copied, exactly as XNA clones it, so later
+    /// edits to the caller's value do not reach the device.
     pub fn new(
         adapter: &GraphicsAdapter,
         graphicsProfile: GraphicsProfile,
         presentationParameters: &PresentationParameters,
     ) -> Result<Self> {
-        let _ = (adapter, graphicsProfile, presentationParameters);
-        Err(CnaError::UnsupportedRuntime(
-            "CNA ABI 0.7 exposes only the game-owned GraphicsDevice; it has no independent device constructor",
-        ))
+        // XNA checks presentationParameters first, then adapter. Rust
+        // references cannot be null, so the two ArgumentNullException paths
+        // have no counterpart; what remains is the rest of the order.
+        let adapter_index = adapter.independent_construction_index()?;
+        // `GraphicsProfile` is a closed Rust enum, so the
+        // ArgumentOutOfRangeException("graphicsProfile") path is unreachable
+        // here for the same reason: the value cannot be out of range.
+        let window = presentationParameters.DeviceWindowHandle();
+        if window != WindowHandle::default() {
+            // XNA presents an independently created device to this window.
+            // cna_graphics_device_create takes no window, so honouring the
+            // request is impossible; silently dropping it would make the
+            // device claim a surface it does not have.
+            return Err(CnaError::UnsupportedRuntime(
+                "CNA creates an independent GraphicsDevice without a window, so a non-null PresentationParameters.DeviceWindowHandle cannot be honoured",
+            ));
+        }
+        let native = Native::process()?;
+        let parameters = presentationParameters.to_native(true);
+        let handle = native.create_graphics_device(
+            adapter_index,
+            graphicsProfile as u32,
+            &parameters,
+        )?;
+        Ok(Self::with_owner(&native, DeviceOwner::Independent, handle))
     }
 
     pub(crate) fn handle(&self) -> Result<sys::CNA_Handle> {
@@ -356,11 +483,14 @@ impl GraphicsDevice {
         self.state
             .native
             .presentation_parameters(self.state.handle()?, &mut value)?;
-        let window_handle = WindowHandle(
-            self.state
-                .native
-                .game_window_native_handle(self.state.game)?,
-        );
+        // XNA answers whatever window the device presents to. A game's device
+        // presents to that game's window; an independently created device has
+        // no window at all, and CNA's create route takes none, so the honest
+        // answer there is the default handle rather than some other window's.
+        let window_handle = match self.state.owner.game() {
+            Some(game) => WindowHandle(self.state.native.game_window_native_handle(game)?),
+            None => WindowHandle::default(),
+        };
         if !self
             .state
             .presentation_parameters
@@ -1734,19 +1864,40 @@ impl GraphicsDevice {
             .present_graphics_device(self.state.handle()?)
     }
 
+    /// XNA's `Dispose(bool)`.
+    ///
+    /// The reference implementation ignores the flag for everything this
+    /// projection can observe: both `Dispose(true)` and the finalizer reach
+    /// the same release, which returns immediately when already disposed,
+    /// releases every device resource, destroys the device, and only then
+    /// raises `Disposing` -- once.
     pub fn Dispose(&mut self, value: bool) -> Result<()> {
         let _ = value;
-        if self.IsDisposed()? {
-            return Ok(());
+        match self.state.owner {
+            // The single-shot guard lives in `release_independent`, as one
+            // atomic swap. Checking `IsDisposed` here as well would be a
+            // second guard that hides a regression in the first one and does
+            // not survive a race, because two threads can both observe "not
+            // disposed" before either disposes.
+            DeviceOwner::Independent => self.state.release_independent(self),
+            DeviceOwner::Game { .. } => {
+                if self.IsDisposed()? {
+                    // XNA's `~GraphicsDevice` returns before raising
+                    // `Disposing` when `isDisposed` is already set, so a
+                    // repeat is silent rather than a refusal.
+                    return Ok(());
+                }
+                // Not a missing route: `cna_graphics_device_dispose` exists
+                // and answers NOT_SUPPORTED by design for the running game's
+                // device, because disposing it through a borrowed handle
+                // would leave that game drawing into a destroyed device.
+                // `cna_game_destroy` performs the canonical disposal instead,
+                // and `IsDisposed` observes the result.
+                Err(CnaError::UnsupportedRuntime(
+                    "CNA reserves GraphicsDevice disposal to the owning Game; a borrowed device cannot dispose itself",
+                ))
+            }
         }
-        // Not a missing route: `cna_graphics_device_dispose` exists and
-        // answers NOT_SUPPORTED by design for the running game's device,
-        // because disposing it through a borrowed handle would leave that game
-        // drawing into a destroyed device. `cna_game_destroy` performs the
-        // canonical disposal instead, and `IsDisposed` observes the result.
-        Err(CnaError::UnsupportedRuntime(
-            "CNA reserves GraphicsDevice disposal to the owning Game; a borrowed device cannot dispose itself",
-        ))
     }
 
     pub fn DisposeWithNoArguments(&mut self) -> Result<()> {
@@ -1941,7 +2092,37 @@ impl UserIndexData for i32 {
 
 impl Drop for GraphicsDevice {
     fn drop(&mut self) {
-        // The native handle is parent-owned. Dropping an alias releases only
-        // this Rust reference; the host performs deterministic invalidation.
+        // A game's device handle is parent-owned. Dropping an alias releases
+        // only this Rust reference; the host performs deterministic
+        // invalidation. An independent device is this crate's to release, and
+        // `DeviceState` does it when the last clone -- including every clone a
+        // live child resource holds -- has gone.
+    }
+}
+
+impl Drop for DeviceState {
+    fn drop(&mut self) {
+        // Only an independent device is this crate's to destroy. A game's
+        // device is additionally protected by holding no handle outside a
+        // callback and by CNA refusing to destroy a borrowed device, so this
+        // check states the intent rather than being the only thing standing
+        // between a game and a double release.
+        if !matches!(self.owner, DeviceOwner::Independent) {
+            return;
+        }
+        if !self.alive.swap(false, Ordering::AcqRel) {
+            // `Dispose` already released it.
+            return;
+        }
+        let handle = *self
+            .handle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if handle != sys::CNA_INVALID_HANDLE {
+            // Every child resource holds a `GraphicsDevice` clone, so this
+            // runs only after the last one is gone and there is nothing left
+            // to release first.
+            let _ = self.native.destroy_graphics_device(handle);
+        }
     }
 }

@@ -65,6 +65,8 @@ pub(crate) struct Native {
     pub(super) game_window_end_screen_device_change:
         sys::cna_game_window_end_screen_device_change_fn,
     pub(super) game_get_graphics_device: sys::cna_game_get_graphics_device_fn,
+    pub(super) graphics_device_create: sys::cna_graphics_device_create_fn,
+    pub(super) graphics_device_destroy: sys::cna_graphics_device_destroy_fn,
     pub(super) graphics_device_get_status: sys::cna_graphics_device_get_status_fn,
     pub(super) graphics_device_get_graphics_profile:
         sys::cna_graphics_device_get_graphics_profile_fn,
@@ -773,6 +775,14 @@ impl Native {
             game_get_graphics_device: symbol!(
                 "cna_game_get_graphics_device",
                 sys::cna_game_get_graphics_device_fn
+            ),
+            graphics_device_create: symbol!(
+                "cna_graphics_device_create",
+                sys::cna_graphics_device_create_fn
+            ),
+            graphics_device_destroy: symbol!(
+                "cna_graphics_device_destroy",
+                sys::cna_graphics_device_destroy_fn
             ),
             graphics_device_get_status: symbol!(
                 "cna_graphics_device_get_status",

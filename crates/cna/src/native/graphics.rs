@@ -730,6 +730,32 @@ impl Native {
         })
     }
 
+    /// Creates a graphics device this caller owns, outside any game.
+    pub(crate) fn create_graphics_device(
+        &self,
+        adapter_index: u32,
+        profile: sys::CNA_GraphicsProfile,
+        parameters: &sys::CNA_PresentationParameters,
+    ) -> Result<sys::CNA_Handle> {
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the parameter structure is a live initialized local and the
+        // output is a live local; CNA copies the parameters during the call.
+        self.check(unsafe {
+            (self.graphics_device_create)(adapter_index, profile, parameters, &mut handle)
+        })?;
+        Ok(handle)
+    }
+
+    /// Destroys a device created by `create_graphics_device`.
+    ///
+    /// CNA refuses a game's borrowed device here, so only an independently
+    /// created handle ever reaches this route.
+    pub(crate) fn destroy_graphics_device(&self, device: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: the handle came from cna_graphics_device_create and has not
+        // been destroyed, which the caller's alive flag establishes.
+        self.check(unsafe { (self.graphics_device_destroy)(device) })
+    }
+
     pub(crate) fn graphics_device_status(
         &self,
         device: sys::CNA_Handle,

@@ -24,11 +24,13 @@ use cna::Microsoft::Xna::Framework::GamerServices::GamerServicesComponent;
 use cna::Microsoft::Xna::Framework::Graphics::{
     AlphaTestEffect, BasicEffect, BlendState, BufferUsage, ClearOptions, CompareFunction,
     CubeMapFace,
-    DepthStencilState, DualTextureEffect, DynamicIndexBuffer, DynamicVertexBuffer, Effect,
+    DepthFormat, DepthStencilState, DualTextureEffect, DynamicIndexBuffer, DynamicVertexBuffer,
+    Effect,
     EffectMaterial, EffectParameterClass, EffectParameterType, EnvironmentMapEffect,
     GraphicsAdapter, GraphicsDevice, GraphicsDeviceStatus, GraphicsProfile, GraphicsResource,
     IndexBuffer, IndexElementSize, Model, ModelBone, OcclusionQuery, PrimitiveType,
-    RasterizerState, RenderTarget2D, RenderTargetBinding, RenderTargetCube, SamplerState,
+    PresentationParameters, RasterizerState, RenderTarget2D, RenderTargetBinding, RenderTargetCube,
+    SamplerState,
     SetDataOptions, SkinnedEffect, SpriteBatch, SpriteFont, SpriteSortMode, SurfaceFormat, Texture,
     Texture2D, Texture3D, TextureCube, VertexBuffer, VertexBufferBinding, VertexDeclaration,
     VertexElement, VertexElementFormat, VertexElementUsage, VertexPositionColor,
@@ -36,7 +38,8 @@ use cna::Microsoft::Xna::Framework::Graphics::{
 use cna::Microsoft::Xna::Framework::Input::Touch::{GestureType, TouchPanel};
 use cna::Microsoft::Xna::Framework::Storage::StorageDevice;
 use cna::Microsoft::Xna::Framework::{
-    Color, Game, GameContext, GameTime, GraphicsDeviceManager, IDrawable, IGameComponent,
+    Color, Game, GameContext, GameTime, GraphicsDeviceInformation, GraphicsDeviceManager, IDrawable,
+    IGameComponent,
     IUpdateable, Matrix, PreparingDeviceSettingsEventArgs, Rectangle, Vector2, Vector3, Vector4,
 };
 use cna::{
@@ -2604,6 +2607,7 @@ fn native_stress_isolated() {
         "fault-game-create",
         "fault-texture-info",
         "fault-game-destroy",
+        "independent-graphics-device",
     ] {
         let status = Command::new(std::env::current_exe().expect("current test executable"))
             .args(["--exact", "native_stress_isolated"])
@@ -2617,8 +2621,245 @@ fn native_stress_isolated() {
     }
 }
 
+/// Presentation parameters for an independently constructed device.
+fn independent_presentation(width: i32, height: i32) -> PresentationParameters {
+    let parameters = PresentationParameters::new();
+    parameters.SetBackBufferWidth(width);
+    parameters.SetBackBufferHeight(height);
+    parameters.SetBackBufferFormat(SurfaceFormat::Color);
+    parameters.SetDepthStencilFormat(DepthFormat::Depth24);
+    parameters
+}
+
+/// A `GraphicsAdapter` reachable before any device exists.
+///
+/// XNA's `GraphicsAdapter.DefaultAdapter` is static; this projection reaches
+/// the same default through `GraphicsDeviceInformation`, whose public
+/// constructor sets `Adapter` to it. Nothing here borrows a device, which is
+/// the point: the first independent device has none to borrow.
+fn independent_adapter() -> Arc<GraphicsAdapter> {
+    GraphicsDeviceInformation::new().Adapter()
+}
+
+/// Proves that `GraphicsDevice::new` produces an *owned* device.
+///
+/// The distinction being tested is ownership, not construction: a game's
+/// device is borrowed for a callback and refuses to dispose itself, while this
+/// one is created, used, and destroyed entirely by this crate, with no game in
+/// the process at all.
+fn independent_graphics_device_case() {
+    let adapter = independent_adapter();
+
+    // 1. Construction with no game anywhere.
+    let mut device =
+        GraphicsDevice::new(&adapter, GraphicsProfile::Reach, &independent_presentation(320, 240))
+            .expect("independent GraphicsDevice construction");
+
+    // 2. State immediately after construction is the requested state.
+    assert!(!device.IsDisposed().expect("fresh device is not disposed"));
+    assert_eq!(
+        device.GraphicsProfile().expect("profile of a fresh device"),
+        GraphicsProfile::Reach
+    );
+    assert_eq!(
+        device
+            .GraphicsDeviceStatus()
+            .expect("status of a fresh device"),
+        GraphicsDeviceStatus::Normal
+    );
+    let parameters = device
+        .PresentationParameters()
+        .expect("presentation parameters of a fresh device");
+    assert_eq!(parameters.BackBufferWidth(), 320);
+    assert_eq!(parameters.BackBufferHeight(), 240);
+    assert_eq!(parameters.BackBufferFormat(), SurfaceFormat::Color);
+    assert_eq!(parameters.DepthStencilFormat(), DepthFormat::Depth24);
+    // An independent device presents to no window, and says so rather than
+    // naming some other window.
+    assert_eq!(
+        parameters.DeviceWindowHandle(),
+        PresentationParameters::new().DeviceWindowHandle()
+    );
+
+    // A device outside a callback is nevertheless usable: that is exactly what
+    // distinguishes it from the game-owned device, whose handle is borrowed
+    // only for the duration of one callback.
+    device
+        .ClearWithColor(Color::CornflowerBlue)
+        .expect("clear on an independent device outside any callback");
+
+    // 3. Child resources, with exact data rather than a success code.
+    let texture = Texture2D::new(&device, 2, 2).expect("texture on an independent device");
+    assert_eq!((texture.Width(), texture.Height()), (2, 2));
+    assert_eq!(texture.LevelCount(), 1);
+    let written = [Color::Red, Color::Green, Color::Blue, Color::White];
+    texture.SetData(&written).expect("upload to owned texture");
+    let mut read = [Color::Transparent; 4];
+    texture.GetData(&mut read).expect("download from owned texture");
+    assert_eq!(read, written);
+
+    // 4. Two independent devices coexist, and each one owns its own resources.
+    let second =
+        GraphicsDevice::new(&adapter, GraphicsProfile::HiDef, &independent_presentation(64, 48))
+            .expect("a second independent device");
+    assert_eq!(
+        second.GraphicsProfile().expect("second device profile"),
+        GraphicsProfile::HiDef
+    );
+    assert_eq!(
+        second
+            .PresentationParameters()
+            .expect("second device parameters")
+            .BackBufferWidth(),
+        64
+    );
+    // Both stay usable while the other lives. Their distinctness is proved
+    // below by the cross-device refusal and by one surviving the other's
+    // disposal, rather than by an identity member XNA does not declare.
+    device.ClearWithColor(Color::Black).expect("first device still usable");
+    second.ClearWithColor(Color::White).expect("second device usable");
+
+    // 5. A resource belongs to the device that made it. CNA itself was
+    //    measured to accept a foreign texture in a sampler slot, so the
+    //    refusal here is this crate's, and it must not weaken.
+    let foreign = second
+        .Textures()
+        .expect("second device sampler collection")
+        .SetItem(0, Some(Arc::new(Texture2D::new(&device, 1, 1).expect("device texture"))
+            as Arc<dyn Texture>));
+    assert!(
+        matches!(foreign, Err(CnaError::InvalidInput(message))
+            if message.contains("different graphics device")),
+        "a texture from another device must be refused, got {foreign:?}"
+    );
+
+    // 6. Disposal raises Disposing exactly once and releases the children.
+    let disposals = Arc::new(AtomicUsize::new(0));
+    let observed = Arc::clone(&disposals);
+    device.AddDisposingHandler(Box::new(move |sender: &dyn std::any::Any, _| {
+        let device = sender
+            .downcast_ref::<GraphicsDevice>()
+            .expect("GraphicsDevice disposing sender");
+        // XNA sets isDisposed before raising the event.
+        assert!(device.IsDisposed().expect("state inside Disposing"));
+        observed.fetch_add(1, Ordering::SeqCst);
+    }));
+    device
+        .DisposeWithNoArguments()
+        .expect("independent device disposes itself");
+    assert_eq!(disposals.load(Ordering::SeqCst), 1);
+    assert!(device.IsDisposed().expect("disposed device reports it"));
+    // XNA's release disposes every device resource, and CNA leaves them alive,
+    // so the crate must have released this one itself.
+    assert!(texture.IsDisposed(), "device disposal releases its resources");
+
+    // 7. Stale use refuses deterministically rather than reaching CNA.
+    let stale = device.ClearWithColor(Color::Black);
+    assert!(
+        matches!(stale, Err(CnaError::InvalidInput("graphics device is disposed"))),
+        "a disposed device refuses work, got {stale:?}"
+    );
+    assert!(device.PresentationParameters().is_err());
+    assert!(Texture2D::new(&device, 1, 1).is_err());
+
+    // 8. A repeated Dispose is silent and raises nothing further, which is
+    //    what XNA's `~GraphicsDevice` does once `isDisposed` is set.
+    device
+        .DisposeWithNoArguments()
+        .expect("repeating Dispose is a no-op");
+    assert_eq!(disposals.load(Ordering::SeqCst), 1);
+
+    // 9. The other device is untouched by the first one's disposal.
+    assert!(!second.IsDisposed().expect("second device still alive"));
+    second
+        .ClearWithColor(Color::White)
+        .expect("second device survives the first one's disposal");
+
+    // 10. A game's device still refuses to dispose itself: adding an owned
+    //     device must not have relaxed the borrowed one.
+    run_for_frames(BorrowedDeviceDisposalGame::default(), 1)
+        .expect("a game device still refuses self-disposal");
+
+    // 11. Dropping the last clone releases a device that was never disposed,
+    //     and a live child keeps it alive until the child goes first.
+    let dropped = GraphicsDevice::new(
+        &adapter,
+        GraphicsProfile::Reach,
+        &independent_presentation(32, 32),
+    )
+    .expect("a device released by Drop alone");
+    let child = Texture2D::new(&dropped, 1, 1).expect("child of the dropped device");
+    drop(dropped);
+    // The child holds a device clone, so it is still usable after the last
+    // caller-visible handle is gone.
+    child
+        .SetData(&[Color::Red])
+        .expect("child outlives the caller's device handle");
+    drop(child);
+
+    // 12. Repeated construction, use and release. A native handle this crate
+    //     failed to destroy would not be visible through the safe API -- the
+    //     wrapper has already forgotten it -- so this is a cycle test in the
+    //     same sense as the other stress cases, and it is the sanitizer path
+    //     rather than this assertion that would show a leak.
+    for cycle in 0..25 {
+        let mut device = GraphicsDevice::new(
+            &adapter,
+            if cycle % 2 == 0 {
+                GraphicsProfile::Reach
+            } else {
+                GraphicsProfile::HiDef
+            },
+            &independent_presentation(16 + cycle, 16),
+        )
+        .expect("independent device cycle");
+        let texture = Texture2D::new(&device, 1, 1).expect("cycle texture");
+        texture.SetData(&[Color::Red]).expect("cycle upload");
+        assert_eq!(
+            device
+                .PresentationParameters()
+                .expect("cycle parameters")
+                .BackBufferWidth(),
+            16 + cycle
+        );
+        if cycle % 3 == 0 {
+            // Release through Dispose on some cycles and through Drop on the
+            // others, so neither path is exercised only once.
+            device.DisposeWithNoArguments().expect("cycle disposal");
+            assert!(texture.IsDisposed());
+        }
+    }
+}
+
+/// A game whose device must keep refusing to dispose itself.
+#[derive(Default)]
+struct BorrowedDeviceDisposalGame {
+    state: Arc<GameState>,
+}
+
+impl GameStateAccess for BorrowedDeviceDisposalGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for BorrowedDeviceDisposalGame {
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let mut device = game.GraphicsDevice()?;
+        let refusal = device.DisposeWithNoArguments();
+        assert!(
+            matches!(refusal, Err(CnaError::UnsupportedRuntime(message))
+                if message.contains("reserves GraphicsDevice disposal to the owning Game")),
+            "a borrowed device must refuse self-disposal, got {refusal:?}"
+        );
+        assert!(!device.IsDisposed()?, "a refused Dispose changes nothing");
+        Ok(())
+    }
+}
+
 fn run_child_case(case: &str) {
     match case {
+        "independent-graphics-device" => independent_graphics_device_case(),
         "lifecycle-100" => {
             for _ in 0..100 {
                 run_for_frames(EmptyGame::default(), 1).expect("create/run/destroy cycle");
