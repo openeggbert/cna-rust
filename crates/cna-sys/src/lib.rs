@@ -194,6 +194,23 @@ pub const CNA_CNB_METADATA_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_TEXTURE_INFO_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_MODEL_INFO_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_SPRITE_FONT_INFO_STRUCT_VERSION: u32 = 1;
+pub const CNA_ALPHA_MODE_OPAQUE_EXT: CNA_AlphaModeEXT = 0;
+pub const CNA_ALPHA_MODE_MASK_EXT: CNA_AlphaModeEXT = 1;
+pub const CNA_ALPHA_MODE_BLEND_EXT: CNA_AlphaModeEXT = 2;
+pub const CNA_ALPHA_MODE_MAXIMUM_EXT: CNA_AlphaModeEXT = CNA_ALPHA_MODE_BLEND_EXT;
+pub const CNA_TONEMAPPING_MODE_NONE: CNA_TonemappingMode = 0;
+pub const CNA_TONEMAPPING_MODE_REINHARD: CNA_TonemappingMode = 1;
+pub const CNA_TONEMAPPING_MODE_FILMIC: CNA_TonemappingMode = 2;
+pub const CNA_TONEMAPPING_MODE_ACES: CNA_TonemappingMode = 3;
+pub const CNA_RENDER_QUALITY_LOW: CNA_RenderQuality = 0;
+pub const CNA_RENDER_QUALITY_MEDIUM: CNA_RenderQuality = 1;
+pub const CNA_RENDER_QUALITY_HIGH: CNA_RenderQuality = 2;
+pub const CNA_RENDER_QUALITY_ULTRA: CNA_RenderQuality = 3;
+pub const CNA_SHADOW_QUALITY_DISABLED: CNA_ShadowQuality = 0;
+pub const CNA_SHADOW_QUALITY_LOW: CNA_ShadowQuality = 1;
+pub const CNA_SHADOW_QUALITY_MEDIUM: CNA_ShadowQuality = 2;
+pub const CNA_SHADOW_QUALITY_HIGH: CNA_ShadowQuality = 3;
+pub const CNA_SHADOW_QUALITY_ULTRA: CNA_ShadowQuality = 4;
 pub const CNA_SENSOR_TYPE_UNKNOWN: CNA_SensorType = 0;
 pub const CNA_SENSOR_TYPE_ACCELEROMETER: CNA_SensorType = 1;
 pub const CNA_SENSOR_TYPE_GYROSCOPE: CNA_SensorType = 2;
@@ -632,6 +649,45 @@ pub type CNA_CnbTextureDataHandle = CNA_Handle;
 pub type CNA_CnbModelDataHandle = CNA_Handle;
 pub type CNA_CnbLoaderHandle = CNA_Handle;
 pub type CNA_CnbWriterHandle = CNA_Handle;
+pub type CNA_AlphaModeEXT = u32;
+pub type CNA_TonemappingMode = u32;
+pub type CNA_RenderQuality = u32;
+pub type CNA_ShadowQuality = u32;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_PbrMaterial {
+    pub albedo_texture: CNA_Handle,
+    pub normal_texture: CNA_Handle,
+    pub metallic_roughness_texture: CNA_Handle,
+    pub ambient_occlusion_texture: CNA_Handle,
+    pub emissive_texture: CNA_Handle,
+    pub albedo_color: CNA_Color,
+    pub emissive_color: CNA_Color,
+    pub metallic_factor: f32,
+    pub roughness_factor: f32,
+    pub normal_scale: f32,
+    pub occlusion_strength: f32,
+    pub alpha_cutoff: f32,
+    pub alpha_blend_enabled: CNA_Bool,
+    pub reserved: [u8; 3],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_RenderPipelineSettings {
+    pub exposure: f32,
+    pub gamma: f32,
+    pub bloom_intensity: f32,
+    pub tonemapping_mode: CNA_TonemappingMode,
+    pub render_quality: CNA_RenderQuality,
+    pub shadow_quality: CNA_ShadowQuality,
+    pub hdr_enabled: CNA_Bool,
+    pub bloom_enabled: CNA_Bool,
+    pub ssao_enabled: CNA_Bool,
+    pub shadows_enabled: CNA_Bool,
+}
+
 pub type CNA_SensorEventRegistrationHandle = CNA_Handle;
 pub type CNA_AccelerometerHandle = CNA_Handle;
 pub type CNA_CompassHandle = CNA_Handle;
@@ -4539,6 +4595,91 @@ pub type cna_cnb_texture_data_get_level_count_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_cnb_texture_data_copy_level_fn = unsafe extern "C" fn(
     CNA_CnbTextureDataHandle, u64, u64, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_pbr_material_init_fn = unsafe extern "C" fn(*mut CNA_PbrMaterial) -> CNA_Result;
+pub type cna_render_pipeline_settings_init_fn = unsafe extern "C" fn(
+    *mut CNA_RenderPipelineSettings,
+) -> CNA_Result;
+pub type cna_engine_layer_get_version_fn = unsafe extern "C" fn(*mut i32) -> CNA_Result;
+pub type cna_engine_layer_copy_version_string_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_pbr_effect_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_pbr_effect_get_metallic_factor_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_metallic_factor_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, f32,
+) -> CNA_Result;
+pub type cna_pbr_effect_get_roughness_factor_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_roughness_factor_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, f32,
+) -> CNA_Result;
+pub type cna_pbr_effect_get_alpha_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_alpha_fn = unsafe extern "C" fn(CNA_EffectHandle, f32) -> CNA_Result;
+pub type cna_pbr_effect_get_diffuse_color_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_diffuse_color_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_Vector3,
+) -> CNA_Result;
+pub type cna_pbr_effect_get_emissive_factor_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_emissive_factor_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_Vector3,
+) -> CNA_Result;
+pub type cna_pbr_effect_get_alpha_cutoff_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_alpha_cutoff_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, f32,
+) -> CNA_Result;
+pub type cna_pbr_effect_get_normal_scale_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_normal_scale_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, f32,
+) -> CNA_Result;
+pub type cna_pbr_effect_get_occlusion_strength_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_occlusion_strength_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, f32,
+) -> CNA_Result;
+pub type cna_pbr_effect_get_ior_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_ior_ext_fn = unsafe extern "C" fn(CNA_EffectHandle, f32) -> CNA_Result;
+pub type cna_pbr_effect_get_specular_factor_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_specular_factor_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, f32,
+) -> CNA_Result;
+pub type cna_pbr_effect_get_double_sided_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_double_sided_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_pbr_effect_get_alpha_mode_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_AlphaModeEXT,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_alpha_mode_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_AlphaModeEXT,
+) -> CNA_Result;
+pub type cna_pbr_effect_get_vertex_color_enabled_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_vertex_color_enabled_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_Bool,
 ) -> CNA_Result;
 pub type cna_sensors_get_count_fn = unsafe extern "C" fn(CNA_Handle, *mut u32) -> CNA_Result;
 pub type cna_sensors_get_info_at_fn = unsafe extern "C" fn(

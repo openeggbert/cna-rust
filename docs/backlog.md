@@ -63,7 +63,8 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-EXT-012 | Backend category and maturity classification | `core_ext.h` | DONE |
 | RUST-EXT-003 | Renderer capability report, limits and feature support | `graphics.h`, `graphics_device.h` | DONE |
 | RUST-EXT-004 | Post-processing effects: CRT, depth, ASCII | `graphics_ext.h` | DONE |
-| RUST-EXT-005 | PBR material and render-pipeline settings | `graphics_ext.h` | READY |
+| RUST-EXT-005 | PBR material, effect and render-pipeline settings | `graphics_ext.h`, `effects.h`, `engine_layer.h` | DONE |
+| RUST-EXT-005b | The extended `PbrMaterialEXT` with its texture slots and per-slot transforms | `graphics_ext.h` | READY |
 | RUST-EXT-006 | `.cnb` container: open, metadata, Texture2D | `cnb.h` | DONE |
 | RUST-EXT-013a | `.cnb` Model: graph, geometry, materials | `cnb.h` | DONE |
 | RUST-EXT-013b | `.cnb` loader registry, writer and native content manager | `cnb.h`, `content.h` | DONE |

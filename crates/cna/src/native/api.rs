@@ -240,7 +240,7 @@ pub(crate) struct Native {
     pub(super) effect_create_empty: sys::cna_effect_create_empty_fn,
     pub(super) effect_create_compiled: sys::cna_effect_create_compiled_fn,
     pub(super) effect_material_create: sys::cna_effect_material_create_fn,
-    pub(super) effect_destroy: sys::cna_effect_destroy_fn,
+    pub(crate) effect_destroy: sys::cna_effect_destroy_fn,
     pub(super) effect_clone: sys::cna_effect_clone_fn,
     pub(super) effect_dispose: sys::cna_effect_dispose_fn,
     pub(super) effect_apply: sys::cna_effect_apply_fn,

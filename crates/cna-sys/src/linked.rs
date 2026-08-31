@@ -3213,6 +3213,115 @@ extern "C" {
         argument4: u64,
         argument5: *mut u64,
     ) -> CNA_Result;
+    pub fn cna_pbr_material_init(argument0: *mut CNA_PbrMaterial) -> CNA_Result;
+    pub fn cna_render_pipeline_settings_init(
+        argument0: *mut CNA_RenderPipelineSettings,
+    ) -> CNA_Result;
+    pub fn cna_engine_layer_get_version(argument0: *mut i32) -> CNA_Result;
+    pub fn cna_engine_layer_copy_version_string(
+        argument0: *mut c_char,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_get_metallic_factor(
+        argument0: CNA_EffectHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_set_metallic_factor(
+        argument0: CNA_EffectHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_get_roughness_factor(
+        argument0: CNA_EffectHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_set_roughness_factor(
+        argument0: CNA_EffectHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_get_alpha(argument0: CNA_EffectHandle, argument1: *mut f32) -> CNA_Result;
+    pub fn cna_pbr_effect_set_alpha(argument0: CNA_EffectHandle, argument1: f32) -> CNA_Result;
+    pub fn cna_pbr_effect_get_diffuse_color(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_set_diffuse_color(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_get_emissive_factor(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_set_emissive_factor(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_get_alpha_cutoff_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_set_alpha_cutoff_ext(
+        argument0: CNA_EffectHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_get_normal_scale_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_set_normal_scale_ext(
+        argument0: CNA_EffectHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_get_occlusion_strength_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_set_occlusion_strength_ext(
+        argument0: CNA_EffectHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_get_ior_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_set_ior_ext(argument0: CNA_EffectHandle, argument1: f32) -> CNA_Result;
+    pub fn cna_pbr_effect_get_specular_factor_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_set_specular_factor_ext(
+        argument0: CNA_EffectHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_get_double_sided_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_set_double_sided_ext(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_get_alpha_mode_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_AlphaModeEXT,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_set_alpha_mode_ext(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_AlphaModeEXT,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_get_vertex_color_enabled_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_set_vertex_color_enabled_ext(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
     pub fn cna_sensors_get_count(argument0: CNA_Handle, argument1: *mut u32) -> CNA_Result;
     pub fn cna_sensors_get_info_at(
         argument0: CNA_Handle,

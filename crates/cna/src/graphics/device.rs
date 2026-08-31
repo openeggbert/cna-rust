@@ -170,7 +170,7 @@ impl DeviceState {
             .unwrap_or_else(std::sync::PoisonError::into_inner) = sys::CNA_INVALID_HANDLE;
     }
 
-    pub(super) fn native(&self) -> &Arc<Native> {
+    pub(crate) fn native(&self) -> &Arc<Native> {
         &self.native
     }
 
@@ -614,6 +614,11 @@ impl GraphicsDevice {
 
     pub fn RemoveDeviceResettingHandler(&self, registration: u64) -> bool {
         self.state.device_resetting.remove(registration)
+    }
+
+    /// The process function table this device resolved through.
+    pub(crate) fn state_native(&self) -> &Arc<Native> {
+        self.state.native()
     }
 
     pub(crate) fn is_same_device(&self, other: &Self) -> bool {

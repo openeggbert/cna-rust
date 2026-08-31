@@ -600,3 +600,63 @@ The three families genuinely disagree about injection, and the test records
 that rather than smoothing it over. The routes that would install a sensor test
 backend are CNA's own test seams -- classified `TOOLING_ONLY` and deliberately
 unbound, because a binding that called them would fake runtime state.
+
+## PBR materials, effects and pipeline settings (RUST-EXT-005, 2026-08-31)
+
+None of this is XNA. `BasicEffect` has a diffuse colour and a specular power;
+there is no metallic factor, no roughness, no index of refraction, no
+tonemapping operator and no HDR anywhere in
+`Microsoft.Xna.Framework.Graphics`. It lives in `cna::extensions::pbr`.
+
+### Availability is queried, not assumed
+
+These routes need CNA's engine layer, which is a build-time choice. A symbol
+exists either way -- upstream keeps the exported ABI one shape regardless of
+what was built -- so presence proves nothing and `engine_layer_version()` is
+the query that does. Zero means absent, and this artifact answers **2**,
+matching what the header declares.
+
+The two version routes must agree, and a test asserts it: a build where the
+number says "absent" while the string names a revision would send a consumer
+down the wrong path. The string route is also not CNA's usual size-then-copy
+pair, so its size probe answers `BUFFER_TOO_SMALL` rather than success --
+treating that as a failure is the difference between reading the string and
+refusing to.
+
+### Defaults come from CNA
+
+`PbrMaterial::canonical_defaults()` and
+`RenderPipelineSettings::canonical_defaults()` ask the library rather than
+restating values here, because restating them is how a binding ends up quietly
+disagreeing with the renderer about what "default" means. The measured values
+are asserted, so one that changes upstream fails here rather than shipping:
+
+```text
+PbrMaterial          metallic 0, roughness 0.5, normal 1, occlusion 1,
+                     cutoff 0.5, albedo white, emissive black, blend off
+RenderPipeline       exposure 1, gamma 2.2, bloom 1, tonemapping None,
+                     quality Medium, shadows Disabled, every pass off
+```
+
+The plain `PbrMaterial` and the extended `PbrMaterialEXT` do **not** share
+defaults -- the plain one starts non-metallic and half-rough where the extended
+one starts fully metallic and fully rough -- and the comment says so, because
+assuming they matched is the obvious mistake.
+
+Every pass starting off matters: a game opts into HDR, bloom, SSAO and shadows
+rather than discovering it is already paying for them.
+
+### The effect round trip
+
+`PbrEffect` is created on a device -- an independently constructed one works,
+which is what makes this testable without a `Game` -- and every scalar it
+carries round-trips through distinguishable values, so a property read back
+from a neighbouring slot is visible rather than plausible. All three alpha
+modes round-trip, not only the one the main assertion uses, and every
+tonemapping, render-quality and shadow-quality identity is walked in both
+directions so a mapping that collapsed two variants onto one number would fail.
+
+`PbrMaterial` deliberately carries no textures. The canonical structure has
+non-owning handle slots, and a safe Rust value holding raw handles would be a
+raw-handle leak; textures belong on the effect, where the lifetime relationship
+is real.
