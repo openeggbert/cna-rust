@@ -550,3 +550,53 @@ the cursor. Disposal is idempotent.
 A headless host has no window to show a cursor on. The test records CNA's
 actual answer rather than asserting one, and requires only that it be one of
 CNA's real answers rather than a crash or a silent success that did nothing.
+
+## Motion sensors (RUST-EXT-009, 2026-08-31)
+
+XNA had these only on Windows Phone, in `Microsoft.Devices.Sensors`, which is
+not one of the ten runtime assemblies this binding projects, so accelerometer,
+compass and gyroscope live in `cna::extensions::sensors`.
+
+The whole point of the module is that **absence is an answer**. A desktop has
+no accelerometer, and the honest report is `SensorState::NotSupported` with no
+reading at all -- not `Vector3::ZERO`, which is what a device in free fall
+genuinely reports. `current_value` therefore returns `Option`, and returns
+`None` whenever `is_data_valid` is false.
+
+`SensorState` keeps CNA's six distinctions rather than collapsing to a boolean,
+because a game should be able to tell a user to grant a permission, wait for
+initialisation, or stop asking: `NotSupported`, `Ready`, `Initializing`,
+`NoData`, `NoPermissions`, `Disabled`.
+
+Units are stated rather than converted: **g** for the accelerometer, **radians
+per second** for the gyroscope, **degrees** for the compass headings and
+**micro-teslas** for its raw magnetometer axes. Timestamps keep both tick
+counts CNA carries -- local ticks and the UTC offset -- because folding the
+offset away would lose which zone the device recorded.
+
+### What this host measured
+
+`HARDWARE_PENDING` for every real reading: there is no accelerometer, compass
+or gyroscope here. Everything else was measured:
+
+| Behaviour | Result |
+|---|---|
+| enumeration and count agree | yes, for zero sensors |
+| construction with no hardware | succeeds, so a game can ask *why* there are no readings |
+| state | `NotSupported`, uniformly across all three families |
+| `current_value` with no hardware | `None`, never a zeroed reading |
+| sampling interval | a real setting; 200,000 ticks reads back exactly |
+| accelerometer and gyroscope injection | **accepted** |
+| compass injection | refused: "No test backend is installed and started for this sensor" |
+| a reading after an accepted injection | still `None` |
+
+That last row is the one worth keeping. CNA accepts an injected value without
+claiming the device now exists, so `is_data_valid` stays false and
+`current_value` stays `None`, and the projection passes that through instead of
+surfacing an injected number as though hardware had reported it. `is_supported`
+stays false too: injecting a reading does not conjure a sensor.
+
+The three families genuinely disagree about injection, and the test records
+that rather than smoothing it over. The routes that would install a sensor test
+backend are CNA's own test seams -- classified `TOOLING_ONLY` and deliberately
+unbound, because a binding that called them would fake runtime state.

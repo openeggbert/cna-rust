@@ -194,6 +194,21 @@ pub const CNA_CNB_METADATA_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_TEXTURE_INFO_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_MODEL_INFO_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_SPRITE_FONT_INFO_STRUCT_VERSION: u32 = 1;
+pub const CNA_SENSOR_TYPE_UNKNOWN: CNA_SensorType = 0;
+pub const CNA_SENSOR_TYPE_ACCELEROMETER: CNA_SensorType = 1;
+pub const CNA_SENSOR_TYPE_GYROSCOPE: CNA_SensorType = 2;
+pub const CNA_SENSOR_TYPE_ACCELEROMETER_LEFT: CNA_SensorType = 3;
+pub const CNA_SENSOR_TYPE_GYROSCOPE_LEFT: CNA_SensorType = 4;
+pub const CNA_SENSOR_TYPE_ACCELEROMETER_RIGHT: CNA_SensorType = 5;
+pub const CNA_SENSOR_TYPE_GYROSCOPE_RIGHT: CNA_SensorType = 6;
+pub const CNA_SENSOR_TYPE_MAXIMUM: CNA_SensorType = CNA_SENSOR_TYPE_GYROSCOPE_RIGHT;
+pub const CNA_SENSOR_STATE_NOT_SUPPORTED: CNA_SensorState = 0;
+pub const CNA_SENSOR_STATE_READY: CNA_SensorState = 1;
+pub const CNA_SENSOR_STATE_INITIALIZING: CNA_SensorState = 2;
+pub const CNA_SENSOR_STATE_NO_DATA: CNA_SensorState = 3;
+pub const CNA_SENSOR_STATE_NO_PERMISSIONS: CNA_SensorState = 4;
+pub const CNA_SENSOR_STATE_DISABLED: CNA_SensorState = 5;
+pub const CNA_SENSOR_STATE_MAXIMUM: CNA_SensorState = CNA_SENSOR_STATE_DISABLED;
 pub const CNA_MOUSE_CURSOR_STOCK_ARROW: CNA_MouseCursorStock = 0;
 pub const CNA_MOUSE_CURSOR_STOCK_CROSSHAIR: CNA_MouseCursorStock = 1;
 pub const CNA_MOUSE_CURSOR_STOCK_HAND: CNA_MouseCursorStock = 2;
@@ -617,6 +632,59 @@ pub type CNA_CnbTextureDataHandle = CNA_Handle;
 pub type CNA_CnbModelDataHandle = CNA_Handle;
 pub type CNA_CnbLoaderHandle = CNA_Handle;
 pub type CNA_CnbWriterHandle = CNA_Handle;
+pub type CNA_SensorEventRegistrationHandle = CNA_Handle;
+pub type CNA_AccelerometerHandle = CNA_Handle;
+pub type CNA_CompassHandle = CNA_Handle;
+pub type CNA_GyroscopeHandle = CNA_Handle;
+pub type CNA_SensorType = u32;
+pub type CNA_SensorState = u32;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_DateTimeOffset {
+    pub ticks: i64,
+    pub offset_ticks: i64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_SensorInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub id: u32,
+    pub r#type: CNA_SensorType,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_AccelerometerReading {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub timestamp: CNA_DateTimeOffset,
+    pub acceleration: CNA_Vector3,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CompassReading {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub timestamp: CNA_DateTimeOffset,
+    pub heading_accuracy: f64,
+    pub magnetic_heading: f64,
+    pub true_heading: f64,
+    pub magnetometer_reading: CNA_Vector3,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_GyroscopeReading {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub timestamp: CNA_DateTimeOffset,
+    pub rotation_rate: CNA_Vector3,
+}
+
 pub type CNA_InputDeviceEventRegistrationHandle = CNA_Handle;
 pub type CNA_MouseCursorHandle = CNA_Handle;
 pub type CNA_MouseCursorStock = u32;
@@ -4471,6 +4539,100 @@ pub type cna_cnb_texture_data_get_level_count_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_cnb_texture_data_copy_level_fn = unsafe extern "C" fn(
     CNA_CnbTextureDataHandle, u64, u64, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_sensors_get_count_fn = unsafe extern "C" fn(CNA_Handle, *mut u32) -> CNA_Result;
+pub type cna_sensors_get_info_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut CNA_SensorInfo,
+) -> CNA_Result;
+pub type cna_sensors_get_name_size_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut u64,
+) -> CNA_Result;
+pub type cna_sensors_copy_name_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_accelerometer_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_AccelerometerHandle,
+) -> CNA_Result;
+pub type cna_accelerometer_destroy_fn = unsafe extern "C" fn(CNA_AccelerometerHandle) -> CNA_Result;
+pub type cna_accelerometer_dispose_fn = unsafe extern "C" fn(CNA_AccelerometerHandle) -> CNA_Result;
+pub type cna_accelerometer_get_is_supported_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_accelerometer_get_state_fn = unsafe extern "C" fn(
+    CNA_AccelerometerHandle, *mut CNA_SensorState,
+) -> CNA_Result;
+pub type cna_accelerometer_get_is_data_valid_fn = unsafe extern "C" fn(
+    CNA_AccelerometerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_accelerometer_get_current_value_fn = unsafe extern "C" fn(
+    CNA_AccelerometerHandle, *mut CNA_AccelerometerReading,
+) -> CNA_Result;
+pub type cna_accelerometer_get_time_between_updates_ticks_fn = unsafe extern "C" fn(
+    CNA_AccelerometerHandle, *mut i64,
+) -> CNA_Result;
+pub type cna_accelerometer_set_time_between_updates_ticks_fn = unsafe extern "C" fn(
+    CNA_AccelerometerHandle, i64,
+) -> CNA_Result;
+pub type cna_accelerometer_start_fn = unsafe extern "C" fn(CNA_AccelerometerHandle) -> CNA_Result;
+pub type cna_accelerometer_stop_fn = unsafe extern "C" fn(CNA_AccelerometerHandle) -> CNA_Result;
+pub type cna_accelerometer_inject_synthetic_update_ext_fn = unsafe extern "C" fn(
+    CNA_AccelerometerHandle, f32, f32, f32,
+) -> CNA_Result;
+pub type cna_compass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_CompassHandle,
+) -> CNA_Result;
+pub type cna_compass_destroy_fn = unsafe extern "C" fn(CNA_CompassHandle) -> CNA_Result;
+pub type cna_compass_dispose_fn = unsafe extern "C" fn(CNA_CompassHandle) -> CNA_Result;
+pub type cna_compass_get_is_supported_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_compass_get_state_fn = unsafe extern "C" fn(
+    CNA_CompassHandle, *mut CNA_SensorState,
+) -> CNA_Result;
+pub type cna_compass_get_is_data_valid_fn = unsafe extern "C" fn(
+    CNA_CompassHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_compass_get_current_value_fn = unsafe extern "C" fn(
+    CNA_CompassHandle, *mut CNA_CompassReading,
+) -> CNA_Result;
+pub type cna_compass_get_time_between_updates_ticks_fn = unsafe extern "C" fn(
+    CNA_CompassHandle, *mut i64,
+) -> CNA_Result;
+pub type cna_compass_set_time_between_updates_ticks_fn = unsafe extern "C" fn(
+    CNA_CompassHandle, i64,
+) -> CNA_Result;
+pub type cna_compass_start_fn = unsafe extern "C" fn(CNA_CompassHandle) -> CNA_Result;
+pub type cna_compass_stop_fn = unsafe extern "C" fn(CNA_CompassHandle) -> CNA_Result;
+pub type cna_compass_inject_synthetic_update_ext_fn = unsafe extern "C" fn(
+    CNA_CompassHandle, *const CNA_CompassReading,
+) -> CNA_Result;
+pub type cna_gyroscope_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_GyroscopeHandle,
+) -> CNA_Result;
+pub type cna_gyroscope_destroy_fn = unsafe extern "C" fn(CNA_GyroscopeHandle) -> CNA_Result;
+pub type cna_gyroscope_dispose_fn = unsafe extern "C" fn(CNA_GyroscopeHandle) -> CNA_Result;
+pub type cna_gyroscope_get_is_supported_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_gyroscope_get_state_fn = unsafe extern "C" fn(
+    CNA_GyroscopeHandle, *mut CNA_SensorState,
+) -> CNA_Result;
+pub type cna_gyroscope_get_is_data_valid_fn = unsafe extern "C" fn(
+    CNA_GyroscopeHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_gyroscope_get_current_value_fn = unsafe extern "C" fn(
+    CNA_GyroscopeHandle, *mut CNA_GyroscopeReading,
+) -> CNA_Result;
+pub type cna_gyroscope_get_time_between_updates_ticks_fn = unsafe extern "C" fn(
+    CNA_GyroscopeHandle, *mut i64,
+) -> CNA_Result;
+pub type cna_gyroscope_set_time_between_updates_ticks_fn = unsafe extern "C" fn(
+    CNA_GyroscopeHandle, i64,
+) -> CNA_Result;
+pub type cna_gyroscope_start_fn = unsafe extern "C" fn(CNA_GyroscopeHandle) -> CNA_Result;
+pub type cna_gyroscope_stop_fn = unsafe extern "C" fn(CNA_GyroscopeHandle) -> CNA_Result;
+pub type cna_gyroscope_inject_synthetic_update_ext_fn = unsafe extern "C" fn(
+    CNA_GyroscopeHandle, f32, f32, f32,
 ) -> CNA_Result;
 pub type cna_input_devices_get_keyboard_count_fn = unsafe extern "C" fn(
     CNA_Handle, *mut u32,

@@ -74,7 +74,7 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-EXT-014b | Device enumeration, hot-plug events and mouse cursors | `input_devices.h`, `input_cursor.h` | DONE |
 | RUST-EXT-014c | Haptics | `input_haptics.h` | READY |
 | RUST-ABI-013 | Gate that both acquisition modes declare the same routes | `tools/native-abi/verify.py` | DONE |
-| RUST-EXT-009 | Sensors: accelerometer, compass, gyroscope | `sensors.h` | READY |
+| RUST-EXT-009 | Sensors: accelerometer, compass, gyroscope | `sensors.h`, `input_devices.h` | DONE, real readings `HARDWARE_PENDING` |
 | RUST-EXT-010 | CNAEXT engine layer, 857 routes | `engine_layer.h` | READY |
 
 ## Platform and packaging

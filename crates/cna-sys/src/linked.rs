@@ -3213,6 +3213,136 @@ extern "C" {
         argument4: u64,
         argument5: *mut u64,
     ) -> CNA_Result;
+    pub fn cna_sensors_get_count(argument0: CNA_Handle, argument1: *mut u32) -> CNA_Result;
+    pub fn cna_sensors_get_info_at(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut CNA_SensorInfo,
+    ) -> CNA_Result;
+    pub fn cna_sensors_get_name_size_at(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_sensors_copy_name_at(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_AccelerometerHandle,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_destroy(argument0: CNA_AccelerometerHandle) -> CNA_Result;
+    pub fn cna_accelerometer_dispose(argument0: CNA_AccelerometerHandle) -> CNA_Result;
+    pub fn cna_accelerometer_get_is_supported(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_get_state(
+        argument0: CNA_AccelerometerHandle,
+        argument1: *mut CNA_SensorState,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_get_is_data_valid(
+        argument0: CNA_AccelerometerHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_get_current_value(
+        argument0: CNA_AccelerometerHandle,
+        argument1: *mut CNA_AccelerometerReading,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_get_time_between_updates_ticks(
+        argument0: CNA_AccelerometerHandle,
+        argument1: *mut i64,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_set_time_between_updates_ticks(
+        argument0: CNA_AccelerometerHandle,
+        argument1: i64,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_start(argument0: CNA_AccelerometerHandle) -> CNA_Result;
+    pub fn cna_accelerometer_stop(argument0: CNA_AccelerometerHandle) -> CNA_Result;
+    pub fn cna_accelerometer_inject_synthetic_update_ext(
+        argument0: CNA_AccelerometerHandle,
+        argument1: f32,
+        argument2: f32,
+        argument3: f32,
+    ) -> CNA_Result;
+    pub fn cna_compass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_CompassHandle,
+    ) -> CNA_Result;
+    pub fn cna_compass_destroy(argument0: CNA_CompassHandle) -> CNA_Result;
+    pub fn cna_compass_dispose(argument0: CNA_CompassHandle) -> CNA_Result;
+    pub fn cna_compass_get_is_supported(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_compass_get_state(
+        argument0: CNA_CompassHandle,
+        argument1: *mut CNA_SensorState,
+    ) -> CNA_Result;
+    pub fn cna_compass_get_is_data_valid(
+        argument0: CNA_CompassHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_compass_get_current_value(
+        argument0: CNA_CompassHandle,
+        argument1: *mut CNA_CompassReading,
+    ) -> CNA_Result;
+    pub fn cna_compass_get_time_between_updates_ticks(
+        argument0: CNA_CompassHandle,
+        argument1: *mut i64,
+    ) -> CNA_Result;
+    pub fn cna_compass_set_time_between_updates_ticks(
+        argument0: CNA_CompassHandle,
+        argument1: i64,
+    ) -> CNA_Result;
+    pub fn cna_compass_start(argument0: CNA_CompassHandle) -> CNA_Result;
+    pub fn cna_compass_stop(argument0: CNA_CompassHandle) -> CNA_Result;
+    pub fn cna_compass_inject_synthetic_update_ext(
+        argument0: CNA_CompassHandle,
+        argument1: *const CNA_CompassReading,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_GyroscopeHandle,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_destroy(argument0: CNA_GyroscopeHandle) -> CNA_Result;
+    pub fn cna_gyroscope_dispose(argument0: CNA_GyroscopeHandle) -> CNA_Result;
+    pub fn cna_gyroscope_get_is_supported(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_get_state(
+        argument0: CNA_GyroscopeHandle,
+        argument1: *mut CNA_SensorState,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_get_is_data_valid(
+        argument0: CNA_GyroscopeHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_get_current_value(
+        argument0: CNA_GyroscopeHandle,
+        argument1: *mut CNA_GyroscopeReading,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_get_time_between_updates_ticks(
+        argument0: CNA_GyroscopeHandle,
+        argument1: *mut i64,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_set_time_between_updates_ticks(
+        argument0: CNA_GyroscopeHandle,
+        argument1: i64,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_start(argument0: CNA_GyroscopeHandle) -> CNA_Result;
+    pub fn cna_gyroscope_stop(argument0: CNA_GyroscopeHandle) -> CNA_Result;
+    pub fn cna_gyroscope_inject_synthetic_update_ext(
+        argument0: CNA_GyroscopeHandle,
+        argument1: f32,
+        argument2: f32,
+        argument3: f32,
+    ) -> CNA_Result;
     pub fn cna_input_devices_get_keyboard_count(
         argument0: CNA_Handle,
         argument1: *mut u32,
