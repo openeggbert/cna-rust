@@ -6758,4 +6758,135 @@ extern "C" {
         argument1: u64,
         argument2: *mut u64,
     ) -> CNA_Result;
+    pub fn cna_gpu_timer_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_GpuTimerHandle,
+    ) -> CNA_Result;
+    pub fn cna_gpu_timer_destroy(argument0: CNA_GpuTimerHandle) -> CNA_Result;
+    pub fn cna_gpu_timer_is_supported(
+        argument0: CNA_GpuTimerHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_gpu_timer_copy_unsupported_reason(
+        argument0: CNA_GpuTimerHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_gpu_timer_begin(argument0: CNA_GpuTimerHandle) -> CNA_Result;
+    pub fn cna_gpu_timer_end(argument0: CNA_GpuTimerHandle) -> CNA_Result;
+    pub fn cna_gpu_timer_is_result_available(
+        argument0: CNA_GpuTimerHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_gpu_timer_poll(
+        argument0: CNA_GpuTimerHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_gpu_timer_get_last_milliseconds(
+        argument0: CNA_GpuTimerHandle,
+        argument1: *mut f64,
+    ) -> CNA_Result;
+    pub fn cna_gpu_timer_get_sample_count(
+        argument0: CNA_GpuTimerHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_gpu_timer_is_open(
+        argument0: CNA_GpuTimerHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_particle_init(argument0: *mut CNA_Particle) -> CNA_Result;
+    pub fn cna_particle_emitter_settings_init(
+        argument0: *mut CNA_ParticleEmitterSettings,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_ParticleSystemHandle,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_create_with_capacity(
+        argument0: CNA_Handle,
+        argument1: i32,
+        argument2: *mut CNA_ParticleSystemHandle,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_destroy(argument0: CNA_ParticleSystemHandle) -> CNA_Result;
+    pub fn cna_particle_system_get_settings(
+        argument0: CNA_ParticleSystemHandle,
+        argument1: *mut CNA_ParticleEmitterSettings,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_set_settings(
+        argument0: CNA_ParticleSystemHandle,
+        argument1: *const CNA_ParticleEmitterSettings,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_get_capacity(
+        argument0: CNA_ParticleSystemHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_get_active_count(
+        argument0: CNA_ParticleSystemHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_is_emission_rate_clamped(
+        argument0: CNA_ParticleSystemHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_update(
+        argument0: CNA_ParticleSystemHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_reset(argument0: CNA_ParticleSystemHandle) -> CNA_Result;
+    pub fn cna_particle_system_draw(
+        argument0: CNA_ParticleSystemHandle,
+        argument1: *const CNA_Matrix,
+        argument2: *const CNA_Matrix,
+        argument3: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_copy_particles_ext(
+        argument0: CNA_ParticleSystemHandle,
+        argument1: *mut CNA_Particle,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_step(
+        argument0: *mut CNA_Particle,
+        argument1: i32,
+        argument2: *const CNA_ParticleEmitterSettings,
+        argument3: f32,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_random(argument0: u32, argument1: *mut f32) -> CNA_Result;
+    pub fn cna_particle_system_uses_compute(
+        argument0: CNA_ParticleSystemHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_is_simulation_on_cpu_ext(
+        argument0: CNA_ParticleSystemHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_set_simulation_on_cpu_ext(
+        argument0: CNA_ParticleSystemHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_copy_unsupported_reason(
+        argument0: CNA_ParticleSystemHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_copy_particle_lookup_glsl(
+        argument0: *mut c_char,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_get_softness_ext(
+        argument0: CNA_ParticleSystemHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_set_softness_ext(
+        argument0: CNA_ParticleSystemHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_particle_system_set_depth_input_ext(
+        argument0: CNA_ParticleSystemHandle,
+        argument1: CNA_Handle,
+        argument2: f32,
+    ) -> CNA_Result;
 }

@@ -758,6 +758,37 @@ pub type CNA_ShadowMapHandle = CNA_Handle;
 pub type CNA_PostProcessPassHandle = CNA_Handle;
 pub type CNA_PostProcessChainHandle = CNA_Handle;
 pub type CNA_RenderTargetPoolHandle = CNA_Handle;
+pub type CNA_GpuTimerHandle = CNA_Handle;
+pub type CNA_ParticleSystemHandle = CNA_Handle;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_Particle {
+    pub position: CNA_Vector4,
+    pub velocity: CNA_Vector4,
+    pub state: CNA_Vector4,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_ParticleEmitterSettings {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub position: CNA_Vector3,
+    pub direction: CNA_Vector3,
+    pub gravity: CNA_Vector3,
+    pub start_color: CNA_Vector4,
+    pub end_color: CNA_Vector4,
+    pub cone_angle: f32,
+    pub speed: f32,
+    pub speed_variance: f32,
+    pub lifetime: f32,
+    pub lifetime_variance: f32,
+    pub drag: f32,
+    pub emission_rate: f32,
+    pub start_size: f32,
+    pub end_size: f32,
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -8061,4 +8092,101 @@ pub type cna_fxaa_pass_edge_threshold_for_quality_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_fxaa_pass_copy_fragment_glsl_fn = unsafe extern "C" fn(
     *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+
+// --- CNA engine layer: GPU timers and particle systems (engine_layer.h) ---
+pub type cna_gpu_timer_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_GpuTimerHandle,
+) -> CNA_Result;
+pub type cna_gpu_timer_destroy_fn = unsafe extern "C" fn(CNA_GpuTimerHandle) -> CNA_Result;
+pub type cna_gpu_timer_is_supported_fn = unsafe extern "C" fn(
+    CNA_GpuTimerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_gpu_timer_copy_unsupported_reason_fn = unsafe extern "C" fn(
+    CNA_GpuTimerHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_gpu_timer_begin_fn = unsafe extern "C" fn(CNA_GpuTimerHandle) -> CNA_Result;
+pub type cna_gpu_timer_end_fn = unsafe extern "C" fn(CNA_GpuTimerHandle) -> CNA_Result;
+pub type cna_gpu_timer_is_result_available_fn = unsafe extern "C" fn(
+    CNA_GpuTimerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_gpu_timer_poll_fn = unsafe extern "C" fn(
+    CNA_GpuTimerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_gpu_timer_get_last_milliseconds_fn = unsafe extern "C" fn(
+    CNA_GpuTimerHandle, *mut f64,
+) -> CNA_Result;
+pub type cna_gpu_timer_get_sample_count_fn = unsafe extern "C" fn(
+    CNA_GpuTimerHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_gpu_timer_is_open_fn = unsafe extern "C" fn(
+    CNA_GpuTimerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_particle_init_fn = unsafe extern "C" fn(*mut CNA_Particle) -> CNA_Result;
+pub type cna_particle_emitter_settings_init_fn = unsafe extern "C" fn(
+    *mut CNA_ParticleEmitterSettings,
+) -> CNA_Result;
+pub type cna_particle_system_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_ParticleSystemHandle,
+) -> CNA_Result;
+pub type cna_particle_system_create_with_capacity_fn = unsafe extern "C" fn(
+    CNA_Handle, i32, *mut CNA_ParticleSystemHandle,
+) -> CNA_Result;
+pub type cna_particle_system_destroy_fn = unsafe extern "C" fn(
+    CNA_ParticleSystemHandle,
+) -> CNA_Result;
+pub type cna_particle_system_get_settings_fn = unsafe extern "C" fn(
+    CNA_ParticleSystemHandle, *mut CNA_ParticleEmitterSettings,
+) -> CNA_Result;
+pub type cna_particle_system_set_settings_fn = unsafe extern "C" fn(
+    CNA_ParticleSystemHandle, *const CNA_ParticleEmitterSettings,
+) -> CNA_Result;
+pub type cna_particle_system_get_capacity_fn = unsafe extern "C" fn(
+    CNA_ParticleSystemHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_particle_system_get_active_count_fn = unsafe extern "C" fn(
+    CNA_ParticleSystemHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_particle_system_is_emission_rate_clamped_fn = unsafe extern "C" fn(
+    CNA_ParticleSystemHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_particle_system_update_fn = unsafe extern "C" fn(
+    CNA_ParticleSystemHandle, f32,
+) -> CNA_Result;
+pub type cna_particle_system_reset_fn = unsafe extern "C" fn(
+    CNA_ParticleSystemHandle,
+) -> CNA_Result;
+pub type cna_particle_system_draw_fn = unsafe extern "C" fn(
+    CNA_ParticleSystemHandle, *const CNA_Matrix, *const CNA_Matrix, CNA_Handle,
+) -> CNA_Result;
+pub type cna_particle_system_copy_particles_ext_fn = unsafe extern "C" fn(
+    CNA_ParticleSystemHandle, *mut CNA_Particle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_particle_system_step_fn = unsafe extern "C" fn(
+    *mut CNA_Particle, i32, *const CNA_ParticleEmitterSettings, f32,
+) -> CNA_Result;
+pub type cna_particle_system_random_fn = unsafe extern "C" fn(u32, *mut f32) -> CNA_Result;
+pub type cna_particle_system_uses_compute_fn = unsafe extern "C" fn(
+    CNA_ParticleSystemHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_particle_system_is_simulation_on_cpu_ext_fn = unsafe extern "C" fn(
+    CNA_ParticleSystemHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_particle_system_set_simulation_on_cpu_ext_fn = unsafe extern "C" fn(
+    CNA_ParticleSystemHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_particle_system_copy_unsupported_reason_fn = unsafe extern "C" fn(
+    CNA_ParticleSystemHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_particle_system_copy_particle_lookup_glsl_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_particle_system_get_softness_ext_fn = unsafe extern "C" fn(
+    CNA_ParticleSystemHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_particle_system_set_softness_ext_fn = unsafe extern "C" fn(
+    CNA_ParticleSystemHandle, f32,
+) -> CNA_Result;
+pub type cna_particle_system_set_depth_input_ext_fn = unsafe extern "C" fn(
+    CNA_ParticleSystemHandle, CNA_Handle, f32,
 ) -> CNA_Result;

@@ -12,8 +12,9 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use cna::extensions::engine::{
-    supports_shadow_sampling, DirectionalLight, FxaaPass, PostProcessChain, PostProcessContext,
-    PostProcessPass, RenderPipeline, ShadowMap, TonemapPass,
+    supports_shadow_sampling, DirectionalLight, FxaaPass, GpuTimer, Particle,
+    ParticleEmitterSettings, ParticleSystem, PostProcessChain, PostProcessContext, PostProcessPass,
+    RenderPipeline, ShadowMap, TonemapPass,
 };
 use cna::extensions::graphics::EffectFactoryExt;
 use cna::extensions::pbr::{
@@ -1282,5 +1283,500 @@ fn a_post_process_chain_owns_what_it_is_given_and_copies_what_it_is_asked_to() {
         findings.pool_bytes,
         findings.pipeline_user_passes,
         findings.fxaa_thresholds,
+    );
+}
+
+/// How many frames the GPU-timer and particle run draws.
+///
+/// A GPU timer query is non-blocking and resolves some frames after the work
+/// it timed was submitted, so one frame would measure nothing on a renderer
+/// that supports timing perfectly well.
+const SIMULATION_FRAMES: usize = 30;
+
+/// What a GPU-timer and particle run measured.
+#[derive(Default)]
+struct SimulationFindings {
+    engine_layer: i32,
+    timer_supported: bool,
+    timer_unsupported_reason: String,
+    timer_open_inside_range: Option<bool>,
+    timer_open_after_end: Option<bool>,
+    timer_samples: i32,
+    timer_collections: usize,
+    timer_available_frames: usize,
+    timer_milliseconds: f64,
+    random_values: Vec<f32>,
+    random_is_deterministic: Option<bool>,
+    step_free_fall: Option<(f32, f32)>,
+    step_respawns: Option<(f32, f32)>,
+    capacity: i32,
+    settings_round_trip: Option<(f32, f32)>,
+    emission_rate_clamped: Option<bool>,
+    active_after_update: i32,
+    particles_read: usize,
+    aged_particles: usize,
+    cpu_positions: Vec<(f32, f32, f32)>,
+    gpu_positions: Vec<(f32, f32, f32)>,
+    used_compute: Option<bool>,
+    lookup_glsl_bytes: usize,
+    frames_completed: usize,
+}
+
+struct SimulationGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<SimulationFindings>>,
+    timer: Option<GpuTimer>,
+    system: Option<ParticleSystem>,
+    draws: Arc<AtomicUsize>,
+}
+
+impl SimulationGame {
+    fn new(findings: &Arc<Mutex<SimulationFindings>>) -> Self {
+        Self {
+            state: Arc::new(GameState::default()),
+            findings: Arc::clone(findings),
+            timer: None,
+            system: None,
+            draws: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+}
+
+impl GameStateAccess for SimulationGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+/// A deterministic emitter: no variance, no cone, one particle per second.
+fn steady_emitter() -> Result<ParticleEmitterSettings> {
+    let mut settings = ParticleEmitterSettings::canonical_defaults()?;
+    settings.position = Vector3::Zero;
+    settings.direction = Vector3::Up;
+    settings.gravity = Vector3::from_x_and_y_and_z(0.0, -10.0, 0.0);
+    settings.cone_angle = 0.0;
+    settings.speed = 1.0;
+    settings.speed_variance = 0.0;
+    settings.lifetime = 4.0;
+    settings.lifetime_variance = 0.0;
+    settings.drag = 0.0;
+    settings.emission_rate = 8.0;
+    Ok(settings)
+}
+
+impl Game for SimulationGame {
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+
+        // The shader hash is a pure function and the two simulations agree on
+        // it by construction upstream. Determinism and range are what a caller
+        // can actually rely on, so both are asserted.
+        let seeds = [0_u32, 1, 2, 7, 1_000, 4_294_967_295];
+        let mut values = Vec::new();
+        for seed in seeds {
+            values.push(ParticleSystem::random(seed)?);
+        }
+        let again: Vec<f32> = seeds
+            .iter()
+            .map(|seed| ParticleSystem::random(*seed))
+            .collect::<Result<_>>()?;
+        {
+            let mut findings = self.findings.lock().expect("findings");
+            findings.random_is_deterministic = Some(values == again);
+            findings.random_values = values;
+        }
+
+        // The pure integrator. With no drag and a known gravity, one step is
+        // arithmetic a test can do itself -- which is the difference between
+        // checking the simulation and checking that a call returned.
+        let settings = steady_emitter()?;
+        let mut particle = Particle::canonical_defaults()?;
+        particle.lifetime = 10.0;
+        particle.velocity = Vector3::Zero;
+        let stepped = particle.step(0, settings, 0.5)?;
+        self.findings.lock().expect("findings").step_free_fall =
+            Some((stepped.velocity.Y, stepped.age));
+
+        // A slot whose age passes its lifetime respawns rather than dying, and
+        // the respawn count is how a caller sees that happen.
+        let mut expiring = Particle::canonical_defaults()?;
+        expiring.lifetime = 0.25;
+        expiring.age = 0.2;
+        let respawned = expiring.step(3, settings, 0.5)?;
+        self.findings.lock().expect("findings").step_respawns =
+            Some((respawned.age, respawned.respawn_count));
+
+        let system = ParticleSystem::with_capacity(&device, 64)?;
+        system.set_settings(settings)?;
+        let stored = system.settings()?;
+        {
+            let mut findings = self.findings.lock().expect("findings");
+            findings.capacity = system.capacity()?;
+            findings.settings_round_trip = Some((stored.emission_rate, stored.lifetime));
+        }
+
+        // An emission rate the capacity cannot sustain is accepted and then
+        // reported. The settings must still read back exactly as written --
+        // that is the whole point of reporting rather than clamping.
+        let mut greedy = settings;
+        greedy.emission_rate = 10_000.0;
+        system.set_settings(greedy)?;
+        let clamped = system.is_emission_rate_clamped()?;
+        let greedy_stored = system.settings()?;
+        assert!(
+            (greedy_stored.emission_rate - 10_000.0).abs() < 1e-3,
+            "the settings are stored as given, not corrected: {}",
+            greedy_stored.emission_rate
+        );
+        self.findings.lock().expect("findings").emission_rate_clamped = Some(clamped);
+        system.set_settings(settings)?;
+        system.reset()?;
+
+        let timer = GpuTimer::new(&device)?;
+        {
+            let mut findings = self.findings.lock().expect("findings");
+            findings.timer_supported = timer.is_supported()?;
+            findings.timer_unsupported_reason = timer.unsupported_reason()?;
+        }
+
+        self.findings.lock().expect("findings").lookup_glsl_bytes =
+            ParticleSystem::particle_lookup_glsl()?.len();
+
+        self.timer = Some(timer);
+        self.system = Some(system);
+        Ok(())
+    }
+
+    fn Draw(&mut self, game: &mut GameContext<'_>, _: &GameTime) -> Result<()> {
+        let _ = game;
+        let shared = Arc::clone(&self.findings);
+        let (Some(timer), Some(system)) = (self.timer.as_ref(), self.system.as_ref()) else {
+            return Ok(());
+        };
+        let frame = self.draws.fetch_add(1, Ordering::SeqCst);
+        shared.lock().expect("findings").frames_completed += 1;
+
+        // The poll comes *before* the next range opens. A GPU timer query is
+        // non-blocking: the result of the range closed last frame is not ready
+        // when `end` returns, and opening the next range re-issues the query.
+        // Polling straight after `end` therefore collects nothing, for ever --
+        // which is exactly what this test measured before the order changed.
+        {
+            let mut findings = shared.lock().expect("findings");
+            findings.timer_available_frames += usize::from(timer.is_result_available()?);
+            if timer.poll()? {
+                findings.timer_collections += 1;
+            }
+            findings.timer_samples = timer.sample_count()?;
+            let milliseconds = timer.last_milliseconds()?;
+            if milliseconds > 0.0 {
+                findings.timer_milliseconds = milliseconds;
+            }
+        }
+
+        timer.begin()?;
+        let open = timer.is_open()?;
+        system.update(0.25)?;
+        timer.end()?;
+        let closed = timer.is_open()?;
+        if frame == 0 {
+            let mut findings = shared.lock().expect("findings");
+            findings.timer_open_inside_range = Some(open);
+            findings.timer_open_after_end = Some(closed);
+        }
+
+        if frame == 3 {
+            let particles = system.particles()?;
+            let mut findings = shared.lock().expect("findings");
+            findings.active_after_update = system.active_count()?;
+            findings.particles_read = particles.len();
+            findings.aged_particles = particles.iter().filter(|p| p.age > 0.0).count();
+            findings.used_compute = Some(system.uses_compute()?);
+        }
+        Ok(())
+    }
+
+    fn UnloadContent(&mut self, _: &mut GameContext<'_>) -> Result<()> {
+        Ok(())
+    }
+}
+
+/// Runs one deterministic simulation on the requested path and returns the
+/// positions it produced.
+fn simulate(system: &ParticleSystem, on_cpu: bool) -> Result<Vec<(f32, f32, f32)>> {
+    system.set_simulation_on_cpu(on_cpu)?;
+    system.reset()?;
+    for _ in 0..8 {
+        system.update(0.125)?;
+    }
+    Ok(system
+        .particles()?
+        .into_iter()
+        .map(|p| (p.position.X, p.position.Y, p.position.Z))
+        .collect())
+}
+
+struct PathComparisonGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<SimulationFindings>>,
+}
+
+impl GameStateAccess for PathComparisonGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for PathComparisonGame {
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        if engine_layer_version()? == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+        let system = ParticleSystem::with_capacity(&device, 32)?;
+        system.set_settings(steady_emitter()?)?;
+
+        // Upstream states the CPU and GPU paths are one simulation. Running the
+        // same eight steps on each and comparing the particles is what turns
+        // that from a claim into a measurement.
+        let cpu = simulate(&system, true)?;
+        let gpu = simulate(&system, false)?;
+        let mut findings = self.findings.lock().expect("findings");
+        findings.cpu_positions = cpu;
+        findings.gpu_positions = gpu;
+        findings.used_compute = Some(system.uses_compute()?);
+        Ok(())
+    }
+}
+
+#[test]
+fn gpu_timers_and_particles_report_what_they_measured() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(SimulationFindings::default()));
+    let game = SimulationGame::new(&findings);
+    run_for_frames(game, SIMULATION_FRAMES as u64).expect("every simulation frame runs");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+    assert_eq!(findings.frames_completed, SIMULATION_FRAMES, "every frame ran");
+
+    // The hash is deterministic and in range. A generator that returned the
+    // same number for every seed would satisfy determinism alone, so both
+    // properties are asserted.
+    assert_eq!(
+        findings.random_is_deterministic,
+        Some(true),
+        "the shader hash answers the same value for the same seed"
+    );
+    assert!(
+        findings
+            .random_values
+            .iter()
+            .all(|value| (0.0..1.0).contains(value)),
+        "every hash value is a unit fraction: {:?}",
+        findings.random_values
+    );
+    let distinct: std::collections::BTreeSet<u32> = findings
+        .random_values
+        .iter()
+        .map(|value| value.to_bits())
+        .collect();
+    assert!(
+        distinct.len() >= findings.random_values.len() - 1,
+        "different seeds give different values: {:?}",
+        findings.random_values
+    );
+
+    // Free fall for half a second under -10: the velocity is exactly -5 and the
+    // age is exactly the step. Anything else is a different integrator.
+    let (velocity, age) = findings.step_free_fall.expect("one step was taken");
+    assert!(
+        (velocity - -5.0).abs() < 1e-4,
+        "half a second under gravity -10 gives velocity -5, not {velocity}"
+    );
+    assert!(
+        (age - 0.5).abs() < 1e-6,
+        "one 0.5 second step ages the particle by 0.5, not {age}"
+    );
+
+    // A slot past its lifetime respawns rather than disappearing, and the
+    // overflow carries: a slot aged 0.2 with a lifetime of 0.25, stepped by
+    // 0.5, comes back aged by exactly the 0.45 it overshot. Asserting the rule
+    // rather than "the age got smaller" is what would catch a respawn that
+    // reset to zero and silently lost a frame of motion.
+    let (respawn_age, respawns) = findings.step_respawns.expect("one step was taken");
+    assert!(
+        respawns >= 1.0,
+        "a slot past its lifetime respawns: count {respawns}"
+    );
+    let overflow = (0.2_f32 + 0.5) - 0.25;
+    assert!(
+        (respawn_age - overflow).abs() < 1e-5,
+        "the respawned slot carries the overflow: expected {overflow}, got {respawn_age}"
+    );
+
+    assert_eq!(findings.capacity, 64, "the system allocated what was asked");
+    let (rate, lifetime) = findings.settings_round_trip.expect("settings were read back");
+    assert!(
+        (rate - 8.0).abs() < 1e-4 && (lifetime - 4.0).abs() < 1e-4,
+        "the emitter settings round-trip exactly: rate {rate}, lifetime {lifetime}"
+    );
+    // 10,000 per second for four seconds is 40,000 slots against a capacity of
+    // 64, so the report is not merely "some number came back".
+    assert_eq!(
+        findings.emission_rate_clamped,
+        Some(true),
+        "a rate 600 times the capacity is reported as clamped"
+    );
+
+    assert!(
+        findings.particles_read > 0,
+        "the system hands its particles back"
+    );
+    assert!(
+        findings.aged_particles > 0,
+        "particles that have been updated carry a non-zero age: {} of {}",
+        findings.aged_particles,
+        findings.particles_read
+    );
+    assert!(
+        findings.active_after_update > 0,
+        "a system emitting at eight per second has active slots after a second"
+    );
+
+    if findings.timer_supported {
+        assert_eq!(
+            findings.timer_open_inside_range,
+            Some(true),
+            "a supported timer reports its range open between begin and end"
+        );
+        assert_eq!(
+            findings.timer_open_after_end,
+            Some(false),
+            "and closed after end"
+        );
+        assert!(
+            findings.timer_samples > 0,
+            "a supported timer collects results across {SIMULATION_FRAMES} frames; \
+             {} polls returned a result and {} frames reported one available",
+            findings.timer_collections,
+            findings.timer_available_frames
+        );
+        assert_eq!(
+            findings.timer_samples as usize, findings.timer_collections,
+            "every collected result is one sample"
+        );
+        assert!(
+            findings.timer_milliseconds > 0.0,
+            "a collected GPU sample is a real duration: {}",
+            findings.timer_milliseconds
+        );
+        assert!(
+            findings.timer_milliseconds < 1_000.0,
+            "and a plausible one: {}",
+            findings.timer_milliseconds
+        );
+    } else {
+        assert!(
+            !findings.timer_unsupported_reason.is_empty(),
+            "an unsupported timer says why"
+        );
+        assert_eq!(
+            findings.timer_samples, 0,
+            "an unsupported timer collects nothing"
+        );
+        println!(
+            "GPU timing unsupported by this renderer: {}",
+            findings.timer_unsupported_reason
+        );
+    }
+
+    assert!(
+        findings.lookup_glsl_bytes > 50,
+        "the particle lookup GLSL is real source, {} bytes",
+        findings.lookup_glsl_bytes
+    );
+
+    println!(
+        "particles: capacity {} active {} read {} aged {} | compute {:?} | \
+         timer supported={} samples={} collections={} available-frames={} last={}ms",
+        findings.capacity,
+        findings.active_after_update,
+        findings.particles_read,
+        findings.aged_particles,
+        findings.used_compute,
+        findings.timer_supported,
+        findings.timer_samples,
+        findings.timer_collections,
+        findings.timer_available_frames,
+        findings.timer_milliseconds,
+    );
+}
+
+#[test]
+fn the_cpu_and_gpu_particle_paths_are_one_simulation() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(SimulationFindings::default()));
+    let game = PathComparisonGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame comparing the two simulation paths");
+
+    let findings = findings.lock().expect("findings");
+    if findings.cpu_positions.is_empty() && findings.gpu_positions.is_empty() {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+    assert_eq!(
+        findings.cpu_positions.len(),
+        findings.gpu_positions.len(),
+        "both paths simulate the same number of slots"
+    );
+    assert!(
+        !findings.cpu_positions.is_empty(),
+        "the comparison ran over some particles"
+    );
+    let moved = findings
+        .cpu_positions
+        .iter()
+        .filter(|(x, y, z)| x.abs() + y.abs() + z.abs() > 1e-6)
+        .count();
+    assert!(
+        moved > 0,
+        "the simulation actually moved particles: {:?}",
+        &findings.cpu_positions[..findings.cpu_positions.len().min(4)]
+    );
+
+    // Bit-identical is upstream's claim for the hash; the integration is the
+    // same four lines in the same order, so the two paths must agree to within
+    // float reassociation rather than to within "roughly".
+    let mut worst = 0.0_f32;
+    for (cpu, gpu) in findings.cpu_positions.iter().zip(&findings.gpu_positions) {
+        worst = worst
+            .max((cpu.0 - gpu.0).abs())
+            .max((cpu.1 - gpu.1).abs())
+            .max((cpu.2 - gpu.2).abs());
+    }
+    println!(
+        "cpu/gpu worst position difference: {worst} over {} slots (compute used: {:?})",
+        findings.cpu_positions.len(),
+        findings.used_compute
+    );
+    assert!(
+        worst < 1e-3,
+        "the CPU and GPU paths produce the same particles; worst difference {worst}"
     );
 }

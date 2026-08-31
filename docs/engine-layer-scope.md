@@ -130,6 +130,7 @@ the criterion above is unchanged, only its precondition has been met.
 | render pipeline lifecycle, scene target, statistics, pass timings | `render_pipeline` | 27 | `VERIFIED_PIXEL` |
 | directional-light shadow maps | `shadow_map`, plus the pipeline's shadow-scene pair | 24 | `VERIFIED_GPU` |
 | post-process chain, passes, target pool, tonemap and FXAA | `post_process_chain`, `post_process_pass`, `blit_pass`, `render_target_pool`, `tonemap_pass`, `fxaa_pass` | 49 | `VERIFIED_PIXEL` |
+| GPU timers and particle systems | `gpu_timer`, `particle_system`, `particle` | 35 | `VERIFIED_GPU` |
 
 ### What the GPU artifact changed about the evidence
 
@@ -150,4 +151,14 @@ three found something:
 - **The transparent-scene callback runs only when the transparency mode is not
   `None`,** which is the default. A registration that never fires looks exactly
   like a broken one.
+- **A GPU timer query resolves after the frame that closed it.** Polling
+  straight after `end` collects nothing, and re-opening the range next frame
+  re-issues the query -- so a loop that polls in the wrong order measures
+  nothing for ever while reporting the timer as supported. Polling before the
+  next range opens is what turned "supported, zero samples" into a measured
+  0.007 ms of real GPU work.
+- **`cna_particle_system_get_settings` validates its own output structure.** It
+  is the one engine getter that refuses a destination whose `struct_size` and
+  `struct_version` the caller has not filled, where every other getter fills
+  them itself.
 

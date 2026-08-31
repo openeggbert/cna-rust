@@ -52,7 +52,7 @@ use crate::graphics::{
 };
 use crate::native::Native;
 use crate::graphics::{DepthFormat, RenderTarget2D};
-use crate::value::{BoundingBox, Color, Matrix, Vector3};
+use crate::value::{BoundingBox, Color, Matrix, Vector3, Vector4};
 
 use super::pbr::{EngineRenderSettings, RenderQuality, ShadowQuality, TonemappingMode};
 
@@ -2373,4 +2373,639 @@ impl FxaaPass {
             unsafe { (api.fxaa_pass_copy_fragment_glsl)(destination, capacity, out_bytes) }
         })
     }
+}
+
+/// A non-blocking GPU timer.
+///
+/// `OWNED`. Creation succeeds where the renderer has no timer query at all, so
+/// [`GpuTimer::is_supported`] and [`GpuTimer::unsupported_reason`] are the
+/// questions to ask -- and an unsupported timer's `begin` and `end` do nothing
+/// rather than failing, which is why a caller that reads success as evidence
+/// would measure nothing and never find out.
+pub struct GpuTimer {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl GpuTimer {
+    /// Creates a GPU timer for a device.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe { (native.engine.gpu_timer_create)(device.handle()?, &mut handle) })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.gpu_timer_destroy,
+            released: "the GPU timer has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+        })
+    }
+
+    /// Whether the renderer supplied a timer query.
+    pub fn is_supported(&self) -> Result<bool> {
+        self.flag(self.native.engine.gpu_timer_is_supported)
+    }
+
+    /// Why the timer is unsupported; empty when it is supported.
+    pub fn unsupported_reason(&self) -> Result<String> {
+        let handle = self.core.get()?;
+        copy_text(&self.native, |api, destination, capacity, out_bytes| {
+            // SAFETY: the destination holds `capacity` writable bytes.
+            unsafe {
+                (api.gpu_timer_copy_unsupported_reason)(handle, destination, capacity, out_bytes)
+            }
+        })
+    }
+
+    /// Opens the timed range, or does nothing when unsupported or already open.
+    pub fn begin(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.gpu_timer_begin)(handle) })
+    }
+
+    /// Closes the timed range, or does nothing when unsupported or not open.
+    pub fn end(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.gpu_timer_end)(handle) })
+    }
+
+    /// Whether a timed range is currently open.
+    pub fn is_open(&self) -> Result<bool> {
+        self.flag(self.native.engine.gpu_timer_is_open)
+    }
+
+    /// Whether the last closed range can be collected without blocking.
+    pub fn is_result_available(&self) -> Result<bool> {
+        self.flag(self.native.engine.gpu_timer_is_result_available)
+    }
+
+    /// Collects a finished result without blocking.
+    ///
+    /// Answers `true` only when a *new* result was collected, which is what
+    /// makes polling in a loop terminate rather than spin.
+    pub fn poll(&self) -> Result<bool> {
+        self.flag(self.native.engine.gpu_timer_poll)
+    }
+
+    /// The most recently collected GPU time, or zero before the first result.
+    pub fn last_milliseconds(&self) -> Result<f64> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.gpu_timer_get_last_milliseconds)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// How many results have been collected.
+    pub fn sample_count(&self) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native
+            .check(unsafe { (self.native.engine.gpu_timer_get_sample_count)(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    /// Releases the timer now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+
+    fn flag(
+        &self,
+        route: unsafe extern "C" fn(sys::CNA_GpuTimerHandle, *mut sys::CNA_Bool) -> sys::CNA_Result,
+    ) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut value) })?;
+        Ok(value != 0)
+    }
+}
+
+impl Drop for GpuTimer {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// What an emitter throws, how fast, and what happens to it afterwards.
+///
+/// Assigned as given: no field is clamped or refused on the way in. An emission
+/// rate the capacity cannot sustain is accepted and then *reported* by
+/// [`ParticleSystem::is_emission_rate_clamped`], so the settings read back
+/// exactly as they were written.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct ParticleEmitterSettings {
+    /// Where particles are born, in world space.
+    pub position: Vector3,
+    /// The centre of the emission cone; normalised internally.
+    pub direction: Vector3,
+    /// Constant acceleration, in units per second squared.
+    pub gravity: Vector3,
+    /// Colour at birth, unclamped so it can be an HDR emitter.
+    pub start_color: Vector4,
+    /// Colour at death.
+    pub end_color: Vector4,
+    /// The cone's half angle in radians; zero emits a line, pi a full sphere.
+    pub cone_angle: f32,
+    /// How fast a particle leaves, in units per second.
+    pub speed: f32,
+    /// How much that speed varies, as a fraction of it.
+    pub speed_variance: f32,
+    /// How long a particle lives, in seconds.
+    pub lifetime: f32,
+    /// How much that lifetime varies, as a fraction of it.
+    pub lifetime_variance: f32,
+    /// Linear drag per second; zero is a vacuum.
+    pub drag: f32,
+    /// How many particles are born per second.
+    pub emission_rate: f32,
+    /// A particle's size at birth, in world units.
+    pub start_size: f32,
+    /// Its size at death.
+    pub end_size: f32,
+}
+
+impl ParticleEmitterSettings {
+    /// CNA's own defaults, asked of the library rather than restated here.
+    pub fn canonical_defaults() -> Result<Self> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_ParticleEmitterSettings::default();
+        // SAFETY: the structure is a caller-owned versioned output.
+        native.check(unsafe { (native.engine.particle_emitter_settings_init)(&mut value) })?;
+        Ok(Self::from_native(value))
+    }
+
+    fn from_native(value: sys::CNA_ParticleEmitterSettings) -> Self {
+        Self {
+            position: from_native_vector3(value.position),
+            direction: from_native_vector3(value.direction),
+            gravity: from_native_vector3(value.gravity),
+            start_color: from_native_vector4(value.start_color),
+            end_color: from_native_vector4(value.end_color),
+            cone_angle: value.cone_angle,
+            speed: value.speed,
+            speed_variance: value.speed_variance,
+            lifetime: value.lifetime,
+            lifetime_variance: value.lifetime_variance,
+            drag: value.drag,
+            emission_rate: value.emission_rate,
+            start_size: value.start_size,
+            end_size: value.end_size,
+        }
+    }
+
+    fn to_native(self) -> sys::CNA_ParticleEmitterSettings {
+        sys::CNA_ParticleEmitterSettings {
+            struct_size: core::mem::size_of::<sys::CNA_ParticleEmitterSettings>() as u32,
+            struct_version: 1,
+            position: native_vector3(self.position),
+            direction: native_vector3(self.direction),
+            gravity: native_vector3(self.gravity),
+            start_color: native_vector4(self.start_color),
+            end_color: native_vector4(self.end_color),
+            cone_angle: self.cone_angle,
+            speed: self.speed,
+            speed_variance: self.speed_variance,
+            lifetime: self.lifetime,
+            lifetime_variance: self.lifetime_variance,
+            drag: self.drag,
+            emission_rate: self.emission_rate,
+            start_size: self.start_size,
+            end_size: self.end_size,
+        }
+    }
+}
+
+/// One particle, in the layout both the compute shader and the CPU simulation use.
+///
+/// The fourth component of `position` and `velocity` is padding `std430`
+/// requires, not a `w` anything reads, so it is not exposed. `state` carries
+/// age, lifetime, the seed the last spawn used, and how many times the slot has
+/// respawned, which are four different things and are named as such.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[non_exhaustive]
+pub struct Particle {
+    /// Position in world space.
+    pub position: Vector3,
+    /// Velocity in world space.
+    pub velocity: Vector3,
+    /// How long this slot's current particle has lived, in seconds.
+    pub age: f32,
+    /// How long it will live.
+    pub lifetime: f32,
+    /// The seed its last spawn used.
+    pub seed: f32,
+    /// How many times the slot has respawned.
+    pub respawn_count: f32,
+}
+
+impl Particle {
+    /// CNA's own defaults: at the origin, at rest, aged zero with a lifetime of one.
+    pub fn canonical_defaults() -> Result<Self> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_Particle::default();
+        // SAFETY: the structure is a caller-owned output.
+        native.check(unsafe { (native.engine.particle_init)(&mut value) })?;
+        Ok(Self::from_native(value))
+    }
+
+    /// Advances one particle by one step, exactly as either simulation does.
+    ///
+    /// The pure form of the integrator, so a caller can predict what a system
+    /// will do to a slot without running one -- and a test can assert the
+    /// arithmetic rather than the fact that a call returned.
+    pub fn step(
+        self,
+        index: i32,
+        settings: ParticleEmitterSettings,
+        elapsed_seconds: f32,
+    ) -> Result<Self> {
+        let native = Native::process()?;
+        let mut particle = self.to_native();
+        let settings = settings.to_native();
+        // SAFETY: the particle is a live local updated in place and the
+        // settings are borrowed for the call.
+        native.check(unsafe {
+            (native.engine.particle_system_step)(
+                &mut particle,
+                index,
+                &settings,
+                elapsed_seconds,
+            )
+        })?;
+        Ok(Self::from_native(particle))
+    }
+
+    fn from_native(value: sys::CNA_Particle) -> Self {
+        Self {
+            position: Vector3::from_x_and_y_and_z(
+                value.position.x,
+                value.position.y,
+                value.position.z,
+            ),
+            velocity: Vector3::from_x_and_y_and_z(
+                value.velocity.x,
+                value.velocity.y,
+                value.velocity.z,
+            ),
+            age: value.state.x,
+            lifetime: value.state.y,
+            seed: value.state.z,
+            respawn_count: value.state.w,
+        }
+    }
+
+    fn to_native(self) -> sys::CNA_Particle {
+        sys::CNA_Particle {
+            position: sys::CNA_Vector4 {
+                x: self.position.X,
+                y: self.position.Y,
+                z: self.position.Z,
+                w: 0.0,
+            },
+            velocity: sys::CNA_Vector4 {
+                x: self.velocity.X,
+                y: self.velocity.Y,
+                z: self.velocity.Z,
+                w: 0.0,
+            },
+            state: sys::CNA_Vector4 {
+                x: self.age,
+                y: self.lifetime,
+                z: self.seed,
+                w: self.respawn_count,
+            },
+        }
+    }
+}
+
+/// An emitter, a simulation and a draw.
+///
+/// The simulation runs on the GPU where the device has compute and on the CPU
+/// where it does not, and upstream states these are one simulation rather than
+/// two implementations of one idea. [`ParticleSystem::uses_compute`] says which
+/// path the last update took, and
+/// [`ParticleSystem::set_simulation_on_cpu`] forces the other one -- which is
+/// what makes the claim checkable rather than a promise.
+pub struct ParticleSystem {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+    /// The depth image particles fade against. CNA keeps a raw pointer to it.
+    depth: Option<Texture2D>,
+}
+
+impl ParticleSystem {
+    /// Creates a system at CNA's default capacity.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe {
+            (native.engine.particle_system_create)(device.handle()?, &mut handle)
+        })?;
+        Ok(Self::adopt(native, device, handle))
+    }
+
+    /// Creates a system with a chosen number of slots.
+    pub fn with_capacity(device: &GraphicsDevice, capacity: i32) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe {
+            (native.engine.particle_system_create_with_capacity)(
+                device.handle()?,
+                capacity,
+                &mut handle,
+            )
+        })?;
+        Ok(Self::adopt(native, device, handle))
+    }
+
+    fn adopt(native: &Arc<Native>, device: &GraphicsDevice, handle: sys::CNA_Handle) -> Self {
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.particle_system_destroy,
+            released: "the particle system has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Self {
+            core,
+            native: Arc::clone(native),
+            depth: None,
+        }
+    }
+
+    /// The emitter settings, exactly as they were set.
+    ///
+    /// This is the one engine getter that validates its *output* structure on
+    /// the way in: upstream refuses a destination whose `struct_size` and
+    /// `struct_version` are not filled, so a zeroed one is rejected as
+    /// malformed rather than being filled in. The versioning is written here
+    /// before the call for exactly that reason.
+    pub fn settings(&self) -> Result<ParticleEmitterSettings> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_ParticleEmitterSettings {
+            struct_size: core::mem::size_of::<sys::CNA_ParticleEmitterSettings>() as u32,
+            struct_version: 1,
+            ..sys::CNA_ParticleEmitterSettings::default()
+        };
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.particle_system_get_settings)(handle, &mut value)
+        })?;
+        Ok(ParticleEmitterSettings::from_native(value))
+    }
+
+    /// Replaces the emitter settings.
+    pub fn set_settings(&self, settings: ParticleEmitterSettings) -> Result<()> {
+        let handle = self.core.get()?;
+        let value = settings.to_native();
+        // SAFETY: the handle is owned and the structure is borrowed for the call.
+        self.native
+            .check(unsafe { (self.native.engine.particle_system_set_settings)(handle, &value) })
+    }
+
+    /// How many slots the system allocated.
+    pub fn capacity(&self) -> Result<i32> {
+        self.count(self.native.engine.particle_system_get_capacity)
+    }
+
+    /// How many slots are actually in use.
+    pub fn active_count(&self) -> Result<i32> {
+        self.count(self.native.engine.particle_system_get_active_count)
+    }
+
+    /// Whether the emission rate exceeds what the capacity can sustain.
+    pub fn is_emission_rate_clamped(&self) -> Result<bool> {
+        self.flag(self.native.engine.particle_system_is_emission_rate_clamped)
+    }
+
+    /// Advances the simulation.
+    pub fn update(&self, elapsed_seconds: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the value is by value.
+        self.native.check(unsafe {
+            (self.native.engine.particle_system_update)(handle, elapsed_seconds)
+        })
+    }
+
+    /// Returns every slot to its unspawned state.
+    pub fn reset(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.particle_system_reset)(handle) })
+    }
+
+    /// Draws every active particle as one instanced draw.
+    pub fn draw(&self, view: Matrix, projection: Matrix, texture: &Texture2D) -> Result<()> {
+        let handle = self.core.get()?;
+        let view = native_matrix(view);
+        let projection = native_matrix(projection);
+        // SAFETY: the handle is owned, both matrices are borrowed for the call,
+        // and the texture handle is live.
+        self.native.check(unsafe {
+            (self.native.engine.particle_system_draw)(
+                handle,
+                &view,
+                &projection,
+                texture.handle()?,
+            )
+        })
+    }
+
+    /// Copies the particles out, whichever path is simulating them.
+    pub fn particles(&self) -> Result<Vec<Particle>> {
+        let handle = self.core.get()?;
+        let capacity = usize::try_from(self.capacity()?.max(0))
+            .map_err(|_| CnaError::InvalidInput("the particle capacity does not fit in memory"))?;
+        let mut buffer = vec![sys::CNA_Particle::default(); capacity];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `capacity`
+        // writable particles, which is the count passed alongside it.
+        self.native.check(unsafe {
+            (self.native.engine.particle_system_copy_particles_ext)(
+                handle,
+                buffer.as_mut_ptr(),
+                capacity as u64,
+                &mut count,
+            )
+        })?;
+        let count = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("CNA reported more particles than fit in memory"))?;
+        Ok(buffer
+            .into_iter()
+            .take(count.min(capacity))
+            .map(Particle::from_native)
+            .collect())
+    }
+
+    /// Whether the last [`ParticleSystem::update`] ran on the GPU.
+    pub fn uses_compute(&self) -> Result<bool> {
+        self.flag(self.native.engine.particle_system_uses_compute)
+    }
+
+    /// Whether the CPU path has been forced.
+    pub fn is_simulation_on_cpu(&self) -> Result<bool> {
+        self.flag(self.native.engine.particle_system_is_simulation_on_cpu_ext)
+    }
+
+    /// Forces the simulation onto the CPU, or lets it use the GPU again.
+    pub fn set_simulation_on_cpu(&self, forced: bool) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the flag is a canonical boolean.
+        self.native.check(unsafe {
+            (self.native.engine.particle_system_set_simulation_on_cpu_ext)(
+                handle,
+                u8::from(forced),
+            )
+        })
+    }
+
+    /// Why the GPU path was not taken; empty when it was.
+    pub fn unsupported_reason(&self) -> Result<String> {
+        let handle = self.core.get()?;
+        copy_text(&self.native, |api, destination, capacity, out_bytes| {
+            // SAFETY: the destination holds `capacity` writable bytes.
+            unsafe {
+                (api.particle_system_copy_unsupported_reason)(
+                    handle,
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+    }
+
+    /// How sharply particles fade into the depth behind them.
+    pub fn softness(&self) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.particle_system_get_softness_ext)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Sets how sharply particles fade into the depth behind them.
+    pub fn set_softness(&self, value: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the value is by value.
+        self.native
+            .check(unsafe { (self.native.engine.particle_system_set_softness_ext)(handle, value) })
+    }
+
+    /// Supplies the depth image particles fade against.
+    ///
+    /// CNA keeps a raw pointer to it and retains nothing, so the system takes
+    /// the texture and holds it for exactly as long as CNA points at it.
+    pub fn set_depth_input(&mut self, depth: Option<Texture2D>, far_plane: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        let texture_handle = match depth.as_ref() {
+            Some(texture) => texture.handle()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        // SAFETY: the handle is owned and the texture handle is live for the call.
+        self.native.check(unsafe {
+            (self.native.engine.particle_system_set_depth_input_ext)(
+                handle,
+                texture_handle,
+                far_plane,
+            )
+        })?;
+        self.depth = depth;
+        Ok(())
+    }
+
+    /// Releases the system now rather than at drop.
+    pub fn release(&mut self) -> Result<()> {
+        let result = self.core.release();
+        self.depth = None;
+        result
+    }
+
+    /// The same pseudo-random value the shader's hash returns for a seed.
+    ///
+    /// Bit-identical in GLSL and C++ upstream, which is what makes the CPU and
+    /// GPU paths one simulation rather than two.
+    pub fn random(seed: u32) -> Result<f32> {
+        let native = Native::process()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the seed is by value and the output is a live local.
+        native.check(unsafe { (native.engine.particle_system_random)(seed, &mut value) })?;
+        Ok(value)
+    }
+
+    /// The GLSL a vertex shader includes to read a particle.
+    pub fn particle_lookup_glsl() -> Result<String> {
+        let native = Native::process()?;
+        copy_text(&native, |api, destination, capacity, out_bytes| {
+            // SAFETY: the destination holds `capacity` writable bytes.
+            unsafe { (api.particle_system_copy_particle_lookup_glsl)(destination, capacity, out_bytes) }
+        })
+    }
+
+    fn flag(
+        &self,
+        route: unsafe extern "C" fn(
+            sys::CNA_ParticleSystemHandle,
+            *mut sys::CNA_Bool,
+        ) -> sys::CNA_Result,
+    ) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut value) })?;
+        Ok(value != 0)
+    }
+
+    fn count(
+        &self,
+        route: unsafe extern "C" fn(sys::CNA_ParticleSystemHandle, *mut i32) -> sys::CNA_Result,
+    ) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut value) })?;
+        Ok(value)
+    }
+}
+
+impl Drop for ParticleSystem {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+fn native_vector4(value: Vector4) -> sys::CNA_Vector4 {
+    sys::CNA_Vector4 {
+        x: value.X,
+        y: value.Y,
+        z: value.Z,
+        w: value.W,
+    }
+}
+
+fn from_native_vector4(value: sys::CNA_Vector4) -> Vector4 {
+    Vector4::from_x_and_y_and_z_and_w(value.x, value.y, value.z, value.w)
 }
