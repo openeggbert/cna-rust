@@ -34,7 +34,7 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-XNA-006a | GamerServices object model: gamers, collections, profiles, achievements, leaderboards, Guide, dispatcher | `xna40-windows-full` profile | 40 -> 18 missing types, no other diagnostic | full-profile verifier, `gamer_services_native` | DONE |
 | RUST-XNA-006b | Avatar object model: `AvatarDescription`, `AvatarAnimation`, `IAvatarAnimation`, `AvatarRenderer` | `xna40-windows-full` profile | 18 -> 14 missing types, no other diagnostic | full-profile verifier, `gamer_services_native` | DONE |
 | RUST-XNA-006c | Net object model: `NetworkSession` and its 13 companions | `xna40-windows-full` profile | 14 -> 0 missing types, strict zero on the complete runtime profile | full-profile verifier, `net_native` | DONE |
-| RUST-XNA-004 | Content Pipeline: 125 missing design-time types | `xna40-windows-pipeline` profile | decide whether a design-time profile belongs in this crate | pipeline verifier | READY |
+| RUST-XNA-004 | Content Pipeline: 125 missing design-time types | `xna40-windows-pipeline` profile | **decided**: out of scope. CNA's native `.cnj`/`.cnb` tooling replaces it, 17 of the 125 cannot be projected faithfully at all, and the useful overlap is already bound by RUST-EXT-013. See [docs/content-pipeline-decision.md](content-pipeline-decision.md) | pipeline verifier, unchanged at 125 by design | DONE |
 
 ## Behaviour
 
