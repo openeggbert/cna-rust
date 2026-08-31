@@ -8544,6 +8544,132 @@ extern "C" {
         argument2: f32,
         argument3: *mut f32,
     ) -> CNA_Result;
+    pub fn cna_light_probe_baker_bake_light(
+        argument0: CNA_LightProbeBakerHandle,
+        argument1: CNA_LightProbeVolumeHandle,
+        argument2: CNA_LightProbeSceneDrawCallback,
+        argument3: *mut c_void,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_baker_bake_probe(
+        argument0: CNA_LightProbeBakerHandle,
+        argument1: *const CNA_Vector3,
+        argument2: CNA_LightProbeSceneDrawCallback,
+        argument3: *mut c_void,
+        argument4: *mut CNA_LightProbeHandle,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_baker_bake_visibility(
+        argument0: CNA_LightProbeBakerHandle,
+        argument1: CNA_LightProbeVolumeHandle,
+        argument2: CNA_LightProbeSceneDrawCallback,
+        argument3: *mut c_void,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_baker_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_LightProbeBakerHandle,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_baker_create_with_face_size(
+        argument0: CNA_Handle,
+        argument1: i32,
+        argument2: *mut CNA_LightProbeBakerHandle,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_baker_destroy(argument0: CNA_LightProbeBakerHandle) -> CNA_Result;
+    pub fn cna_light_probe_baker_face_count(argument0: *mut i32) -> CNA_Result;
+    pub fn cna_light_probe_baker_face_view(
+        argument0: CNA_LightProbeBakerHandle,
+        argument1: i32,
+        argument2: *const CNA_Vector3,
+        argument3: *mut CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_baker_get_face_size(
+        argument0: CNA_LightProbeBakerHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_baker_get_far_plane(
+        argument0: CNA_LightProbeBakerHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_baker_get_near_plane(
+        argument0: CNA_LightProbeBakerHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_baker_is_supported(
+        argument0: CNA_LightProbeBakerHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_baker_set_planes(
+        argument0: CNA_LightProbeBakerHandle,
+        argument1: f32,
+        argument2: f32,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_volume_ext_contains(
+        argument0: CNA_LightProbeVolumeHandle,
+        argument1: *const CNA_Vector3,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_volume_ext_create(
+        argument0: *const CNA_BoundingBox,
+        argument1: i32,
+        argument2: i32,
+        argument3: i32,
+        argument4: *mut CNA_LightProbeVolumeHandle,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_volume_ext_destroy(argument0: CNA_LightProbeVolumeHandle) -> CNA_Result;
+    pub fn cna_light_probe_volume_ext_get_bounds(
+        argument0: CNA_LightProbeVolumeHandle,
+        argument1: *mut CNA_BoundingBox,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_volume_ext_get_count_x(
+        argument0: CNA_LightProbeVolumeHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_volume_ext_get_count_y(
+        argument0: CNA_LightProbeVolumeHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_volume_ext_get_count_z(
+        argument0: CNA_LightProbeVolumeHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_volume_ext_get_probe(
+        argument0: CNA_LightProbeVolumeHandle,
+        argument1: i32,
+        argument2: i32,
+        argument3: i32,
+        argument4: CNA_LightProbeHandle,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_volume_ext_get_probe_count(
+        argument0: CNA_LightProbeVolumeHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_volume_ext_get_probe_position(
+        argument0: CNA_LightProbeVolumeHandle,
+        argument1: i32,
+        argument2: i32,
+        argument3: i32,
+        argument4: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_volume_ext_irradiance(
+        argument0: CNA_LightProbeVolumeHandle,
+        argument1: *const CNA_Vector3,
+        argument2: *const CNA_Vector3,
+        argument3: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_volume_ext_is_zero(
+        argument0: CNA_LightProbeVolumeHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_volume_ext_sample_probe(
+        argument0: CNA_LightProbeVolumeHandle,
+        argument1: *const CNA_Vector3,
+        argument2: CNA_LightProbeHandle,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_volume_ext_set_probe(
+        argument0: CNA_LightProbeVolumeHandle,
+        argument1: i32,
+        argument2: i32,
+        argument3: i32,
+        argument4: CNA_LightProbeHandle,
+    ) -> CNA_Result;
     pub fn cna_debug_draw_add_bounding_sphere(
         argument0: CNA_DebugDrawHandle,
         argument1: *const CNA_BoundingSphere,

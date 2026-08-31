@@ -810,6 +810,13 @@ pub type CNA_ClusteredLightComputeHandle = CNA_Handle;
 pub type CNA_ClusteredForwardEffectHandle = CNA_Handle;
 pub type CNA_LightProbeHandle = CNA_Handle;
 pub type CNA_EnvironmentProcessorHandle = CNA_Handle;
+pub type CNA_LightProbeVolumeHandle = CNA_Handle;
+pub type CNA_LightProbeBakerHandle = CNA_Handle;
+pub type CNA_LightProbeSceneDrawCallback =
+    Option<unsafe extern "C" fn(*const CNA_Matrix, *const CNA_Matrix, *mut c_void)>;
+
+pub const CNA_LIGHT_PROBE_BAKER_DEFAULT_FACE_SIZE: i32 = 32;
+pub const CNA_LIGHT_PROBE_BAKER_FACE_COUNT: i32 = 6;
 
 pub const CNA_LIGHT_PROBE_COEFFICIENT_COUNT_EXT: i32 = 9;
 pub const CNA_LIGHT_PROBE_VISIBILITY_DIRECTIONS_EXT: i32 = 6;
@@ -10005,4 +10012,83 @@ pub type cna_light_probe_ext_set_visibility_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_light_probe_ext_visibility_weight_fn = unsafe extern "C" fn(
     CNA_LightProbeHandle, *const CNA_Vector3, f32, *mut f32,
+) -> CNA_Result;
+pub type cna_light_probe_baker_bake_light_fn = unsafe extern "C" fn(
+    CNA_LightProbeBakerHandle, CNA_LightProbeVolumeHandle, CNA_LightProbeSceneDrawCallback, *mut c_void,
+) -> CNA_Result;
+pub type cna_light_probe_baker_bake_probe_fn = unsafe extern "C" fn(
+    CNA_LightProbeBakerHandle, *const CNA_Vector3, CNA_LightProbeSceneDrawCallback, *mut c_void, *mut CNA_LightProbeHandle,
+) -> CNA_Result;
+pub type cna_light_probe_baker_bake_visibility_fn = unsafe extern "C" fn(
+    CNA_LightProbeBakerHandle, CNA_LightProbeVolumeHandle, CNA_LightProbeSceneDrawCallback, *mut c_void,
+) -> CNA_Result;
+pub type cna_light_probe_baker_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_LightProbeBakerHandle,
+) -> CNA_Result;
+pub type cna_light_probe_baker_create_with_face_size_fn = unsafe extern "C" fn(
+    CNA_Handle, i32, *mut CNA_LightProbeBakerHandle,
+) -> CNA_Result;
+pub type cna_light_probe_baker_destroy_fn = unsafe extern "C" fn(
+    CNA_LightProbeBakerHandle,
+) -> CNA_Result;
+pub type cna_light_probe_baker_face_count_fn = unsafe extern "C" fn(*mut i32) -> CNA_Result;
+pub type cna_light_probe_baker_face_view_fn = unsafe extern "C" fn(
+    CNA_LightProbeBakerHandle, i32, *const CNA_Vector3, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_light_probe_baker_get_face_size_fn = unsafe extern "C" fn(
+    CNA_LightProbeBakerHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_light_probe_baker_get_far_plane_fn = unsafe extern "C" fn(
+    CNA_LightProbeBakerHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_light_probe_baker_get_near_plane_fn = unsafe extern "C" fn(
+    CNA_LightProbeBakerHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_light_probe_baker_is_supported_fn = unsafe extern "C" fn(
+    CNA_LightProbeBakerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_light_probe_baker_set_planes_fn = unsafe extern "C" fn(
+    CNA_LightProbeBakerHandle, f32, f32,
+) -> CNA_Result;
+pub type cna_light_probe_volume_ext_contains_fn = unsafe extern "C" fn(
+    CNA_LightProbeVolumeHandle, *const CNA_Vector3, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_light_probe_volume_ext_create_fn = unsafe extern "C" fn(
+    *const CNA_BoundingBox, i32, i32, i32, *mut CNA_LightProbeVolumeHandle,
+) -> CNA_Result;
+pub type cna_light_probe_volume_ext_destroy_fn = unsafe extern "C" fn(
+    CNA_LightProbeVolumeHandle,
+) -> CNA_Result;
+pub type cna_light_probe_volume_ext_get_bounds_fn = unsafe extern "C" fn(
+    CNA_LightProbeVolumeHandle, *mut CNA_BoundingBox,
+) -> CNA_Result;
+pub type cna_light_probe_volume_ext_get_count_x_fn = unsafe extern "C" fn(
+    CNA_LightProbeVolumeHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_light_probe_volume_ext_get_count_y_fn = unsafe extern "C" fn(
+    CNA_LightProbeVolumeHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_light_probe_volume_ext_get_count_z_fn = unsafe extern "C" fn(
+    CNA_LightProbeVolumeHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_light_probe_volume_ext_get_probe_fn = unsafe extern "C" fn(
+    CNA_LightProbeVolumeHandle, i32, i32, i32, CNA_LightProbeHandle,
+) -> CNA_Result;
+pub type cna_light_probe_volume_ext_get_probe_count_fn = unsafe extern "C" fn(
+    CNA_LightProbeVolumeHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_light_probe_volume_ext_get_probe_position_fn = unsafe extern "C" fn(
+    CNA_LightProbeVolumeHandle, i32, i32, i32, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_light_probe_volume_ext_irradiance_fn = unsafe extern "C" fn(
+    CNA_LightProbeVolumeHandle, *const CNA_Vector3, *const CNA_Vector3, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_light_probe_volume_ext_is_zero_fn = unsafe extern "C" fn(
+    CNA_LightProbeVolumeHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_light_probe_volume_ext_sample_probe_fn = unsafe extern "C" fn(
+    CNA_LightProbeVolumeHandle, *const CNA_Vector3, CNA_LightProbeHandle,
+) -> CNA_Result;
+pub type cna_light_probe_volume_ext_set_probe_fn = unsafe extern "C" fn(
+    CNA_LightProbeVolumeHandle, i32, i32, i32, CNA_LightProbeHandle,
 ) -> CNA_Result;

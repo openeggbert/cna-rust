@@ -10747,7 +10747,21 @@ impl LightProbe {
             .check(unsafe { (self.native.engine.light_probe_ext_scale)(handle, factor) })
     }
 
-    /// Whether two probes agree across every coefficient and visibility entry.
+    /// Whether two probes agree on their position and all nine coefficients.
+    ///
+    /// **Visibility is not compared,** although CNA's header says it is: the
+    /// canonical `operator==` tests the position and the coefficient table and
+    /// stops there, so two probes differing only in their occluder statistics
+    /// answer `true`. Compare
+    /// [`visibility_mean`](Self::visibility_mean) and
+    /// [`visibility_mean_squared`](Self::visibility_mean_squared) directly when
+    /// that matters.
+    ///
+    /// The position being part of the comparison matters more than it looks:
+    /// [`LightProbeVolume::set_probe`] *relocates* the probe it stores to the
+    /// grid cell's own position, so a probe read back out of a volume is only
+    /// equal to the one that went in once the original has been moved there
+    /// too.
     pub fn value_eq(&self, other: &Self) -> Result<bool> {
         let first = self.core.get()?;
         let second = other.core.get()?;
@@ -11133,6 +11147,522 @@ impl EnvironmentProcessor {
 }
 
 impl Drop for EnvironmentProcessor {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// A grid of [`LightProbe`]s over a box.
+///
+/// `OWNED`, with no parent, like the probes it holds. The volume stores probes
+/// **by value**: reading one copies it out into a probe the caller already has,
+/// and writing one copies it in, so nothing here lends a handle and no probe
+/// taken from a volume goes stale when the volume changes.
+pub struct LightProbeVolume {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl LightProbeVolume {
+    /// The most probes one volume may hold.
+    pub const MAX_PROBES: i32 = sys::CNA_LIGHT_PROBE_VOLUME_MAX_PROBES_EXT;
+
+    /// Creates a volume spanning a box with a probe grid inside it.
+    ///
+    /// Three distinct refusals, each with its own message because a caller
+    /// fixes each differently: a count below one, a product above
+    /// [`MAX_PROBES`](Self::MAX_PROBES), and a box whose maximum is below its
+    /// minimum.
+    pub fn new(bounds: BoundingBox, count_x: i32, count_y: i32, count_z: i32) -> Result<Self> {
+        let native = Native::process()?;
+        let bounds = native_bounds(bounds);
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the bounds are borrowed for the call and the output is a live
+        // local.
+        native.check(unsafe {
+            (native.engine.light_probe_volume_ext_create)(
+                &bounds, count_x, count_y, count_z, &mut handle,
+            )
+        })?;
+        Ok(Self {
+            core: Arc::new(EngineHandle {
+                native: Arc::clone(&native),
+                handle: Mutex::new(handle),
+                destroy: native.engine.light_probe_volume_ext_destroy,
+                released: "the light probe volume has been released",
+            }),
+            native,
+        })
+    }
+
+    /// The box the grid spans.
+    pub fn bounds(&self) -> Result<BoundingBox> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_BoundingBox::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_volume_ext_get_bounds)(handle, &mut value)
+        })?;
+        Ok(from_native_bounds(value))
+    }
+
+    fn count(
+        &self,
+        route: unsafe extern "C" fn(sys::CNA_Handle, *mut i32) -> sys::CNA_Result,
+    ) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    /// How many probes lie along X.
+    pub fn count_x(&self) -> Result<i32> {
+        self.count(self.native.engine.light_probe_volume_ext_get_count_x)
+    }
+
+    /// How many probes lie along Y.
+    pub fn count_y(&self) -> Result<i32> {
+        self.count(self.native.engine.light_probe_volume_ext_get_count_y)
+    }
+
+    /// How many probes lie along Z.
+    pub fn count_z(&self) -> Result<i32> {
+        self.count(self.native.engine.light_probe_volume_ext_get_count_z)
+    }
+
+    /// How many probes the volume holds in total.
+    pub fn probe_count(&self) -> Result<i32> {
+        self.count(self.native.engine.light_probe_volume_ext_get_probe_count)
+    }
+
+    /// The world-space position of one probe in the grid.
+    pub fn probe_position(&self, x: i32, y: i32, z: i32) -> Result<Vector3> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_volume_ext_get_probe_position)(
+                handle, x, y, z, &mut value,
+            )
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// Copies one probe out of the grid into `destination`.
+    ///
+    /// A copy, not a lend: the destination stays correct after the volume
+    /// changes. It is also why this takes a probe rather than returning one --
+    /// that is CNA's own shape for the route.
+    pub fn copy_probe_into(&self, x: i32, y: i32, z: i32, destination: &LightProbe) -> Result<()> {
+        let handle = self.core.get()?;
+        let probe = destination.core.get()?;
+        // SAFETY: both handles are owned and live for the call.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_volume_ext_get_probe)(handle, x, y, z, probe)
+        })
+    }
+
+    /// Copies a probe into one cell of the grid.
+    ///
+    /// The stored copy is **relocated to the cell's own position**: the grid
+    /// decides where a probe is, because a probe placed somewhere else makes
+    /// the interpolation weights describe one arrangement and the light
+    /// another, and the result looks like the lighting is lagging behind the
+    /// geometry. The caller's probe is untouched; only the copy moves.
+    pub fn set_probe(&self, x: i32, y: i32, z: i32, probe: &LightProbe) -> Result<()> {
+        let handle = self.core.get()?;
+        let source = probe.core.get()?;
+        // SAFETY: both handles are owned and live for the call.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_volume_ext_set_probe)(handle, x, y, z, source)
+        })
+    }
+
+    /// Whether a position lies inside the volume's box.
+    pub fn contains(&self, position: Vector3) -> Result<bool> {
+        let handle = self.core.get()?;
+        let position = native_vector3(position);
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned, the position is borrowed for the call,
+        // and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_volume_ext_contains)(handle, &position, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Interpolates the eight surrounding probes into `destination`.
+    ///
+    /// The position is **clamped into the box** rather than refused: a point
+    /// just outside a probe grid is an ordinary thing during rendering, and the
+    /// nearest interpolation is what a caller wants there.
+    pub fn sample_into(&self, position: Vector3, destination: &LightProbe) -> Result<()> {
+        let handle = self.core.get()?;
+        let probe = destination.core.get()?;
+        let position = native_vector3(position);
+        // SAFETY: both handles are owned and the position is borrowed for the
+        // call.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_volume_ext_sample_probe)(handle, &position, probe)
+        })
+    }
+
+    /// The irradiance at a point on a surface facing one way.
+    pub fn irradiance(&self, position: Vector3, normal: Vector3) -> Result<Vector3> {
+        let handle = self.core.get()?;
+        let position = native_vector3(position);
+        let normal = native_vector3(normal);
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the handle is owned, both vectors are borrowed for the call,
+        // and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_volume_ext_irradiance)(
+                handle, &position, &normal, &mut value,
+            )
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// Whether every probe in the volume stores no light.
+    pub fn is_zero(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_volume_ext_is_zero)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Releases the volume now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for LightProbeVolume {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// The scene draw a probe capture asks for, once per cube face.
+struct ProbeSceneCallback {
+    draw: RefCell<Box<dyn FnMut(Matrix, Matrix) -> Result<()>>>,
+    /// Set when the callback returned an error or panicked. The C callback
+    /// returns `void`, so there is nowhere to report a failure *to*: the bake
+    /// route cannot be stopped part-way and will answer success, and this slot
+    /// is what lets the safe wrapper report the Rust cause afterwards.
+    failure: RefCell<Option<CnaError>>,
+    calls: RefCell<u32>,
+}
+
+impl ProbeSceneCallback {
+    fn new(draw: impl FnMut(Matrix, Matrix) -> Result<()> + 'static) -> Arc<Self> {
+        Arc::new(Self {
+            draw: RefCell::new(Box::new(draw)),
+            failure: RefCell::new(None),
+            calls: RefCell::new(0),
+        })
+    }
+
+    fn context(self: &Arc<Self>) -> *mut c_void {
+        Arc::as_ptr(self).cast::<c_void>().cast_mut()
+    }
+
+    fn take_failure(&self) -> Option<CnaError> {
+        self.failure.borrow_mut().take()
+    }
+}
+
+/// Draws one cube face of a probe capture.
+///
+/// A panic is caught here rather than crossing the C frame. Unlike the render
+/// pipeline's callback this one cannot refuse: it returns `void`, so a failure
+/// is recorded and the remaining faces still run.
+unsafe extern "C" fn probe_scene_trampoline(
+    view: *const sys::CNA_Matrix,
+    projection: *const sys::CNA_Matrix,
+    context: *mut c_void,
+) {
+    if context.is_null() || view.is_null() || projection.is_null() {
+        return;
+    }
+    // SAFETY: the pointer is the address of an `Arc<ProbeSceneCallback>`'s
+    // contents, kept alive by the caller across the whole bake, and only ever
+    // shared. The matrices are CNA's, valid for this call.
+    let scene = unsafe { &*context.cast::<ProbeSceneCallback>() };
+    let view = from_native_matrix(unsafe { *view });
+    let projection = from_native_matrix(unsafe { *projection });
+    *scene.calls.borrow_mut() += 1;
+    let Ok(mut draw) = scene.draw.try_borrow_mut() else {
+        *scene.failure.borrow_mut() = Some(CnaError::Callback(
+            "a light-probe scene callback re-entered the capture it was drawing".to_owned(),
+        ));
+        return;
+    };
+    match catch_unwind(AssertUnwindSafe(|| draw(view, projection))) {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => *scene.failure.borrow_mut() = Some(error),
+        Err(_) => {
+            *scene.failure.borrow_mut() = Some(CnaError::Callback(
+                "a light-probe scene callback panicked".to_owned(),
+            ));
+        }
+    }
+}
+
+/// Captures light probes by drawing the scene into a cube around each one.
+///
+/// `OWNED`. **Whether a baker can bake is probed, not asked**: no renderer
+/// publishes "can bind an offscreen target and read it back" as a capability
+/// and the two do not come together, so CNA renders one capture at construction
+/// and remembers whether it worked. [`is_supported`](Self::is_supported)
+/// reports that measurement and every bake refuses when it is false.
+pub struct LightProbeBaker {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl LightProbeBaker {
+    /// The cube-face resolution a baker captures at unless told otherwise.
+    pub const DEFAULT_FACE_SIZE: i32 = sys::CNA_LIGHT_PROBE_BAKER_DEFAULT_FACE_SIZE;
+    /// How many faces one capture renders.
+    pub const FACE_COUNT: i32 = sys::CNA_LIGHT_PROBE_BAKER_FACE_COUNT;
+
+    fn wrap(native: &Arc<Native>, device: &GraphicsDevice, handle: sys::CNA_Handle) -> Self {
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.light_probe_baker_destroy,
+            released: "the light probe baker has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Self {
+            core,
+            native: Arc::clone(native),
+        }
+    }
+
+    /// Creates a baker at the default face size.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.light_probe_baker_create)(device.handle()?, &mut handle)
+        })?;
+        Ok(Self::wrap(native, device, handle))
+    }
+
+    /// Creates a baker at a chosen face size.
+    pub fn with_face_size(device: &GraphicsDevice, face_size: i32) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.light_probe_baker_create_with_face_size)(
+                device.handle()?,
+                face_size,
+                &mut handle,
+            )
+        })?;
+        Ok(Self::wrap(native, device, handle))
+    }
+
+    /// How many faces one capture renders, asked of the library.
+    ///
+    /// The same number as [`FACE_COUNT`](Self::FACE_COUNT), without a call.
+    pub fn face_count() -> Result<i32> {
+        let native = Native::process()?;
+        let mut value = 0_i32;
+        // SAFETY: the output is a live local.
+        native.check(unsafe { (native.engine.light_probe_baker_face_count)(&mut value) })?;
+        Ok(value)
+    }
+
+    /// Whether this renderer can actually capture probes.
+    pub fn is_supported(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_baker_is_supported)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// The cube-face resolution this baker captures at.
+    pub fn face_size(&self) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_baker_get_face_size)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// The near capture distance.
+    pub fn near_plane(&self) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_baker_get_near_plane)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// The far capture distance.
+    pub fn far_plane(&self) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_baker_get_far_plane)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Sets both capture distances at once.
+    ///
+    /// **Validated as a pair and refused as a pair**: a near distance that is
+    /// not positive, or a far distance that does not exceed it, leaves *both*
+    /// unchanged. There is no half-applied state and no clamping, because a
+    /// silently corrected capture range gives probes that look plausible and
+    /// are lit from the wrong depth.
+    pub fn set_planes(&self, near_plane: f32, far_plane: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_baker_set_planes)(handle, near_plane, far_plane)
+        })
+    }
+
+    /// The view matrix one cube face is captured with.
+    pub fn face_view(&self, face: i32, position: Vector3) -> Result<Matrix> {
+        let handle = self.core.get()?;
+        let position = native_vector3(position);
+        let mut value = sys::CNA_Matrix::default();
+        // SAFETY: the handle is owned, the position is borrowed for the call,
+        // and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_baker_face_view)(handle, face, &position, &mut value)
+        })?;
+        Ok(from_native_matrix(value))
+    }
+
+    /// Captures one probe by drawing the scene six times.
+    ///
+    /// `draw` receives the view and projection CNA chose for each face. Draw
+    /// the scene and nothing else: the baker owns the render target, and
+    /// binding another one inside the callback loses the face being captured.
+    ///
+    /// The C callback returns nothing, so a failing or panicking closure cannot
+    /// stop the capture; the remaining faces still run and the error is
+    /// reported here afterwards, ahead of the probe.
+    pub fn bake_probe(
+        &self,
+        position: Vector3,
+        draw: impl FnMut(Matrix, Matrix) -> Result<()> + 'static,
+    ) -> Result<LightProbe> {
+        let handle = self.core.get()?;
+        let scene = ProbeSceneCallback::new(draw);
+        let position = native_vector3(position);
+        let mut out = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned, the position is borrowed for the call,
+        // and the context is the address of an `Arc` this frame keeps alive
+        // across the whole capture.
+        let result = self.native.check(unsafe {
+            (self.native.engine.light_probe_baker_bake_probe)(
+                handle,
+                &position,
+                Some(probe_scene_trampoline),
+                scene.context(),
+                &mut out,
+            )
+        });
+        if let Some(error) = scene.take_failure() {
+            if out != sys::CNA_INVALID_HANDLE {
+                // SAFETY: the probe CNA published is destroyed exactly once,
+                // here, because it is not being handed to the caller.
+                let _ = unsafe { (self.native.engine.light_probe_ext_destroy)(out) };
+            }
+            return Err(error);
+        }
+        result?;
+        Ok(LightProbe::wrap(&self.native, out))
+    }
+
+    fn bake_volume(
+        &self,
+        route: unsafe extern "C" fn(
+            sys::CNA_Handle,
+            sys::CNA_LightProbeVolumeHandle,
+            sys::CNA_LightProbeSceneDrawCallback,
+            *mut c_void,
+        ) -> sys::CNA_Result,
+        volume: &LightProbeVolume,
+        draw: impl FnMut(Matrix, Matrix) -> Result<()> + 'static,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let volume = volume.core.get()?;
+        let scene = ProbeSceneCallback::new(draw);
+        // SAFETY: both handles are owned and the context is the address of an
+        // `Arc` this frame keeps alive across the whole bake.
+        let result = self.native.check(unsafe {
+            route(
+                handle,
+                volume,
+                Some(probe_scene_trampoline),
+                scene.context(),
+            )
+        });
+        if let Some(error) = scene.take_failure() {
+            return Err(error);
+        }
+        result
+    }
+
+    /// Captures the light of every probe of a volume.
+    ///
+    /// Whatever visibility each probe already carried is **kept**: light and
+    /// visibility are two separate bakes and either may be run without the
+    /// other.
+    pub fn bake_light(
+        &self,
+        volume: &LightProbeVolume,
+        draw: impl FnMut(Matrix, Matrix) -> Result<()> + 'static,
+    ) -> Result<()> {
+        self.bake_volume(self.native.engine.light_probe_baker_bake_light, volume, draw)
+    }
+
+    /// Captures the visibility distances of every probe of a volume.
+    pub fn bake_visibility(
+        &self,
+        volume: &LightProbeVolume,
+        draw: impl FnMut(Matrix, Matrix) -> Result<()> + 'static,
+    ) -> Result<()> {
+        self.bake_volume(
+            self.native.engine.light_probe_baker_bake_visibility,
+            volume,
+            draw,
+        )
+    }
+
+    /// Releases the baker now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for LightProbeBaker {
     fn drop(&mut self) {
         let _ = self.core.release();
     }

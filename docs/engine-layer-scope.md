@@ -142,6 +142,7 @@ the criterion above is unchanged, only its precondition has been met.
 | the shadow budget, the light upload buffer and the compute sort | `clustered_shadow_policy`, `clustered_light_buffer`, `clustered_light_compute` | 30 | `VERIFIED_GPU` |
 | the clustered forward effect | `clustered_forward_effect` (23 of 29; the other six wait on the PBR material extensions, the light probes and the area lights) | 23 | `VERIFIED_STATE` |
 | light probes, image-based lights and the environment processor | `light_probe_ext`, `image_based_light_ext`, `environment_processor` | 34 | `VERIFIED_GPU` |
+| probe volumes and the probe baker | `light_probe_volume_ext`, `light_probe_baker` | 27 | `VERIFIED_GPU` |
 
 ### What the GPU artifact changed about the evidence
 
@@ -298,4 +299,33 @@ three found something:
   exactly like a working query. Beyond the mean the weight is Chebyshev's
   `variance / (variance + gap^2)`, which the test pins to the value rather than
   to the direction of change.
+- **`LightProbeVolume::set_probe` relocates the probe it stores.** The grid
+  decides where a probe is, so the stored copy is moved to the cell's own
+  position and the caller's probe is left alone. A probe written in at
+  `(9, 9, 9)` comes back out at `(-1, -2, -3)` -- and because
+  `cna_light_probe_ext_equals` compares the position, a round-trip
+  `set_probe`/`get_probe` pair is **not** equal to what went in until the
+  original is moved there too. Upstream's own comment says why: a probe placed
+  somewhere else makes the interpolation weights describe one arrangement and
+  the light another, and the result looks like the lighting is lagging behind
+  the geometry.
+- **`cna_light_probe_ext_equals` does not compare visibility, although its
+  header says it does.** The canonical `operator==` tests the position and the
+  nine coefficients and stops; two probes differing only in their occluder
+  statistics answer `true`. The Rust doc says what the call actually does and
+  the test pins it, so nobody builds a "did the visibility bake change
+  anything" check on it.
+- **The probe baker works on this host, and a failing callback cannot stop
+  it.** `is_supported` -- which CNA measures by rendering one capture at
+  construction rather than asking the renderer -- is true on the OPENGLES3
+  artifact, and a probe bake calls the scene callback exactly six times, a
+  two-probe volume twelve. The C callback returns `void`, so a Rust closure
+  that fails does not abort the capture: every remaining face still runs and
+  the safe wrapper reports the Rust cause afterwards. The test asserts both the
+  message and the six calls.
+- **The baker's capture planes are validated as a pair and refused as a pair.**
+  Three refused calls in a row -- a zero near plane, a negative one, and a far
+  plane below the near one -- left both distances at the values the last
+  accepted call set. An implementation that wrote the near plane before
+  validating the far one would fail exactly here and nowhere else.
 

@@ -23,6 +23,7 @@ use cna::extensions::engine::{
     ClusteredLightBuffer, ClusteredLightCompute, ClusteredLightSet, ClusteredLightType,
     ClusteredForwardEffect, ClusteredShadingMaterial, ClusteredShadowPolicy, CubeLut,
     DebugDraw, DepthEncoding, EnvironmentProcessor, ImageBasedLight, LightProbe,
+    LightProbeBaker, LightProbeVolume,
     DepthNormalPrepass, DisplayColorSpace, FrustumCuller, HdrDisplayOutput, LodGroup,
     LodSelectionMode, ShadowCascadeState, SpotLight, SpotShadowMap, SsaoPass,
     SsrPass, StorageBuffer, TonemapPass, TransparentDrawList, VolumetricFogPass,
@@ -6352,5 +6353,445 @@ fn light_probes_store_directional_light_and_the_processor_makes_the_maps_that_fi
     println!("bad generator arguments: {:?}", findings.bad_generator_arguments);
     for (name, refused) in &findings.bad_generator_arguments {
         assert!(refused, "{name} is refused");
+    }
+}
+
+/// What the probe-volume and probe-baker run measured.
+#[derive(Default)]
+struct VolumeFindings {
+    engine_layer: i32,
+    shape: (i32, i32, i32, i32),
+    bounds: ((f32, f32, f32), (f32, f32, f32)),
+    corner_positions: Vec<(f32, f32, f32)>,
+    bad_index: bool,
+    containment: Vec<(&'static str, bool)>,
+    bad_volumes: Vec<(&'static str, bool)>,
+    zero_states: Vec<(&'static str, bool)>,
+    round_trip: Vec<(&'static str, bool)>,
+    relocated: ((f32, f32, f32), (f32, f32, f32)),
+    sample_at_probe: bool,
+    sample_outside: bool,
+    irradiance_matches_sample: bool,
+    face_count: (i32, i32),
+    face_sizes: Vec<(&'static str, i32)>,
+    bad_face_size: bool,
+    baker_supported: bool,
+    planes: Vec<(&'static str, f32, f32)>,
+    bad_planes: Vec<(&'static str, bool)>,
+    face_views: Vec<(f32, f32, f32)>,
+    bad_faces: Vec<(&'static str, bool)>,
+    bake_calls: Option<u32>,
+    bake_failure: Option<(String, u32)>,
+    volume_light_calls: Option<u32>,
+    volume_visibility_calls: Option<u32>,
+    unsupported_bake: Option<String>,
+}
+
+struct VolumeGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<VolumeFindings>>,
+}
+
+impl GameStateAccess for VolumeGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+/// A closure that counts its calls, and the counter it writes to.
+fn counting_draw() -> (Arc<Mutex<u32>>, impl FnMut(Matrix, Matrix) -> Result<()> + 'static) {
+    let calls = Arc::new(Mutex::new(0_u32));
+    let counter = Arc::clone(&calls);
+    (calls, move |_view, _projection| {
+        *counter.lock().expect("call counter") += 1;
+        Ok(())
+    })
+}
+
+impl Game for VolumeGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+        let mut findings = VolumeFindings {
+            engine_layer: version,
+            ..VolumeFindings::default()
+        };
+
+        // --- the volume -------------------------------------------------------
+        let box_min = Vector3::from_x_and_y_and_z(-1.0, -2.0, -3.0);
+        let box_max = Vector3::from_x_and_y_and_z(1.0, 2.0, 3.0);
+        let bounds = BoundingBox::new(box_min, box_max);
+        let volume = LightProbeVolume::new(bounds, 2, 3, 4)?;
+        findings.shape = (
+            volume.count_x()?,
+            volume.count_y()?,
+            volume.count_z()?,
+            volume.probe_count()?,
+        );
+        let read_back = volume.bounds()?;
+        findings.bounds = (triple(read_back.Min), triple(read_back.Max));
+        findings
+            .corner_positions
+            .push(triple(volume.probe_position(0, 0, 0)?));
+        findings
+            .corner_positions
+            .push(triple(volume.probe_position(1, 2, 3)?));
+        findings.bad_index = volume.probe_position(2, 0, 0).is_err();
+        findings
+            .containment
+            .push(("the centre", volume.contains(Vector3::Zero)?));
+        findings.containment.push((
+            "well outside",
+            volume.contains(Vector3::from_x_and_y_and_z(100.0, 0.0, 0.0))?,
+        ));
+
+        for (name, count_x, count_y, count_z, bounds) in [
+            ("a count below one", 0, 2, 2, bounds),
+            (
+                "more probes than the ceiling",
+                34,
+                34,
+                34,
+                bounds,
+            ),
+            (
+                "a box whose maximum is below its minimum",
+                2,
+                2,
+                2,
+                BoundingBox::new(box_max, box_min),
+            ),
+        ] {
+            findings.bad_volumes.push((
+                name,
+                LightProbeVolume::new(bounds, count_x, count_y, count_z).is_err(),
+            ));
+        }
+
+        findings.zero_states.push(("fresh", volume.is_zero()?));
+        let lit = LightProbe::new()?;
+        lit.set_coefficient(0, Vector3::from_x_and_y_and_z(1.0, 0.5, 0.25))?;
+        lit.set_position(Vector3::from_x_and_y_and_z(9.0, 9.0, 9.0))?;
+        volume.set_probe(0, 0, 0, &lit)?;
+        findings.zero_states.push(("with one lit probe", volume.is_zero()?));
+
+        let scratch = LightProbe::new()?;
+        volume.copy_probe_into(0, 0, 0, &scratch)?;
+        // The grid relocates what it stores, so the probe that comes back sits
+        // at the cell rather than where the caller had put it.
+        findings.relocated = (triple(lit.position()?), triple(scratch.position()?));
+        findings
+            .round_trip
+            .push(("straight back out", scratch.value_eq(&lit)?));
+        findings.round_trip.push((
+            "its light",
+            triple(scratch.coefficient(0)?) == triple(lit.coefficient(0)?),
+        ));
+        lit.set_position(volume.probe_position(0, 0, 0)?)?;
+        findings
+            .round_trip
+            .push(("once the original is moved there too", scratch.value_eq(&lit)?));
+        // Equality is position and coefficients only: CNA's header claims the
+        // visibility table is compared too, and it is not.
+        scratch.set_visibility(0, 12.0, 400.0)?;
+        findings
+            .round_trip
+            .push(("with visibility on one side only", scratch.value_eq(&lit)?));
+
+        // Sampling exactly at a probe's grid position must reproduce that
+        // probe: every interpolation weight but one is zero there.
+        let corner = volume.probe_position(0, 0, 0)?;
+        let sampled = LightProbe::new()?;
+        volume.sample_into(corner, &sampled)?;
+        let expected = LightProbe::new()?;
+        volume.copy_probe_into(0, 0, 0, &expected)?;
+        expected.set_position(sampled.position()?)?;
+        findings.sample_at_probe = sampled.value_eq(&expected)?;
+
+        // A position outside the box is clamped into it, so it gives the same
+        // answer as the nearest corner rather than an error or an empty probe.
+        let outside = LightProbe::new()?;
+        volume.sample_into(
+            Vector3::from_x_and_y_and_z(-100.0, -100.0, -100.0),
+            &outside,
+        )?;
+        outside.set_position(sampled.position()?)?;
+        findings.sample_outside = outside.value_eq(&sampled)?;
+
+        let normal = Vector3::from_x_and_y_and_z(0.0, 1.0, 0.0);
+        let direct = volume.irradiance(corner, normal)?;
+        let through_probe = sampled.irradiance(normal)?;
+        findings.irradiance_matches_sample = triple(direct) == triple(through_probe);
+
+        // --- the baker ---------------------------------------------------------
+        findings.face_count = (LightProbeBaker::face_count()?, LightProbeBaker::FACE_COUNT);
+        let baker = LightProbeBaker::new(&device)?;
+        findings
+            .face_sizes
+            .push(("the default", baker.face_size()?));
+        let small = LightProbeBaker::with_face_size(&device, 16)?;
+        findings.face_sizes.push(("asked for sixteen", small.face_size()?));
+        small.release()?;
+        findings.bad_face_size = LightProbeBaker::with_face_size(&device, 0).is_err();
+        findings.baker_supported = baker.is_supported()?;
+
+        findings
+            .planes
+            .push(("as created", baker.near_plane()?, baker.far_plane()?));
+        baker.set_planes(0.5, 250.0)?;
+        findings
+            .planes
+            .push(("after setting a pair", baker.near_plane()?, baker.far_plane()?));
+        for (name, near, far) in [
+            ("a zero near plane", 0.0_f32, 250.0_f32),
+            ("a negative near plane", -1.0, 250.0),
+            ("a far plane below the near one", 10.0, 5.0),
+        ] {
+            findings
+                .bad_planes
+                .push((name, baker.set_planes(near, far).is_err()));
+        }
+        // The pair is refused as a pair: neither half may have been applied.
+        findings
+            .planes
+            .push(("after three refusals", baker.near_plane()?, baker.far_plane()?));
+
+        let position = Vector3::from_x_and_y_and_z(1.0, 2.0, 3.0);
+        for face in 0..LightProbeBaker::FACE_COUNT {
+            let view = baker.face_view(face, position)?;
+            findings.face_views.push((view.M41, view.M42, view.M43));
+        }
+        for (name, face) in [
+            ("before the first", -1),
+            ("past the last", LightProbeBaker::FACE_COUNT),
+        ] {
+            findings
+                .bad_faces
+                .push((name, baker.face_view(face, position).is_err()));
+        }
+
+        if findings.baker_supported {
+            let (calls, draw) = counting_draw();
+            let probe = baker.bake_probe(position, draw)?;
+            findings.bake_calls = Some(*calls.lock().expect("call counter"));
+            drop(probe);
+
+            // A failing callback cannot stop the capture -- the C callback
+            // returns nothing -- so every face still runs and the error is
+            // reported afterwards.
+            let calls = Arc::new(Mutex::new(0_u32));
+            let counter = Arc::clone(&calls);
+            let failure = baker
+                .bake_probe(position, move |_view, _projection| {
+                    *counter.lock().expect("call counter") += 1;
+                    Err(cna::CnaError::InvalidInput("the scene refused to draw"))
+                })
+                .err()
+                .map(|error| error.to_string());
+            findings.bake_failure =
+                failure.map(|message| (message, *calls.lock().expect("call counter")));
+
+            let small_volume = LightProbeVolume::new(bounds, 2, 1, 1)?;
+            let (calls, draw) = counting_draw();
+            baker.bake_light(&small_volume, draw)?;
+            findings.volume_light_calls = Some(*calls.lock().expect("call counter"));
+            let (calls, draw) = counting_draw();
+            baker.bake_visibility(&small_volume, draw)?;
+            findings.volume_visibility_calls = Some(*calls.lock().expect("call counter"));
+        } else {
+            let (_, draw) = counting_draw();
+            findings.unsupported_bake = baker
+                .bake_probe(position, draw)
+                .err()
+                .map(|error| error.to_string());
+        }
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn a_probe_volume_interpolates_its_grid_and_a_baker_draws_six_faces_per_probe() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(VolumeFindings::default()));
+    let game = VolumeGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with a probe volume and a probe baker");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+
+    // --- the volume ---------------------------------------------------------
+    assert_eq!(
+        findings.shape,
+        (2, 3, 4, 24),
+        "the probe count is the product of the three grid dimensions"
+    );
+    assert_eq!(
+        findings.bounds,
+        ((-1.0, -2.0, -3.0), (1.0, 2.0, 3.0)),
+        "the box round-trips"
+    );
+    // The grid's first and last cells sit on the box corners, so the whole box
+    // is covered rather than the cell centres.
+    println!("corner positions: {:?}", findings.corner_positions);
+    assert_eq!(
+        findings.corner_positions,
+        vec![(-1.0, -2.0, -3.0), (1.0, 2.0, 3.0)],
+        "the outermost probes sit on the box's own corners"
+    );
+    assert!(findings.bad_index, "an index outside the grid is refused");
+    assert_eq!(
+        findings.containment,
+        vec![("the centre", true), ("well outside", false)],
+        "containment is the box's own test"
+    );
+    for (name, refused) in &findings.bad_volumes {
+        assert!(refused, "{name} is refused");
+    }
+
+    assert_eq!(
+        findings.zero_states,
+        vec![("fresh", true), ("with one lit probe", false)],
+        "a volume is dark until one of its probes is not"
+    );
+    // The grid decides where a probe is: what comes back has been moved to the
+    // cell, and only matches the original once the original is moved there too.
+    println!("relocation: {:?}", findings.relocated);
+    assert_eq!(
+        findings.relocated,
+        ((9.0, 9.0, 9.0), (-1.0, -2.0, -3.0)),
+        "storing a probe relocates the copy to its cell and leaves the caller's alone"
+    );
+    println!("round trip: {:?}", findings.round_trip);
+    assert_eq!(
+        findings.round_trip,
+        vec![
+            ("straight back out", false),
+            ("its light", true),
+            ("once the original is moved there too", true),
+            ("with visibility on one side only", true),
+        ],
+        "the light survives the round trip, the position does not,          and visibility is not part of the comparison at all"
+    );
+    assert!(
+        findings.sample_at_probe,
+        "sampling at a probe's own position reproduces that probe exactly"
+    );
+    assert!(
+        findings.sample_outside,
+        "and a position outside the box is clamped into it rather than refused"
+    );
+    assert!(
+        findings.irradiance_matches_sample,
+        "the volume's irradiance is the sampled probe's irradiance, not a second calculation"
+    );
+
+    // --- the baker ----------------------------------------------------------
+    assert_eq!(
+        findings.face_count.0, findings.face_count.1,
+        "the constant and the call agree about six faces"
+    );
+    assert_eq!(findings.face_count.1, 6, "and it is six");
+    println!("face sizes: {:?}", findings.face_sizes);
+    assert_eq!(
+        findings.face_sizes[0].1,
+        LightProbeBaker::DEFAULT_FACE_SIZE,
+        "a default baker captures at the documented default size"
+    );
+    assert_eq!(
+        findings.face_sizes[1].1, 16,
+        "and one asked for sixteen captures at sixteen"
+    );
+    assert!(findings.bad_face_size, "a face size below one is refused");
+
+    println!("planes: {:?}", findings.planes);
+    let (_, near, far) = findings.planes[1];
+    assert_eq!((near, far), (0.5, 250.0), "an ordered pair is applied");
+    for (name, refused) in &findings.bad_planes {
+        assert!(refused, "{name} is refused");
+    }
+    // The pair rule: a refused call leaves *both* halves as they were. An
+    // implementation that wrote the near plane before validating the far one
+    // would fail exactly here and nowhere else.
+    assert_eq!(
+        findings.planes[2],
+        ("after three refusals", 0.5, 250.0),
+        "three refused pairs left both distances untouched"
+    );
+
+    // Six faces, six distinct view translations, each the negated capture
+    // position rotated into that face's basis.
+    println!("face views: {:?}", findings.face_views);
+    assert_eq!(findings.face_views.len(), 6);
+    for (index, first) in findings.face_views.iter().enumerate() {
+        for second in &findings.face_views[index + 1..] {
+            assert!(
+                first != second,
+                "two faces capture with the same view: {:?}",
+                findings.face_views
+            );
+        }
+        let length = (first.0 * first.0 + first.1 * first.1 + first.2 * first.2).sqrt();
+        let distance = (1.0_f32 * 1.0 + 2.0 * 2.0 + 3.0 * 3.0).sqrt();
+        assert!(
+            (length - distance).abs() < 1e-3,
+            "face {index} places the eye {length} from the origin, not {distance}"
+        );
+    }
+    for (name, refused) in &findings.bad_faces {
+        assert!(refused, "a face index {name} is refused");
+    }
+
+    println!("baker supported: {}", findings.baker_supported);
+    if findings.baker_supported {
+        assert_eq!(
+            findings.bake_calls,
+            Some(6),
+            "one probe is six faces, once each"
+        );
+        let (message, calls) = findings
+            .bake_failure
+            .clone()
+            .expect("a failing callback reported its cause");
+        println!("bake failure: {message} after {calls} faces");
+        assert!(
+            message.contains("the scene refused to draw"),
+            "the Rust cause is what comes back, not the native code it became: {message}"
+        );
+        assert_eq!(
+            calls, 6,
+            "and every face still ran, because the C callback has no way to refuse"
+        );
+        assert_eq!(
+            findings.volume_light_calls,
+            Some(12),
+            "a two-probe volume is two captures, six faces each"
+        );
+        assert_eq!(
+            findings.volume_visibility_calls,
+            Some(12),
+            "and the visibility bake is a second pass over the same captures"
+        );
+    } else {
+        let message = findings
+            .unsupported_bake
+            .as_deref()
+            .expect("a baker that cannot capture refuses to");
+        println!("baking is unavailable on this renderer: {message}");
     }
 }
