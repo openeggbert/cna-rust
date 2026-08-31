@@ -160,6 +160,25 @@ impl Texture2D {
         Self::adopt(graphics_device, handle, None)
     }
 
+    /// Adopts a texture CNA created and handed over outright.
+    ///
+    /// The engine layer has factory routes that publish an owned texture --
+    /// `cna_color_grade_pass_create_identity_lut` is the first -- and the
+    /// caller destroys it. This is that adoption, and it destroys the handle
+    /// on failure so a refused wrap never strands one.
+    pub(crate) fn from_owned_handle(
+        graphics_device: &GraphicsDevice,
+        handle: sys::CNA_Handle,
+    ) -> Result<Self> {
+        match Self::from_handle(graphics_device, handle) {
+            Ok(texture) => Ok(texture),
+            Err(error) => {
+                let _ = graphics_device.state.native().destroy_texture(handle);
+                Err(error)
+            }
+        }
+    }
+
     /// Wraps a texture another native object owns for the duration of a borrow.
     ///
     /// `VideoPlayer::GetTexture` is the one caller: CNA hands back the frame

@@ -7145,4 +7145,635 @@ extern "C" {
         argument1: *const CNA_Vector3,
     ) -> CNA_Result;
     pub fn cna_skybox_set_yaw(argument0: CNA_SkyboxHandle, argument1: f32) -> CNA_Result;
+    pub fn cna_aerial_perspective_pass_air_mass_for_distance(
+        argument0: *const CNA_Vector3,
+        argument1: f32,
+        argument2: f32,
+        argument3: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_aerial_perspective_pass_copy_fallback_reason(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_aerial_perspective_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_aerial_perspective_pass_get_intensity(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_aerial_perspective_pass_get_scale_height(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_aerial_perspective_pass_get_sun_direction(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_aerial_perspective_pass_get_turbidity(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_aerial_perspective_pass_set_intensity(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_aerial_perspective_pass_set_scale_height(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_aerial_perspective_pass_set_sun_direction(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *const CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_aerial_perspective_pass_set_turbidity(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_aerial_perspective_pass_transmittance(
+        argument0: f32,
+        argument1: f32,
+        argument2: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_ascii_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_ascii_pass_get_effect(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut CNA_AsciiPostProcessEffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_bloom_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_bloom_pass_extract_channel(
+        argument0: f32,
+        argument1: f32,
+        argument2: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_bloom_pass_get_intensity(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_bloom_pass_get_iterations(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_bloom_pass_get_threshold(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_bloom_pass_iterations_for_quality(
+        argument0: CNA_RenderQuality,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_bloom_pass_reset_targets(argument0: CNA_PostProcessPassHandle) -> CNA_Result;
+    pub fn cna_bloom_pass_set_intensity(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_bloom_pass_set_iterations(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: i32,
+    ) -> CNA_Result;
+    pub fn cna_bloom_pass_set_threshold(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_chromatic_aberration_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_chromatic_aberration_pass_get_strength(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_chromatic_aberration_pass_set_strength(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_color_grade_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_color_grade_pass_create_identity_lut(
+        argument0: CNA_Handle,
+        argument1: i32,
+        argument2: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_color_grade_pass_get_interpolation(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut CNA_LutInterpolation,
+    ) -> CNA_Result;
+    pub fn cna_color_grade_pass_get_lut(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_color_grade_pass_get_strength(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_color_grade_pass_get_volume_lut(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_color_grade_pass_lut_size_for_strip(
+        argument0: i32,
+        argument1: i32,
+        argument2: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_color_grade_pass_set_interpolation(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: CNA_LutInterpolation,
+    ) -> CNA_Result;
+    pub fn cna_color_grade_pass_set_lut(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_color_grade_pass_set_strength(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_color_grade_pass_set_volume_lut(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_contact_shadow_pass_combine_visibility(
+        argument0: f32,
+        argument1: f32,
+        argument2: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_contact_shadow_pass_copy_fallback_reason(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_contact_shadow_pass_copy_occlusion_test_glsl(
+        argument0: *mut c_char,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_contact_shadow_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_contact_shadow_pass_get_bias(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_contact_shadow_pass_get_intensity(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_contact_shadow_pass_get_light_direction(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_contact_shadow_pass_get_max_distance(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_contact_shadow_pass_get_step_count(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_contact_shadow_pass_get_thickness(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_contact_shadow_pass_is_occluded(
+        argument0: f32,
+        argument1: f32,
+        argument2: f32,
+        argument3: f32,
+        argument4: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_contact_shadow_pass_set_bias(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_contact_shadow_pass_set_intensity(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_contact_shadow_pass_set_light_direction(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *const CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_contact_shadow_pass_set_max_distance(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_contact_shadow_pass_set_step_count(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: i32,
+    ) -> CNA_Result;
+    pub fn cna_contact_shadow_pass_set_thickness(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_depth_of_field_pass_circle_of_confusion_millimetres(
+        argument0: f32,
+        argument1: f32,
+        argument2: f32,
+        argument3: f32,
+        argument4: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_depth_of_field_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_depth_of_field_pass_get_f_number(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_depth_of_field_pass_get_focal_length(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_depth_of_field_pass_get_focus_distance(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_depth_of_field_pass_get_max_radius(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_depth_of_field_pass_set_f_number(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_depth_of_field_pass_set_focal_length(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_depth_of_field_pass_set_focus_distance(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_depth_of_field_pass_set_max_radius(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_film_grain_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_film_grain_pass_get_intensity(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_film_grain_pass_set_intensity(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_fullscreen_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_FullscreenPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_fullscreen_pass_destroy(argument0: CNA_FullscreenPassHandle) -> CNA_Result;
+    pub fn cna_fullscreen_pass_draw(
+        argument0: CNA_FullscreenPassHandle,
+        argument1: CNA_Handle,
+        argument2: CNA_Handle,
+        argument3: CNA_EffectHandle,
+        argument4: i32,
+        argument5: i32,
+        argument6: *const CNA_SamplerState,
+    ) -> CNA_Result;
+    pub fn cna_fullscreen_pass_draw_over_current_target(
+        argument0: CNA_FullscreenPassHandle,
+        argument1: CNA_Handle,
+        argument2: CNA_EffectHandle,
+        argument3: i32,
+        argument4: i32,
+        argument5: *const CNA_SamplerState,
+    ) -> CNA_Result;
+    pub fn cna_height_fog_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_height_fog_pass_get_base_height(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_height_fog_pass_get_color(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_height_fog_pass_get_density(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_height_fog_pass_get_falloff(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_height_fog_pass_optical_depth(
+        argument0: f32,
+        argument1: f32,
+        argument2: f32,
+        argument3: f32,
+        argument4: f32,
+        argument5: f32,
+        argument6: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_height_fog_pass_set_base_height(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_height_fog_pass_set_color(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *const CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_height_fog_pass_set_density(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_height_fog_pass_set_falloff(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_lens_flare_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_lens_flare_pass_get_dispersal(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_lens_flare_pass_get_intensity(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_lens_flare_pass_get_threshold(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_lens_flare_pass_set_dispersal(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_lens_flare_pass_set_intensity(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_lens_flare_pass_set_threshold(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_light_shaft_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_light_shaft_pass_get_decay(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_light_shaft_pass_get_intensity(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_light_shaft_pass_get_light_screen_position(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut CNA_Vector2,
+    ) -> CNA_Result;
+    pub fn cna_light_shaft_pass_get_threshold(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_light_shaft_pass_set_decay(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_light_shaft_pass_set_intensity(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_light_shaft_pass_set_light_screen_position(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *const CNA_Vector2,
+    ) -> CNA_Result;
+    pub fn cna_light_shaft_pass_set_threshold(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_motion_blur_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_motion_blur_pass_get_max_distance(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_motion_blur_pass_get_strength(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_motion_blur_pass_set_max_distance(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_motion_blur_pass_set_strength(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_scoped_render_target_begin(
+        argument0: CNA_Handle,
+        argument1: CNA_Handle,
+        argument2: *mut CNA_ScopedRenderTargetHandle,
+    ) -> CNA_Result;
+    pub fn cna_scoped_render_target_end(argument0: CNA_ScopedRenderTargetHandle) -> CNA_Result;
+    pub fn cna_scoped_render_target_get_has_recorded_previous(
+        argument0: CNA_ScopedRenderTargetHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_spatial_upscale_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_SpatialUpscalePassHandle,
+    ) -> CNA_Result;
+    pub fn cna_spatial_upscale_pass_destroy(argument0: CNA_SpatialUpscalePassHandle) -> CNA_Result;
+    pub fn cna_spatial_upscale_pass_draw(
+        argument0: CNA_SpatialUpscalePassHandle,
+        argument1: CNA_Handle,
+        argument2: i32,
+        argument3: i32,
+        argument4: i32,
+        argument5: i32,
+    ) -> CNA_Result;
+    pub fn cna_spatial_upscale_pass_get_edge_adaptive(
+        argument0: CNA_SpatialUpscalePassHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_spatial_upscale_pass_get_sharpness(
+        argument0: CNA_SpatialUpscalePassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_spatial_upscale_pass_is_identity_scale(
+        argument0: i32,
+        argument1: i32,
+        argument2: i32,
+        argument3: i32,
+        argument4: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_spatial_upscale_pass_set_edge_adaptive(
+        argument0: CNA_SpatialUpscalePassHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_spatial_upscale_pass_set_sharpness(
+        argument0: CNA_SpatialUpscalePassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_ssao_pass_copy_kernel(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut CNA_Vector3,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_ssao_pass_copy_occlusion_glsl(
+        argument0: CNA_Bool,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_ssao_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_ssao_pass_get_half_resolution(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_ssao_pass_get_intensity(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_ssao_pass_get_radius(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_ssao_pass_get_sample_count(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_ssao_pass_reset_targets(argument0: CNA_PostProcessPassHandle) -> CNA_Result;
+    pub fn cna_ssao_pass_sample_count_for_quality(
+        argument0: CNA_RenderQuality,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_ssao_pass_set_half_resolution(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_ssao_pass_set_intensity(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_ssao_pass_set_radius(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_ssao_pass_set_sample_count(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: i32,
+    ) -> CNA_Result;
+    pub fn cna_ssr_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_ssr_pass_get_depth_bias(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_ssr_pass_get_edge_fade(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_ssr_pass_get_intensity(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_ssr_pass_get_max_distance(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_ssr_pass_get_roughness_blur(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_ssr_pass_get_step_count(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_ssr_pass_get_thickness(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_ssr_pass_set_depth_bias(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_ssr_pass_set_edge_fade(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_ssr_pass_set_intensity(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_ssr_pass_set_max_distance(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_ssr_pass_set_roughness_blur(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_ssr_pass_set_step_count(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: i32,
+    ) -> CNA_Result;
+    pub fn cna_ssr_pass_set_thickness(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_volumetric_fog_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_volumetric_fog_pass_get_anisotropy(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_volumetric_fog_pass_get_density(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_volumetric_fog_pass_get_range(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_volumetric_fog_pass_set_anisotropy(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_volumetric_fog_pass_set_density(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_volumetric_fog_pass_set_light(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: CNA_ShadowMapHandle,
+        argument2: *const CNA_Vector3,
+        argument3: *const CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_volumetric_fog_pass_set_range(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
 }

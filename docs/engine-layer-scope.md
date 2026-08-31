@@ -133,6 +133,7 @@ the criterion above is unchanged, only its precondition has been met.
 | GPU timers and particle systems | `gpu_timer`, `particle_system`, `particle` | 35 | `VERIFIED_GPU` |
 | storage buffers and compute shaders | `storage_buffer`, `compute_shader`, `graphics_memory_barrier` | 23 | `VERIFIED_GPU` |
 | decals, cube-map skies and the analytic sky | `decal_pass`, `skybox`, `atmospheric_sky` | 38 | `VERIFIED_STATE` |
+| the seventeen screen-space passes, the fullscreen draw and the render-target scope | `bloom_pass`, `ssao_pass`, `ssr_pass`, `color_grade_pass`, `depth_of_field_pass`, `motion_blur_pass`, `height_fog_pass`, `volumetric_fog_pass`, `light_shaft_pass`, `lens_flare_pass`, `chromatic_aberration_pass`, `film_grain_pass`, `ascii_pass`, `aerial_perspective_pass`, `spatial_upscale_pass`, `contact_shadow_pass`, `fullscreen_pass`, `scoped_render_target` | 150 | `VERIFIED_STATE` |
 
 ### What the GPU artifact changed about the evidence
 
@@ -169,6 +170,17 @@ three found something:
   with "All owned C child resources must be destroyed before the game" and
   named nothing. Every engine query that answers with a handle is now a
   lifetime-bound view that releases on drop.
+- **A handle is not a type.** `cna_ascii_pass_get_effect` publishes a handle to
+  CNAEXT's `AsciiPostProcessEffect`, not to a generic `Effect`, and releasing it
+  through `cna_effect_destroy` does not fail: the call succeeds, every test
+  passes, and the process then calls `std::terminate` at exit with no
+  diagnostic. It took a bisection over one test's own body to find, and the fix
+  is a separate Rust view type so the wrong release cannot be written.
+- **A bare `BUFFER_TOO_SMALL` carries no message.** `CopyValueRange` returns the
+  code without going through `Fail`, so the thread-local last-error still holds
+  whatever the previous failing call said. Sizing the SSAO kernel from
+  `sample_count` -- which is not its size -- therefore reported "The destination
+  cannot hold the complete text" about a kernel of vectors.
 - **`atmospheric_sky`'s `sun_direction` is the direction the light travels,**
   the same convention `DirectionalLightEXT` uses, and the opposite of what "the
   direction the sun is in" in the header suggests. Measured by sweeping five

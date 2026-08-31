@@ -120,6 +120,11 @@ impl Texture3D {
         })
     }
 
+    /// The native handle, for an engine route that borrows this texture.
+    pub(crate) fn native_handle(&self) -> Result<sys::CNA_Handle> {
+        self.state.require_handle()
+    }
+
     #[must_use]
     pub const fn Width(&self) -> i32 {
         self.width

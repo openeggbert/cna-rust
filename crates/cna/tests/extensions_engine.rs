@@ -14,8 +14,11 @@ use std::sync::{Arc, Mutex};
 use cna::extensions::engine::{
     supports_shadow_sampling, DirectionalLight, FxaaPass, GpuTimer, Particle,
     ParticleEmitterSettings, ParticleSystem, PostProcessChain, PostProcessContext, PostProcessPass,
-    AtmosphericSky, ComputeShader, DecalPass, MemoryBarrier, RenderPipeline, ShadowMap, Skybox,
-    StorageBuffer, TonemapPass,
+    AerialPerspectivePass, AsciiPass, AtmosphericSky, BloomPass, ChromaticAberrationPass,
+    ColorGradePass, ComputeShader, ContactShadowPass, DecalPass, DepthOfFieldPass, FilmGrainPass,
+    FullscreenPass, HeightFogPass, LensFlarePass, LightShaftPass, LutInterpolation, MemoryBarrier,
+    MotionBlurPass, RenderPipeline, ScopedRenderTarget, ShadowMap, Skybox, SpatialUpscalePass,
+    SsaoPass, SsrPass, StorageBuffer, TonemapPass, VolumetricFogPass,
 };
 use cna::extensions::graphics::EffectFactoryExt;
 use cna::extensions::pbr::{
@@ -25,7 +28,7 @@ use cna::Microsoft::Xna::Framework::Graphics::{
     DepthFormat, SurfaceFormat, Texture2D, TextureCube,
 };
 use cna::Microsoft::Xna::Framework::{
-    BoundingBox, Color, Game, GameContext, GameTime, Matrix, Vector3,
+    BoundingBox, Color, Game, GameContext, GameTime, Matrix, Vector2, Vector3,
 };
 use cna::{run_for_frames, CnaError, ErrorCategory, GameState, GameStateAccess, Result};
 
@@ -2320,5 +2323,551 @@ fn decals_and_skies_answer_with_the_values_they_were_given() {
     println!(
         "sky: skybox supported={} | atmospheric supported={} | turbidity response {:?}",
         findings.skybox_supported, findings.sky_supported, findings.sky_turbidity_response
+    );
+}
+
+/// What the screen-space pass run measured.
+#[derive(Default)]
+struct PassFindings {
+    engine_layer: i32,
+    bloom_extract: Vec<(f32, f32)>,
+    bloom_iterations: Vec<i32>,
+    ssao_samples: Vec<i32>,
+    ssao_kernel: Vec<(f32, f32, f32)>,
+    ssao_kernel_len: usize,
+    coc: Vec<(f32, f32)>,
+    optical_depth: Vec<(f32, f32)>,
+    occluded: Vec<(f32, bool)>,
+    combined_visibility: Vec<(f32, f32, f32)>,
+    transmittance: Vec<(f32, f32)>,
+    air_mass: Vec<(f32, f32)>,
+    identity_scale: Vec<((i32, i32, i32, i32), bool)>,
+    lut_size: Vec<((i32, i32), i32)>,
+    identity_lut_size: Option<(i32, i32)>,
+    has_strip_lut: Option<bool>,
+    round_trips: Vec<(&'static str, f32, f32)>,
+    supported: Vec<(&'static str, bool)>,
+    scope_recorded: Option<bool>,
+    ascii_cell_size: Option<(i32, i32)>,
+    glsl_bytes: Vec<(&'static str, usize)>,
+}
+
+struct PassGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<PassFindings>>,
+}
+
+impl GameStateAccess for PassGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for PassGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+        let mut findings = PassFindings {
+            engine_layer: version,
+            ..PassFindings::default()
+        };
+
+        // --- pure functions, which need no pass ---------------------------
+        for value in [0.0_f32, 0.5, 1.0, 2.0, 4.0] {
+            findings
+                .bloom_extract
+                .push((value, BloomPass::extract_channel(value, 1.0)?));
+        }
+        for quality in [
+            RenderQuality::Low,
+            RenderQuality::Medium,
+            RenderQuality::High,
+            RenderQuality::Ultra,
+        ] {
+            findings
+                .bloom_iterations
+                .push(BloomPass::iterations_for_quality(quality)?);
+            findings
+                .ssao_samples
+                .push(SsaoPass::sample_count_for_quality(quality)?);
+        }
+        for distance in [1.0_f32, 5.0, 10.0, 20.0] {
+            findings.coc.push((
+                distance,
+                DepthOfFieldPass::circle_of_confusion_millimetres(distance, 10.0, 50.0, 2.8)?,
+            ));
+        }
+        for distance in [0.0_f32, 10.0, 100.0] {
+            findings.optical_depth.push((
+                distance,
+                // A level ray at the height the fog is densest at, so the
+                // integral is density times distance and nothing else.
+                HeightFogPass::optical_depth(0.0, 0.0, distance, 0.02, 0.1, 0.0)?,
+            ));
+        }
+        // The ray is at view depth 5. A scene sample nearer than that by more
+        // than the bias and by less than the thickness is an occluder; one
+        // further away, or nearer by more than the thickness, is not.
+        for scene_depth in [4.0_f32, 4.7, 4.99, 5.0, 6.0] {
+            findings.occluded.push((
+                scene_depth,
+                ContactShadowPass::is_occluded(5.0, scene_depth, 0.01, 0.5)?,
+            ));
+        }
+        for (map, contact) in [(1.0_f32, 1.0_f32), (1.0, 0.25), (0.5, 0.5), (0.0, 1.0)] {
+            findings.combined_visibility.push((
+                map,
+                contact,
+                ContactShadowPass::combine_visibility(map, contact)?,
+            ));
+        }
+        for air_mass in [0.0_f32, 1.0, 4.0] {
+            let value = AerialPerspectivePass::transmittance(air_mass, 3.0)?;
+            findings.transmittance.push((air_mass, value.X));
+        }
+        for distance in [0.0_f32, 100.0, 1000.0] {
+            findings.air_mass.push((
+                distance,
+                AerialPerspectivePass::air_mass_for_distance(
+                    Vector3::from_x_and_y_and_z(0.0, 1.0, 0.0),
+                    distance,
+                    8000.0,
+                )?,
+            ));
+        }
+        for sizes in [(64, 64, 64, 64), (64, 64, 128, 128), (128, 64, 64, 64)] {
+            findings.identity_scale.push((
+                sizes,
+                SpatialUpscalePass::is_identity_scale(sizes.0, sizes.1, sizes.2, sizes.3)?,
+            ));
+        }
+        for strip in [(256, 16), (1024, 32)] {
+            findings.lut_size.push((
+                strip,
+                ColorGradePass::lut_size_for_strip(strip.0, strip.1)?,
+            ));
+        }
+        findings.glsl_bytes.push((
+            "ssao",
+            SsaoPass::occlusion_glsl(false)?.len(),
+        ));
+        findings.glsl_bytes.push((
+            "contact-shadow",
+            ContactShadowPass::occlusion_test_glsl()?.len(),
+        ));
+
+        // --- the passes themselves ----------------------------------------
+        macro_rules! round_trip {
+            ($label:literal, $pass:expr, $set:ident, $get:ident, $value:expr) => {{
+                let pass = &$pass;
+                pass.$set($value)?;
+                findings.round_trips.push(($label, $value, pass.$get()?));
+            }};
+        }
+
+        let bloom = BloomPass::new(&device)?;
+        round_trip!("bloom.threshold", bloom, set_threshold, threshold, 0.875);
+        round_trip!("bloom.intensity", bloom, set_intensity, intensity, 1.25);
+        bloom.set_iterations(5)?;
+        findings
+            .round_trips
+            .push(("bloom.iterations", 5.0, bloom.iterations()? as f32));
+        bloom.reset_targets()?;
+        findings
+            .supported
+            .push(("bloom", bloom.pass().is_supported(&device)?));
+
+        let ssao = SsaoPass::new(&device)?;
+        round_trip!("ssao.radius", ssao, set_radius, radius, 0.75);
+        round_trip!("ssao.intensity", ssao, set_intensity, intensity, 1.5);
+        ssao.set_sample_count(24)?;
+        ssao.set_half_resolution(true)?;
+        findings
+            .round_trips
+            .push(("ssao.sample_count", 24.0, ssao.sample_count()? as f32));
+        findings.round_trips.push((
+            "ssao.half_resolution",
+            1.0,
+            f32::from(u8::from(ssao.is_half_resolution()?)),
+        ));
+        let kernel = ssao.kernel()?;
+        findings.ssao_kernel_len = kernel.len();
+        findings.ssao_kernel = kernel.iter().map(|v| (v.X, v.Y, v.Z)).collect();
+        ssao.reset_targets()?;
+        findings
+            .supported
+            .push(("ssao", ssao.pass().is_supported(&device)?));
+
+        let ssr = SsrPass::new(&device)?;
+        round_trip!("ssr.max_distance", ssr, set_max_distance, max_distance, 40.0);
+        round_trip!("ssr.thickness", ssr, set_thickness, thickness, 0.35);
+        round_trip!("ssr.edge_fade", ssr, set_edge_fade, edge_fade, 0.2);
+        round_trip!("ssr.intensity", ssr, set_intensity, intensity, 0.8);
+        findings
+            .supported
+            .push(("ssr", ssr.pass().is_supported(&device)?));
+
+        let dof = DepthOfFieldPass::new(&device)?;
+        round_trip!("dof.focus_distance", dof, set_focus_distance, focus_distance, 12.5);
+        round_trip!("dof.focal_length", dof, set_focal_length, focal_length, 35.0);
+        round_trip!("dof.f_number", dof, set_f_number, f_number, 1.8);
+
+        let contact = ContactShadowPass::new(&device)?;
+        round_trip!("contact.max_distance", contact, set_max_distance, max_distance, 0.5);
+        round_trip!("contact.thickness", contact, set_thickness, thickness, 0.08);
+        contact.set_light_direction(Vector3::from_x_and_y_and_z(0.0, -1.0, 0.0))?;
+        findings.round_trips.push((
+            "contact.light_direction.y",
+            -1.0,
+            contact.light_direction()?.Y,
+        ));
+        findings
+            .supported
+            .push(("contact-shadow", contact.pass().is_supported(&device)?));
+
+        let shafts = LightShaftPass::new(&device)?;
+        round_trip!("shafts.decay", shafts, set_decay, decay, 0.95);
+        shafts.set_light_screen_position(Vector2::from_x_and_y(0.25, 0.75))?;
+        findings.round_trips.push((
+            "shafts.light_x",
+            0.25,
+            shafts.light_screen_position()?.X,
+        ));
+
+        let fog = HeightFogPass::new(&device)?;
+        round_trip!("fog.density", fog, set_density, density, 0.03);
+        fog.set_color(Vector3::from_x_and_y_and_z(0.4, 0.5, 0.6))?;
+        findings
+            .round_trips
+            .push(("fog.color.z", 0.6, fog.color()?.Z));
+
+        let mut volumetric = VolumetricFogPass::new(&device)?;
+        round_trip!("volumetric.density", volumetric, set_density, density, 0.15);
+        round_trip!("volumetric.anisotropy", volumetric, set_anisotropy, anisotropy, 0.6);
+        let map = Arc::new(ShadowMap::new(&device, ShadowQuality::Low)?);
+        volumetric.set_light(
+            &map,
+            Vector3::from_x_and_y_and_z(0.0, -1.0, 0.0),
+            Vector3::from_x_and_y_and_z(1.0, 0.9, 0.8),
+        )?;
+
+        let aerial = AerialPerspectivePass::new(&device)?;
+        round_trip!("aerial.turbidity", aerial, set_turbidity, turbidity, 3.5);
+        findings.glsl_bytes.push((
+            "aerial-fallback",
+            aerial.fallback_reason()?.len(),
+        ));
+
+        let grain = FilmGrainPass::new(&device)?;
+        round_trip!("grain.intensity", grain, set_intensity, intensity, 0.05);
+        let aberration = ChromaticAberrationPass::new(&device)?;
+        round_trip!("aberration.strength", aberration, set_strength, strength, 0.004);
+        let flare = LensFlarePass::new(&device)?;
+        round_trip!("flare.dispersal", flare, set_dispersal, dispersal, 0.3);
+        let blur = MotionBlurPass::new(&device)?;
+        round_trip!("blur.strength", blur, set_strength, strength, 0.4);
+
+        let mut grade = ColorGradePass::new(&device)?;
+        round_trip!("grade.strength", grade, set_strength, strength, 0.65);
+        grade.set_interpolation(LutInterpolation::Tetrahedral)?;
+        findings.round_trips.push((
+            "grade.interpolation",
+            1.0,
+            f32::from(u8::from(grade.interpolation()? == LutInterpolation::Tetrahedral)),
+        ));
+        let lut = ColorGradePass::create_identity_lut(&device, 16)?;
+        findings.identity_lut_size = Some((lut.Width(), lut.Height()));
+        grade.set_strip_lut(Some(lut))?;
+        findings.has_strip_lut = Some(grade.has_strip_lut()?);
+
+        let upscale = SpatialUpscalePass::new(&device)?;
+        upscale.set_sharpness(0.55)?;
+        upscale.set_edge_adaptive(true)?;
+        findings
+            .round_trips
+            .push(("upscale.sharpness", 0.55, upscale.sharpness()?));
+
+        let ascii = AsciiPass::new(&device)?;
+        findings
+            .supported
+            .push(("ascii-effect", ascii.has_effect()?));
+        if let Some(effect) = ascii.effect()? {
+            let (width, height) = effect.cell_size()?;
+            findings.ascii_cell_size = Some((width, height));
+        }
+
+        let _fullscreen = FullscreenPass::new(&device)?;
+
+        // A scope records the binding it replaced, which is what lets it put
+        // the old one back. Asking is the only way to know it recorded one.
+        {
+            let scope = ScopedRenderTarget::begin(&device, None)?;
+            findings.scope_recorded = Some(scope.has_recorded_previous()?);
+            scope.end()?;
+        }
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+fn the_screen_space_passes_carry_their_knobs_and_compute_their_curves() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(PassFindings::default()));
+    let game = PassGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame building every screen-space pass");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+
+    // Every knob comes back as it was set. Fifty-odd of them at once is where a
+    // macro-generated accessor wired to a neighbouring route shows up.
+    for (label, expected, actual) in &findings.round_trips {
+        assert!(
+            (expected - actual).abs() < 1e-4,
+            "{label} round-trips: set {expected}, read {actual}"
+        );
+    }
+    assert!(
+        findings.round_trips.len() >= 25,
+        "every knob was exercised: {}",
+        findings.round_trips.len()
+    );
+
+    // The bright pass keeps nothing of black, never brightens, and keeps more
+    // of a brighter pixel. It is a soft knee rather than a hard cut -- a pixel
+    // exactly at the threshold still contributes -- which is measured here
+    // rather than assumed either way.
+    println!("bloom extraction: {:?}", findings.bloom_extract);
+    let extracted: Vec<f32> = findings.bloom_extract.iter().map(|(_, k)| *k).collect();
+    assert!(
+        extracted[0].abs() < 1e-6,
+        "black contributes nothing: {:?}",
+        findings.bloom_extract
+    );
+    for (value, kept) in &findings.bloom_extract {
+        assert!(
+            *kept >= 0.0 && kept <= value,
+            "the bright pass never brightens: {value} -> {kept}"
+        );
+    }
+    assert!(
+        extracted.windows(2).all(|pair| pair[0] <= pair[1]),
+        "a brighter pixel contributes at least as much: {:?}",
+        findings.bloom_extract
+    );
+    assert!(
+        extracted[4] > extracted[1],
+        "and strictly more once it is well over the threshold: {:?}",
+        findings.bloom_extract
+    );
+
+    // Quality presets are ordered and distinct for both passes.
+    for (label, values) in [
+        ("bloom iterations", &findings.bloom_iterations),
+        ("ssao samples", &findings.ssao_samples),
+    ] {
+        assert_eq!(values.len(), 4, "{label}: four presets were measured");
+        assert!(
+            values.windows(2).all(|pair| pair[0] <= pair[1]),
+            "{label} do not decrease with quality: {values:?}"
+        );
+        assert!(
+            values[0] < values[3],
+            "{label} are not all the same: {values:?}"
+        );
+    }
+
+    // The SSAO kernel is the pass's own, and it is a unit hemisphere.
+    // The kernel is upstream's fixed sample pool, not the frame's sample
+    // count: asking for twenty-four samples does not shrink it.
+    assert!(
+        findings.ssao_kernel_len >= 24,
+        "the kernel holds at least the requested sample count: {}",
+        findings.ssao_kernel_len
+    );
+    for (x, y, z) in &findings.ssao_kernel {
+        let length = (x * x + y * y + z * z).sqrt();
+        assert!(
+            length <= 1.001,
+            "every kernel sample is inside the unit sphere: {length}"
+        );
+        assert!(
+            *z >= -0.001,
+            "and in the hemisphere the normal points into: {z}"
+        );
+    }
+
+    // The lens equation: nothing is out of focus at the focus distance, and
+    // more is out of focus the further away it gets.
+    println!("circle of confusion: {:?}", findings.coc);
+    let at_focus = findings
+        .coc
+        .iter()
+        .find(|(distance, _)| (*distance - 10.0).abs() < 1e-6)
+        .map(|(_, coc)| *coc)
+        .expect("a sample at the focus distance");
+    assert!(
+        at_focus.abs() < 1e-4,
+        "the circle of confusion vanishes at the focus distance: {at_focus}"
+    );
+    let far = findings
+        .coc
+        .iter()
+        .find(|(distance, _)| (*distance - 20.0).abs() < 1e-6)
+        .map(|(_, coc)| *coc)
+        .expect("a far sample");
+    assert!(far > at_focus, "and grows beyond it: {far} vs {at_focus}");
+
+    // Optical depth is zero over no distance and grows with it.
+    println!("optical depth: {:?}", findings.optical_depth);
+    assert!(
+        findings.optical_depth[0].1.abs() < 1e-6,
+        "no distance means no fog: {:?}",
+        findings.optical_depth[0]
+    );
+    assert!(
+        findings.optical_depth[1].1 < findings.optical_depth[2].1,
+        "more distance means more fog: {:?}",
+        findings.optical_depth
+    );
+    // A level ray at the fog's own base height integrates to exactly density
+    // times distance, which is the closed form the exponential collapses to.
+    assert!(
+        (findings.optical_depth[2].1 - 0.02 * 100.0).abs() < 1e-3,
+        "a level ray at the base height integrates to density times distance: {:?}",
+        findings.optical_depth[2]
+    );
+
+    // The contact-shadow march's own test has a boundary, and it is where the
+    // sample lies in front of the ray by more than the bias and less than the
+    // thickness.
+    println!("contact-shadow occlusion: {:?}", findings.occluded);
+    assert!(
+        findings.occluded.iter().any(|(_, hit)| *hit),
+        "some sample occludes: {:?}",
+        findings.occluded
+    );
+    assert!(
+        findings.occluded.iter().any(|(_, hit)| !*hit),
+        "and some does not: {:?}",
+        findings.occluded
+    );
+
+    // Combining a shadow map's visibility with a contact shadow's is the
+    // product: neither can brighten the other, and full visibility on one side
+    // leaves the other untouched.
+    println!("combined visibility: {:?}", findings.combined_visibility);
+    for (map, contact, combined) in &findings.combined_visibility {
+        assert!(
+            (*combined - map * contact).abs() < 1e-5,
+            "the two visibilities multiply: {map} and {contact} gave {combined}"
+        );
+        assert!(
+            *combined <= map.min(*contact) + 1e-6,
+            "so a contact shadow only ever darkens: {map} and {contact} gave {combined}"
+        );
+    }
+
+    // Transmittance is a fraction that never rises with air mass. It does not
+    // start at one -- the model keeps a floor -- so the assertion is the
+    // ordering and the range, which is what a caller can rely on.
+    println!("transmittance: {:?}", findings.transmittance);
+    assert!(
+        findings
+            .transmittance
+            .iter()
+            .all(|(_, value)| *value > 0.0 && *value <= 1.0),
+        "transmittance is a fraction: {:?}",
+        findings.transmittance
+    );
+    assert!(
+        findings
+            .transmittance
+            .windows(2)
+            .all(|pair| pair[0].1 >= pair[1].1),
+        "more air never means more light: {:?}",
+        findings.transmittance
+    );
+    assert!(
+        findings.transmittance[0].1 > findings.transmittance[2].1,
+        "and four air masses attenuate more than none: {:?}",
+        findings.transmittance
+    );
+    assert!(
+        findings.air_mass[0].1.abs() < 1e-6
+            && findings.air_mass[1].1 < findings.air_mass[2].1,
+        "air mass starts at zero and grows with distance: {:?}",
+        findings.air_mass
+    );
+
+    // An identity resample is exactly the one where nothing changes size.
+    for (sizes, identity) in &findings.identity_scale {
+        let expected = sizes.0 == sizes.2 && sizes.1 == sizes.3;
+        assert_eq!(
+            *identity, expected,
+            "{sizes:?} is an identity scale only when the sizes match"
+        );
+    }
+
+    // A 256x16 strip carries sixteen slices of sixteen texels, and a 1024x32
+    // strip carries thirty-two.
+    assert_eq!(
+        findings.lut_size,
+        vec![((256, 16), 16), ((1024, 32), 32)],
+        "a strip's slice count is its height"
+    );
+    assert_eq!(
+        findings.identity_lut_size,
+        Some((256, 16)),
+        "a sixteen-slice identity table is a 256x16 strip"
+    );
+    assert_eq!(
+        findings.has_strip_lut,
+        Some(true),
+        "the attached table is the one the pass reports"
+    );
+
+    assert_eq!(
+        findings.scope_recorded,
+        Some(true),
+        "a scope records the binding it replaced"
+    );
+    // The borrowed ASCII effect is CNAEXT's own type, and reading its cell size
+    // through the borrow is what proves the handle names that effect rather
+    // than merely being non-zero.
+    let (cell_width, cell_height) = findings
+        .ascii_cell_size
+        .expect("the ASCII pass lends its effect");
+    assert!(
+        cell_width > 0 && cell_height > 0,
+        "the ASCII cell is a real size: {cell_width}x{cell_height}"
+    );
+    for (label, bytes) in &findings.glsl_bytes {
+        if label.ends_with("fallback") {
+            continue;
+        }
+        assert!(*bytes > 100, "{label} GLSL is real source, {bytes} bytes");
+    }
+
+    println!(
+        "screen-space passes: {} knobs round-tripped | support {:?} | glsl {:?}",
+        findings.round_trips.len(),
+        findings.supported,
+        findings.glsl_bytes
     );
 }

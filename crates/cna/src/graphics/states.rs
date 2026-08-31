@@ -1025,7 +1025,7 @@ impl SamplerState {
     pub(super) fn bind(&self, device: &GraphicsDevice) -> Result<()> {
         self.resource.bind(device)
     }
-    pub(super) fn native(&self) -> sys::CNA_SamplerState {
+    pub(crate) fn native(&self) -> sys::CNA_SamplerState {
         sys::CNA_SamplerState {
             struct_size: u32::try_from(size_of::<sys::CNA_SamplerState>())
                 .expect("CNA sampler-state layout fits u32"),

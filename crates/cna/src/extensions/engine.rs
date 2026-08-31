@@ -51,8 +51,8 @@ use crate::graphics::{
     BorrowedHandle, Effect, GraphicsDevice, OwnedEngineChild, SurfaceFormat, Texture2D,
 };
 use crate::native::Native;
-use crate::graphics::{DepthFormat, RenderTarget2D, TextureCube};
-use crate::value::{BoundingBox, Color, Matrix, Vector3, Vector4};
+use crate::graphics::{DepthFormat, RenderTarget2D, SamplerState, Texture3D, TextureCube};
+use crate::value::{BoundingBox, Color, Matrix, Vector2, Vector3, Vector4};
 
 use super::pbr::{EngineRenderSettings, RenderQuality, ShadowQuality, TonemappingMode};
 
@@ -3641,6 +3641,97 @@ impl Drop for BorrowedTextureCube<'_> {
     }
 }
 
+/// A texture another engine object owns, viewed for a bounded borrow.
+///
+/// The same shape as [`BorrowedTextureCube`]: the handle CNA publishes aliases
+/// its owner and has to be released, or the owner outlives its own device.
+pub struct BorrowedTexture2D<'owner> {
+    native: Arc<Native>,
+    handle: sys::CNA_Handle,
+    owner: PhantomData<&'owner ()>,
+}
+
+impl BorrowedTexture2D<'_> {
+    /// The texture's size, read through the borrow.
+    pub fn size(&self) -> Result<(i32, i32)> {
+        let mut info = sys::CNA_Texture2DInfo {
+            struct_size: core::mem::size_of::<sys::CNA_Texture2DInfo>() as u32,
+            struct_version: 1,
+            ..sys::CNA_Texture2DInfo::default()
+        };
+        self.native.texture_info(self.handle, &mut info)?;
+        let width = i32::try_from(info.width)
+            .map_err(|_| CnaError::InvalidInput("texture width exceeds i32"))?;
+        let height = i32::try_from(info.height)
+            .map_err(|_| CnaError::InvalidInput("texture height exceeds i32"))?;
+        Ok((width, height))
+    }
+}
+
+impl Drop for BorrowedTexture2D<'_> {
+    fn drop(&mut self) {
+        // SAFETY: the handle is this view's own, released exactly once.
+        let _ = self.native.destroy_texture(self.handle);
+    }
+}
+
+/// A volume texture another engine object owns, viewed for a bounded borrow.
+pub struct BorrowedTexture3D<'owner> {
+    native: Arc<Native>,
+    handle: sys::CNA_Handle,
+    owner: PhantomData<&'owner ()>,
+}
+
+impl Drop for BorrowedTexture3D<'_> {
+    fn drop(&mut self) {
+        // SAFETY: the handle is this view's own, released exactly once.
+        let _ = self.native.destroy_texture3d(self.handle);
+    }
+}
+
+/// CNAEXT's ASCII post-process effect, owned by an [`AsciiPass`].
+pub struct BorrowedAsciiEffect<'owner> {
+    native: Arc<Native>,
+    handle: sys::CNA_AsciiPostProcessEffectHandle,
+    owner: PhantomData<&'owner ()>,
+}
+
+impl BorrowedAsciiEffect<'_> {
+    /// The character cell size in pixels.
+    pub fn cell_size(&self) -> Result<(i32, i32)> {
+        let mut width = 0_i32;
+        let mut height = 0_i32;
+        // SAFETY: the handle is this view's own and both outputs are live locals.
+        self.native.check(unsafe {
+            (self.native.runtime.ascii_get_cell_size)(self.handle, &mut width, &mut height)
+        })?;
+        Ok((width, height))
+    }
+
+    /// The grid the last draw produced, in cells.
+    pub fn last_grid_dimensions(&self) -> Result<(i32, i32)> {
+        let mut columns = 0_i32;
+        let mut rows = 0_i32;
+        // SAFETY: the handle is this view's own and both outputs are live locals.
+        self.native.check(unsafe {
+            (self.native.runtime.ascii_get_last_grid_dimensions)(
+                self.handle,
+                &mut columns,
+                &mut rows,
+            )
+        })?;
+        Ok((columns, rows))
+    }
+}
+
+impl Drop for BorrowedAsciiEffect<'_> {
+    fn drop(&mut self) {
+        // SAFETY: the handle is this view's own, released exactly once, and
+        // through the ASCII effect's own destroy rather than the generic one.
+        let _ = unsafe { (self.native.runtime.ascii_effect_destroy)(self.handle) };
+    }
+}
+
 /// A cube map the skybox refused to take over.
 pub struct EnvironmentNotTransferred {
     /// The cube map, still owned by the caller.
@@ -4068,6 +4159,1506 @@ impl AtmosphericSky {
 }
 
 impl Drop for AtmosphericSky {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// Defines one concrete post-process pass over the shared `PostProcessPass`.
+///
+/// Upstream's concrete passes are the same handle type driven through the same
+/// shared operations, so `apply`, `name` and `is_supported` come from the pass
+/// itself and only the pass's own knobs are declared here.
+macro_rules! concrete_pass {
+    ($name:ident, $create:ident, $doc:literal) => {
+        #[doc = $doc]
+        pub struct $name {
+            pass: PostProcessPass,
+        }
+
+        impl $name {
+            #[doc = "Creates the pass on a device."]
+            pub fn new(device: &GraphicsDevice) -> Result<Self> {
+                let native = device.state_native();
+                let mut handle = sys::CNA_INVALID_HANDLE;
+                // SAFETY: the device handle is live and the output is a live local.
+                native
+                    .check(unsafe { (native.engine.$create)(device.handle()?, &mut handle) })?;
+                Ok(Self {
+                    pass: PostProcessPass::adopt(native, device, handle, None),
+                })
+            }
+
+            /// The pass itself, for the operations every pass shares.
+            #[must_use]
+            pub const fn pass(&self) -> &PostProcessPass {
+                &self.pass
+            }
+
+            /// Hands the pass over, for adding to a chain.
+            #[must_use]
+            pub fn into_pass(self) -> PostProcessPass {
+                self.pass
+            }
+
+            #[allow(dead_code)]
+            fn scalar(
+                &self,
+                route: unsafe extern "C" fn(
+                    sys::CNA_PostProcessPassHandle,
+                    *mut f32,
+                ) -> sys::CNA_Result,
+            ) -> Result<f32> {
+                let handle = self.pass.core.get()?;
+                let mut value = 0.0_f32;
+                // SAFETY: the handle is owned and the output is a live local.
+                self.pass.native.check(unsafe { route(handle, &mut value) })?;
+                Ok(value)
+            }
+
+            #[allow(dead_code)]
+            fn set_scalar(
+                &self,
+                route: unsafe extern "C" fn(
+                    sys::CNA_PostProcessPassHandle,
+                    f32,
+                ) -> sys::CNA_Result,
+                value: f32,
+            ) -> Result<()> {
+                let handle = self.pass.core.get()?;
+                // SAFETY: the handle is owned and the value is by value.
+                self.pass.native.check(unsafe { route(handle, value) })
+            }
+
+            #[allow(dead_code)]
+            fn count(
+                &self,
+                route: unsafe extern "C" fn(
+                    sys::CNA_PostProcessPassHandle,
+                    *mut i32,
+                ) -> sys::CNA_Result,
+            ) -> Result<i32> {
+                let handle = self.pass.core.get()?;
+                let mut value = 0_i32;
+                // SAFETY: the handle is owned and the output is a live local.
+                self.pass.native.check(unsafe { route(handle, &mut value) })?;
+                Ok(value)
+            }
+
+            #[allow(dead_code)]
+            fn set_count(
+                &self,
+                route: unsafe extern "C" fn(
+                    sys::CNA_PostProcessPassHandle,
+                    i32,
+                ) -> sys::CNA_Result,
+                value: i32,
+            ) -> Result<()> {
+                let handle = self.pass.core.get()?;
+                // SAFETY: the handle is owned and the value is by value.
+                self.pass.native.check(unsafe { route(handle, value) })
+            }
+
+            #[allow(dead_code)]
+            fn flag(
+                &self,
+                route: unsafe extern "C" fn(
+                    sys::CNA_PostProcessPassHandle,
+                    *mut sys::CNA_Bool,
+                ) -> sys::CNA_Result,
+            ) -> Result<bool> {
+                let handle = self.pass.core.get()?;
+                let mut value: sys::CNA_Bool = 0;
+                // SAFETY: the handle is owned and the output is a live local.
+                self.pass.native.check(unsafe { route(handle, &mut value) })?;
+                Ok(value != 0)
+            }
+
+            #[allow(dead_code)]
+            fn set_flag(
+                &self,
+                route: unsafe extern "C" fn(
+                    sys::CNA_PostProcessPassHandle,
+                    sys::CNA_Bool,
+                ) -> sys::CNA_Result,
+                value: bool,
+            ) -> Result<()> {
+                let handle = self.pass.core.get()?;
+                // SAFETY: the handle is owned and the flag is a canonical boolean.
+                self.pass
+                    .native
+                    .check(unsafe { route(handle, u8::from(value)) })
+            }
+
+            #[allow(dead_code)]
+            fn vector3(
+                &self,
+                route: unsafe extern "C" fn(
+                    sys::CNA_PostProcessPassHandle,
+                    *mut sys::CNA_Vector3,
+                ) -> sys::CNA_Result,
+            ) -> Result<Vector3> {
+                let handle = self.pass.core.get()?;
+                let mut value = sys::CNA_Vector3::default();
+                // SAFETY: the handle is owned and the output is a live local.
+                self.pass.native.check(unsafe { route(handle, &mut value) })?;
+                Ok(from_native_vector3(value))
+            }
+
+            #[allow(dead_code)]
+            fn set_vector3(
+                &self,
+                route: unsafe extern "C" fn(
+                    sys::CNA_PostProcessPassHandle,
+                    *const sys::CNA_Vector3,
+                ) -> sys::CNA_Result,
+                value: Vector3,
+            ) -> Result<()> {
+                let handle = self.pass.core.get()?;
+                let vector = native_vector3(value);
+                // SAFETY: the handle is owned and the vector is borrowed for the call.
+                self.pass.native.check(unsafe { route(handle, &vector) })
+            }
+
+            #[allow(dead_code)]
+            fn text(
+                &self,
+                route: impl Fn(
+                    &crate::native::engine::EngineApi,
+                    sys::CNA_PostProcessPassHandle,
+                    *mut c_char,
+                    u64,
+                    *mut u64,
+                ) -> sys::CNA_Result,
+            ) -> Result<String> {
+                let handle = self.pass.core.get()?;
+                copy_text(&self.pass.native, |api, destination, capacity, out_bytes| {
+                    route(api, handle, destination, capacity, out_bytes)
+                })
+            }
+        }
+    };
+}
+
+/// Declares one `f32` knob on a concrete pass.
+macro_rules! pass_scalar {
+    ($get:ident, $set:ident, $get_route:ident, $set_route:ident, $doc:literal) => {
+        #[doc = $doc]
+        pub fn $get(&self) -> Result<f32> {
+            self.scalar(self.pass.native.engine.$get_route)
+        }
+
+        #[doc = $doc]
+        pub fn $set(&self, value: f32) -> Result<()> {
+            self.set_scalar(self.pass.native.engine.$set_route, value)
+        }
+    };
+}
+
+/// Declares one `i32` knob on a concrete pass.
+macro_rules! pass_count {
+    ($get:ident, $set:ident, $get_route:ident, $set_route:ident, $doc:literal) => {
+        #[doc = $doc]
+        pub fn $get(&self) -> Result<i32> {
+            self.count(self.pass.native.engine.$get_route)
+        }
+
+        #[doc = $doc]
+        pub fn $set(&self, value: i32) -> Result<()> {
+            self.set_count(self.pass.native.engine.$set_route, value)
+        }
+    };
+}
+
+/// Declares one boolean knob on a concrete pass.
+macro_rules! pass_flag {
+    ($get:ident, $set:ident, $get_route:ident, $set_route:ident, $doc:literal) => {
+        #[doc = $doc]
+        pub fn $get(&self) -> Result<bool> {
+            self.flag(self.pass.native.engine.$get_route)
+        }
+
+        #[doc = $doc]
+        pub fn $set(&self, value: bool) -> Result<()> {
+            self.set_flag(self.pass.native.engine.$set_route, value)
+        }
+    };
+}
+
+/// Declares one `Vector3` knob on a concrete pass.
+macro_rules! pass_vector3 {
+    ($get:ident, $set:ident, $get_route:ident, $set_route:ident, $doc:literal) => {
+        #[doc = $doc]
+        pub fn $get(&self) -> Result<Vector3> {
+            self.vector3(self.pass.native.engine.$get_route)
+        }
+
+        #[doc = $doc]
+        pub fn $set(&self, value: Vector3) -> Result<()> {
+            self.set_vector3(self.pass.native.engine.$set_route, value)
+        }
+    };
+}
+
+concrete_pass!(
+    BloomPass,
+    bloom_pass_create,
+    "A bloom pass: a bright-pass extraction and a blur pyramid."
+);
+
+impl BloomPass {
+    pass_scalar!(
+        threshold, set_threshold, bloom_pass_get_threshold, bloom_pass_set_threshold,
+        "The luminance above which a pixel contributes to the bloom."
+    );
+    pass_scalar!(
+        intensity, set_intensity, bloom_pass_get_intensity, bloom_pass_set_intensity,
+        "How strongly the bloom is added back."
+    );
+    pass_count!(
+        iterations, set_iterations, bloom_pass_get_iterations, bloom_pass_set_iterations,
+        "How many pyramid levels the blur uses; stored as given and clamped where the pyramid is built."
+    );
+
+    /// Releases the pass's pooled pyramid targets.
+    pub fn reset_targets(&self) -> Result<()> {
+        let handle = self.pass.core.get()?;
+        // SAFETY: the handle is owned.
+        self.pass
+            .native
+            .check(unsafe { (self.pass.native.engine.bloom_pass_reset_targets)(handle) })
+    }
+
+    /// What the bright pass keeps of one channel above a threshold.
+    ///
+    /// A pure function, so the extraction curve is assertable without a frame.
+    pub fn extract_channel(value: f32, threshold: f32) -> Result<f32> {
+        let native = Native::process()?;
+        let mut out = 0.0_f32;
+        // SAFETY: both inputs are by value and the output is a live local.
+        native
+            .check(unsafe { (native.engine.bloom_pass_extract_channel)(value, threshold, &mut out) })?;
+        Ok(out)
+    }
+
+    /// How many pyramid levels a render-quality preset asks for.
+    pub fn iterations_for_quality(quality: RenderQuality) -> Result<i32> {
+        let native = Native::process()?;
+        let mut value = 0_i32;
+        // SAFETY: the identity is canonical and the output is a live local.
+        native.check(unsafe {
+            (native.engine.bloom_pass_iterations_for_quality)(quality.to_native(), &mut value)
+        })?;
+        Ok(value)
+    }
+}
+
+concrete_pass!(
+    ChromaticAberrationPass,
+    chromatic_aberration_pass_create,
+    "A chromatic-aberration pass: the channels are sampled at slightly different radii."
+);
+
+impl ChromaticAberrationPass {
+    pass_scalar!(
+        strength, set_strength,
+        chromatic_aberration_pass_get_strength, chromatic_aberration_pass_set_strength,
+        "How far apart the channels are sampled."
+    );
+}
+
+concrete_pass!(FilmGrainPass, film_grain_pass_create, "A film-grain pass.");
+
+impl FilmGrainPass {
+    pass_scalar!(
+        intensity, set_intensity, film_grain_pass_get_intensity, film_grain_pass_set_intensity,
+        "How strong the grain is."
+    );
+}
+
+concrete_pass!(LensFlarePass, lens_flare_pass_create, "A lens-flare pass.");
+
+impl LensFlarePass {
+    pass_scalar!(
+        intensity, set_intensity, lens_flare_pass_get_intensity, lens_flare_pass_set_intensity,
+        "How strong the flare is."
+    );
+    pass_scalar!(
+        threshold, set_threshold, lens_flare_pass_get_threshold, lens_flare_pass_set_threshold,
+        "The luminance above which a pixel produces a ghost."
+    );
+    pass_scalar!(
+        dispersal, set_dispersal, lens_flare_pass_get_dispersal, lens_flare_pass_set_dispersal,
+        "How far apart the ghost images are spread."
+    );
+}
+
+concrete_pass!(MotionBlurPass, motion_blur_pass_create, "A motion-blur pass.");
+
+impl MotionBlurPass {
+    pass_scalar!(
+        strength, set_strength, motion_blur_pass_get_strength, motion_blur_pass_set_strength,
+        "How far the blur reaches along the velocity vector."
+    );
+    pass_scalar!(
+        max_distance, set_max_distance,
+        motion_blur_pass_get_max_distance, motion_blur_pass_set_max_distance,
+        "The furthest the blur will reach, whatever the velocity says."
+    );
+}
+
+concrete_pass!(
+    HeightFogPass,
+    height_fog_pass_create,
+    "A height-fog pass: density falls off with altitude."
+);
+
+impl HeightFogPass {
+    pass_scalar!(
+        density, set_density, height_fog_pass_get_density, height_fog_pass_set_density,
+        "The fog's density at the base height."
+    );
+    pass_scalar!(
+        falloff, set_falloff, height_fog_pass_get_falloff, height_fog_pass_set_falloff,
+        "How quickly the density falls off with altitude."
+    );
+    pass_scalar!(
+        base_height, set_base_height,
+        height_fog_pass_get_base_height, height_fog_pass_set_base_height,
+        "The altitude the density is quoted at."
+    );
+    pass_vector3!(
+        color, set_color, height_fog_pass_get_color, height_fog_pass_set_color,
+        "The fog's colour."
+    );
+
+    /// The optical depth along a ray through the fog.
+    ///
+    /// A pure function of the geometry, so the fog's integral is assertable
+    /// without rendering it. The ray starts at `camera_height` and gains
+    /// `ray_height_step` of altitude per unit travelled.
+    #[allow(clippy::too_many_arguments)]
+    pub fn optical_depth(
+        camera_height: f32,
+        ray_height_step: f32,
+        distance: f32,
+        density: f32,
+        falloff: f32,
+        base_height: f32,
+    ) -> Result<f32> {
+        let native = Native::process()?;
+        let mut value = 0.0_f32;
+        // SAFETY: every input is by value and the output is a live local.
+        native.check(unsafe {
+            (native.engine.height_fog_pass_optical_depth)(
+                camera_height,
+                ray_height_step,
+                distance,
+                density,
+                falloff,
+                base_height,
+                &mut value,
+            )
+        })?;
+        Ok(value)
+    }
+}
+
+concrete_pass!(SsaoPass, ssao_pass_create, "A screen-space ambient-occlusion pass.");
+
+impl SsaoPass {
+    pass_scalar!(
+        radius, set_radius, ssao_pass_get_radius, ssao_pass_set_radius,
+        "How far the occlusion search reaches, in world units."
+    );
+    pass_scalar!(
+        intensity, set_intensity, ssao_pass_get_intensity, ssao_pass_set_intensity,
+        "How strongly the occlusion darkens."
+    );
+    pass_count!(
+        sample_count, set_sample_count,
+        ssao_pass_get_sample_count, ssao_pass_set_sample_count,
+        "How many samples the kernel takes."
+    );
+    pass_flag!(
+        is_half_resolution, set_half_resolution,
+        ssao_pass_get_half_resolution, ssao_pass_set_half_resolution,
+        "Whether the pass runs at half resolution."
+    );
+
+    /// Releases the pass's pooled targets.
+    pub fn reset_targets(&self) -> Result<()> {
+        let handle = self.pass.core.get()?;
+        // SAFETY: the handle is owned.
+        self.pass
+            .native
+            .check(unsafe { (self.pass.native.engine.ssao_pass_reset_targets)(handle) })
+    }
+
+    /// The pass's own sample kernel, as it will use it.
+    ///
+    /// Reading it is what makes "the kernel is a hemisphere" checkable rather
+    /// than a comment: every sample is a direction the pass will actually take.
+    ///
+    /// The size is asked for rather than assumed. The kernel is not the sample
+    /// count: upstream keeps a fixed pool and the count selects how much of it
+    /// a frame uses, so sizing the destination from `sample_count` refuses with
+    /// `BUFFER_TOO_SMALL` -- and that particular refusal carries no message of
+    /// its own, so it surfaces whatever the last failing call happened to say.
+    pub fn kernel(&self) -> Result<Vec<Vector3>> {
+        let handle = self.pass.core.get()?;
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the count.
+        let probe = unsafe {
+            (self.pass.native.engine.ssao_pass_copy_kernel)(
+                handle,
+                core::ptr::null_mut(),
+                0,
+                &mut required,
+            )
+        };
+        if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+            self.pass.native.check(probe)?;
+        }
+        let capacity = usize::try_from(required)
+            .map_err(|_| CnaError::InvalidInput("the kernel size does not fit in memory"))?;
+        if capacity == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![sys::CNA_Vector3::default(); capacity];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `capacity`
+        // writable vectors, which is the count passed alongside it.
+        self.pass.native.check(unsafe {
+            (self.pass.native.engine.ssao_pass_copy_kernel)(
+                handle,
+                buffer.as_mut_ptr(),
+                required,
+                &mut count,
+            )
+        })?;
+        let count = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("CNA reported a kernel larger than memory"))?;
+        Ok(buffer
+            .into_iter()
+            .take(count.min(capacity))
+            .map(from_native_vector3)
+            .collect())
+    }
+
+    /// How many samples a render-quality preset asks for.
+    pub fn sample_count_for_quality(quality: RenderQuality) -> Result<i32> {
+        let native = Native::process()?;
+        let mut value = 0_i32;
+        // SAFETY: the identity is canonical and the output is a live local.
+        native.check(unsafe {
+            (native.engine.ssao_pass_sample_count_for_quality)(quality.to_native(), &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// The occlusion GLSL, at full or half resolution.
+    pub fn occlusion_glsl(half_resolution: bool) -> Result<String> {
+        let native = Native::process()?;
+        copy_text(&native, |api, destination, capacity, out_bytes| {
+            // SAFETY: the destination holds `capacity` writable bytes.
+            unsafe {
+                (api.ssao_pass_copy_occlusion_glsl)(
+                    u8::from(half_resolution),
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+    }
+}
+
+concrete_pass!(SsrPass, ssr_pass_create, "A screen-space reflection pass.");
+
+impl SsrPass {
+    pass_scalar!(
+        max_distance, set_max_distance, ssr_pass_get_max_distance, ssr_pass_set_max_distance,
+        "How far a reflection ray marches."
+    );
+    pass_scalar!(
+        thickness, set_thickness, ssr_pass_get_thickness, ssr_pass_set_thickness,
+        "How thick a depth sample is treated as being."
+    );
+    pass_scalar!(
+        depth_bias, set_depth_bias, ssr_pass_get_depth_bias, ssr_pass_set_depth_bias,
+        "The bias applied to the ray's depth comparison."
+    );
+    pass_scalar!(
+        edge_fade, set_edge_fade, ssr_pass_get_edge_fade, ssr_pass_set_edge_fade,
+        "How far from the screen edge the reflection fades out."
+    );
+    pass_scalar!(
+        roughness_blur, set_roughness_blur,
+        ssr_pass_get_roughness_blur, ssr_pass_set_roughness_blur,
+        "How much a rough surface blurs its reflection."
+    );
+    pass_scalar!(
+        intensity, set_intensity, ssr_pass_get_intensity, ssr_pass_set_intensity,
+        "How strongly the reflection is added."
+    );
+    pass_count!(
+        step_count, set_step_count, ssr_pass_get_step_count, ssr_pass_set_step_count,
+        "How many steps the ray march takes; clamped to the engine's own bounds."
+    );
+}
+
+concrete_pass!(
+    DepthOfFieldPass,
+    depth_of_field_pass_create,
+    "A depth-of-field pass, parameterised as a physical lens."
+);
+
+impl DepthOfFieldPass {
+    pass_scalar!(
+        focus_distance, set_focus_distance,
+        depth_of_field_pass_get_focus_distance, depth_of_field_pass_set_focus_distance,
+        "The distance in focus, in world units."
+    );
+    pass_scalar!(
+        focal_length, set_focal_length,
+        depth_of_field_pass_get_focal_length, depth_of_field_pass_set_focal_length,
+        "The lens's focal length in millimetres."
+    );
+    pass_scalar!(
+        f_number, set_f_number, depth_of_field_pass_get_f_number, depth_of_field_pass_set_f_number,
+        "The lens's f-number."
+    );
+    pass_scalar!(
+        max_radius, set_max_radius,
+        depth_of_field_pass_get_max_radius, depth_of_field_pass_set_max_radius,
+        "The largest circle of confusion the pass will draw."
+    );
+
+    /// The circle of confusion, in millimetres, for one distance.
+    ///
+    /// The lens equation itself, as a pure function: a caller can check the
+    /// focus falls where it asked without rendering anything.
+    pub fn circle_of_confusion_millimetres(
+        distance: f32,
+        focus_distance: f32,
+        focal_length: f32,
+        f_number: f32,
+    ) -> Result<f32> {
+        let native = Native::process()?;
+        let mut value = 0.0_f32;
+        // SAFETY: every input is by value and the output is a live local.
+        native.check(unsafe {
+            (native.engine.depth_of_field_pass_circle_of_confusion_millimetres)(
+                distance,
+                focus_distance,
+                focal_length,
+                f_number,
+                &mut value,
+            )
+        })?;
+        Ok(value)
+    }
+}
+
+concrete_pass!(LightShaftPass, light_shaft_pass_create, "A light-shaft (god-ray) pass.");
+
+impl LightShaftPass {
+    pass_scalar!(
+        intensity, set_intensity, light_shaft_pass_get_intensity, light_shaft_pass_set_intensity,
+        "How strong the shafts are."
+    );
+    pass_scalar!(
+        decay, set_decay, light_shaft_pass_get_decay, light_shaft_pass_set_decay,
+        "How quickly a shaft fades along its length."
+    );
+    pass_scalar!(
+        threshold, set_threshold, light_shaft_pass_get_threshold, light_shaft_pass_set_threshold,
+        "The luminance above which a pixel contributes."
+    );
+
+    /// Where the light is on screen, in normalised device coordinates.
+    pub fn light_screen_position(&self) -> Result<Vector2> {
+        let handle = self.pass.core.get()?;
+        let mut value = sys::CNA_Vector2::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.pass.native.check(unsafe {
+            (self.pass.native.engine.light_shaft_pass_get_light_screen_position)(
+                handle,
+                &mut value,
+            )
+        })?;
+        Ok(Vector2::from_x_and_y(value.x, value.y))
+    }
+
+    /// Sets where the light is on screen.
+    pub fn set_light_screen_position(&self, value: Vector2) -> Result<()> {
+        let handle = self.pass.core.get()?;
+        let position = sys::CNA_Vector2 {
+            x: value.X,
+            y: value.Y,
+        };
+        // SAFETY: the handle is owned and the position is borrowed for the call.
+        self.pass.native.check(unsafe {
+            (self.pass.native.engine.light_shaft_pass_set_light_screen_position)(
+                handle,
+                &position,
+            )
+        })
+    }
+}
+
+concrete_pass!(VolumetricFogPassCore, volumetric_fog_pass_create, "A volumetric-fog pass.");
+
+/// A volumetric-fog pass.
+///
+/// Distinct from the other concrete passes because it retains something: CNA
+/// borrows the shadow map it scatters through and keeps a raw pointer to it.
+pub struct VolumetricFogPass {
+    inner: VolumetricFogPassCore,
+    shadow_map: Option<Arc<ShadowMap>>,
+}
+
+impl VolumetricFogPass {
+    /// Creates the pass on a device.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        Ok(Self {
+            inner: VolumetricFogPassCore::new(device)?,
+            shadow_map: None,
+        })
+    }
+
+    /// The pass itself, for the operations every pass shares.
+    #[must_use]
+    pub const fn pass(&self) -> &PostProcessPass {
+        self.inner.pass()
+    }
+
+    /// Hands the pass over, for adding to a chain.
+    ///
+    /// The shadow map goes with it, because CNA still points at it.
+    #[must_use]
+    pub fn into_pass(self) -> (PostProcessPass, Option<Arc<ShadowMap>>) {
+        (self.inner.into_pass(), self.shadow_map)
+    }
+}
+
+impl VolumetricFogPassCore {
+    pass_scalar!(
+        density, set_density, volumetric_fog_pass_get_density, volumetric_fog_pass_set_density,
+        "How dense the medium is."
+    );
+    pass_scalar!(
+        anisotropy, set_anisotropy,
+        volumetric_fog_pass_get_anisotropy, volumetric_fog_pass_set_anisotropy,
+        "The phase function's forward-scattering parameter."
+    );
+    pass_scalar!(
+        range, set_range, volumetric_fog_pass_get_range, volumetric_fog_pass_set_range,
+        "How far the march reaches."
+    );
+
+}
+
+impl VolumetricFogPass {
+    /// How dense the medium is.
+    pub fn density(&self) -> Result<f32> {
+        self.inner.density()
+    }
+
+    /// Sets how dense the medium is.
+    pub fn set_density(&self, value: f32) -> Result<()> {
+        self.inner.set_density(value)
+    }
+
+    /// The phase function's forward-scattering parameter.
+    pub fn anisotropy(&self) -> Result<f32> {
+        self.inner.anisotropy()
+    }
+
+    /// Sets the phase function's forward-scattering parameter.
+    pub fn set_anisotropy(&self, value: f32) -> Result<()> {
+        self.inner.set_anisotropy(value)
+    }
+
+    /// How far the march reaches.
+    pub fn range(&self) -> Result<f32> {
+        self.inner.range()
+    }
+
+    /// Sets how far the march reaches.
+    pub fn set_range(&self, value: f32) -> Result<()> {
+        self.inner.set_range(value)
+    }
+
+    /// Gives the pass the light it scatters, and the shadow map it reads.
+    ///
+    /// The shadow map is borrowed, so the [`Arc`] is what keeps it alive for as
+    /// long as the pass points at it.
+    pub fn set_light(
+        &mut self,
+        shadow_map: &Arc<ShadowMap>,
+        direction: Vector3,
+        color: Vector3,
+    ) -> Result<()> {
+        let handle = self.inner.pass.core.get()?;
+        let direction = native_vector3(direction);
+        let color = native_vector3(color);
+        // SAFETY: both handles are live and the vectors are borrowed for the
+        // call; retention follows on success.
+        self.inner.pass.native.check(unsafe {
+            (self.inner.pass.native.engine.volumetric_fog_pass_set_light)(
+                handle,
+                shadow_map.core.get()?,
+                &direction,
+                &color,
+            )
+        })?;
+        self.shadow_map = Some(Arc::clone(shadow_map));
+        Ok(())
+    }
+}
+
+concrete_pass!(
+    AerialPerspectivePass,
+    aerial_perspective_pass_create,
+    "An aerial-perspective pass: distance haze from the same atmosphere the sky uses."
+);
+
+impl AerialPerspectivePass {
+    pass_scalar!(
+        turbidity, set_turbidity,
+        aerial_perspective_pass_get_turbidity, aerial_perspective_pass_set_turbidity,
+        "How hazy the atmosphere is."
+    );
+    pass_scalar!(
+        intensity, set_intensity,
+        aerial_perspective_pass_get_intensity, aerial_perspective_pass_set_intensity,
+        "How strongly the haze is applied."
+    );
+    pass_scalar!(
+        scale_height, set_scale_height,
+        aerial_perspective_pass_get_scale_height, aerial_perspective_pass_set_scale_height,
+        "The atmosphere's scale height."
+    );
+    pass_vector3!(
+        sun_direction, set_sun_direction,
+        aerial_perspective_pass_get_sun_direction, aerial_perspective_pass_set_sun_direction,
+        "The sun direction the haze is coloured from."
+    );
+
+    /// Why the pass fell back; empty when it did not.
+    pub fn fallback_reason(&self) -> Result<String> {
+        self.text(|api, handle, destination, capacity, out_bytes| {
+            // SAFETY: the destination holds `capacity` writable bytes.
+            unsafe {
+                (api.aerial_perspective_pass_copy_fallback_reason)(
+                    handle,
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+    }
+
+    /// The air mass along a view direction out to a distance.
+    pub fn air_mass_for_distance(
+        view_direction: Vector3,
+        distance: f32,
+        scale_height: f32,
+    ) -> Result<f32> {
+        let native = Native::process()?;
+        let direction = native_vector3(view_direction);
+        let mut value = 0.0_f32;
+        // SAFETY: the direction is borrowed for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.aerial_perspective_pass_air_mass_for_distance)(
+                &direction,
+                distance,
+                scale_height,
+                &mut value,
+            )
+        })?;
+        Ok(value)
+    }
+
+    /// What fraction of each channel survives one air mass at a turbidity.
+    pub fn transmittance(air_mass: f32, turbidity: f32) -> Result<Vector3> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: both inputs are by value and the output is a live local.
+        native.check(unsafe {
+            (native.engine.aerial_perspective_pass_transmittance)(
+                air_mass,
+                turbidity,
+                &mut value,
+            )
+        })?;
+        Ok(from_native_vector3(value))
+    }
+}
+
+concrete_pass!(
+    ContactShadowPass,
+    contact_shadow_pass_create,
+    "A contact-shadow pass: a short screen-space ray march for the shadows a map misses."
+);
+
+impl ContactShadowPass {
+    pass_scalar!(
+        max_distance, set_max_distance,
+        contact_shadow_pass_get_max_distance, contact_shadow_pass_set_max_distance,
+        "How far the march reaches, in world units."
+    );
+    pass_scalar!(
+        thickness, set_thickness,
+        contact_shadow_pass_get_thickness, contact_shadow_pass_set_thickness,
+        "How thick a depth sample is treated as being."
+    );
+    pass_scalar!(
+        bias, set_bias, contact_shadow_pass_get_bias, contact_shadow_pass_set_bias,
+        "The bias applied to the depth comparison."
+    );
+    pass_scalar!(
+        intensity, set_intensity,
+        contact_shadow_pass_get_intensity, contact_shadow_pass_set_intensity,
+        "How strongly the contact shadow darkens."
+    );
+    pass_count!(
+        step_count, set_step_count,
+        contact_shadow_pass_get_step_count, contact_shadow_pass_set_step_count,
+        "How many steps the march takes."
+    );
+    pass_vector3!(
+        light_direction, set_light_direction,
+        contact_shadow_pass_get_light_direction, contact_shadow_pass_set_light_direction,
+        "The direction the light arrives from."
+    );
+
+    /// Why the pass fell back; empty when it did not.
+    pub fn fallback_reason(&self) -> Result<String> {
+        self.text(|api, handle, destination, capacity, out_bytes| {
+            // SAFETY: the destination holds `capacity` writable bytes.
+            unsafe {
+                (api.contact_shadow_pass_copy_fallback_reason)(
+                    handle,
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+    }
+
+    /// Whether one march sample counts as occluded.
+    ///
+    /// The march's own test, as a pure function.
+    pub fn is_occluded(
+        ray_view_depth: f32,
+        scene_view_depth: f32,
+        bias: f32,
+        thickness: f32,
+    ) -> Result<bool> {
+        let native = Native::process()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: every input is by value and the output is a live local.
+        native.check(unsafe {
+            (native.engine.contact_shadow_pass_is_occluded)(
+                ray_view_depth,
+                scene_view_depth,
+                bias,
+                thickness,
+                &mut value,
+            )
+        })?;
+        Ok(value != 0)
+    }
+
+    /// How a contact shadow's visibility combines with a shadow map's.
+    pub fn combine_visibility(map_visibility: f32, contact_visibility: f32) -> Result<f32> {
+        let native = Native::process()?;
+        let mut value = 0.0_f32;
+        // SAFETY: both inputs are by value and the output is a live local.
+        native.check(unsafe {
+            (native.engine.contact_shadow_pass_combine_visibility)(
+                map_visibility,
+                contact_visibility,
+                &mut value,
+            )
+        })?;
+        Ok(value)
+    }
+
+    /// The occlusion test's own GLSL.
+    pub fn occlusion_test_glsl() -> Result<String> {
+        let native = Native::process()?;
+        copy_text(&native, |api, destination, capacity, out_bytes| {
+            // SAFETY: the destination holds `capacity` writable bytes.
+            unsafe { (api.contact_shadow_pass_copy_occlusion_test_glsl)(destination, capacity, out_bytes) }
+        })
+    }
+}
+
+/// How a colour-grading lookup table is sampled between its slices.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum LutInterpolation {
+    /// Eight-corner trilinear.
+    Trilinear,
+    /// Four-corner tetrahedral, which avoids trilinear's diagonal artefacts.
+    Tetrahedral,
+}
+
+impl LutInterpolation {
+    const fn from_native(value: sys::CNA_LutInterpolation) -> Option<Self> {
+        Some(match value {
+            sys::CNA_LUT_INTERPOLATION_TRILINEAR => Self::Trilinear,
+            sys::CNA_LUT_INTERPOLATION_TETRAHEDRAL => Self::Tetrahedral,
+            _ => return None,
+        })
+    }
+
+    const fn to_native(self) -> sys::CNA_LutInterpolation {
+        match self {
+            Self::Trilinear => sys::CNA_LUT_INTERPOLATION_TRILINEAR,
+            Self::Tetrahedral => sys::CNA_LUT_INTERPOLATION_TETRAHEDRAL,
+        }
+    }
+}
+
+concrete_pass!(
+    ColorGradePassCore,
+    color_grade_pass_create,
+    "A colour-grading pass driven by a lookup table."
+);
+
+impl ColorGradePassCore {
+    pass_scalar!(
+        strength, set_strength, color_grade_pass_get_strength, color_grade_pass_set_strength,
+        "How far the grade is applied, from zero through one."
+    );
+}
+
+/// A colour-grading pass driven by a lookup table.
+///
+/// Distinct from the other concrete passes because it retains its tables: CNA
+/// borrows the strip or volume LUT and keeps a raw pointer to it.
+pub struct ColorGradePass {
+    inner: ColorGradePassCore,
+    strip_lut: Option<Texture2D>,
+    volume_lut: Option<Texture3D>,
+}
+
+impl ColorGradePass {
+    /// Creates the pass on a device.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        Ok(Self {
+            inner: ColorGradePassCore::new(device)?,
+            strip_lut: None,
+            volume_lut: None,
+        })
+    }
+
+    /// The pass itself, for the operations every pass shares.
+    #[must_use]
+    pub const fn pass(&self) -> &PostProcessPass {
+        self.inner.pass()
+    }
+
+    /// Hands the pass over, along with the tables CNA still points at.
+    #[must_use]
+    pub fn into_pass(self) -> (PostProcessPass, Option<Texture2D>, Option<Texture3D>) {
+        (self.inner.into_pass(), self.strip_lut, self.volume_lut)
+    }
+
+    /// How far the grade is applied, from zero through one.
+    pub fn strength(&self) -> Result<f32> {
+        self.inner.strength()
+    }
+
+    /// Sets how far the grade is applied.
+    pub fn set_strength(&self, value: f32) -> Result<()> {
+        self.inner.set_strength(value)
+    }
+
+    /// How the table is sampled between its slices.
+    pub fn interpolation(&self) -> Result<LutInterpolation> {
+        let handle = self.inner.pass.core.get()?;
+        let mut value: sys::CNA_LutInterpolation = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.inner.pass.native.check(unsafe {
+            (self.inner.pass.native.engine.color_grade_pass_get_interpolation)(handle, &mut value)
+        })?;
+        LutInterpolation::from_native(value)
+            .ok_or(CnaError::InvalidInput("native LUT interpolation is unknown"))
+    }
+
+    /// Sets how the table is sampled between its slices.
+    pub fn set_interpolation(&self, value: LutInterpolation) -> Result<()> {
+        let handle = self.inner.pass.core.get()?;
+        // SAFETY: the handle is owned and the identity is canonical.
+        self.inner.pass.native.check(unsafe {
+            (self.inner.pass.native.engine.color_grade_pass_set_interpolation)(
+                handle,
+                value.to_native(),
+            )
+        })
+    }
+
+    /// The attached strip table, borrowed for as long as the pass lives.
+    ///
+    /// Like every engine query that answers with a handle, this one publishes a
+    /// *new* handle aliasing the pass. The view releases it on drop; a caller
+    /// that only compared it against `CNA_INVALID_HANDLE` would leak one per
+    /// call and only find out at game shutdown.
+    pub fn strip_lut(&self) -> Result<Option<BorrowedTexture2D<'_>>> {
+        let handle = self.inner.pass.core.get()?;
+        let mut value = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.inner.pass.native.check(unsafe {
+            (self.inner.pass.native.engine.color_grade_pass_get_lut)(handle, &mut value)
+        })?;
+        if value == sys::CNA_INVALID_HANDLE {
+            return Ok(None);
+        }
+        Ok(Some(BorrowedTexture2D {
+            native: Arc::clone(&self.inner.pass.native),
+            handle: value,
+            owner: PhantomData,
+        }))
+    }
+
+    /// Whether a strip table is attached.
+    pub fn has_strip_lut(&self) -> Result<bool> {
+        Ok(self.strip_lut()?.is_some())
+    }
+
+    /// The attached volume table, borrowed on the same terms.
+    pub fn volume_lut(&self) -> Result<Option<BorrowedTexture3D<'_>>> {
+        let handle = self.inner.pass.core.get()?;
+        let mut value = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.inner.pass.native.check(unsafe {
+            (self.inner.pass.native.engine.color_grade_pass_get_volume_lut)(handle, &mut value)
+        })?;
+        if value == sys::CNA_INVALID_HANDLE {
+            return Ok(None);
+        }
+        Ok(Some(BorrowedTexture3D {
+            native: Arc::clone(&self.inner.pass.native),
+            handle: value,
+            owner: PhantomData,
+        }))
+    }
+
+    /// Whether a volume table is attached.
+    pub fn has_volume_lut(&self) -> Result<bool> {
+        Ok(self.volume_lut()?.is_some())
+    }
+
+    /// Attaches a strip lookup table, which the pass borrows.
+    pub fn set_strip_lut(&mut self, lut: Option<Texture2D>) -> Result<()> {
+        let handle = self.inner.pass.core.get()?;
+        let texture = match lut.as_ref() {
+            Some(value) => value.handle()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        // SAFETY: the handle is owned and the texture handle is live for the call.
+        self.inner.pass.native.check(unsafe {
+            (self.inner.pass.native.engine.color_grade_pass_set_lut)(handle, texture)
+        })?;
+        self.strip_lut = lut;
+        Ok(())
+    }
+
+    /// Attaches a volume lookup table, which the pass borrows.
+    pub fn set_volume_lut(&mut self, lut: Option<Texture3D>) -> Result<()> {
+        let handle = self.inner.pass.core.get()?;
+        let texture = match lut.as_ref() {
+            Some(value) => value.native_handle()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        // SAFETY: the handle is owned and the texture handle is live for the call.
+        self.inner.pass.native.check(unsafe {
+            (self.inner.pass.native.engine.color_grade_pass_set_volume_lut)(handle, texture)
+        })?;
+        self.volume_lut = lut;
+        Ok(())
+    }
+
+    /// Creates a strip table that grades nothing.
+    ///
+    /// The texture is the caller's: CNA allocates it and hands it over.
+    pub fn create_identity_lut(device: &GraphicsDevice, size: i32) -> Result<Texture2D> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe {
+            (native.engine.color_grade_pass_create_identity_lut)(
+                device.handle()?,
+                size,
+                &mut handle,
+            )
+        })?;
+        Texture2D::from_owned_handle(device, handle)
+    }
+
+    /// The slice count a strip of the given pixel dimensions carries.
+    ///
+    /// A pure function, so a caller can validate a strip before uploading it.
+    pub fn lut_size_for_strip(width: i32, height: i32) -> Result<i32> {
+        let native = Native::process()?;
+        let mut value = 0_i32;
+        // SAFETY: both inputs are by value and the output is a live local.
+        native.check(unsafe {
+            (native.engine.color_grade_pass_lut_size_for_strip)(width, height, &mut value)
+        })?;
+        Ok(value)
+    }
+}
+
+concrete_pass!(
+    AsciiPass,
+    ascii_pass_create,
+    "An ASCII-art pass over CNAEXT's own ASCII post-process effect."
+);
+
+impl AsciiPass {
+    /// The effect the pass draws through, borrowed for as long as the pass lives.
+    ///
+    /// Deliberately **not** a [`BorrowedEffect`]: the handle upstream publishes
+    /// here names CNAEXT's own `AsciiPostProcessEffect`, not a generic
+    /// `Effect`, and releasing it through the generic effect destroy leaves the
+    /// process aborting at exit rather than failing at the call. The type is
+    /// separate so the wrong release cannot be written.
+    pub fn effect(&self) -> Result<Option<BorrowedAsciiEffect<'_>>> {
+        let handle = self.pass.core.get()?;
+        let mut value = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.pass.native.check(unsafe {
+            (self.pass.native.engine.ascii_pass_get_effect)(handle, &mut value)
+        })?;
+        if value == sys::CNA_INVALID_HANDLE {
+            return Ok(None);
+        }
+        Ok(Some(BorrowedAsciiEffect {
+            native: Arc::clone(&self.pass.native),
+            handle: value,
+            owner: PhantomData,
+        }))
+    }
+
+    /// Whether the pass carries an effect to draw through.
+    pub fn has_effect(&self) -> Result<bool> {
+        Ok(self.effect()?.is_some())
+    }
+}
+
+/// A spatial upscaler: a sharpening resample from one size to another.
+pub struct SpatialUpscalePass {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl SpatialUpscalePass {
+    /// Creates an upscaler on a device.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe {
+            (native.engine.spatial_upscale_pass_create)(device.handle()?, &mut handle)
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.spatial_upscale_pass_destroy,
+            released: "the spatial upscale pass has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+        })
+    }
+
+    /// How strongly the resample sharpens.
+    pub fn sharpness(&self) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.spatial_upscale_pass_get_sharpness)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Sets how strongly the resample sharpens.
+    pub fn set_sharpness(&self, value: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the value is by value.
+        self.native
+            .check(unsafe { (self.native.engine.spatial_upscale_pass_set_sharpness)(handle, value) })
+    }
+
+    /// Whether the filter follows edges rather than resampling uniformly.
+    pub fn is_edge_adaptive(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.spatial_upscale_pass_get_edge_adaptive)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Sets whether the filter follows edges.
+    pub fn set_edge_adaptive(&self, value: bool) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the flag is a canonical boolean.
+        self.native.check(unsafe {
+            (self.native.engine.spatial_upscale_pass_set_edge_adaptive)(handle, u8::from(value))
+        })
+    }
+
+    /// Draws the source into the current target at the destination size.
+    pub fn draw(
+        &self,
+        source: &Texture2D,
+        source_width: i32,
+        source_height: i32,
+        destination_width: i32,
+        destination_height: i32,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned, the texture handle is live and the
+        // sizes are by value.
+        self.native.check(unsafe {
+            (self.native.engine.spatial_upscale_pass_draw)(
+                handle,
+                source.handle()?,
+                source_width,
+                source_height,
+                destination_width,
+                destination_height,
+            )
+        })
+    }
+
+    /// Whether a source and destination size pair is a no-op resample.
+    ///
+    /// A pure function, so a caller can skip the pass rather than run an
+    /// identity through it.
+    pub fn is_identity_scale(
+        source_width: i32,
+        source_height: i32,
+        destination_width: i32,
+        destination_height: i32,
+    ) -> Result<bool> {
+        let native = Native::process()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: every input is by value and the output is a live local.
+        native.check(unsafe {
+            (native.engine.spatial_upscale_pass_is_identity_scale)(
+                source_width,
+                source_height,
+                destination_width,
+                destination_height,
+                &mut value,
+            )
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Releases the pass now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for SpatialUpscalePass {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// A one-triangle fullscreen draw, for a pass written outside this chain.
+///
+/// `OWNED`. The effect it draws through is `BORROWED` for the call only, which
+/// is why the draw takes it rather than the pass holding one.
+pub struct FullscreenPass {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl FullscreenPass {
+    /// Creates a fullscreen pass on a device.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native
+            .check(unsafe { (native.engine.fullscreen_pass_create)(device.handle()?, &mut handle) })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.fullscreen_pass_destroy,
+            released: "the fullscreen pass has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+        })
+    }
+
+    /// Draws the source into a destination render target.
+    ///
+    /// A `None` destination is the back buffer, which is what upstream's
+    /// invalid handle means.
+    pub fn draw(
+        &self,
+        source: &Texture2D,
+        destination: Option<&RenderTarget2D>,
+        effect: Option<&Effect>,
+        width: i32,
+        height: i32,
+        sampler: &SamplerState,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let destination_handle = match destination {
+            Some(target) => target.handle()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        let effect_handle = match effect {
+            Some(value) => value.native_handle()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        let state = sampler.native();
+        // SAFETY: the handle is owned, every resource handle is live and the
+        // sampler state is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.fullscreen_pass_draw)(
+                handle,
+                source.handle()?,
+                destination_handle,
+                effect_handle,
+                width,
+                height,
+                &state,
+            )
+        })
+    }
+
+    /// Draws the source over whatever target is already bound.
+    pub fn draw_over_current_target(
+        &self,
+        source: &Texture2D,
+        effect: Option<&Effect>,
+        width: i32,
+        height: i32,
+        sampler: &SamplerState,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let effect_handle = match effect {
+            Some(value) => value.native_handle()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        let state = sampler.native();
+        // SAFETY: the handle is owned, every resource handle is live and the
+        // sampler state is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.fullscreen_pass_draw_over_current_target)(
+                handle,
+                source.handle()?,
+                effect_handle,
+                width,
+                height,
+                &state,
+            )
+        })
+    }
+
+    /// Releases the pass now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for FullscreenPass {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// A render-target binding that is put back when the scope ends.
+///
+/// `OWNED`, and deliberately not `Copy` or `Clone`: the scope is the thing that
+/// restores the previous binding, so ending it twice or letting two values
+/// think they own it would restore the wrong target.
+pub struct ScopedRenderTarget {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl ScopedRenderTarget {
+    /// Records the current binding and binds a destination until the scope ends.
+    ///
+    /// A `None` destination is the back buffer.
+    pub fn begin(device: &GraphicsDevice, destination: Option<&RenderTarget2D>) -> Result<Self> {
+        let native = device.state_native();
+        let destination_handle = match destination {
+            Some(target) => target.handle()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: both handles are live and the output is a live local.
+        native.check(unsafe {
+            (native.engine.scoped_render_target_begin)(
+                device.handle()?,
+                destination_handle,
+                &mut handle,
+            )
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.scoped_render_target_end,
+            released: "the render-target scope has already ended",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+        })
+    }
+
+    /// Whether the scope recorded a previous binding to restore.
+    pub fn has_recorded_previous(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.scoped_render_target_get_has_recorded_previous)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Ends the scope now rather than at drop, reporting any failure.
+    ///
+    /// `Drop` ends it too, and cannot report; this is for a caller that wants
+    /// to know whether the restore worked.
+    pub fn end(self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for ScopedRenderTarget {
     fn drop(&mut self) {
         let _ = self.core.release();
     }

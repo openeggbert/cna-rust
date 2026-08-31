@@ -765,6 +765,13 @@ pub type CNA_ComputeShaderHandle = CNA_Handle;
 pub type CNA_DecalPassHandle = CNA_Handle;
 pub type CNA_SkyboxHandle = CNA_Handle;
 pub type CNA_AtmosphericSkyHandle = CNA_Handle;
+pub type CNA_FullscreenPassHandle = CNA_Handle;
+pub type CNA_ScopedRenderTargetHandle = CNA_Handle;
+pub type CNA_SpatialUpscalePassHandle = CNA_Handle;
+pub type CNA_LutInterpolation = u32;
+
+pub const CNA_LUT_INTERPOLATION_TRILINEAR: CNA_LutInterpolation = 0;
+pub const CNA_LUT_INTERPOLATION_TETRAHEDRAL: CNA_LutInterpolation = 1;
 pub type CNA_GraphicsImageAccess = u32;
 pub type CNA_GraphicsMemoryBarrier = u32;
 
@@ -8400,3 +8407,453 @@ pub type cna_skybox_set_tint_fn = unsafe extern "C" fn(
     CNA_SkyboxHandle, *const CNA_Vector3,
 ) -> CNA_Result;
 pub type cna_skybox_set_yaw_fn = unsafe extern "C" fn(CNA_SkyboxHandle, f32) -> CNA_Result;
+
+// --- CNA engine layer: the screen-space post-process passes (engine_layer.h) ---
+pub type cna_aerial_perspective_pass_air_mass_for_distance_fn = unsafe extern "C" fn(
+    *const CNA_Vector3, f32, f32, *mut f32,
+) -> CNA_Result;
+pub type cna_aerial_perspective_pass_copy_fallback_reason_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_aerial_perspective_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_aerial_perspective_pass_get_intensity_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_aerial_perspective_pass_get_scale_height_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_aerial_perspective_pass_get_sun_direction_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_aerial_perspective_pass_get_turbidity_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_aerial_perspective_pass_set_intensity_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_aerial_perspective_pass_set_scale_height_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_aerial_perspective_pass_set_sun_direction_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *const CNA_Vector3,
+) -> CNA_Result;
+pub type cna_aerial_perspective_pass_set_turbidity_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_aerial_perspective_pass_transmittance_fn = unsafe extern "C" fn(
+    f32, f32, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_ascii_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_ascii_pass_get_effect_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut CNA_AsciiPostProcessEffectHandle,
+) -> CNA_Result;
+pub type cna_bloom_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_bloom_pass_extract_channel_fn = unsafe extern "C" fn(f32, f32, *mut f32) -> CNA_Result;
+pub type cna_bloom_pass_get_intensity_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_bloom_pass_get_iterations_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_bloom_pass_get_threshold_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_bloom_pass_iterations_for_quality_fn = unsafe extern "C" fn(
+    CNA_RenderQuality, *mut i32,
+) -> CNA_Result;
+pub type cna_bloom_pass_reset_targets_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_bloom_pass_set_intensity_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_bloom_pass_set_iterations_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, i32,
+) -> CNA_Result;
+pub type cna_bloom_pass_set_threshold_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_chromatic_aberration_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_chromatic_aberration_pass_get_strength_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_chromatic_aberration_pass_set_strength_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_color_grade_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_color_grade_pass_create_identity_lut_fn = unsafe extern "C" fn(
+    CNA_Handle, i32, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_color_grade_pass_get_interpolation_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut CNA_LutInterpolation,
+) -> CNA_Result;
+pub type cna_color_grade_pass_get_lut_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_color_grade_pass_get_strength_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_color_grade_pass_get_volume_lut_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_color_grade_pass_lut_size_for_strip_fn = unsafe extern "C" fn(
+    i32, i32, *mut i32,
+) -> CNA_Result;
+pub type cna_color_grade_pass_set_interpolation_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, CNA_LutInterpolation,
+) -> CNA_Result;
+pub type cna_color_grade_pass_set_lut_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, CNA_Handle,
+) -> CNA_Result;
+pub type cna_color_grade_pass_set_strength_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_color_grade_pass_set_volume_lut_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, CNA_Handle,
+) -> CNA_Result;
+pub type cna_contact_shadow_pass_combine_visibility_fn = unsafe extern "C" fn(
+    f32, f32, *mut f32,
+) -> CNA_Result;
+pub type cna_contact_shadow_pass_copy_fallback_reason_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_contact_shadow_pass_copy_occlusion_test_glsl_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_contact_shadow_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_contact_shadow_pass_get_bias_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_contact_shadow_pass_get_intensity_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_contact_shadow_pass_get_light_direction_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_contact_shadow_pass_get_max_distance_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_contact_shadow_pass_get_step_count_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_contact_shadow_pass_get_thickness_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_contact_shadow_pass_is_occluded_fn = unsafe extern "C" fn(
+    f32, f32, f32, f32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_contact_shadow_pass_set_bias_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_contact_shadow_pass_set_intensity_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_contact_shadow_pass_set_light_direction_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *const CNA_Vector3,
+) -> CNA_Result;
+pub type cna_contact_shadow_pass_set_max_distance_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_contact_shadow_pass_set_step_count_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, i32,
+) -> CNA_Result;
+pub type cna_contact_shadow_pass_set_thickness_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_depth_of_field_pass_circle_of_confusion_millimetres_fn = unsafe extern "C" fn(
+    f32, f32, f32, f32, *mut f32,
+) -> CNA_Result;
+pub type cna_depth_of_field_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_depth_of_field_pass_get_f_number_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_depth_of_field_pass_get_focal_length_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_depth_of_field_pass_get_focus_distance_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_depth_of_field_pass_get_max_radius_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_depth_of_field_pass_set_f_number_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_depth_of_field_pass_set_focal_length_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_depth_of_field_pass_set_focus_distance_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_depth_of_field_pass_set_max_radius_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_film_grain_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_film_grain_pass_get_intensity_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_film_grain_pass_set_intensity_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_fullscreen_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_FullscreenPassHandle,
+) -> CNA_Result;
+pub type cna_fullscreen_pass_destroy_fn = unsafe extern "C" fn(
+    CNA_FullscreenPassHandle,
+) -> CNA_Result;
+pub type cna_fullscreen_pass_draw_fn = unsafe extern "C" fn(
+    CNA_FullscreenPassHandle, CNA_Handle, CNA_Handle, CNA_EffectHandle, i32, i32, *const CNA_SamplerState,
+) -> CNA_Result;
+pub type cna_fullscreen_pass_draw_over_current_target_fn = unsafe extern "C" fn(
+    CNA_FullscreenPassHandle, CNA_Handle, CNA_EffectHandle, i32, i32, *const CNA_SamplerState,
+) -> CNA_Result;
+pub type cna_height_fog_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_height_fog_pass_get_base_height_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_height_fog_pass_get_color_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_height_fog_pass_get_density_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_height_fog_pass_get_falloff_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_height_fog_pass_optical_depth_fn = unsafe extern "C" fn(
+    f32, f32, f32, f32, f32, f32, *mut f32,
+) -> CNA_Result;
+pub type cna_height_fog_pass_set_base_height_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_height_fog_pass_set_color_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *const CNA_Vector3,
+) -> CNA_Result;
+pub type cna_height_fog_pass_set_density_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_height_fog_pass_set_falloff_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_lens_flare_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_lens_flare_pass_get_dispersal_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_lens_flare_pass_get_intensity_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_lens_flare_pass_get_threshold_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_lens_flare_pass_set_dispersal_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_lens_flare_pass_set_intensity_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_lens_flare_pass_set_threshold_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_light_shaft_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_light_shaft_pass_get_decay_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_light_shaft_pass_get_intensity_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_light_shaft_pass_get_light_screen_position_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut CNA_Vector2,
+) -> CNA_Result;
+pub type cna_light_shaft_pass_get_threshold_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_light_shaft_pass_set_decay_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_light_shaft_pass_set_intensity_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_light_shaft_pass_set_light_screen_position_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *const CNA_Vector2,
+) -> CNA_Result;
+pub type cna_light_shaft_pass_set_threshold_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_motion_blur_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_motion_blur_pass_get_max_distance_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_motion_blur_pass_get_strength_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_motion_blur_pass_set_max_distance_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_motion_blur_pass_set_strength_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_scoped_render_target_begin_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Handle, *mut CNA_ScopedRenderTargetHandle,
+) -> CNA_Result;
+pub type cna_scoped_render_target_end_fn = unsafe extern "C" fn(
+    CNA_ScopedRenderTargetHandle,
+) -> CNA_Result;
+pub type cna_scoped_render_target_get_has_recorded_previous_fn = unsafe extern "C" fn(
+    CNA_ScopedRenderTargetHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_spatial_upscale_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_SpatialUpscalePassHandle,
+) -> CNA_Result;
+pub type cna_spatial_upscale_pass_destroy_fn = unsafe extern "C" fn(
+    CNA_SpatialUpscalePassHandle,
+) -> CNA_Result;
+pub type cna_spatial_upscale_pass_draw_fn = unsafe extern "C" fn(
+    CNA_SpatialUpscalePassHandle, CNA_Handle, i32, i32, i32, i32,
+) -> CNA_Result;
+pub type cna_spatial_upscale_pass_get_edge_adaptive_fn = unsafe extern "C" fn(
+    CNA_SpatialUpscalePassHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_spatial_upscale_pass_get_sharpness_fn = unsafe extern "C" fn(
+    CNA_SpatialUpscalePassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_spatial_upscale_pass_is_identity_scale_fn = unsafe extern "C" fn(
+    i32, i32, i32, i32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_spatial_upscale_pass_set_edge_adaptive_fn = unsafe extern "C" fn(
+    CNA_SpatialUpscalePassHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_spatial_upscale_pass_set_sharpness_fn = unsafe extern "C" fn(
+    CNA_SpatialUpscalePassHandle, f32,
+) -> CNA_Result;
+pub type cna_ssao_pass_copy_kernel_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut CNA_Vector3, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_ssao_pass_copy_occlusion_glsl_fn = unsafe extern "C" fn(
+    CNA_Bool, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_ssao_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_ssao_pass_get_half_resolution_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_ssao_pass_get_intensity_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_ssao_pass_get_radius_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_ssao_pass_get_sample_count_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_ssao_pass_reset_targets_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_ssao_pass_sample_count_for_quality_fn = unsafe extern "C" fn(
+    CNA_RenderQuality, *mut i32,
+) -> CNA_Result;
+pub type cna_ssao_pass_set_half_resolution_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_ssao_pass_set_intensity_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_ssao_pass_set_radius_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_ssao_pass_set_sample_count_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, i32,
+) -> CNA_Result;
+pub type cna_ssr_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_ssr_pass_get_depth_bias_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_ssr_pass_get_edge_fade_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_ssr_pass_get_intensity_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_ssr_pass_get_max_distance_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_ssr_pass_get_roughness_blur_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_ssr_pass_get_step_count_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_ssr_pass_get_thickness_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_ssr_pass_set_depth_bias_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_ssr_pass_set_edge_fade_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_ssr_pass_set_intensity_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_ssr_pass_set_max_distance_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_ssr_pass_set_roughness_blur_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_ssr_pass_set_step_count_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, i32,
+) -> CNA_Result;
+pub type cna_ssr_pass_set_thickness_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_volumetric_fog_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_volumetric_fog_pass_get_anisotropy_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_volumetric_fog_pass_get_density_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_volumetric_fog_pass_get_range_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_volumetric_fog_pass_set_anisotropy_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_volumetric_fog_pass_set_density_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_volumetric_fog_pass_set_light_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, CNA_ShadowMapHandle, *const CNA_Vector3, *const CNA_Vector3,
+) -> CNA_Result;
+pub type cna_volumetric_fog_pass_set_range_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
