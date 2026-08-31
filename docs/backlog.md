@@ -98,7 +98,44 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-TEMPLATE-002 | Template modern-extension canary | `--extensions-smoke` | DONE |
 | RUST-TEMPLATE-003 | Generated standalone project on the live ABI | re-verified on ABI 0.21; the canary caught the generator dropping `cna-sys`'s new build script, now taken from the manifest | DONE |
 
-## Qualification, 2026-08-31
+## Qualification, 2026-08-31 (ABI 0.21 milestone)
+
+Run against the HEADLESS **ABI 0.21** artifact with SHA-256
+`3a976d2494580ca9af45fbb2be30c13b01d05477f98ae80796ef26898c97d812`, built out
+of tree from `cnanext` at `599d14e5` (clean) and `sharp-runtimenext` at
+`4a49afb0` (clean). Library exports and header declarations agree exactly at
+4,054.
+
+| Gate | Result |
+|---|---|
+| `cargo check --workspace --all-targets` | PASS, no warnings |
+| `cargo test --workspace --all-features` | PASS: 51 suites, 156 assertions, 0 failures |
+| `cargo test --workspace` (dynamic linkage) | PASS: 40 suites, 133 assertions |
+| `cargo test --workspace --no-default-features --features direct-link` | PASS: 40 suites, 133 assertions -- identical |
+| `cargo doc --workspace --no-deps` | PASS, no warnings |
+| native ABI verifier | PASS: 1,591 functions, 5,488 prototype positions, 2,272 C/Rust measurements, 121 layouts, 121 layout field sets, 23 callbacks, 790 constants, 1,587 symbol acquisitions, 1,591 linked declarations, 0 findings, 0 unaudited |
+| ABI mutation tests | PASS: 33 |
+| API-compat mutation tests | PASS: 28 |
+| canonical route inventory | PASS: 4,054 canonical, 1,591 bound, 0 unmapped, 0 stale overrides, 0 unused rules |
+| runtime capability provenance | PASS: 35 rows, artifact and ABI 0.21 confirmed |
+| selected XNA profile (strict) | PASS: 257 types, 2,964 members, 0 diagnostics, 0 unmeasured categories |
+| complete XNA runtime profile | PASS: 331 types, 3,640 members, 0 missing, 0 diagnostics |
+| Content Pipeline profile | 125 missing types -- **stated product boundary**, see [content-pipeline-decision.md](content-pipeline-decision.md) |
+| superset discovery profile | 125 missing types, all of them the pipeline |
+| leak verifier | PASS: 0 diagnostics, empty allowlist, 0 out-of-profile types, 0 unmeasured |
+| MSRV source audit | PASS |
+| packaged-source consumer | PASS: 7 sys files, 158 crate files, 0 workspace path leaks |
+| direct-link consumer | PASS: links `libcna_c_api.so`, imports no `dlopen`/`dlsym`/`dlclose`, runs a real `GraphicsDevice` lifecycle |
+| template: build, 60, 600, `--extensions-smoke` | PASS |
+| generated standalone project: build, 60, 600, `--extensions-smoke`, no developer path | PASS |
+| `git diff --check`, both writable repositories | clean |
+| `cnanext` / `sharp-runtimenext` modified by this session | 0 files, both clean |
+| MSRV 1.74 runtime | NOT_RUN -- no 1.74 toolchain on this host |
+| `rustfmt`, `clippy` | NOT_AVAILABLE |
+| sanitizers | NOT_RUN -- no instrumented artifact was built |
+| WebAssembly target | NOT_AVAILABLE -- no wasm std installed, no `rustup` to add one |
+
+## Qualification, 2026-08-31 (previous, ABI 0.20 milestone)
 
 Run against the HEADLESS ABI 0.20 artifact with SHA-256
 `092b2d80a775f39a6ad872d084bc09492576c82ac33641faeb4a3036c7fc347b`, built out

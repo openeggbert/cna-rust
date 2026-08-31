@@ -70,34 +70,16 @@
       "rationale": "CNA device layer: power, locale, clipboard, dialogs, tray, camera, vibration"
     },
     {
-      "id": "input-haptics",
-      "category": "CNA_EXTENSION_BACKING",
-      "header": "input_haptics.h",
-      "rationale": "force-feedback devices have no XNA 4.0 counterpart"
-    },
-    {
       "id": "input-joystick",
       "category": "CNA_EXTENSION_BACKING",
       "header": "input_joystick.h",
       "rationale": "raw joystick enumeration has no XNA 4.0 counterpart"
     },
     {
-      "id": "input-text",
-      "category": "CNA_EXTENSION_BACKING",
-      "header": "input_text.h",
-      "rationale": "text-input events have no XNA 4.0 counterpart"
-    },
-    {
       "id": "input-devices",
       "category": "CNA_EXTENSION_BACKING",
       "header": "input_devices.h",
       "rationale": "device hot-plug, clipboard and sensor enumeration beyond XNA 4.0"
-    },
-    {
-      "id": "input-cursor",
-      "category": "CNA_EXTENSION_BACKING",
-      "header": "input_cursor.h",
-      "rationale": "mouse-cursor objects have no XNA 4.0 counterpart"
     },
     {
       "id": "reflective-content",
@@ -322,14 +304,6 @@
     "cna_object_dictionary_ext_copy_runtime_type_name": {
       "category": "CNA_EXTENSION_BACKING",
       "rationale": "not reflection: the retained managed identity of a processor-written Model.Tag, which upstream contrasts with the diagnostic C++ spelling and which a reader must branch on"
-    },
-    "cna_cnb_loader_registry_get_registered_type_name_size": {
-      "category": "CNA_EXTENSION_BACKING",
-      "rationale": "not reflection: the canonical name a .cnb asset type id was registered under, which is loader-registry data"
-    },
-    "cna_cnb_loader_registry_copy_registered_type_name": {
-      "category": "CNA_EXTENSION_BACKING",
-      "rationale": "not reflection: the canonical name a .cnb asset type id was registered under, which is loader-registry data"
     },
     "cna_cnb_cnj_result_get_asset_type_name_size": {
       "category": "CNA_EXTENSION_BACKING",

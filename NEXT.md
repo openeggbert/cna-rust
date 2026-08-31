@@ -1,120 +1,104 @@
 # CNA-Rust next work
 
-## 2026-08-31 — the complete XNA 4.0 Windows runtime profile is closed
+## 2026-08-31 — ABI 0.21, owned devices, CNB content, and two linkage modes
 
-All ten retained Microsoft runtime assemblies are now projected at strict zero.
-The selected seven-assembly profile remains the hard gate and is unchanged; the
-only structural gap left in the whole retained corpus is the design-time
-Content Pipeline.
+The previous milestone closed the complete XNA 4.0 runtime profile. This one
+kept that at strict zero and moved everything else: the binding now admits live
+ABI 0.21, constructs graphics devices of its own, reads and writes CNA's
+compiled content format, and fills its function tables either through the
+platform loader or through symbols the linker resolved.
 
 ```text
-CNANEXT_HEAD=17b5a90a0878f3f44c23bc8e3197d5d30373dc72 (dirty: another agent's WIP)
-SHARP_RUNTIMENEXT_HEAD=4a49afb0cfe6a41e6e0af0bb62dc5175976731bb
+CNANEXT_HEAD=599d14e54e073b566d77b3d6fb30ac52d3d810b7 (clean)
+SHARP_RUNTIMENEXT_HEAD=4a49afb0cfe6a41e6e0af0bb62dc5175976731bb (clean)
 
-ABI=0.20.0 / 0x1400
-LIBRARY_SHA256=092b2d80a775f39a6ad872d084bc09492576c82ac33641faeb4a3036c7fc347b
-LIBRARY_EXPORTS=4051
-HEADER_EXPORTS=4054            # the live headers moved during the milestone
+ABI=0.21.0 / 0x1500          # was 0.20.0
+LIBRARY_SHA256=3a976d2494580ca9af45fbb2be30c13b01d05477f98ae80796ef26898c97d812
+LIBRARY_EXPORTS=4054
+HEADER_EXPORTS=4054          # artifact and headers now agree exactly
+ENGINE_LAYER_VERSION=2
 
-ABI_FUNCTIONS=1326             # was 886
-PROTOTYPE_TYPE_POSITIONS=4574  # was 3019
-C_RUST_MEASUREMENTS=1845       # was 1236
-LAYOUTS=98                     # was 71
-CALLBACKS=19                   # was 8
-CONSTANTS=665                  # was 397
-SYMBOL_ACQUISITIONS=1119       # new gate
-SYMBOL_TYPE_MISMATCHES=0
+ABI_FUNCTIONS=1591           # was 1326
+PROTOTYPE_TYPE_POSITIONS=5488  # was 4574
+C_RUST_MEASUREMENTS=2272     # was 1845
+LAYOUTS=121                  # was 98
+LAYOUT_FIELD_SETS_CHECKED=121  # new gate
+CALLBACKS=23                 # was 19
+CONSTANTS=790                # was 665
+SYMBOL_ACQUISITIONS=1587     # was 1119; +203 the gate had never seen
+LINKED_DECLARATIONS=1591     # new: the direct-link mode's typed externs
 ABI_FINDINGS=0
 UNAUDITED_DECLARATIONS=0
 
 CANONICAL_ROUTES=4054
-RUST_SYS_BOUND=1326
-CNA_EXTENSION_BACKING=1705
-STRICT_XNA_BACKING=275
+RUST_SYS_BOUND=1591          # was 1326
+CNA_EXTENSION_BACKING=1452
+STRICT_XNA_BACKING=271
 MANAGED_BY_DESIGN=577
-UPSTREAM_NOT_USEFUL_TO_RUST=126
+UPSTREAM_NOT_USEFUL_TO_RUST=118  # was 126; eight were misclassified
 TOOLING_ONLY=42
 PLATFORM_ONLY=3
 DEFERRED_RUNTIME=0
 UNMAPPED_ROUTES=0
 
 PROFILE_SELECTED_DIAGNOSTICS=0
-PROFILE_FULL_MISSING_TYPES=0   # was 40
+PROFILE_FULL_MISSING_TYPES=0
 PROFILE_FULL_DIAGNOSTICS=0
-PROFILE_PIPELINE_MISSING_TYPES=125
-PROFILE_SUPERSET_MISSING_TYPES=125  # was 165
+PROFILE_PIPELINE_MISSING_TYPES=125   # stated product boundary, not a backlog
+PROFILE_SUPERSET_MISSING_TYPES=125
 LEAK_DIAGNOSTICS=0
 
-WORKSPACE_TEST_SUITES=45
-WORKSPACE_TEST_ASSERTIONS=115
+WORKSPACE_TEST_SUITES=51
+WORKSPACE_TEST_ASSERTIONS=156
 ```
 
-Evidence: [docs/graphics-evidence.md](docs/graphics-evidence.md) for the ABI
-0.20 capability gaps the version migration left refused,
-[docs/backlog.md](docs/backlog.md) for the per-item status, and the three
-native suites `gamer_services_native`, `net_native` and `native_stress`.
+### What this milestone found
 
-### What the runtime taught this milestone
+Four defects that had already shipped, each found by writing a test that
+asserted a value rather than a success code:
 
-Several behaviours were measured rather than assumed, and each is asserted by a
-test that would fail if the projection faked it:
+- **`CNA_CnbReadLimits` was missing a field.** Six declared bounds against
+  seven in C; padding hid it exactly, so `sizeof`, alignment and every declared
+  offset agreed. The layout gate could not have caught it, so the verifier now
+  asks Clang for each structure's real field list — 121 checked.
+- **203 media routes were outside the symbol gate entirely.** They were `usize`
+  slots each call site transmuted, so `SYMBOL_TYPE_MISMATCH` had no declared
+  alias to check. Typed now; all 203 proved correctly paired.
+- **The symbol gate then went blind.** Moving call sites to identifiers broke
+  its regex, and it reported zero acquisitions and zero mismatches — a clean
+  pass. There is a floor under the scan now.
+- **Tightening one `.cnb` read bound zeroed the others,** because `None` was
+  sent as `0` and CNA reads `0` as a literal limit.
 
-- `AvatarDescription.CreateRandom` randomizes nothing -- real XNA answers an
-  all-zero, invalid description, and the body-type overload validates its
-  argument and then ignores it.
-- `AvatarRenderer.BindPose` raises unless the renderer reached `Ready`, which
-  nothing in this runtime ever sets.
-- `NetworkSession.Create` needs a signed-in gamer, because it makes the first
-  one the host; `StartGame`/`EndGame` are queued and land on `Update`; and
-  `EndGame` returns the session to `Lobby`, not `Ended`.
-- `Guide.IsScreenSaverEnabled` belongs to the platform's display layer, which a
-  headless host does not have: CNA answers `true` and its setter changes
-  nothing.
-- `Guide.EndShowMessageBox` on an unanswered box is CNA's state error, not a
-  fabricated button press.
+And one in the tooling: the project generator dropped `cna-sys`'s new build
+script, which the generated-project canary caught.
 
-Three new upstream blockers were found and recorded rather than worked around:
-`NetworkGamer` cannot answer the `Gamer` members it inherits, a
-`LocalNetworkGamer` cannot answer its signed-in gamer, and a genuine second
-machine needs a second host.
+### Two decisions, both recorded with evidence
 
-Two upstream blockers were re-measured on cnanext `17b5a90a` and still stand:
-`GraphicsDeviceManager.RankDevices` has no candidate-ranking route, and
-`CNA_GameCallbacks` is still copied at create with no context-rebind route.
+- [`docs/content-pipeline-decision.md`](docs/content-pipeline-decision.md) —
+  the 125 design-time types are **out of scope**. Seventeen cannot be projected
+  faithfully at all, and CNA's own `.cnj`/`.cnb` tooling already does the job,
+  through routes this binding now uses.
+- [`docs/engine-layer-scope.md`](docs/engine-layer-scope.md) — the engine layer
+  is bound one slice at a time, and a slice qualifies when its semantics can be
+  asserted exactly. 808 routes remain, blocked on a GPU-backed artifact rather
+  than on anything here.
 
 ## Do next
 
-Work the backlog in [docs/backlog.md](docs/backlog.md). The highest-value ready
-items, in order:
+Everything locally actionable is done: `docs/backlog.md` has no `READY` row.
+What remains is blocked, and each row says on what.
 
-1. `RUST-ABI-008`: `cna_graphics_device_create` exists at ABI 0.20, so XNA's
-   public `GraphicsDevice` constructor no longer has to refuse. It is a real
-   ownership design -- an independently owned device beside the Game-owned one
-   -- rather than a message fix.
-2. `RUST-EXT-013`: `.cnb` Model and the loader registry, then sprite font and
-   sound effect.
-3. `RUST-PLATFORM-004`: a direct/static linkage mode, the prerequisite for any
-   WebAssembly route. The new `SYMBOL_TYPE_MISMATCH` gate and the generated
-   `GamerServicesApi`/`NetApi` tables are the shape to generalise: one canonical
-   list, two acquisition modes.
-4. `RUST-EXT-014`, `RUST-EXT-009`, `RUST-EXT-005`, `RUST-EXT-010`: haptics and
-   text input, sensors, PBR and render-pipeline settings, and one coherent
-   engine-layer vertical slice.
-5. `RUST-BEHAVIOR-007`: re-measure media catalogs, picture tokens and
-   `SavePicture` against the live ABI.
-6. `RUST-XNA-004`: decide whether the design-time Content Pipeline belongs in
-   this crate at all. 125 types either way.
-
-## Toolchain reality on this host
-
-```text
-rustc/cargo 1.85.0 (source tarball)
-rustfmt=NOT_AVAILABLE
-clippy=NOT_AVAILABLE
-rustup=NOT_AVAILABLE
-MSRV 1.74 toolchain=NOT_INSTALLED -> MSRV_RUNTIME_NOT_RUN
-MSRV source denylist=PASS (tools/msrv/audit.py)
-sanitizers=NOT_RUN
-```
-
-Record those as `NOT_AVAILABLE`, never as passed.
+1. **A GPU-backed qualified artifact** is the single highest-value unblock. It
+   turns most of the 224 engine-layer families from "constructs" into
+   "constructs and can be asserted", and it is what
+   `docs/engine-layer-scope.md` names as the trigger.
+2. **A wasm Rust target.** The binding's side is done — `direct-link` works and
+   is verified — so `RUST-PLATFORM-003` now waits only on a toolchain this host
+   does not have and that this session may not install.
+3. **Re-measure the three standing upstream blockers** when cnanext moves.
+   `RUST-BEHAVIOR-011` was one of four and is now fixed; the others are
+   `runtime.h`'s missing context rebind, `runtime_graphics_manager.h`'s missing
+   ranking route, and `cna_gamer_*` on a network gamer handle.
+4. **A second machine** for `RUST-BEHAVIOR-012`, and **real hardware** for the
+   sensor, haptic and audio-backend rows.

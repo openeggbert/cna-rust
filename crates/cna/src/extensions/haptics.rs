@@ -167,7 +167,7 @@ fn view(value: &str) -> sys::CNA_StringView {
 /// One enumerated haptic device, before it is opened.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HapticInfo {
-    /// The device identifier, which is what [`open`] takes.
+    /// The device identifier, which is what [`HapticDevice::open`] takes.
     ///
     /// The index it was enumerated at is not a durable reference, the same way
     /// it is not for input devices; the identifier is.
