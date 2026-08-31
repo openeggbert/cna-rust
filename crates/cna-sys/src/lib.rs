@@ -582,6 +582,8 @@ pub type CNA_CnbTextureFormat = u32;
 pub type CNA_CnbDocumentHandle = CNA_Handle;
 pub type CNA_CnbTextureDataHandle = CNA_Handle;
 pub type CNA_CnbModelDataHandle = CNA_Handle;
+pub type CNA_CnbLoaderHandle = CNA_Handle;
+pub type CNA_CnbWriterHandle = CNA_Handle;
 pub type CNA_CnbEffectKind = u32;
 pub type CNA_CnbMaterialTextureSlot = u32;
 pub type CNA_PowerState = u32;
@@ -1346,6 +1348,31 @@ pub struct CNA_CnbTextureInfo {
     pub face_count: u32,
     pub mip_count: u32,
     pub representation_count: u32,
+}
+
+/// Turns one validated `.cnb` container into a caller-owned object.
+///
+/// The document and content-manager handles are callback-scoped borrows: both
+/// are invalidated before the callback returns and neither has a destroy
+/// operation. `out_object` is the caller's own opaque pointer, which this ABI
+/// never dereferences, copies or frees.
+pub type CNA_CnbLoaderCallback = Option<
+    unsafe extern "C" fn(
+        *mut c_void,
+        CNA_CnbDocumentHandle,
+        CNA_Handle,
+        CNA_StringView,
+        *mut *mut c_void,
+    ) -> CNA_Result,
+>;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_ContentManagerCreateInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub root_directory: CNA_StringView,
+    pub reserved: u64,
 }
 
 #[repr(C)]
@@ -4329,6 +4356,48 @@ pub type cna_cnb_texture_data_get_level_count_fn = unsafe extern "C" fn(
 pub type cna_cnb_texture_data_copy_level_fn = unsafe extern "C" fn(
     CNA_CnbTextureDataHandle, u64, u64, *mut u8, u64, *mut u64,
 ) -> CNA_Result;
+pub type cna_cnb_writer_create_fn = unsafe extern "C" fn(
+    u32, u32, *mut CNA_CnbWriterHandle,
+) -> CNA_Result;
+pub type cna_cnb_writer_destroy_fn = unsafe extern "C" fn(CNA_CnbWriterHandle) -> CNA_Result;
+pub type cna_cnb_writer_set_metadata_fn = unsafe extern "C" fn(
+    CNA_CnbWriterHandle, CNA_StringView, CNA_StringView,
+) -> CNA_Result;
+pub type cna_cnb_writer_add_chunk_fn = unsafe extern "C" fn(
+    CNA_CnbWriterHandle, CNA_CnbChunkId, *const u8, u64, u32, u32,
+) -> CNA_Result;
+pub type cna_cnb_writer_build_fn = unsafe extern "C" fn(
+    CNA_CnbWriterHandle, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_loader_registry_register_fn = unsafe extern "C" fn(
+    u32, CNA_StringView, CNA_CnbLoaderCallback, *mut c_void,
+) -> CNA_Result;
+pub type cna_cnb_loader_registry_remove_fn = unsafe extern "C" fn(u32, *mut CNA_Bool) -> CNA_Result;
+pub type cna_cnb_loader_registry_clear_fn = unsafe extern "C" fn() -> CNA_Result;
+pub type cna_cnb_loader_registry_is_registered_fn = unsafe extern "C" fn(
+    u32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_cnb_loader_registry_find_fn = unsafe extern "C" fn(
+    u32, *mut CNA_Bool, *mut CNA_CnbLoaderHandle,
+) -> CNA_Result;
+pub type cna_cnb_loader_registry_get_registered_type_name_size_fn = unsafe extern "C" fn(
+    u32, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_loader_registry_copy_registered_type_name_fn = unsafe extern "C" fn(
+    u32, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_loader_registry_resolve_for_document_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut CNA_CnbLoaderHandle,
+) -> CNA_Result;
+pub type cna_cnb_loader_registry_register_builtins_fn = unsafe extern "C" fn() -> CNA_Result;
+pub type cna_cnb_loader_destroy_fn = unsafe extern "C" fn(CNA_CnbLoaderHandle) -> CNA_Result;
+pub type cna_cnb_loader_invoke_fn = unsafe extern "C" fn(
+    CNA_CnbLoaderHandle, CNA_CnbDocumentHandle, CNA_Handle, CNA_StringView, *mut *mut c_void,
+) -> CNA_Result;
+pub type cna_content_manager_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *const CNA_ContentManagerCreateInfo, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_content_manager_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
 pub type cna_cnb_read_limits_init_fn = unsafe extern "C" fn(*mut CNA_CnbReadLimits) -> CNA_Result;
 pub type cna_cnb_model_create_fn = unsafe extern "C" fn(*mut CNA_CnbModelDataHandle) -> CNA_Result;
 pub type cna_cnb_model_destroy_fn = unsafe extern "C" fn(CNA_CnbModelDataHandle) -> CNA_Result;

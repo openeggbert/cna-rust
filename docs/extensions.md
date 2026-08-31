@@ -366,3 +366,63 @@ shipped:
 CNA validates model geometry properly: an index that addresses a vertex the
 part does not have is refused at decode time with the chunk, offset, part and
 index named. The fixture builds real indices because of it.
+
+## `.cnb` loader registry (RUST-EXT-013b, 2026-08-31)
+
+A Rust game can now define its own asset type, author a `.cnb` file of that
+type, install a Rust loader for it, and get its own value back out -- with no
+`Game` in the process. That last part is what `RUST-ABI-008` unlocked:
+`cna_cnb_loader_invoke` requires a native content manager, a native content
+manager requires a graphics device, and until this milestone the only graphics
+device was a running game's.
+
+```text
+GraphicsDevice::new  ->  NativeContentManager::new
+CnbLoaderRegistry::register("Game.MyAsset", loader)
+CnbWriter::new(AssetTypeId::custom("Game.MyAsset"), 1) -> bytes
+CnbDocument::parse(bytes) -> resolve_for_document -> invoke -> Arc<dyn Any>
+```
+
+### Ownership, stated rather than implied
+
+- **Registration owner.** `CnbLoaderRegistration` is an RAII handle. CNA's
+  registrations are process-wide and outlive any content manager, so this is
+  what bounds one; dropping it withdraws the loader.
+- **Produced objects.** CNA never dereferences, copies or frees a loader's
+  object -- upstream says its lifetime "is the caller's own business" -- so the
+  registration owns every object its loader produced and releases them all when
+  it drops. A load whose object CNA hands to C++ code Rust never sees again is
+  still released, at the latest with the registration.
+- **Callback context.** The context handed to CNA is the asset type identifier
+  by value, not a pointer. There is therefore no context lifetime to get wrong:
+  a stale registration finds nothing in the table and fails the load instead of
+  dereferencing freed memory.
+- **Document lifetime.** The document reaching a loader is borrowed for exactly
+  that call. `CnbDocument` carries a `DocumentOwner`, and the callback-scoped
+  form never calls destroy -- CNA invalidates the handle when the callback
+  returns and it has no destroy operation.
+- **Callback thread.** Whatever thread performs the load, so `CnbLoader` is
+  `Send + Sync + 'static`.
+- **Panic containment.** A panic is caught at the boundary and becomes a failed
+  load. No Rust unwind crosses into C.
+- **Raw pointers.** None are public. The trait takes `&CnbDocument` and returns
+  `Arc<dyn Any + Send + Sync>`; no `void*`, callback pointer or native vtable
+  reaches a safe consumer.
+
+### What the round trip proved
+
+`cna_cnb_loader_registry_resolve_for_document` really does check identity, not
+just the number, and CNA is stricter about it than the header's load-time
+description suggests: **the writer refuses to author an ambiguous file at all.**
+Building a custom-typed document whose declared name does not hash to its
+identifier fails at build time as a "hash collision", and so does building a
+custom-typed document with no canonical name -- with a message naming the call
+to make instead. Both halves of the collision defence therefore sit where the
+file is written, and this API cannot produce an ambiguous custom-typed document.
+The load-time refusal upstream documents still matters for a file some other
+toolchain wrote; it is not reachable from here, and the test says so rather than
+claiming coverage it does not have.
+
+`cna_cnb_loader_invoke` with no content manager answers `INVALID_HANDLE` rather
+than manufacturing one, which is what upstream intends: a placeholder manager
+would install the built-in loaders as a side effect of an invoke.

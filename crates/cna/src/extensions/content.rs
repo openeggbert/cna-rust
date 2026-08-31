@@ -13,13 +13,17 @@
 
 #![allow(clippy::missing_errors_doc)]
 
+use core::ffi::c_void;
+use std::any::Any;
+use std::collections::HashMap;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use cna_sys as sys;
 
 use crate::error::{CnaError, Result};
-use crate::graphics::SurfaceFormat;
+use crate::graphics::{GraphicsDevice, SurfaceFormat};
 use crate::native::runtime::read_string;
 use crate::native::Native;
 
@@ -104,11 +108,23 @@ pub struct Metadata {
     pub content_name: String,
 }
 
+/// How a `CnbDocument` relates to CNA's native document.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DocumentOwner {
+    /// This value parsed the document and destroys it.
+    Owned,
+    /// CNA lent the handle for the duration of one loader callback. It is
+    /// invalidated before that callback returns and has no destroy operation,
+    /// so this value must not release it.
+    CallbackScoped,
+}
+
 /// One parsed `.cnb` document.
 #[derive(Debug)]
 pub struct CnbDocument {
     native: Arc<Native>,
     handle: sys::CNA_CnbDocumentHandle,
+    owner: DocumentOwner,
 }
 
 /// Texture pixels decoded from, or destined for, a `.cnb` document.
@@ -295,7 +311,11 @@ impl CnbDocument {
                 &mut handle,
             )
         })?;
-        Ok(Self { native, handle })
+        Ok(Self {
+            native,
+            handle,
+            owner: DocumentOwner::Owned,
+        })
     }
 
     /// Parses a `.cnb` file from the filesystem.
@@ -316,7 +336,11 @@ impl CnbDocument {
         native.check(unsafe {
             (native.runtime.cnb_document_parse_file)(view, limits_pointer, &mut handle)
         })?;
-        Ok(Self { native, handle })
+        Ok(Self {
+            native,
+            handle,
+            owner: DocumentOwner::Owned,
+        })
     }
 
     /// The name the document was parsed under, for diagnostics.
@@ -458,6 +482,10 @@ impl CnbDocument {
 
 impl Drop for CnbDocument {
     fn drop(&mut self) {
+        if self.owner == DocumentOwner::CallbackScoped {
+            // CNA owns this one and invalidates it when the callback returns.
+            return;
+        }
         // SAFETY: the handle is owned by this value and released exactly once.
         let _ = unsafe { (self.native.runtime.cnb_document_destroy)(self.handle) };
     }
@@ -490,7 +518,10 @@ impl CnbTextureData {
                 &mut handle,
             )
         })?;
-        Ok(Self { native, handle })
+        Ok(Self {
+            native,
+            handle,
+        })
     }
 
     /// The texture's dimensions, faces, mip levels and representations.
@@ -839,7 +870,10 @@ impl CnbModel {
         let mut handle = sys::CNA_INVALID_HANDLE;
         // SAFETY: the output is a live local receiving a newly owned handle.
         native.check(unsafe { (native.runtime.cnb_model_create)(&mut handle) })?;
-        Ok(Self { native, handle })
+        Ok(Self {
+            native,
+            handle,
+        })
     }
 
     /// Sets the two policy facts that travel with the content.
@@ -1334,5 +1368,510 @@ const fn decode_parent(value: i32) -> Option<u64> {
         None
     } else {
         Some(value as u64)
+    }
+}
+
+/// Builds one `.cnb` document.
+///
+/// This is how a game authors an asset of its **own** type: the built-in
+/// `encode` routes cover CNA's types, and this covers everything else. The
+/// asset type identifier must be the custom one
+/// [`AssetTypeId::custom`] mints for the type's canonical name, and the
+/// metadata must carry that same name -- CNA compares it against the
+/// registered name before dispatching a loader.
+#[derive(Debug)]
+pub struct CnbWriter {
+    native: Arc<Native>,
+    handle: sys::CNA_CnbWriterHandle,
+}
+
+impl CnbWriter {
+    /// Starts a document for one asset type and schema version.
+    pub fn new(asset_type: AssetTypeId, asset_schema_version: u32) -> Result<Self> {
+        let native = Native::process()?;
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the output is a live local receiving a newly owned handle.
+        native.check(unsafe {
+            (native.runtime.cnb_writer_create)(asset_type.value(), asset_schema_version, &mut handle)
+        })?;
+        Ok(Self { native, handle })
+    }
+
+    /// Records the document's canonical type name and content name.
+    ///
+    /// The type name is load-bearing for a custom type: CNA refuses to dispatch
+    /// a custom-typed file that carries no name, and refuses one whose name
+    /// disagrees with the registered loader's, because a 31-bit identifier can
+    /// collide and decoding the wrong game's content is worse than failing.
+    pub fn set_metadata(&self, asset_type_name: &str, content_name: &str) -> Result<()> {
+        let type_view = string_view(asset_type_name);
+        let content_view = string_view(content_name);
+        // SAFETY: both names are borrowed for the call and CNA copies them.
+        self.native.check(unsafe {
+            (self.native.runtime.cnb_writer_set_metadata)(self.handle, type_view, content_view)
+        })
+    }
+
+    /// Appends one chunk of the asset's own payload.
+    pub fn add_chunk(&self, chunk: u32, data: &[u8], flags: u32, alignment: u32) -> Result<()> {
+        // SAFETY: `data` is borrowed for the call with its own length.
+        self.native.check(unsafe {
+            (self.native.runtime.cnb_writer_add_chunk)(
+                self.handle,
+                chunk,
+                if data.is_empty() {
+                    core::ptr::null()
+                } else {
+                    data.as_ptr()
+                },
+                data.len() as u64,
+                flags,
+                alignment,
+            )
+        })
+    }
+
+    /// Produces the complete document bytes.
+    pub fn build(&self) -> Result<Vec<u8>> {
+        let api = &self.native.runtime;
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the size.
+        accept_size_probe(&self.native, unsafe {
+            (api.cnb_writer_build)(self.handle, core::ptr::null_mut(), 0, &mut required)
+        })?;
+        let capacity = usize::try_from(required)
+            .map_err(|_| CnaError::InvalidInput("encoded document is too large"))?;
+        let mut bytes = vec![0_u8; capacity];
+        let mut written = 0_u64;
+        // SAFETY: `bytes` holds exactly `required` writable bytes for the call.
+        self.native.check(unsafe {
+            (api.cnb_writer_build)(self.handle, bytes.as_mut_ptr(), required, &mut written)
+        })?;
+        let written = usize::try_from(written)
+            .map_err(|_| CnaError::InvalidInput("encoded document is too large"))?;
+        bytes.truncate(written.min(capacity));
+        Ok(bytes)
+    }
+}
+
+impl Drop for CnbWriter {
+    fn drop(&mut self) {
+        // SAFETY: the handle is owned by this value and released exactly once.
+        let _ = unsafe { (self.native.runtime.cnb_writer_destroy)(self.handle) };
+    }
+}
+
+/// A native CNA content manager.
+///
+/// This is not XNA's `ContentManager`, which this crate implements in Rust and
+/// which has no native handle. It exists because CNA's loader registry takes
+/// one by reference: `cna_cnb_loader_invoke` requires a manager so a loader can
+/// resolve a document's external references through the normal cache, and
+/// upstream refuses to manufacture a placeholder because doing so would install
+/// the built-in loaders as a side effect nobody asked for.
+#[derive(Debug)]
+pub struct NativeContentManager {
+    native: Arc<Native>,
+    handle: sys::CNA_Handle,
+}
+
+impl NativeContentManager {
+    /// Creates a content manager on a graphics device.
+    ///
+    /// An independently constructed [`GraphicsDevice`] works here, which is
+    /// what makes the whole loader chain reachable without a running `Game`.
+    pub fn new(graphics_device: &GraphicsDevice, root_directory: &str) -> Result<Self> {
+        let native = Native::process()?;
+        let info = sys::CNA_ContentManagerCreateInfo {
+            struct_size: core::mem::size_of::<sys::CNA_ContentManagerCreateInfo>() as u32,
+            struct_version: 1,
+            root_directory: string_view(root_directory),
+            reserved: 0,
+        };
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the descriptor borrows `root_directory` for the call and CNA
+        // copies it; the output is a live local.
+        native.check(unsafe {
+            (native.runtime.content_manager_create)(
+                graphics_device.handle()?,
+                &info,
+                &mut handle,
+            )
+        })?;
+        Ok(Self { native, handle })
+    }
+}
+
+impl Drop for NativeContentManager {
+    fn drop(&mut self) {
+        // SAFETY: the handle is owned by this value and released exactly once.
+        let _ = unsafe { (self.native.runtime.content_manager_destroy)(self.handle) };
+    }
+}
+
+/// A game's own `.cnb` loader for one custom asset type.
+///
+/// CNA calls this on whatever thread performs the load, so it must be `Sync`.
+/// A panic must not cross back into C, so one is caught at the boundary and
+/// reported as a failed load rather than unwinding.
+pub trait CnbLoader: Send + Sync + 'static {
+    /// Turns one validated document into an object.
+    ///
+    /// `document` is borrowed for exactly this call: CNA invalidates it before
+    /// the call returns and it has no destroy operation, so keeping a copy and
+    /// reading it later fails rather than reading freed memory. Anything the
+    /// loader needs afterwards must be copied out here.
+    fn load(&self, document: &CnbDocument, asset_name: &str)
+        -> Result<Arc<dyn Any + Send + Sync>>;
+}
+
+/// One live registration, which withdraws itself when dropped.
+///
+/// Registrations are process-wide in CNA and outlive any content manager, so
+/// this is what bounds one: holding it keeps the loader installed, and dropping
+/// it withdraws the loader and releases every object the loader produced.
+///
+/// That last part is a deliberate ownership choice. CNA never dereferences,
+/// copies or frees a loader's object -- "its lifetime is the caller's own
+/// business" -- so something on this side has to own it. The registration does,
+/// which means a load whose object CNA hands to C++ code Rust never sees again
+/// is still released, at the latest when the registration goes.
+#[derive(Debug)]
+pub struct CnbLoaderRegistration {
+    asset_type: AssetTypeId,
+}
+
+impl CnbLoaderRegistration {
+    /// The asset type this registration serves.
+    #[must_use]
+    pub const fn asset_type(&self) -> AssetTypeId {
+        self.asset_type
+    }
+}
+
+impl Drop for CnbLoaderRegistration {
+    fn drop(&mut self) {
+        let _ = CnbLoaderRegistry::remove(self.asset_type);
+    }
+}
+
+/// One entry of this crate's side of the registry.
+struct LoaderEntry {
+    loader: Arc<dyn CnbLoader>,
+    /// Every object this loader produced, keyed by the pointer handed to CNA.
+    produced: Vec<(usize, Arc<dyn Any + Send + Sync>)>,
+}
+
+type LoaderTable = Mutex<HashMap<u32, LoaderEntry>>;
+
+fn loader_table() -> &'static LoaderTable {
+    static TABLE: OnceLock<LoaderTable> = OnceLock::new();
+    TABLE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// The trampoline CNA calls.
+///
+/// The context is the asset type identifier itself rather than a pointer, so
+/// there is no context lifetime to get wrong: a stale registration simply finds
+/// nothing in the table and fails the load.
+unsafe extern "C" fn cnb_loader_trampoline(
+    context: *mut c_void,
+    document: sys::CNA_CnbDocumentHandle,
+    _content_manager: sys::CNA_Handle,
+    asset_name: sys::CNA_StringView,
+    out_object: *mut *mut c_void,
+) -> sys::CNA_Result {
+    let asset_type = context as usize as u32;
+    let outcome = catch_unwind(AssertUnwindSafe(|| {
+        let native = Native::process()?;
+        let loader = {
+            let table = loader_table()
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            match table.get(&asset_type) {
+                Some(entry) => Arc::clone(&entry.loader),
+                None => return Err(CnaError::InvalidInput("no Rust loader is registered")),
+            }
+        };
+        // SAFETY: CNA documents `asset_name` as borrowed UTF-8 bytes valid for
+        // the duration of this call, with no terminator.
+        let name = unsafe { string_view_bytes(asset_name) };
+        let name = core::str::from_utf8(name)
+            .map_err(|_| CnaError::InvalidInput("CNA passed a non-UTF-8 asset name"))?;
+        // The handle is CNA's, borrowed for exactly this call.
+        let borrowed = CnbDocument {
+            native,
+            handle: document,
+            owner: DocumentOwner::CallbackScoped,
+        };
+        loader.load(&borrowed, name)
+    }));
+    let object = match outcome {
+        Ok(Ok(object)) => object,
+        // A failed load is the loader's answer; a panic must not unwind into C,
+        // so it becomes the same kind of failure rather than crossing back.
+        Ok(Err(_)) | Err(_) => return sys::CNA_RESULT_IO,
+    };
+    let pointer = Arc::as_ptr(&object).cast::<c_void>().cast_mut();
+    {
+        let mut table = loader_table()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        match table.get_mut(&asset_type) {
+            Some(entry) => entry.produced.push((pointer as usize, object)),
+            None => return sys::CNA_RESULT_IO,
+        }
+    }
+    // SAFETY: `out_object` is CNA's live output for this call.
+    unsafe { *out_object = pointer };
+    sys::CNA_RESULT_SUCCESS
+}
+
+/// Reads a borrowed `CNA_StringView` as bytes.
+///
+/// # Safety
+/// The view must describe live bytes for the duration of the borrow.
+unsafe fn string_view_bytes<'a>(view: sys::CNA_StringView) -> &'a [u8] {
+    if view.data.is_null() || view.byte_length == 0 {
+        return &[];
+    }
+    let length = usize::try_from(view.byte_length).unwrap_or(0);
+    // SAFETY: the caller guarantees `view` describes `length` live bytes.
+    unsafe { core::slice::from_raw_parts(view.data.cast::<u8>(), length) }
+}
+
+/// CNA's process-wide `.cnb` loader registry.
+///
+/// Every operation here is process-wide, exactly as upstream's is: there is no
+/// per-manager variant, and a registration outlives any content manager.
+#[derive(Debug)]
+pub struct CnbLoaderRegistry;
+
+impl CnbLoaderRegistry {
+    /// Installs a loader for one custom asset type.
+    ///
+    /// `canonical_type_name` is not a label. CNA compares it against the name
+    /// the file itself carries before dispatching, so it must be exactly the
+    /// string [`AssetTypeId::custom`] hashed; a custom identifier is a 31-bit
+    /// hash and two unrelated game types can legitimately collide, so the name
+    /// is what stops one game's file being decoded by another's loader.
+    ///
+    /// Only a custom identifier can be registered. CNA's built-in and reserved
+    /// identifiers belong to CNA and there is deliberately no way to claim one.
+    pub fn register(
+        canonical_type_name: &str,
+        loader: Arc<dyn CnbLoader>,
+    ) -> Result<CnbLoaderRegistration> {
+        let asset_type = AssetTypeId::custom(canonical_type_name)?;
+        let native = Native::process()?;
+        {
+            let mut table = loader_table()
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            table.insert(
+                asset_type.value(),
+                LoaderEntry {
+                    loader,
+                    produced: Vec::new(),
+                },
+            );
+        }
+        let view = string_view(canonical_type_name);
+        // SAFETY: the name is borrowed for the call and CNA copies it; the
+        // context is the identifier by value, not a pointer, so it cannot
+        // dangle.
+        let result = native.check(unsafe {
+            (native.runtime.cnb_loader_register)(
+                asset_type.value(),
+                view,
+                Some(cnb_loader_trampoline),
+                asset_type.value() as usize as *mut c_void,
+            )
+        });
+        if result.is_err() {
+            // A refused registration must not leave this side claiming one.
+            let _ = loader_table()
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .remove(&asset_type.value());
+        }
+        result?;
+        Ok(CnbLoaderRegistration { asset_type })
+    }
+
+    /// Withdraws a registration and releases the objects it produced.
+    ///
+    /// Answers whether one was installed; absence is an ordinary answer.
+    pub fn remove(asset_type: AssetTypeId) -> Result<bool> {
+        let native = Native::process()?;
+        let mut removed = sys::CNA_FALSE;
+        // SAFETY: the output is a live local of the declared type.
+        let result = native.check(unsafe {
+            (native.runtime.cnb_loader_remove)(asset_type.value(), &mut removed)
+        });
+        // Release this side's entry either way: leaving it behind after CNA has
+        // dropped the registration would retain objects nothing can reach.
+        let _ = loader_table()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove(&asset_type.value());
+        result?;
+        Ok(removed != sys::CNA_FALSE)
+    }
+
+    /// Withdraws every registration, CNA's and this crate's.
+    ///
+    /// Upstream describes this as primarily for test isolation, and notes that
+    /// getting the whole built-in table back afterwards needs a content
+    /// manager rather than [`CnbLoaderRegistry::register_builtins`] alone.
+    pub fn clear() -> Result<()> {
+        let native = Native::process()?;
+        // SAFETY: the route takes no arguments.
+        let result = native.check(unsafe { (native.runtime.cnb_loader_clear)() });
+        loader_table()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clear();
+        result
+    }
+
+    /// Whether a loader is installed for an identifier.
+    pub fn is_registered(asset_type: AssetTypeId) -> Result<bool> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the output is a live local of the declared type.
+        native.check(unsafe {
+            (native.runtime.cnb_loader_is_registered)(asset_type.value(), &mut value)
+        })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    /// The canonical name an identifier was registered under.
+    ///
+    /// Empty when nothing is registered.
+    pub fn registered_type_name(asset_type: AssetTypeId) -> Result<String> {
+        let native = Native::process()?;
+        let api = &native.runtime;
+        let id = asset_type.value();
+        read_string(
+            |value| native.check(value),
+            // SAFETY: both outputs are live locals; the two routes form CNA's
+            // canonical size-then-copy pair for one UTF-8 string.
+            |bytes| unsafe { (api.cnb_loader_registered_type_name_size)(id, bytes) },
+            |destination, capacity, written| unsafe {
+                (api.cnb_loader_copy_registered_type_name)(id, destination, capacity, written)
+            },
+        )
+    }
+
+    /// Installs the built-in loaders that need nothing but their own codec.
+    ///
+    /// `Curve` and `AnimationClip` only: upstream registers the other eight
+    /// through a content manager, because they construct a runtime object.
+    /// Idempotent, and every content manager calls it, so a game normally
+    /// never needs to.
+    pub fn register_builtins() -> Result<()> {
+        let native = Native::process()?;
+        // SAFETY: the route takes no arguments.
+        native.check(unsafe { (native.runtime.cnb_loader_register_builtins)() })
+    }
+
+    /// Looks up a loader by identifier alone, without checking any type name.
+    ///
+    /// This is the wrong entry point for loading a file, and upstream says so:
+    /// use [`CnbLoaderRegistry::resolve_for_document`], which also proves
+    /// identity. This exists for tooling that has no document to hand.
+    pub fn find(asset_type: AssetTypeId) -> Result<Option<CnbResolvedLoader>> {
+        let native = Native::process()?;
+        let mut found = sys::CNA_FALSE;
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: both outputs are live locals; the handle is newly owned.
+        native.check(unsafe {
+            (native.runtime.cnb_loader_find)(asset_type.value(), &mut found, &mut handle)
+        })?;
+        if found == sys::CNA_FALSE || handle == sys::CNA_INVALID_HANDLE {
+            return Ok(None);
+        }
+        Ok(Some(CnbResolvedLoader { native, handle }))
+    }
+
+    /// Resolves the loader that may decode a document, proving identity too.
+    ///
+    /// For a built-in type the number is authoritative, because CNA assigns
+    /// those and they are frozen. For a custom one it is not: the document must
+    /// also carry a canonical type name equal to the registered one, so a file
+    /// whose 31-bit hash collides is refused instead of being decoded by
+    /// somebody else's loader.
+    pub fn resolve_for_document(document: &CnbDocument) -> Result<CnbResolvedLoader> {
+        let native = Native::process()?;
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the document handle is live for the call; the output is a
+        // live local receiving a newly owned loader handle.
+        native.check(unsafe {
+            (native.runtime.cnb_loader_resolve_for_document)(document.handle, &mut handle)
+        })?;
+        Ok(CnbResolvedLoader { native, handle })
+    }
+}
+
+/// One loader, copied out of the registry and safe to invoke.
+///
+/// CNA returns loaders by value on purpose: a pointer into the table would be
+/// invalidated by any later registration that rehashes it, with no way for the
+/// holder to know.
+#[derive(Debug)]
+pub struct CnbResolvedLoader {
+    native: Arc<Native>,
+    handle: sys::CNA_CnbLoaderHandle,
+}
+
+impl CnbResolvedLoader {
+    /// Runs the loader over a document.
+    ///
+    /// The document need not be the one this loader was resolved from, which is
+    /// exactly why the loader is a value rather than a cursor into the table.
+    ///
+    /// The object comes back only for a loader registered from this crate.
+    /// CNA's own built-in loaders construct C++ objects -- a `Curve`, a
+    /// `Texture2D` -- and this reports [`CnaError::UnsupportedRuntime`] for one
+    /// of those rather than handing back a pointer nothing here could name.
+    pub fn invoke(
+        &self,
+        document: &CnbDocument,
+        content_manager: &NativeContentManager,
+        asset_name: &str,
+    ) -> Result<Arc<dyn Any + Send + Sync>> {
+        let view = string_view(asset_name);
+        let mut object: *mut c_void = core::ptr::null_mut();
+        // SAFETY: both handles are live, the name is borrowed for the call, and
+        // the output is a live local.
+        self.native.check(unsafe {
+            (self.native.runtime.cnb_loader_invoke)(
+                self.handle,
+                document.handle,
+                content_manager.handle,
+                view,
+                &mut object,
+            )
+        })?;
+        let key = object as usize;
+        let table = loader_table()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        for entry in table.values() {
+            if let Some((_, value)) = entry.produced.iter().find(|(pointer, _)| *pointer == key) {
+                return Ok(Arc::clone(value));
+            }
+        }
+        Err(CnaError::UnsupportedRuntime(
+            "this loader produced an object that did not come from a Rust loader",
+        ))
+    }
+}
+
+impl Drop for CnbResolvedLoader {
+    fn drop(&mut self) {
+        // SAFETY: the handle is owned by this value and released exactly once.
+        let _ = unsafe { (self.native.runtime.cnb_loader_destroy)(self.handle) };
     }
 }

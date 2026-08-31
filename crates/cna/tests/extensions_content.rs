@@ -4,10 +4,18 @@
 //! parsing the result back is the round trip that proves both directions, and
 //! it needs no asset the repository is not allowed to carry.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+
 use cna::extensions::content::{
-    AssetTypeId, CnbDocument, CnbEffectKind, CnbMaterial, CnbMaterialTexture, CnbModel,
-    CnbModelPart, CnbTextureData, ReadLimits,
+    AssetTypeId, CnbDocument, CnbEffectKind, CnbLoader, CnbLoaderRegistry, CnbMaterial,
+    CnbMaterialTexture, CnbModel, CnbModelPart, CnbTextureData, CnbWriter, NativeContentManager,
+    ReadLimits,
 };
+use cna::Microsoft::Xna::Framework::Graphics::{
+    GraphicsDevice, GraphicsProfile, PresentationParameters,
+};
+use cna::Microsoft::Xna::Framework::GraphicsDeviceInformation;
 use cna::CnaError;
 
 /// A 4x2 image whose every pixel is distinguishable, so a byte that moves is
@@ -503,4 +511,254 @@ fn model_parsing_honours_a_caller_supplied_bound() {
         },
     )
     .expect("the same document parses within a sufficient bound");
+}
+
+/// A game's own asset type, decoded by a Rust loader.
+#[derive(Debug, Eq, PartialEq)]
+struct ProbeAsset {
+    origin: String,
+    asset_name: String,
+    container: (u16, u16),
+}
+
+/// Counts how often the loader ran, so a load that never reached Rust is
+/// distinguishable from one that did.
+struct CountingLoader {
+    calls: Arc<AtomicUsize>,
+    fail: bool,
+    panic: bool,
+}
+
+impl CnbLoader for CountingLoader {
+    fn load(
+        &self,
+        document: &CnbDocument,
+        asset_name: &str,
+    ) -> cna::Result<Arc<dyn std::any::Any + Send + Sync>> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        assert!(
+            !(self.fail && self.panic),
+            "a loader is either failing or panicking, not both"
+        );
+        if self.panic {
+            panic!("a loader panic must not unwind into C");
+        }
+        if self.fail {
+            return Err(CnaError::InvalidInput("this loader refuses every document"));
+        }
+        // The document is borrowed for exactly this call, so everything the
+        // asset keeps is copied out here.
+        Ok(Arc::new(ProbeAsset {
+            origin: document.origin()?,
+            asset_name: asset_name.to_owned(),
+            container: document.container_version()?,
+        }))
+    }
+}
+
+/// A device and a native content manager, which the loader chain needs.
+///
+/// Both come from `GraphicsDevice::new`, so this whole test runs with no
+/// `Game` in the process at all.
+fn loader_host() -> (GraphicsDevice, NativeContentManager) {
+    let adapter = GraphicsDeviceInformation::new().Adapter();
+    let parameters = PresentationParameters::new();
+    parameters.SetBackBufferWidth(64);
+    parameters.SetBackBufferHeight(64);
+    let device = GraphicsDevice::new(&adapter, GraphicsProfile::Reach, &parameters)
+        .expect("independent device for a content manager");
+    let manager =
+        NativeContentManager::new(&device, "").expect("native content manager on that device");
+    (device, manager)
+}
+
+/// A document of a game's own type, carrying the canonical name CNA checks.
+fn custom_document(type_name: &str, content_name: &str) -> Vec<u8> {
+    let asset_type = AssetTypeId::custom(type_name).expect("mint a custom asset type");
+    let writer = CnbWriter::new(asset_type, 1).expect("writer");
+    writer
+        .set_metadata(type_name, content_name)
+        .expect("metadata");
+    writer.build().expect("build")
+}
+
+#[test]
+fn a_rust_loader_decodes_a_game_s_own_asset_type() {
+    if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
+        return;
+    }
+    let (_device, manager) = loader_host();
+    let type_name = "CnaRust.Test.RoundTripAsset";
+    let asset_type = AssetTypeId::custom(type_name).expect("custom identity");
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    let registration = CnbLoaderRegistry::register(
+        type_name,
+        Arc::new(CountingLoader {
+            calls: Arc::clone(&calls),
+            fail: false,
+            panic: false,
+        }),
+    )
+    .expect("register a Rust loader");
+    assert_eq!(registration.asset_type(), asset_type);
+    assert!(CnbLoaderRegistry::is_registered(asset_type).expect("registered"));
+    assert_eq!(
+        CnbLoaderRegistry::registered_type_name(asset_type).expect("registered name"),
+        type_name,
+        "CNA keeps the canonical name it dispatches on"
+    );
+
+    let bytes = custom_document(type_name, "round-trip");
+    let document =
+        CnbDocument::parse(&bytes, "round-trip.cnb", ReadLimits::default()).expect("parse");
+    assert_eq!(document.asset_type().expect("asset type"), asset_type);
+
+    let loader = CnbLoaderRegistry::resolve_for_document(&document).expect("resolve");
+    let object = loader
+        .invoke(&document, &manager, "round-trip")
+        .expect("invoke the Rust loader");
+    assert_eq!(calls.load(Ordering::SeqCst), 1, "the loader really ran");
+
+    let asset = object
+        .downcast_ref::<ProbeAsset>()
+        .expect("the object is the Rust value the loader built");
+    assert_eq!(asset.asset_name, "round-trip");
+    assert_eq!(asset.origin, "round-trip.cnb");
+    assert_eq!(
+        asset.container,
+        document.container_version().expect("container version"),
+        "the loader read the borrowed document, not a default"
+    );
+
+    // Dropping the registration withdraws it and releases what it produced.
+    drop(registration);
+    assert!(!CnbLoaderRegistry::is_registered(asset_type).expect("withdrawn"));
+    assert!(
+        CnbLoaderRegistry::resolve_for_document(&document).is_err(),
+        "a withdrawn loader no longer resolves"
+    );
+}
+
+#[test]
+fn an_ambiguous_custom_typed_document_cannot_even_be_authored() {
+    if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
+        return;
+    }
+    let type_name = "CnaRust.Test.NameCheckedAsset";
+    let asset_type = AssetTypeId::custom(type_name).expect("custom identity");
+    let calls = Arc::new(AtomicUsize::new(0));
+    let _registration = CnbLoaderRegistry::register(
+        type_name,
+        Arc::new(CountingLoader {
+            calls: Arc::clone(&calls),
+            fail: false,
+            panic: false,
+        }),
+    )
+    .expect("register");
+
+    // A file claiming this numeric identity while naming a different type
+    // cannot even be authored: CNA checks the name against the identifier at
+    // build time and says so, rather than producing a file that would be
+    // refused later. The guarantee is therefore stronger than the load-time
+    // check alone, and this is where it is observable.
+    let writer = CnbWriter::new(asset_type, 1).expect("writer");
+    writer
+        .set_metadata("CnaRust.Test.ImpostorAsset", "impostor")
+        .expect("metadata is recorded; the identity check happens at build");
+    let refused = writer.build();
+    assert!(
+        matches!(&refused, Err(CnaError::Native { message, .. })
+            if message.contains("hash collision")),
+        "authoring a name that does not hash to the identifier must be refused, got {refused:?}"
+    );
+
+    // The other way to reach the load-time check -- a custom-typed file
+    // carrying no canonical name at all -- is refused at build time too, and
+    // the message says exactly what to call instead.
+    let anonymous = CnbWriter::new(asset_type, 1).expect("writer");
+    let nameless = anonymous.build();
+    assert!(
+        matches!(&nameless, Err(CnaError::Native { message, .. })
+            if message.contains("must carry its canonical type name")),
+        "a custom-typed file with no canonical name must be refused, got {nameless:?}"
+    );
+
+    // So both halves of the collision defence are enforced where the file is
+    // authored, not only where it is loaded: this API cannot produce an
+    // ambiguous custom-typed document at all. The load-time refusal upstream
+    // documents still matters -- for a file some other toolchain wrote -- but
+    // it is not reachable from here, and this test does not pretend otherwise.
+    assert_eq!(calls.load(Ordering::SeqCst), 0, "the loader never ran");
+}
+
+#[test]
+fn a_loader_failure_and_a_loader_panic_are_both_contained() {
+    if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
+        return;
+    }
+    let (_device, manager) = loader_host();
+    for (label, fail, panic) in [("failing", true, false), ("panicking", false, true)] {
+        let type_name = format!("CnaRust.Test.{label}Asset");
+        let calls = Arc::new(AtomicUsize::new(0));
+        let registration = CnbLoaderRegistry::register(
+            &type_name,
+            Arc::new(CountingLoader {
+                calls: Arc::clone(&calls),
+                fail,
+                panic,
+            }),
+        )
+        .expect("register");
+        let bytes = custom_document(&type_name, label);
+        let document =
+            CnbDocument::parse(&bytes, "contained.cnb", ReadLimits::default()).expect("parse");
+        let loader = CnbLoaderRegistry::resolve_for_document(&document).expect("resolve");
+        let result = loader.invoke(&document, &manager, label);
+        assert!(result.is_err(), "a {label} loader fails the load");
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "the {label} loader ran");
+        // The process is still usable, which is the point of containing a
+        // panic rather than letting it unwind into C.
+        assert!(CnbLoaderRegistry::is_registered(registration.asset_type()).expect("still there"));
+        drop(registration);
+    }
+}
+
+#[test]
+fn only_a_custom_asset_type_may_be_registered() {
+    if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
+        return;
+    }
+    // CNA's built-in identifiers belong to CNA, and the registry has no
+    // parameter by which a caller could claim one. `AssetTypeId::custom`
+    // always hashes into the custom range, so a caller cannot reach a built-in
+    // through this API at all -- which is the property being asserted.
+    let minted = AssetTypeId::custom("Texture2D").expect("hash a built-in's name");
+    assert_ne!(
+        minted,
+        AssetTypeId::TEXTURE2D,
+        "hashing a built-in's name mints a custom identity, not the built-in"
+    );
+    assert!(minted.is_custom().expect("custom range"));
+    assert!(!AssetTypeId::TEXTURE2D.is_custom().expect("built-in range"));
+}
+
+#[test]
+fn a_loader_lookup_without_a_document_finds_nothing_when_nothing_is_registered() {
+    if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
+        return;
+    }
+    let asset_type =
+        AssetTypeId::custom("CnaRust.Test.NeverRegisteredAsset").expect("custom identity");
+    assert!(!CnbLoaderRegistry::is_registered(asset_type).expect("not registered"));
+    assert!(
+        CnbLoaderRegistry::find(asset_type).expect("find").is_none(),
+        "absence is an ordinary answer, not a refusal"
+    );
+    assert_eq!(
+        CnbLoaderRegistry::registered_type_name(asset_type).expect("name"),
+        "",
+        "nothing registered names nothing"
+    );
 }
