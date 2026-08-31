@@ -52,7 +52,8 @@ use crate::graphics::{
 };
 use crate::native::Native;
 use crate::graphics::{
-    DepthFormat, RenderTarget2D, SamplerState, Texture3D, TextureCube, VertexPositionColor,
+    CubeMapFace, DepthFormat, RenderTarget2D, SamplerState, Texture3D, TextureCube,
+    VertexPositionColor,
 };
 use crate::value::{
     BoundingBox, BoundingFrustum, BoundingSphere, Color, Matrix, Vector2, Vector3, Vector4,
@@ -10465,6 +10466,673 @@ impl ClusteredForwardEffect {
 }
 
 impl Drop for ClusteredForwardEffect {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// One point of stored ambient light: nine spherical-harmonic coefficients and
+/// six directions of occluder statistics.
+///
+/// `OWNED`, and unusual in this module for having **no parent at all**: CNA
+/// creates it without a device or a game and counts it against nothing, so it
+/// registers with no device and its lifetime is entirely this value's.
+///
+/// A probe is a *value* -- it compares by content and is copied into a volume
+/// rather than referenced by it -- but nine vectors and twelve scalars is more
+/// than a caller should assemble by hand, so upstream binds it as a handle and
+/// so does this.
+pub struct LightProbe {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl LightProbe {
+    /// How many spherical-harmonic coefficients one probe stores.
+    pub const COEFFICIENT_COUNT: i32 = sys::CNA_LIGHT_PROBE_COEFFICIENT_COUNT_EXT;
+    /// How many directions one probe stores visibility for.
+    pub const VISIBILITY_DIRECTIONS: i32 = sys::CNA_LIGHT_PROBE_VISIBILITY_DIRECTIONS_EXT;
+
+    fn wrap(native: &Arc<Native>, handle: sys::CNA_Handle) -> Self {
+        Self {
+            core: Arc::new(EngineHandle {
+                native: Arc::clone(native),
+                handle: Mutex::new(handle),
+                destroy: native.engine.light_probe_ext_destroy,
+                released: "the light probe has been released",
+            }),
+            native: Arc::clone(native),
+        }
+    }
+
+    /// Creates a probe at the origin with no stored light.
+    pub fn new() -> Result<Self> {
+        let native = Native::process()?;
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the output is a live local.
+        native.check(unsafe { (native.engine.light_probe_ext_create)(&mut handle) })?;
+        Ok(Self::wrap(&native, handle))
+    }
+
+    /// Creates a probe at a position.
+    pub fn at(position: Vector3) -> Result<Self> {
+        let native = Native::process()?;
+        let position = native_vector3(position);
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the position is borrowed for the call and the output is a
+        // live local.
+        native
+            .check(unsafe { (native.engine.light_probe_ext_create_at)(&position, &mut handle) })?;
+        Ok(Self::wrap(&native, handle))
+    }
+
+    /// The GLSL that evaluates a probe.
+    ///
+    /// A property of the encoding rather than of any one probe.
+    pub fn evaluation_glsl() -> Result<String> {
+        let native = Native::process()?;
+        copy_text(&native, |api, destination, capacity, out_bytes| {
+            // SAFETY: CNA's size-then-copy protocol, driven by `copy_text`.
+            unsafe { (api.light_probe_ext_copy_evaluation_glsl)(destination, capacity, out_bytes) }
+        })
+    }
+
+    /// Copies every field of another probe over this one.
+    ///
+    /// A handle cannot be assigned, so this is how one probe becomes another.
+    pub fn copy_from(&self, source: &Self) -> Result<()> {
+        let handle = self.core.get()?;
+        let source = source.core.get()?;
+        // SAFETY: both handles are owned and live for the call.
+        self.native
+            .check(unsafe { (self.native.engine.light_probe_ext_copy_from)(handle, source) })
+    }
+
+    /// The probe's world-space position.
+    pub fn position(&self) -> Result<Vector3> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_ext_get_position)(handle, &mut value)
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// Sets it.
+    pub fn set_position(&self, position: Vector3) -> Result<()> {
+        let handle = self.core.get()?;
+        let position = native_vector3(position);
+        // SAFETY: the handle is owned and the position is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_ext_set_position)(handle, &position)
+        })
+    }
+
+    /// One spherical-harmonic coefficient.
+    ///
+    /// An index outside the table is **refused rather than clamped**: a clamped
+    /// index answers with a different coefficient, and the surface would light
+    /// almost right.
+    pub fn coefficient(&self, index: i32) -> Result<Vector3> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_ext_get_coefficient)(handle, index, &mut value)
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// Sets one coefficient.
+    pub fn set_coefficient(&self, index: i32, value: Vector3) -> Result<()> {
+        let handle = self.core.get()?;
+        let value = native_vector3(value);
+        // SAFETY: the handle is owned and the value is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_ext_set_coefficient)(handle, index, &value)
+        })
+    }
+
+    /// Every coefficient at once.
+    pub fn coefficients(&self) -> Result<Vec<Vector3>> {
+        let handle = self.core.get()?;
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the count.
+        let probe = unsafe {
+            (self.native.engine.light_probe_ext_copy_coefficients)(
+                handle,
+                core::ptr::null_mut(),
+                0,
+                &mut required,
+            )
+        };
+        if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+            self.native.check(probe)?;
+        }
+        let capacity = usize::try_from(required)
+            .map_err(|_| CnaError::InvalidInput("the coefficients do not fit in memory"))?;
+        if capacity == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![sys::CNA_Vector3::default(); capacity];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `capacity`
+        // writable vectors, which is the count passed alongside it.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_ext_copy_coefficients)(
+                handle,
+                buffer.as_mut_ptr(),
+                required,
+                &mut count,
+            )
+        })?;
+        let count = usize::try_from(count).map_err(|_| {
+            CnaError::InvalidInput("CNA reported more coefficients than fit in memory")
+        })?;
+        Ok(buffer
+            .into_iter()
+            .take(count.min(capacity))
+            .map(from_native_vector3)
+            .collect())
+    }
+
+    /// The irradiance arriving on a surface with a given normal.
+    ///
+    /// Irradiance, not outgoing radiance, and **never negative**: the
+    /// reconstruction can go below zero and CNA floors it, because negative
+    /// light is not a look.
+    pub fn irradiance(&self, normal: Vector3) -> Result<Vector3> {
+        let handle = self.core.get()?;
+        let normal = native_vector3(normal);
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the handle is owned, the normal is borrowed for the call, and
+        // the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_ext_irradiance)(handle, &normal, &mut value)
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// Stores the mean and mean-squared occluder distance for one direction.
+    ///
+    /// Both are **floored at zero**.
+    pub fn set_visibility(
+        &self,
+        direction: i32,
+        mean_distance: f32,
+        mean_squared_distance: f32,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_ext_set_visibility)(
+                handle,
+                direction,
+                mean_distance,
+                mean_squared_distance,
+            )
+        })
+    }
+
+    /// The mean occluder distance for one direction.
+    pub fn visibility_mean(&self, direction: i32) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_ext_get_visibility_mean)(handle, direction, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// The mean squared occluder distance for one direction.
+    pub fn visibility_mean_squared(&self, direction: i32) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_ext_get_visibility_mean_squared)(
+                handle, direction, &mut value,
+            )
+        })?;
+        Ok(value)
+    }
+
+    /// Whether any visibility has been stored.
+    pub fn has_visibility(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_ext_has_visibility)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// How much of the probe's light reaches a point in a direction.
+    ///
+    /// **Answers one when the probe has no visibility data, and one when the
+    /// distance is not positive** -- both mean "nothing is known to be in the
+    /// way", which is the safe answer rather than an error.
+    pub fn visibility_weight(&self, direction: Vector3, distance: f32) -> Result<f32> {
+        let handle = self.core.get()?;
+        let direction = native_vector3(direction);
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned, the direction is borrowed for the call,
+        // and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_ext_visibility_weight)(
+                handle, &direction, distance, &mut value,
+            )
+        })?;
+        Ok(value)
+    }
+
+    /// Whether the probe stores no light at all.
+    pub fn is_zero(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native
+            .check(unsafe { (self.native.engine.light_probe_ext_is_zero)(handle, &mut value) })?;
+        Ok(value != 0)
+    }
+
+    /// Multiplies every coefficient by a factor.
+    pub fn scale(&self, factor: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.light_probe_ext_scale)(handle, factor) })
+    }
+
+    /// Whether two probes agree across every coefficient and visibility entry.
+    pub fn value_eq(&self, other: &Self) -> Result<bool> {
+        let first = self.core.get()?;
+        let second = other.core.get()?;
+        let mut value = 0_u8;
+        // SAFETY: both handles are owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.light_probe_ext_equals)(first, second, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Releases the probe now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for LightProbe {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// The three textures a PBR shader needs to shade from an environment, and how
+/// bright they are.
+///
+/// The textures are `BORROWED`: the structure records them and never owns them,
+/// so this value holds the Rust resources that keep them alive for exactly as
+/// long as it names them.
+pub struct ImageBasedLight {
+    irradiance: Option<TextureCube>,
+    prefiltered_specular: Option<TextureCube>,
+    brdf_lut: Option<Texture2D>,
+    prefiltered_mip_count: i32,
+    intensity: f32,
+    native: Arc<Native>,
+}
+
+impl ImageBasedLight {
+    /// CNA's own defaults, asked of the library rather than restated here.
+    ///
+    /// The three textures start unbound, which is exactly the state
+    /// [`is_valid`](Self::is_valid) answers `false` for.
+    pub fn canonical_defaults() -> Result<Self> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_ImageBasedLightEXT::default();
+        // SAFETY: the structure is a caller-owned versioned output.
+        native.check(unsafe { (native.engine.image_based_light_ext_init)(&mut value) })?;
+        Ok(Self {
+            irradiance: None,
+            prefiltered_specular: None,
+            brdf_lut: None,
+            prefiltered_mip_count: value.prefiltered_mip_count,
+            intensity: value.intensity,
+            native,
+        })
+    }
+
+    /// Gives the light its diffuse irradiance cube.
+    pub fn set_irradiance(&mut self, value: Option<TextureCube>) {
+        self.irradiance = value;
+    }
+
+    /// Gives the light its prefiltered specular cube and that cube's mip count.
+    ///
+    /// The two go together on purpose: pairing a cube with a mip count from a
+    /// different one is the failure this structure exists to prevent.
+    pub fn set_prefiltered_specular(&mut self, value: Option<TextureCube>, mip_count: i32) {
+        self.prefiltered_specular = value;
+        self.prefiltered_mip_count = mip_count;
+    }
+
+    /// Gives the light its BRDF lookup table.
+    pub fn set_brdf_lut(&mut self, value: Option<Texture2D>) {
+        self.brdf_lut = value;
+    }
+
+    /// How bright the light is.
+    #[must_use]
+    pub const fn intensity(&self) -> f32 {
+        self.intensity
+    }
+
+    /// Sets it.
+    pub const fn set_intensity(&mut self, value: f32) {
+        self.intensity = value;
+    }
+
+    /// How many mip levels the prefiltered cube has.
+    #[must_use]
+    pub const fn prefiltered_mip_count(&self) -> i32 {
+        self.prefiltered_mip_count
+    }
+
+    /// Whether the light is complete enough to shade with.
+    ///
+    /// All three textures must be present and the mip count at least one. A
+    /// light that is *nearly* complete is the failure this answers: it does not
+    /// look like a mismatch, it looks like a scene lit slightly wrong.
+    pub fn is_valid(&self) -> Result<bool> {
+        let value = self.to_native()?;
+        let mut valid = 0_u8;
+        // SAFETY: the structure is borrowed for the call and the output is a
+        // live local.
+        self.native.check(unsafe {
+            (self.native.engine.image_based_light_ext_is_valid)(&value, &mut valid)
+        })?;
+        Ok(valid != 0)
+    }
+
+    fn to_native(&self) -> Result<sys::CNA_ImageBasedLightEXT> {
+        Ok(sys::CNA_ImageBasedLightEXT {
+            struct_size: core::mem::size_of::<sys::CNA_ImageBasedLightEXT>() as u32,
+            struct_version: 1,
+            irradiance: match self.irradiance.as_ref() {
+                Some(texture) => texture.native_handle()?,
+                None => sys::CNA_INVALID_HANDLE,
+            },
+            prefiltered_specular: match self.prefiltered_specular.as_ref() {
+                Some(texture) => texture.native_handle()?,
+                None => sys::CNA_INVALID_HANDLE,
+            },
+            brdf_lut: match self.brdf_lut.as_ref() {
+                Some(texture) => texture.handle()?,
+                None => sys::CNA_INVALID_HANDLE,
+            },
+            prefiltered_mip_count: self.prefiltered_mip_count,
+            intensity: self.intensity,
+        })
+    }
+}
+
+/// Turns an environment map into the three products a PBR shader reads.
+///
+/// `OWNED`, and a pure transformer: it has **no setters at all**, only
+/// operations that take an environment and hand back a new texture. The
+/// textures it produces are *not* released with it -- each is an owned resource
+/// of its own and outlives the processor that made it.
+///
+/// Its three cube generators are renderer-dependent and publish no support flag
+/// to ask first: they build a real `TextureCube` and write its faces, which a
+/// renderer without cube storage refuses. That refusal reaches a caller as
+/// `NOT_SUPPORTED`, the same code a library built without the engine layer
+/// answers -- tell them apart with
+/// [`engine_layer_version`](super::pbr::engine_layer_version), because a
+/// non-zero version means the renderer is the reason.
+/// [`brdf_lut`](Self::brdf_lut) builds a 2D table and works anyway, and the
+/// five static maths routes touch no device at all.
+pub struct EnvironmentProcessor {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+    device: GraphicsDevice,
+}
+
+impl EnvironmentProcessor {
+    /// Creates a processor on the device its outputs are created on.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.environment_processor_create)(device.handle()?, &mut handle)
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.environment_processor_destroy,
+            released: "the environment processor has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+            device: device.clone(),
+        })
+    }
+
+    /// Converts an equirectangular panorama into a cube map.
+    pub fn convert_equirectangular(
+        &self,
+        panorama: &Texture2D,
+        face_size: i32,
+    ) -> Result<TextureCube> {
+        let handle = self.core.get()?;
+        let mut out = sys::CNA_INVALID_HANDLE;
+        // SAFETY: both handles are live for the call and the output is a live
+        // local.
+        self.native.check(unsafe {
+            (self.native.engine.environment_processor_convert_equirectangular)(
+                handle,
+                panorama.handle()?,
+                face_size,
+                &mut out,
+            )
+        })?;
+        TextureCube::from_owned_handle(&self.device, out)
+    }
+
+    /// Generates the cosine-convolved diffuse irradiance cube.
+    pub fn irradiance(
+        &self,
+        environment: &TextureCube,
+        size: i32,
+        sample_count: i32,
+    ) -> Result<TextureCube> {
+        let handle = self.core.get()?;
+        let mut out = sys::CNA_INVALID_HANDLE;
+        // SAFETY: both handles are live for the call and the output is a live
+        // local.
+        self.native.check(unsafe {
+            (self.native.engine.environment_processor_generate_irradiance)(
+                handle,
+                environment.native_handle()?,
+                size,
+                sample_count,
+                &mut out,
+            )
+        })?;
+        TextureCube::from_owned_handle(&self.device, out)
+    }
+
+    /// Generates the GGX-prefiltered specular cube whose mips are a roughness
+    /// ramp.
+    ///
+    /// `mip_count` is the number [`ImageBasedLight`] must be given alongside
+    /// the cube.
+    pub fn prefiltered_specular(
+        &self,
+        environment: &TextureCube,
+        base_size: i32,
+        mip_count: i32,
+        sample_count: i32,
+    ) -> Result<TextureCube> {
+        let handle = self.core.get()?;
+        let mut out = sys::CNA_INVALID_HANDLE;
+        // SAFETY: both handles are live for the call and the output is a live
+        // local.
+        self.native.check(unsafe {
+            (self
+                .native
+                .engine
+                .environment_processor_generate_prefiltered_specular)(
+                handle,
+                environment.native_handle()?,
+                base_size,
+                mip_count,
+                sample_count,
+                &mut out,
+            )
+        })?;
+        TextureCube::from_owned_handle(&self.device, out)
+    }
+
+    /// Projects an environment into one light probe.
+    pub fn probe(&self, environment: &TextureCube, position: Vector3) -> Result<LightProbe> {
+        let handle = self.core.get()?;
+        let position = native_vector3(position);
+        let mut out = sys::CNA_INVALID_HANDLE;
+        // SAFETY: both handles are live for the call, the position is borrowed,
+        // and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.environment_processor_generate_probe)(
+                handle,
+                environment.native_handle()?,
+                &position,
+                &mut out,
+            )
+        })?;
+        Ok(LightProbe::wrap(&self.native, out))
+    }
+
+    /// Generates the BRDF table indexed by (N·V across, roughness down).
+    ///
+    /// Depends on neither an environment nor a scene, so it can be generated
+    /// once and shared by every bundle.
+    pub fn brdf_lut(&self, size: i32, sample_count: i32) -> Result<Texture2D> {
+        let handle = self.core.get()?;
+        let mut out = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.environment_processor_generate_brdf_lut)(
+                handle,
+                size,
+                sample_count,
+                &mut out,
+            )
+        })?;
+        Texture2D::from_owned_handle(&self.device, out)
+    }
+
+    /// The mip that carries a roughness.
+    ///
+    /// **Answers rather than refuses**: a mip count of one or less has no ramp
+    /// to index, so the answer is mip zero, and a roughness outside zero-to-one
+    /// is clamped into it.
+    pub fn mip_for_roughness(roughness: f32, mip_count: i32) -> Result<f32> {
+        let native = Native::process()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the output is a live local.
+        native.check(unsafe {
+            (native.engine.environment_processor_mip_for_roughness)(
+                roughness, mip_count, &mut value,
+            )
+        })?;
+        Ok(value)
+    }
+
+    /// The roughness a mip carries, the inverse of
+    /// [`mip_for_roughness`](Self::mip_for_roughness).
+    pub fn roughness_for_mip(mip: f32, mip_count: i32) -> Result<f32> {
+        let native = Native::process()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the output is a live local.
+        native.check(unsafe {
+            (native.engine.environment_processor_roughness_for_mip)(mip, mip_count, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// One point of the Hammersley low-discrepancy sequence.
+    pub fn hammersley(index: i32, count: i32) -> Result<Vector2> {
+        let native = Native::process()?;
+        let mut x = 0.0_f32;
+        let mut y = 0.0_f32;
+        // SAFETY: both outputs are live locals.
+        native.check(unsafe {
+            (native.engine.environment_processor_hammersley)(index, count, &mut x, &mut y)
+        })?;
+        Ok(Vector2::from_x_and_y(x, y))
+    }
+
+    /// One sequence point turned into a GGX half-vector around a normal.
+    pub fn importance_sample_ggx(point: Vector2, normal: Vector3, roughness: f32) -> Result<Vector3> {
+        let native = Native::process()?;
+        let normal = native_vector3(normal);
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the normal is borrowed for the call and the output is a live
+        // local.
+        native.check(unsafe {
+            (native.engine.environment_processor_importance_sample_ggx)(
+                point.X, point.Y, &normal, roughness, &mut value,
+            )
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// The direction one texel of one cube face looks along.
+    pub fn face_direction(face: CubeMapFace, u: f32, v: f32) -> Result<Vector3> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the output is a live local.
+        native.check(unsafe {
+            (native.engine.environment_processor_face_direction)(face as i32, u, v, &mut value)
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// A direction mapped to a panorama coordinate.
+    pub fn direction_to_equirectangular(direction: Vector3) -> Result<Vector2> {
+        let native = Native::process()?;
+        let direction = native_vector3(direction);
+        let mut u = 0.0_f32;
+        let mut v = 0.0_f32;
+        // SAFETY: the direction is borrowed for the call and both outputs are
+        // live locals.
+        native.check(unsafe {
+            (native.engine.environment_processor_direction_to_equirectangular)(
+                &direction, &mut u, &mut v,
+            )
+        })?;
+        Ok(Vector2::from_x_and_y(u, v))
+    }
+
+    /// Releases the processor now rather than at drop.
+    ///
+    /// The textures it produced are unaffected: each is an owned resource of
+    /// its own and outlives the processor that made it.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for EnvironmentProcessor {
     fn drop(&mut self) {
         let _ = self.core.release();
     }

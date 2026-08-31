@@ -22,7 +22,7 @@ use cna::extensions::engine::{
     AutoExposure, ClusteredLight, ClusteredLightAssignment, ClusteredLightGrid,
     ClusteredLightBuffer, ClusteredLightCompute, ClusteredLightSet, ClusteredLightType,
     ClusteredForwardEffect, ClusteredShadingMaterial, ClusteredShadowPolicy, CubeLut,
-    DebugDraw, DepthEncoding,
+    DebugDraw, DepthEncoding, EnvironmentProcessor, ImageBasedLight, LightProbe,
     DepthNormalPrepass, DisplayColorSpace, FrustumCuller, HdrDisplayOutput, LodGroup,
     LodSelectionMode, ShadowCascadeState, SpotLight, SpotShadowMap, SsaoPass,
     SsrPass, StorageBuffer, TonemapPass, TransparentDrawList, VolumetricFogPass,
@@ -34,7 +34,7 @@ use cna::extensions::pbr::{
     TransparencyMode,
 };
 use cna::Microsoft::Xna::Framework::Graphics::{
-    DepthFormat, SurfaceFormat, Texture2D, TextureCube,
+    CubeMapFace, DepthFormat, SurfaceFormat, Texture2D, TextureCube,
 };
 use cna::Microsoft::Xna::Framework::{
     BoundingBox, BoundingFrustum, BoundingSphere, Color, Game, GameContext, GameTime, Matrix,
@@ -5708,4 +5708,649 @@ fn the_clustered_forward_effect_clamps_what_it_documents_and_shades_what_it_is_g
         (0.0, 0.0, 0.0),
         "and neither does one further away than it reaches"
     );
+}
+
+/// What the light-probe and image-based-lighting run measured.
+#[derive(Default)]
+struct ProbeFindings {
+    engine_layer: i32,
+    fresh: (f32, bool, bool, usize),
+    positioned: (f32, f32, f32),
+    bad_coefficient: Vec<(&'static str, bool)>,
+    dc_irradiance: Vec<(f32, f32, f32)>,
+    directional_irradiance: Vec<(&'static str, (f32, f32, f32))>,
+    scaled: Vec<(&'static str, (f32, f32, f32), bool)>,
+    equality: Vec<(&'static str, bool)>,
+    visibility: Vec<(&'static str, f32, f32)>,
+    bad_visibility: Vec<(&'static str, bool)>,
+    weights: Vec<(&'static str, f32)>,
+    glsl_bytes: usize,
+    ibl_defaults: (bool, i32, f32),
+    ibl_states: Vec<(&'static str, bool)>,
+    mip_ramp: Vec<(f32, f32, f32)>,
+    degenerate_ramp: Vec<(&'static str, f32)>,
+    hammersley: Vec<(i32, f32, f32)>,
+    ggx_smooth: (f32, f32, f32),
+    face_directions: Vec<(f32, f32, f32)>,
+    equirectangular: Vec<(&'static str, f32, f32)>,
+    brdf_lut: Option<(i32, i32)>,
+    generators: Vec<(&'static str, std::result::Result<i32, String>)>,
+    bad_generator_arguments: Vec<(&'static str, bool)>,
+    generated_probe: Option<(f32, f32, f32)>,
+}
+
+struct ProbeGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<ProbeFindings>>,
+}
+
+impl GameStateAccess for ProbeGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for ProbeGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+        let mut findings = ProbeFindings {
+            engine_layer: version,
+            ..ProbeFindings::default()
+        };
+
+        // --- the probe as a value ---------------------------------------------
+        let probe = LightProbe::new()?;
+        let position = probe.position()?;
+        findings.fresh = (
+            position.X.abs() + position.Y.abs() + position.Z.abs(),
+            probe.is_zero()?,
+            probe.has_visibility()?,
+            probe.coefficients()?.len(),
+        );
+        let placed = LightProbe::at(Vector3::from_x_and_y_and_z(3.0, -4.0, 5.0))?;
+        findings.positioned = triple(placed.position()?);
+
+        for (name, index) in [
+            ("one past the table", LightProbe::COEFFICIENT_COUNT),
+            ("before the table", -1),
+        ] {
+            findings
+                .bad_coefficient
+                .push((name, probe.coefficient(index).is_err()));
+            findings.bad_coefficient.push((
+                name,
+                probe.set_coefficient(index, Vector3::Zero).is_err(),
+            ));
+        }
+
+        // The band-zero term is directionally flat: with only it set, every
+        // normal must receive the same irradiance.
+        probe.set_coefficient(0, Vector3::from_x_and_y_and_z(1.0, 1.0, 1.0))?;
+        for normal in [
+            Vector3::Up,
+            Vector3::from_x_and_y_and_z(1.0, 0.0, 0.0),
+            Vector3::from_x_and_y_and_z(0.0, 0.0, -1.0),
+        ] {
+            findings.dc_irradiance.push(triple(probe.irradiance(normal)?));
+        }
+
+        // A band-one term is not: it must brighten one hemisphere and darken
+        // the other, and the dark side is floored at zero rather than going
+        // negative.
+        probe.set_coefficient(1, Vector3::from_x_and_y_and_z(4.0, 4.0, 4.0))?;
+        for (name, normal) in [
+            ("along the band-one axis", Vector3::Up),
+            ("against it", Vector3::from_x_and_y_and_z(0.0, -1.0, 0.0)),
+            ("across it", Vector3::from_x_and_y_and_z(1.0, 0.0, 0.0)),
+        ] {
+            findings
+                .directional_irradiance
+                .push((name, triple(probe.irradiance(normal)?)));
+        }
+
+        probe.set_coefficient(1, Vector3::Zero)?;
+        probe.scale(2.0)?;
+        findings
+            .scaled
+            .push(("doubled", triple(probe.coefficient(0)?), probe.is_zero()?));
+        probe.scale(0.0)?;
+        findings
+            .scaled
+            .push(("scaled to nothing", triple(probe.coefficient(0)?), probe.is_zero()?));
+
+        // Copying makes two probes equal by value; changing one coefficient
+        // stops them being equal.
+        probe.set_coefficient(0, Vector3::from_x_and_y_and_z(0.5, 0.25, 0.125))?;
+        probe.set_position(Vector3::from_x_and_y_and_z(1.0, 2.0, 3.0))?;
+        let copy = LightProbe::new()?;
+        findings
+            .equality
+            .push(("before copying", copy.value_eq(&probe)?));
+        copy.copy_from(&probe)?;
+        findings
+            .equality
+            .push(("after copying", copy.value_eq(&probe)?));
+        copy.set_coefficient(4, Vector3::from_x_and_y_and_z(0.0, 0.0, 1.0))?;
+        findings
+            .equality
+            .push(("after changing one coefficient", copy.value_eq(&probe)?));
+
+        // --- visibility --------------------------------------------------------
+        findings.weights.push((
+            "with no visibility stored",
+            probe.visibility_weight(Vector3::Up, 10.0)?,
+        ));
+        probe.set_visibility(0, 5.0, 30.0)?;
+        findings.visibility.push((
+            "as written",
+            probe.visibility_mean(0)?,
+            probe.visibility_mean_squared(0)?,
+        ));
+        probe.set_visibility(1, -5.0, -30.0)?;
+        findings.visibility.push((
+            "written negative",
+            probe.visibility_mean(1)?,
+            probe.visibility_mean_squared(1)?,
+        ));
+        findings
+            .visibility
+            .push(("never written", probe.visibility_mean(3)?, probe.visibility_mean_squared(3)?));
+        for (name, direction) in [
+            ("before the table", -1),
+            ("one past the table", LightProbe::VISIBILITY_DIRECTIONS),
+        ] {
+            findings
+                .bad_visibility
+                .push((name, probe.set_visibility(direction, 1.0, 1.0).is_err()));
+            findings
+                .bad_visibility
+                .push((name, probe.visibility_mean(direction).is_err()));
+        }
+        // The six slots are +X, -X, +Y, -Y, +Z, -Z in that order, and the weight
+        // blends across the axes the query direction actually points along --
+        // so a query straight up reads slot two and nothing else.
+        probe.set_visibility(2, 5.0, 30.0)?;
+        findings.weights.push((
+            "at no distance at all",
+            probe.visibility_weight(Vector3::Up, 0.0)?,
+        ));
+        findings.weights.push((
+            "well inside the mean",
+            probe.visibility_weight(Vector3::Up, 1.0)?,
+        ));
+        findings.weights.push((
+            "well beyond the mean",
+            probe.visibility_weight(Vector3::Up, 50.0)?,
+        ));
+        findings.weights.push((
+            "along an axis with nothing recorded",
+            probe.visibility_weight(Vector3::from_x_and_y_and_z(0.0, 0.0, 1.0), 50.0)?,
+        ));
+        probe.set_coefficient(0, Vector3::from_x_and_y_and_z(1.0, 1.0, 1.0))?;
+        probe.scale(-1.0)?;
+        findings.scaled.push((
+            "scaled by a negative factor",
+            triple(probe.coefficient(0)?),
+            probe.is_zero()?,
+        ));
+        findings.glsl_bytes = LightProbe::evaluation_glsl()?.len();
+
+        // --- image-based lighting ----------------------------------------------
+        let mut ibl = ImageBasedLight::canonical_defaults()?;
+        findings.ibl_defaults = (
+            ibl.is_valid()?,
+            ibl.prefiltered_mip_count(),
+            ibl.intensity(),
+        );
+        let irradiance = TextureCube::new(&device, 4, false, SurfaceFormat::Color)?;
+        let specular = TextureCube::new(&device, 8, true, SurfaceFormat::Color)?;
+        let lut = Texture2D::new(&device, 8, 8)?;
+        ibl.set_irradiance(Some(irradiance));
+        findings.ibl_states.push(("with one texture", ibl.is_valid()?));
+        ibl.set_prefiltered_specular(Some(specular), 4);
+        findings.ibl_states.push(("with two", ibl.is_valid()?));
+        ibl.set_brdf_lut(Some(lut));
+        findings.ibl_states.push(("with all three", ibl.is_valid()?));
+        ibl.set_prefiltered_specular(None, 4);
+        findings
+            .ibl_states
+            .push(("with the specular cube taken away", ibl.is_valid()?));
+
+        // --- the static maths ---------------------------------------------------
+        for roughness in [0.0_f32, 0.25, 0.5, 1.0] {
+            let mip = EnvironmentProcessor::mip_for_roughness(roughness, 5)?;
+            findings.mip_ramp.push((
+                roughness,
+                mip,
+                EnvironmentProcessor::roughness_for_mip(mip, 5)?,
+            ));
+        }
+        for (name, roughness, mip_count) in [
+            ("a single mip", 0.75_f32, 1_i32),
+            ("no mips at all", 0.75, 0),
+            ("a roughness below zero", -1.0, 5),
+            ("a roughness above one", 2.0, 5),
+        ] {
+            findings.degenerate_ramp.push((
+                name,
+                EnvironmentProcessor::mip_for_roughness(roughness, mip_count)?,
+            ));
+        }
+        for index in 0..4 {
+            let point = EnvironmentProcessor::hammersley(index, 4)?;
+            findings.hammersley.push((index, point.X, point.Y));
+        }
+        findings.ggx_smooth = triple(EnvironmentProcessor::importance_sample_ggx(
+            EnvironmentProcessor::hammersley(1, 4)?,
+            Vector3::Up,
+            0.0,
+        )?);
+        for face in [
+            CubeMapFace::PositiveX,
+            CubeMapFace::NegativeX,
+            CubeMapFace::PositiveY,
+            CubeMapFace::NegativeY,
+            CubeMapFace::PositiveZ,
+            CubeMapFace::NegativeZ,
+        ] {
+            findings
+                .face_directions
+                .push(triple(EnvironmentProcessor::face_direction(face, 0.5, 0.5)?));
+        }
+        for (name, direction) in [
+            ("straight up", Vector3::Up),
+            ("straight down", Vector3::from_x_and_y_and_z(0.0, -1.0, 0.0)),
+            ("along +X", Vector3::from_x_and_y_and_z(1.0, 0.0, 0.0)),
+        ] {
+            let uv = EnvironmentProcessor::direction_to_equirectangular(direction)?;
+            findings.equirectangular.push((name, uv.X, uv.Y));
+        }
+
+        // --- the generators ------------------------------------------------------
+        let processor = EnvironmentProcessor::new(&device)?;
+        findings.brdf_lut = match processor.brdf_lut(16, 8) {
+            Ok(texture) => Some((texture.Width(), texture.Height())),
+            Err(_) => None,
+        };
+        let panorama = Texture2D::new(&device, 16, 8)?;
+        panorama.SetData(&vec![Color::White; 16 * 8])?;
+        let environment = match processor.convert_equirectangular(&panorama, 8) {
+            Ok(cube) => {
+                findings
+                    .generators
+                    .push(("the equirectangular conversion", Ok(cube.Size())));
+                Some(cube)
+            }
+            Err(error) => {
+                findings
+                    .generators
+                    .push(("the equirectangular conversion", Err(error.to_string())));
+                None
+            }
+        };
+        if let Some(environment) = environment.as_ref() {
+            findings.generators.push((
+                "the irradiance convolution",
+                processor
+                    .irradiance(environment, 4, 8)
+                    .map(|cube| cube.Size())
+                    .map_err(|error| error.to_string()),
+            ));
+            findings.generators.push((
+                "the prefiltered specular chain",
+                processor
+                    .prefiltered_specular(environment, 8, 3, 8)
+                    .map(|cube| cube.Size())
+                    .map_err(|error| error.to_string()),
+            ));
+            findings.generated_probe = processor
+                .probe(environment, Vector3::from_x_and_y_and_z(1.0, 2.0, 3.0))
+                .ok()
+                .map(|probe| triple(probe.position().unwrap_or(Vector3::Zero)));
+            for (name, refused) in [
+                ("a zero irradiance size", processor.irradiance(environment, 0, 8).is_err()),
+                ("a zero sample count", processor.irradiance(environment, 4, 0).is_err()),
+                (
+                    "a zero mip count",
+                    processor.prefiltered_specular(environment, 8, 0, 8).is_err(),
+                ),
+            ] {
+                findings.bad_generator_arguments.push((name, refused));
+            }
+        }
+        findings.bad_generator_arguments.push((
+            "a zero face size",
+            processor.convert_equirectangular(&panorama, 0).is_err(),
+        ));
+        findings
+            .bad_generator_arguments
+            .push(("a zero table size", processor.brdf_lut(0, 8).is_err()));
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn light_probes_store_directional_light_and_the_processor_makes_the_maps_that_fill_them() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(ProbeFindings::default()));
+    let game = ProbeGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with a light probe and an environment processor");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+
+    // --- the probe as a value ----------------------------------------------
+    assert_eq!(
+        findings.fresh,
+        (0.0, true, false, LightProbe::COEFFICIENT_COUNT as usize),
+        "a fresh probe sits at the origin, stores no light and no visibility, \
+         and carries exactly the documented number of coefficients"
+    );
+    assert_eq!(
+        findings.positioned,
+        (3.0, -4.0, 5.0),
+        "a probe created at a position remembers it"
+    );
+    for (name, refused) in &findings.bad_coefficient {
+        assert!(
+            refused,
+            "a coefficient index {name} is refused rather than clamped"
+        );
+    }
+
+    // Band zero is directionally flat: with only it set, every normal gets the
+    // same irradiance, and it is not zero.
+    println!("band-zero irradiance: {:?}", findings.dc_irradiance);
+    let first = findings.dc_irradiance[0];
+    assert!(first.0 > 0.0, "the band-zero term lights the surface");
+    for value in &findings.dc_irradiance {
+        assert_eq!(
+            *value, first,
+            "band zero is the same in every direction: {:?}",
+            findings.dc_irradiance
+        );
+    }
+
+    // Band one is not flat, and the dark side is floored at zero rather than
+    // going negative.
+    println!("band-one irradiance: {:?}", findings.directional_irradiance);
+    let along = findings.directional_irradiance[0].1;
+    let against = findings.directional_irradiance[1].1;
+    let across = findings.directional_irradiance[2].1;
+    assert!(
+        along.0 > across.0 && across.0 >= against.0,
+        "a band-one term brightens one hemisphere and darkens the other: {:?}",
+        findings.directional_irradiance
+    );
+    assert_eq!(
+        against,
+        (0.0, 0.0, 0.0),
+        "and a reconstruction that would go negative is floored at zero, not signed"
+    );
+
+    println!("scaled: {:?}", findings.scaled);
+    let (_, doubled, still_lit) = findings.scaled[0];
+    assert_eq!(doubled, (2.0, 2.0, 2.0), "scaling multiplies the coefficients");
+    assert!(!still_lit, "a scaled probe still stores light");
+    let (_, emptied, is_zero) = findings.scaled[1];
+    assert_eq!(emptied, (0.0, 0.0, 0.0), "scaling by zero empties them");
+    assert!(is_zero, "and the probe says it stores nothing");
+    let (_, unchanged, _) = findings.scaled[2];
+    assert_eq!(
+        unchanged,
+        (1.0, 1.0, 1.0),
+        "a negative factor is ignored outright, not applied and then floored"
+    );
+
+    assert_eq!(
+        findings.equality,
+        vec![
+            ("before copying", false),
+            ("after copying", true),
+            ("after changing one coefficient", false),
+        ],
+        "probes compare by content, across every coefficient"
+    );
+
+    // --- visibility ---------------------------------------------------------
+    println!("visibility: {:?}", findings.visibility);
+    assert_eq!(
+        findings.visibility[0],
+        ("as written", 5.0, 30.0),
+        "visibility round-trips"
+    );
+    assert_eq!(
+        findings.visibility[1],
+        ("written negative", 0.0, 0.0),
+        "a negative distance is floored at zero, not stored"
+    );
+    assert_eq!(
+        findings.visibility[2],
+        ("never written", 0.0, 0.0),
+        "and a direction never written carries nothing"
+    );
+    for (name, refused) in &findings.bad_visibility {
+        assert!(refused, "a visibility direction {name} is refused");
+    }
+
+    println!("weights: {:?}", findings.weights);
+    let weight = |name: &str| -> f32 {
+        findings
+            .weights
+            .iter()
+            .find(|(label, _)| *label == name)
+            .expect("a recorded weight")
+            .1
+    };
+    assert_eq!(
+        weight("with no visibility stored"),
+        1.0,
+        "an empty probe hides nothing"
+    );
+    assert_eq!(
+        weight("at no distance at all"),
+        1.0,
+        "and neither does a point at no distance"
+    );
+    assert_eq!(
+        weight("well inside the mean"),
+        1.0,
+        "a point closer than the mean occluder is not shadowed at all"
+    );
+    // Chebyshev, exactly as a variance shadow map computes it: with a mean of
+    // five and a mean square of thirty the variance is five, so a point fifty
+    // units out is weighted 5 / (5 + 45^2). A weight that merely *fell* with
+    // distance would pass a monotonicity check and fail this.
+    let expected = 5.0_f32 / (5.0 + 45.0 * 45.0);
+    assert!(
+        (weight("well beyond the mean") - expected).abs() < expected * 1e-3,
+        "the weight beyond the mean is {}, not {expected}",
+        weight("well beyond the mean")
+    );
+    assert_eq!(
+        weight("along an axis with nothing recorded"),
+        1.0,
+        "an axis with no occluder statistics is trusted rather than discarded"
+    );
+    for (name, value) in &findings.weights {
+        assert!(
+            (0.0..=1.0).contains(value),
+            "{name} produced a weight outside zero-to-one: {value}"
+        );
+    }
+    assert!(findings.glsl_bytes > 0, "the evaluation GLSL is published");
+
+    // --- image-based lighting -----------------------------------------------
+    println!("image-based light defaults: {:?}", findings.ibl_defaults);
+    let (valid, mips, intensity) = findings.ibl_defaults;
+    assert!(!valid, "a light with no textures cannot shade");
+    assert!(mips >= 1, "the default mip count is at least one: {mips}");
+    assert!(intensity > 0.0, "and the default intensity is not zero");
+    assert_eq!(
+        findings.ibl_states,
+        vec![
+            ("with one texture", false),
+            ("with two", false),
+            ("with all three", true),
+            ("with the specular cube taken away", false),
+        ],
+        "a nearly complete light is invalid, which is the failure the check exists for"
+    );
+
+    // --- the static maths ----------------------------------------------------
+    // The roughness ramp and its inverse must agree; a one-way monotonic map
+    // would satisfy every other property here.
+    println!("mip ramp: {:?}", findings.mip_ramp);
+    for (roughness, mip, back) in &findings.mip_ramp {
+        assert!(
+            (0.0..=4.0).contains(mip),
+            "roughness {roughness} mapped outside the five-mip chain: {mip}"
+        );
+        assert!(
+            (roughness - back).abs() < 1e-4,
+            "roughness {roughness} came back as {back} through mip {mip}"
+        );
+    }
+    assert!(
+        findings
+            .mip_ramp
+            .windows(2)
+            .all(|pair| pair[0].1 < pair[1].1),
+        "and a rougher surface reads a higher mip: {:?}",
+        findings.mip_ramp
+    );
+
+    println!("degenerate ramp: {:?}", findings.degenerate_ramp);
+    assert_eq!(
+        findings.degenerate_ramp[0].1, 0.0,
+        "a single-mip chain has no ramp to index, so the answer is mip zero"
+    );
+    assert_eq!(
+        findings.degenerate_ramp[1].1, 0.0,
+        "and neither does an empty one"
+    );
+    assert_eq!(
+        findings.degenerate_ramp[2].1, 0.0,
+        "a roughness below zero is clamped into the ramp"
+    );
+    assert_eq!(
+        findings.degenerate_ramp[3].1, 4.0,
+        "and one above one is clamped to the last mip"
+    );
+
+    // Hammersley's first coordinate is the *centre* of the index's stratum,
+    // `(i + 0.5) / n`, not `i / n`: the sequence samples texel centres, so no
+    // point sits on the zero edge. Its second coordinate is the radical
+    // inverse in base two, which is what makes the pairs low-discrepancy.
+    println!("hammersley: {:?}", findings.hammersley);
+    assert_eq!(
+        findings.hammersley.iter().map(|(_, _, y)| *y).collect::<Vec<f32>>(),
+        vec![0.0, 0.5, 0.25, 0.75],
+        "the second coordinate is the base-two radical inverse"
+    );
+    for (index, x, y) in &findings.hammersley {
+        let stratum = (*index as f32 + 0.5) / 4.0;
+        assert!(
+            (x - stratum).abs() < 1e-6,
+            "point {index} has first coordinate {x}, not {stratum}"
+        );
+        assert!(
+            (0.0..1.0).contains(y),
+            "point {index} has second coordinate {y} outside the unit interval"
+        );
+    }
+    let seconds: Vec<f32> = findings.hammersley.iter().map(|(_, _, y)| *y).collect();
+    for (index, first) in seconds.iter().enumerate() {
+        for second in &seconds[index + 1..] {
+            assert!(
+                (first - second).abs() > 1e-6,
+                "the sequence repeats a point: {seconds:?}"
+            );
+        }
+    }
+
+    // At zero roughness the GGX lobe collapses onto the normal.
+    println!("ggx at zero roughness: {:?}", findings.ggx_smooth);
+    let (x, y, z) = findings.ggx_smooth;
+    assert!(
+        x.abs() < 1e-4 && (y - 1.0).abs() < 1e-4 && z.abs() < 1e-4,
+        "a mirror-smooth lobe samples along the normal itself: {:?}",
+        findings.ggx_smooth
+    );
+
+    // The six face centres are the six axes: distinct, and unit length.
+    println!("face directions: {:?}", findings.face_directions);
+    assert_eq!(findings.face_directions.len(), 6);
+    for (index, first) in findings.face_directions.iter().enumerate() {
+        let length = (first.0 * first.0 + first.1 * first.1 + first.2 * first.2).sqrt();
+        assert!(
+            (length - 1.0).abs() < 1e-4,
+            "face {index} looks along a direction of length {length}"
+        );
+        for second in &findings.face_directions[index + 1..] {
+            assert!(
+                first != second,
+                "two faces look the same way: {:?}",
+                findings.face_directions
+            );
+        }
+    }
+
+    // The panorama mapping puts the poles at the top and bottom edges.
+    println!("equirectangular: {:?}", findings.equirectangular);
+    for (name, u, v) in &findings.equirectangular {
+        assert!(
+            (0.0..=1.0).contains(u) && (0.0..=1.0).contains(v),
+            "{name} mapped outside the panorama: ({u}, {v})"
+        );
+    }
+    let up = findings.equirectangular[0].2;
+    let down = findings.equirectangular[1].2;
+    assert!(
+        (up - down).abs() > 0.9,
+        "up and down land at opposite edges: {up} against {down}"
+    );
+
+    // --- the generators -------------------------------------------------------
+    assert_eq!(
+        findings.brdf_lut,
+        Some((16, 16)),
+        "the BRDF table is square at the size it was asked for, on every renderer"
+    );
+    println!("generators: {:?}", findings.generators);
+    for (name, outcome) in &findings.generators {
+        match outcome {
+            Ok(size) => assert!(*size > 0, "{name} produced a cube of size {size}"),
+            Err(message) => println!("{name} is unavailable on this renderer: {message}"),
+        }
+    }
+    if let Some((label, Ok(size))) = findings.generators.first() {
+        assert_eq!(*size, 8, "{label} honoured the face size it was given");
+        assert_eq!(
+            findings.generated_probe,
+            Some((1.0, 2.0, 3.0)),
+            "and a probe projected from it records the position it was asked for"
+        );
+    }
+    println!("bad generator arguments: {:?}", findings.bad_generator_arguments);
+    for (name, refused) in &findings.bad_generator_arguments {
+        assert!(refused, "{name} is refused");
+    }
 }

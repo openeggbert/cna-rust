@@ -8385,6 +8385,165 @@ extern "C" {
         argument0: CNA_HdrDisplayOutputHandle,
         argument1: f32,
     ) -> CNA_Result;
+    pub fn cna_environment_processor_convert_equirectangular(
+        argument0: CNA_EnvironmentProcessorHandle,
+        argument1: CNA_Handle,
+        argument2: i32,
+        argument3: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_environment_processor_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_EnvironmentProcessorHandle,
+    ) -> CNA_Result;
+    pub fn cna_environment_processor_destroy(
+        argument0: CNA_EnvironmentProcessorHandle,
+    ) -> CNA_Result;
+    pub fn cna_environment_processor_direction_to_equirectangular(
+        argument0: *const CNA_Vector3,
+        argument1: *mut f32,
+        argument2: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_environment_processor_face_direction(
+        argument0: i32,
+        argument1: f32,
+        argument2: f32,
+        argument3: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_environment_processor_generate_brdf_lut(
+        argument0: CNA_EnvironmentProcessorHandle,
+        argument1: i32,
+        argument2: i32,
+        argument3: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_environment_processor_generate_irradiance(
+        argument0: CNA_EnvironmentProcessorHandle,
+        argument1: CNA_Handle,
+        argument2: i32,
+        argument3: i32,
+        argument4: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_environment_processor_generate_prefiltered_specular(
+        argument0: CNA_EnvironmentProcessorHandle,
+        argument1: CNA_Handle,
+        argument2: i32,
+        argument3: i32,
+        argument4: i32,
+        argument5: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_environment_processor_generate_probe(
+        argument0: CNA_EnvironmentProcessorHandle,
+        argument1: CNA_Handle,
+        argument2: *const CNA_Vector3,
+        argument3: *mut CNA_LightProbeHandle,
+    ) -> CNA_Result;
+    pub fn cna_environment_processor_hammersley(
+        argument0: i32,
+        argument1: i32,
+        argument2: *mut f32,
+        argument3: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_environment_processor_importance_sample_ggx(
+        argument0: f32,
+        argument1: f32,
+        argument2: *const CNA_Vector3,
+        argument3: f32,
+        argument4: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_environment_processor_mip_for_roughness(
+        argument0: f32,
+        argument1: i32,
+        argument2: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_environment_processor_roughness_for_mip(
+        argument0: f32,
+        argument1: i32,
+        argument2: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_image_based_light_ext_init(argument0: *mut CNA_ImageBasedLightEXT) -> CNA_Result;
+    pub fn cna_image_based_light_ext_is_valid(
+        argument0: *const CNA_ImageBasedLightEXT,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_ext_copy_coefficients(
+        argument0: CNA_LightProbeHandle,
+        argument1: *mut CNA_Vector3,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_ext_copy_evaluation_glsl(
+        argument0: *mut c_char,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_ext_copy_from(
+        argument0: CNA_LightProbeHandle,
+        argument1: CNA_LightProbeHandle,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_ext_create(argument0: *mut CNA_LightProbeHandle) -> CNA_Result;
+    pub fn cna_light_probe_ext_create_at(
+        argument0: *const CNA_Vector3,
+        argument1: *mut CNA_LightProbeHandle,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_ext_destroy(argument0: CNA_LightProbeHandle) -> CNA_Result;
+    pub fn cna_light_probe_ext_equals(
+        argument0: CNA_LightProbeHandle,
+        argument1: CNA_LightProbeHandle,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_ext_get_coefficient(
+        argument0: CNA_LightProbeHandle,
+        argument1: i32,
+        argument2: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_ext_get_position(
+        argument0: CNA_LightProbeHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_ext_get_visibility_mean(
+        argument0: CNA_LightProbeHandle,
+        argument1: i32,
+        argument2: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_ext_get_visibility_mean_squared(
+        argument0: CNA_LightProbeHandle,
+        argument1: i32,
+        argument2: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_ext_has_visibility(
+        argument0: CNA_LightProbeHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_ext_irradiance(
+        argument0: CNA_LightProbeHandle,
+        argument1: *const CNA_Vector3,
+        argument2: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_ext_is_zero(
+        argument0: CNA_LightProbeHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_ext_scale(argument0: CNA_LightProbeHandle, argument1: f32) -> CNA_Result;
+    pub fn cna_light_probe_ext_set_coefficient(
+        argument0: CNA_LightProbeHandle,
+        argument1: i32,
+        argument2: *const CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_ext_set_position(
+        argument0: CNA_LightProbeHandle,
+        argument1: *const CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_ext_set_visibility(
+        argument0: CNA_LightProbeHandle,
+        argument1: i32,
+        argument2: f32,
+        argument3: f32,
+    ) -> CNA_Result;
+    pub fn cna_light_probe_ext_visibility_weight(
+        argument0: CNA_LightProbeHandle,
+        argument1: *const CNA_Vector3,
+        argument2: f32,
+        argument3: *mut f32,
+    ) -> CNA_Result;
     pub fn cna_debug_draw_add_bounding_sphere(
         argument0: CNA_DebugDrawHandle,
         argument1: *const CNA_BoundingSphere,

@@ -141,6 +141,7 @@ the criterion above is unchanged, only its precondition has been met.
 | the clustered light set, the cluster grid and the light-to-cluster assignment | `clustered_light_ext`, `clustered_light_set`, `clustered_light_grid`, `clustered_light_assignment` | 43 | `VERIFIED_STATE` |
 | the shadow budget, the light upload buffer and the compute sort | `clustered_shadow_policy`, `clustered_light_buffer`, `clustered_light_compute` | 30 | `VERIFIED_GPU` |
 | the clustered forward effect | `clustered_forward_effect` (23 of 29; the other six wait on the PBR material extensions, the light probes and the area lights) | 23 | `VERIFIED_STATE` |
+| light probes, image-based lights and the environment processor | `light_probe_ext`, `image_based_light_ext`, `environment_processor` | 34 | `VERIFIED_GPU` |
 
 ### What the GPU artifact changed about the evidence
 
@@ -272,4 +273,29 @@ three found something:
   white ambient is a choice while a negative one would subtract light that was
   never added. A single "clamped to 0..1" assumption would have been wrong for
   two of the four.
+- **The environment processor's three cube generators run on this host.** The
+  equirectangular conversion, the cosine-convolved irradiance cube and the
+  GGX-prefiltered specular chain all produce real cube maps at the sizes they
+  were asked for on the OPENGLES3 artifact -- the header warns that a renderer
+  without cube storage answers `NOT_SUPPORTED`, and this one does not. The
+  test records the outcome per generator rather than assuming either way, so
+  the same test is honest on a renderer that refuses.
+- **A light probe has no parent at all.** `cna_light_probe_ext_create` takes no
+  device and no game and calls no `AddOwnedGraphicsResourceFor`, so unlike
+  every other owned engine object in this module a probe registers with no
+  device: its lifetime is entirely the Rust value's. Registering it anyway
+  would have been harmless but wrong, and the difference is only visible in
+  upstream's source.
+- **`Hammersley` samples stratum centres, not stratum edges.** The first
+  coordinate is `(i + 0.5) / n`, so point zero is `0.125` for four samples
+  rather than `0`. A test asserting `i / n` fails on every point; one asserting
+  only "inside the unit interval" would never notice the sequence was
+  half-a-stratum out.
+- **A probe's visibility slots are `+X, -X, +Y, -Y, +Z, -Z` in that order and
+  the weight blends across them by squared component,** so storing statistics in
+  slot zero and then querying straight up reads *nothing* -- the answer is a
+  confident `1.0`, meaning "nothing is known to be in the way", and looks
+  exactly like a working query. Beyond the mean the weight is Chebyshev's
+  `variance / (variance + gap^2)`, which the test pins to the value rather than
+  to the direction of change.
 

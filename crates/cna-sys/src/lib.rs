@@ -808,6 +808,24 @@ pub type CNA_ClusteredShadowPolicyHandle = CNA_Handle;
 pub type CNA_ClusteredLightBufferHandle = CNA_Handle;
 pub type CNA_ClusteredLightComputeHandle = CNA_Handle;
 pub type CNA_ClusteredForwardEffectHandle = CNA_Handle;
+pub type CNA_LightProbeHandle = CNA_Handle;
+pub type CNA_EnvironmentProcessorHandle = CNA_Handle;
+
+pub const CNA_LIGHT_PROBE_COEFFICIENT_COUNT_EXT: i32 = 9;
+pub const CNA_LIGHT_PROBE_VISIBILITY_DIRECTIONS_EXT: i32 = 6;
+pub const CNA_LIGHT_PROBE_VOLUME_MAX_PROBES_EXT: i32 = 32768;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_ImageBasedLightEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub irradiance: CNA_Handle,
+    pub prefiltered_specular: CNA_Handle,
+    pub brdf_lut: CNA_Handle,
+    pub prefiltered_mip_count: i32,
+    pub intensity: f32,
+}
 
 pub const CNA_CLUSTERED_FORWARD_MAX_LIGHTS_PER_FRAGMENT_EXT: i32 = 128;
 
@@ -9887,4 +9905,104 @@ pub type cna_clustered_forward_effect_set_roughness_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_clustered_forward_effect_volume_attenuation_fn = unsafe extern "C" fn(
     *const CNA_Vector3, f32, f32, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_environment_processor_convert_equirectangular_fn = unsafe extern "C" fn(
+    CNA_EnvironmentProcessorHandle, CNA_Handle, i32, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_environment_processor_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_EnvironmentProcessorHandle,
+) -> CNA_Result;
+pub type cna_environment_processor_destroy_fn = unsafe extern "C" fn(
+    CNA_EnvironmentProcessorHandle,
+) -> CNA_Result;
+pub type cna_environment_processor_direction_to_equirectangular_fn = unsafe extern "C" fn(
+    *const CNA_Vector3, *mut f32, *mut f32,
+) -> CNA_Result;
+pub type cna_environment_processor_face_direction_fn = unsafe extern "C" fn(
+    i32, f32, f32, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_environment_processor_generate_brdf_lut_fn = unsafe extern "C" fn(
+    CNA_EnvironmentProcessorHandle, i32, i32, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_environment_processor_generate_irradiance_fn = unsafe extern "C" fn(
+    CNA_EnvironmentProcessorHandle, CNA_Handle, i32, i32, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_environment_processor_generate_prefiltered_specular_fn = unsafe extern "C" fn(
+    CNA_EnvironmentProcessorHandle, CNA_Handle, i32, i32, i32, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_environment_processor_generate_probe_fn = unsafe extern "C" fn(
+    CNA_EnvironmentProcessorHandle, CNA_Handle, *const CNA_Vector3, *mut CNA_LightProbeHandle,
+) -> CNA_Result;
+pub type cna_environment_processor_hammersley_fn = unsafe extern "C" fn(
+    i32, i32, *mut f32, *mut f32,
+) -> CNA_Result;
+pub type cna_environment_processor_importance_sample_ggx_fn = unsafe extern "C" fn(
+    f32, f32, *const CNA_Vector3, f32, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_environment_processor_mip_for_roughness_fn = unsafe extern "C" fn(
+    f32, i32, *mut f32,
+) -> CNA_Result;
+pub type cna_environment_processor_roughness_for_mip_fn = unsafe extern "C" fn(
+    f32, i32, *mut f32,
+) -> CNA_Result;
+pub type cna_image_based_light_ext_init_fn = unsafe extern "C" fn(
+    *mut CNA_ImageBasedLightEXT,
+) -> CNA_Result;
+pub type cna_image_based_light_ext_is_valid_fn = unsafe extern "C" fn(
+    *const CNA_ImageBasedLightEXT, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_light_probe_ext_copy_coefficients_fn = unsafe extern "C" fn(
+    CNA_LightProbeHandle, *mut CNA_Vector3, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_light_probe_ext_copy_evaluation_glsl_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_light_probe_ext_copy_from_fn = unsafe extern "C" fn(
+    CNA_LightProbeHandle, CNA_LightProbeHandle,
+) -> CNA_Result;
+pub type cna_light_probe_ext_create_fn = unsafe extern "C" fn(
+    *mut CNA_LightProbeHandle,
+) -> CNA_Result;
+pub type cna_light_probe_ext_create_at_fn = unsafe extern "C" fn(
+    *const CNA_Vector3, *mut CNA_LightProbeHandle,
+) -> CNA_Result;
+pub type cna_light_probe_ext_destroy_fn = unsafe extern "C" fn(CNA_LightProbeHandle) -> CNA_Result;
+pub type cna_light_probe_ext_equals_fn = unsafe extern "C" fn(
+    CNA_LightProbeHandle, CNA_LightProbeHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_light_probe_ext_get_coefficient_fn = unsafe extern "C" fn(
+    CNA_LightProbeHandle, i32, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_light_probe_ext_get_position_fn = unsafe extern "C" fn(
+    CNA_LightProbeHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_light_probe_ext_get_visibility_mean_fn = unsafe extern "C" fn(
+    CNA_LightProbeHandle, i32, *mut f32,
+) -> CNA_Result;
+pub type cna_light_probe_ext_get_visibility_mean_squared_fn = unsafe extern "C" fn(
+    CNA_LightProbeHandle, i32, *mut f32,
+) -> CNA_Result;
+pub type cna_light_probe_ext_has_visibility_fn = unsafe extern "C" fn(
+    CNA_LightProbeHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_light_probe_ext_irradiance_fn = unsafe extern "C" fn(
+    CNA_LightProbeHandle, *const CNA_Vector3, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_light_probe_ext_is_zero_fn = unsafe extern "C" fn(
+    CNA_LightProbeHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_light_probe_ext_scale_fn = unsafe extern "C" fn(
+    CNA_LightProbeHandle, f32,
+) -> CNA_Result;
+pub type cna_light_probe_ext_set_coefficient_fn = unsafe extern "C" fn(
+    CNA_LightProbeHandle, i32, *const CNA_Vector3,
+) -> CNA_Result;
+pub type cna_light_probe_ext_set_position_fn = unsafe extern "C" fn(
+    CNA_LightProbeHandle, *const CNA_Vector3,
+) -> CNA_Result;
+pub type cna_light_probe_ext_set_visibility_fn = unsafe extern "C" fn(
+    CNA_LightProbeHandle, i32, f32, f32,
+) -> CNA_Result;
+pub type cna_light_probe_ext_visibility_weight_fn = unsafe extern "C" fn(
+    CNA_LightProbeHandle, *const CNA_Vector3, f32, *mut f32,
 ) -> CNA_Result;

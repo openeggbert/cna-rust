@@ -322,6 +322,26 @@ impl TextureCube {
     pub(crate) fn relinquish(&self) {
         self.state.relinquish();
     }
+
+    /// Adopts a cube map CNA created and handed over outright.
+    ///
+    /// The engine layer's environment processor publishes owned cubes -- the
+    /// equirectangular conversion, the irradiance convolution and the
+    /// prefiltered specular chain -- and the caller destroys each. This is that
+    /// adoption, and it destroys the handle on failure so a refused wrap never
+    /// strands one.
+    pub(crate) fn from_owned_handle(
+        graphics_device: &GraphicsDevice,
+        handle: sys::CNA_Handle,
+    ) -> Result<Self> {
+        match Self::from_handle(graphics_device, handle, ResourceKind::TextureCube) {
+            Ok(value) => Ok(value),
+            Err(error) => {
+                let _ = graphics_device.state.native().destroy_texture_cube(handle);
+                Err(error)
+            }
+        }
+    }
 }
 
 pub(super) fn color_to_native(value: Color) -> sys::CNA_Color {
