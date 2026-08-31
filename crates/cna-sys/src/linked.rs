@@ -8011,4 +8011,221 @@ extern "C" {
     pub fn cna_point_light_ext_init(argument0: *mut CNA_PointLightEXT) -> CNA_Result;
     pub fn cna_spot_light_ext_init(argument0: *mut CNA_SpotLightEXT) -> CNA_Result;
     pub fn cna_punctual_light_ext_init(argument0: *mut CNA_PunctualLightEXT) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_begin(
+        argument0: CNA_DepthNormalPrepassHandle,
+        argument1: i32,
+        argument2: *const CNA_Matrix,
+        argument3: *const CNA_Matrix,
+        argument4: f32,
+        argument5: f32,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_copy_depth_decode_glsl(
+        argument0: CNA_Bool,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_copy_velocity_decode_glsl(
+        argument0: *mut c_char,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_create(
+        argument0: CNA_Handle,
+        argument1: i32,
+        argument2: i32,
+        argument3: CNA_DepthEncoding,
+        argument4: *mut CNA_DepthNormalPrepassHandle,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_decode_velocity_ext(
+        argument0: CNA_Color,
+        argument1: *mut CNA_Vector2,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_destroy(argument0: CNA_DepthNormalPrepassHandle) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_end(argument0: CNA_DepthNormalPrepassHandle) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_get_depth_texture(
+        argument0: CNA_DepthNormalPrepassHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_get_normal_texture(
+        argument0: CNA_DepthNormalPrepassHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_get_pass_count(
+        argument0: CNA_DepthNormalPrepassHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_get_prepass_effect(
+        argument0: CNA_DepthNormalPrepassHandle,
+        argument1: *mut CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_get_roughness(
+        argument0: CNA_DepthNormalPrepassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_get_skinned_prepass_effect(
+        argument0: CNA_DepthNormalPrepassHandle,
+        argument1: *mut CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_get_velocity_texture_ext(
+        argument0: CNA_DepthNormalPrepassHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_has_velocity_ext(
+        argument0: CNA_Color,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_is_depth_packed(
+        argument0: CNA_DepthNormalPrepassHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_is_supported(
+        argument0: CNA_DepthNormalPrepassHandle,
+        argument1: CNA_Handle,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_is_using_multiple_render_targets(
+        argument0: CNA_DepthNormalPrepassHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_is_velocity_enabled_ext(
+        argument0: CNA_DepthNormalPrepassHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_pack_depth(
+        argument0: f32,
+        argument1: *mut f32,
+        argument2: *mut f32,
+        argument3: *mut f32,
+        argument4: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_resize(
+        argument0: CNA_DepthNormalPrepassHandle,
+        argument1: i32,
+        argument2: i32,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_set_previous_camera_ext(
+        argument0: CNA_DepthNormalPrepassHandle,
+        argument1: *const CNA_Matrix,
+        argument2: *const CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_set_previous_world_ext(
+        argument0: CNA_DepthNormalPrepassHandle,
+        argument1: *const CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_set_roughness(
+        argument0: CNA_DepthNormalPrepassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_set_velocity_enabled_ext(
+        argument0: CNA_DepthNormalPrepassHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_unpack_depth(
+        argument0: f32,
+        argument1: f32,
+        argument2: f32,
+        argument3: f32,
+        argument4: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_depth_normal_prepass_uses_packed_depth_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_transparent_draw_list_camera_position_of(
+        argument0: *const CNA_Matrix,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_transparent_draw_list_clear(argument0: CNA_TransparentDrawListHandle) -> CNA_Result;
+    pub fn cna_transparent_draw_list_copy_sorted_order_ext(
+        argument0: CNA_TransparentDrawListHandle,
+        argument1: *const CNA_Matrix,
+        argument2: *mut i32,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_transparent_draw_list_create(
+        argument0: *mut CNA_TransparentDrawListHandle,
+    ) -> CNA_Result;
+    pub fn cna_transparent_draw_list_destroy(
+        argument0: CNA_TransparentDrawListHandle,
+    ) -> CNA_Result;
+    pub fn cna_transparent_draw_list_draw_sorted(
+        argument0: CNA_TransparentDrawListHandle,
+        argument1: *const CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_transparent_draw_list_get_count(
+        argument0: CNA_TransparentDrawListHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_transparent_draw_list_sort_key(
+        argument0: *const CNA_BoundingBox,
+        argument1: *const CNA_Vector3,
+        argument2: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_transparent_draw_list_submit(
+        argument0: CNA_TransparentDrawListHandle,
+        argument1: *const CNA_BoundingBox,
+        argument2: CNA_TransparentDrawCallback,
+        argument3: *mut c_void,
+    ) -> CNA_Result;
+    pub fn cna_weighted_blended_transparency_begin(
+        argument0: CNA_WeightedBlendedTransparencyHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_weighted_blended_transparency_copy_accumulation_glsl(
+        argument0: *mut c_char,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_weighted_blended_transparency_copy_unsupported_reason(
+        argument0: CNA_WeightedBlendedTransparencyHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_weighted_blended_transparency_create(
+        argument0: CNA_Handle,
+        argument1: i32,
+        argument2: i32,
+        argument3: *mut CNA_WeightedBlendedTransparencyHandle,
+    ) -> CNA_Result;
+    pub fn cna_weighted_blended_transparency_destroy(
+        argument0: CNA_WeightedBlendedTransparencyHandle,
+    ) -> CNA_Result;
+    pub fn cna_weighted_blended_transparency_end(
+        argument0: CNA_WeightedBlendedTransparencyHandle,
+    ) -> CNA_Result;
+    pub fn cna_weighted_blended_transparency_get_accumulation_texture_ext(
+        argument0: CNA_WeightedBlendedTransparencyHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_weighted_blended_transparency_get_revealage_texture_ext(
+        argument0: CNA_WeightedBlendedTransparencyHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_weighted_blended_transparency_is_accumulating(
+        argument0: CNA_WeightedBlendedTransparencyHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_weighted_blended_transparency_is_supported(
+        argument0: CNA_WeightedBlendedTransparencyHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_weighted_blended_transparency_resize(
+        argument0: CNA_WeightedBlendedTransparencyHandle,
+        argument1: i32,
+        argument2: i32,
+    ) -> CNA_Result;
+    pub fn cna_weighted_blended_transparency_resolve(
+        argument0: CNA_WeightedBlendedTransparencyHandle,
+        argument1: i32,
+        argument2: i32,
+    ) -> CNA_Result;
+    pub fn cna_weighted_blended_transparency_weight(
+        argument0: f32,
+        argument1: f32,
+        argument2: f32,
+        argument3: *mut f32,
+    ) -> CNA_Result;
 }

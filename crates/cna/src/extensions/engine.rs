@@ -6571,3 +6571,770 @@ impl PunctualLight {
         })
     }
 }
+
+/// How a depth/normal prepass stores its linear depth.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum DepthEncoding {
+    /// Let the prepass choose what the renderer can do.
+    #[default]
+    Automatic,
+    /// Four eight-bit channels packed together.
+    Packed,
+    /// A single half-float channel.
+    HalfFloat,
+}
+
+impl DepthEncoding {
+    const fn to_native(self) -> sys::CNA_DepthEncoding {
+        match self {
+            Self::Automatic => sys::CNA_DEPTH_ENCODING_AUTOMATIC,
+            Self::Packed => sys::CNA_DEPTH_ENCODING_PACKED,
+            Self::HalfFloat => sys::CNA_DEPTH_ENCODING_HALF_FLOAT,
+        }
+    }
+}
+
+/// A depth and normal prepass: the buffers SSAO, SSR and decals read.
+///
+/// `OWNED`. Whether the depth is packed into four channels or kept as a
+/// half-float is a *renderer* answer under [`DepthEncoding::Automatic`], which
+/// is why [`DepthNormalPrepass::is_depth_packed`] exists as its own question
+/// rather than being inferred from what was asked for.
+pub struct DepthNormalPrepass {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+    device: GraphicsDevice,
+}
+
+impl DepthNormalPrepass {
+    /// Creates a prepass at a size and depth encoding.
+    pub fn new(
+        device: &GraphicsDevice,
+        width: i32,
+        height: i32,
+        encoding: DepthEncoding,
+    ) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe {
+            (native.engine.depth_normal_prepass_create)(
+                device.handle()?,
+                width,
+                height,
+                encoding.to_native(),
+                &mut handle,
+            )
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.depth_normal_prepass_destroy,
+            released: "the depth/normal prepass has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+            device: device.clone(),
+        })
+    }
+
+    /// Whether this renderer can run the prepass on a device.
+    pub fn is_supported(&self, device: &GraphicsDevice) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: both handles are live and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.depth_normal_prepass_is_supported)(
+                handle,
+                device.handle()?,
+                &mut value,
+            )
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Sizes the prepass's targets.
+    pub fn resize(&self, width: i32, height: i32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the sizes are by value.
+        self.native.check(unsafe {
+            (self.native.engine.depth_normal_prepass_resize)(handle, width, height)
+        })
+    }
+
+    /// Opens the prepass for one pass index and camera.
+    pub fn begin(
+        &self,
+        pass_index: i32,
+        view: Matrix,
+        projection: Matrix,
+        near_plane: f32,
+        far_plane: f32,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let view = native_matrix(view);
+        let projection = native_matrix(projection);
+        // SAFETY: the handle is owned and both matrices are borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.depth_normal_prepass_begin)(
+                handle,
+                pass_index,
+                &view,
+                &projection,
+                near_plane,
+                far_plane,
+            )
+        })
+    }
+
+    /// Closes the prepass.
+    pub fn end(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.depth_normal_prepass_end)(handle) })
+    }
+
+    /// How many passes the prepass needs on this renderer.
+    ///
+    /// One with multiple render targets, more without: the count is what a
+    /// caller loops over, so it is read rather than assumed.
+    pub fn pass_count(&self) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.depth_normal_prepass_get_pass_count)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Whether the prepass writes depth and normals in one pass.
+    pub fn is_using_multiple_render_targets(&self) -> Result<bool> {
+        self.flag(self.native.engine.depth_normal_prepass_is_using_multiple_render_targets)
+    }
+
+    /// Whether the depth ended up packed into four channels.
+    pub fn is_depth_packed(&self) -> Result<bool> {
+        self.flag(self.native.engine.depth_normal_prepass_is_depth_packed)
+    }
+
+    /// Whether the velocity target is on.
+    pub fn is_velocity_enabled(&self) -> Result<bool> {
+        self.flag(self.native.engine.depth_normal_prepass_is_velocity_enabled_ext)
+    }
+
+    /// Turns the velocity target on or off.
+    pub fn set_velocity_enabled(&self, value: bool) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the flag is a canonical boolean.
+        self.native.check(unsafe {
+            (self.native.engine.depth_normal_prepass_set_velocity_enabled_ext)(
+                handle,
+                u8::from(value),
+            )
+        })
+    }
+
+    /// The roughness the prepass writes alongside the normals.
+    pub fn roughness(&self) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.depth_normal_prepass_get_roughness)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Sets the roughness the prepass writes.
+    pub fn set_roughness(&self, value: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the value is by value.
+        self.native.check(unsafe {
+            (self.native.engine.depth_normal_prepass_set_roughness)(handle, value)
+        })
+    }
+
+    /// Gives the prepass the previous frame's camera, for velocity.
+    pub fn set_previous_camera(&self, view: Matrix, projection: Matrix) -> Result<()> {
+        let handle = self.core.get()?;
+        let view = native_matrix(view);
+        let projection = native_matrix(projection);
+        // SAFETY: the handle is owned and both matrices are borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.depth_normal_prepass_set_previous_camera_ext)(
+                handle,
+                &view,
+                &projection,
+            )
+        })
+    }
+
+    /// Gives the prepass the previous frame's world transform for the next draw.
+    pub fn set_previous_world(&self, world: Matrix) -> Result<()> {
+        let handle = self.core.get()?;
+        let world = native_matrix(world);
+        // SAFETY: the handle is owned and the matrix is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.depth_normal_prepass_set_previous_world_ext)(handle, &world)
+        })
+    }
+
+    /// A borrowed view of the depth target.
+    pub fn depth_texture(&self) -> Result<Option<BorrowedRenderTarget<'_>>> {
+        self.borrowed_texture(self.native.engine.depth_normal_prepass_get_depth_texture)
+    }
+
+    /// A borrowed view of the normal target.
+    pub fn normal_texture(&self) -> Result<Option<BorrowedRenderTarget<'_>>> {
+        self.borrowed_texture(self.native.engine.depth_normal_prepass_get_normal_texture)
+    }
+
+    /// A borrowed view of the velocity target, when one is enabled.
+    pub fn velocity_texture(&self) -> Result<Option<BorrowedRenderTarget<'_>>> {
+        self.borrowed_texture(self.native.engine.depth_normal_prepass_get_velocity_texture_ext)
+    }
+
+    /// The prepass effect, borrowed for as long as the prepass lives.
+    pub fn prepass_effect(&self) -> Result<Option<BorrowedEffect<'_>>> {
+        self.borrowed_effect(self.native.engine.depth_normal_prepass_get_prepass_effect)
+    }
+
+    /// The skinned prepass effect, borrowed on the same terms.
+    pub fn skinned_prepass_effect(&self) -> Result<Option<BorrowedEffect<'_>>> {
+        self.borrowed_effect(self.native.engine.depth_normal_prepass_get_skinned_prepass_effect)
+    }
+
+    /// Releases the prepass now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+
+    /// Packs a linear depth into four channel values.
+    ///
+    /// The inverse of [`DepthNormalPrepass::unpack_depth`], and the pair is the
+    /// whole of what a packed-depth renderer relies on: a round trip that lost
+    /// precision here would lose it in every shader that reads the buffer.
+    pub fn pack_depth(value: f32) -> Result<(f32, f32, f32, f32)> {
+        let native = Native::process()?;
+        let (mut r, mut g, mut b, mut a) = (0.0_f32, 0.0_f32, 0.0_f32, 0.0_f32);
+        // SAFETY: the value is by value and all four outputs are live locals.
+        native.check(unsafe {
+            (native.engine.depth_normal_prepass_pack_depth)(
+                value, &mut r, &mut g, &mut b, &mut a,
+            )
+        })?;
+        Ok((r, g, b, a))
+    }
+
+    /// Unpacks four channel values back into a linear depth.
+    pub fn unpack_depth(r: f32, g: f32, b: f32, a: f32) -> Result<f32> {
+        let native = Native::process()?;
+        let mut value = 0.0_f32;
+        // SAFETY: every input is by value and the output is a live local.
+        native.check(unsafe {
+            (native.engine.depth_normal_prepass_unpack_depth)(r, g, b, a, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Whether a device's prepass would use packed depth.
+    pub fn uses_packed_depth(device: &GraphicsDevice) -> Result<bool> {
+        let native = device.state_native();
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe {
+            (native.engine.depth_normal_prepass_uses_packed_depth_ext)(
+                device.handle()?,
+                &mut value,
+            )
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Whether an encoded velocity texel carries a velocity at all.
+    pub fn has_velocity(texel: Color) -> Result<bool> {
+        let native = Native::process()?;
+        let texel = native_color(texel);
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the texel is by value and the output is a live local.
+        native.check(unsafe {
+            (native.engine.depth_normal_prepass_has_velocity_ext)(texel, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Decodes a velocity texel back into screen-space motion.
+    pub fn decode_velocity(texel: Color) -> Result<Vector2> {
+        let native = Native::process()?;
+        let texel = native_color(texel);
+        let mut value = sys::CNA_Vector2::default();
+        // SAFETY: the texel is by value and the output is a live local.
+        native.check(unsafe {
+            (native.engine.depth_normal_prepass_decode_velocity_ext)(texel, &mut value)
+        })?;
+        Ok(Vector2::from_x_and_y(value.x, value.y))
+    }
+
+    /// The GLSL a shader includes to decode this prepass's depth.
+    pub fn depth_decode_glsl(packed: bool) -> Result<String> {
+        let native = Native::process()?;
+        copy_text(&native, |api, destination, capacity, out_bytes| {
+            // SAFETY: the destination holds `capacity` writable bytes.
+            unsafe {
+                (api.depth_normal_prepass_copy_depth_decode_glsl)(
+                    u8::from(packed),
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+    }
+
+    /// The GLSL a shader includes to decode the velocity target.
+    pub fn velocity_decode_glsl() -> Result<String> {
+        let native = Native::process()?;
+        copy_text(&native, |api, destination, capacity, out_bytes| {
+            // SAFETY: the destination holds `capacity` writable bytes.
+            unsafe {
+                (api.depth_normal_prepass_copy_velocity_decode_glsl)(
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+    }
+
+    fn flag(
+        &self,
+        route: unsafe extern "C" fn(
+            sys::CNA_DepthNormalPrepassHandle,
+            *mut sys::CNA_Bool,
+        ) -> sys::CNA_Result,
+    ) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut value) })?;
+        Ok(value != 0)
+    }
+
+    fn borrowed_texture(
+        &self,
+        route: unsafe extern "C" fn(
+            sys::CNA_DepthNormalPrepassHandle,
+            *mut sys::CNA_Handle,
+        ) -> sys::CNA_Result,
+    ) -> Result<Option<BorrowedRenderTarget<'_>>> {
+        let handle = self.core.get()?;
+        let mut texture = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut texture) })?;
+        if texture == sys::CNA_INVALID_HANDLE {
+            return Ok(None);
+        }
+        BorrowedRenderTarget::new(&self.native, &self.device, texture).map(Some)
+    }
+
+    fn borrowed_effect(
+        &self,
+        route: unsafe extern "C" fn(
+            sys::CNA_DepthNormalPrepassHandle,
+            *mut sys::CNA_EffectHandle,
+        ) -> sys::CNA_Result,
+    ) -> Result<Option<BorrowedEffect<'_>>> {
+        let handle = self.core.get()?;
+        let mut effect = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut effect) })?;
+        if effect == sys::CNA_INVALID_HANDLE {
+            return Ok(None);
+        }
+        Ok(Some(BorrowedEffect::new(
+            &self.native,
+            &self.device,
+            effect,
+        )))
+    }
+}
+
+impl Drop for DepthNormalPrepass {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+fn native_color(value: Color) -> sys::CNA_Color {
+    sys::CNA_Color {
+        r: value.R(),
+        g: value.G(),
+        b: value.B(),
+        a: value.A(),
+    }
+}
+
+/// Weighted-blended order-independent transparency.
+///
+/// `OWNED`. Creation succeeds on a renderer that cannot run it; ask
+/// [`WeightedBlendedTransparency::is_supported`] and, when it answers no,
+/// [`WeightedBlendedTransparency::unsupported_reason`] for the reason the
+/// pipeline's own fallback message quotes.
+pub struct WeightedBlendedTransparency {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+    device: GraphicsDevice,
+}
+
+impl WeightedBlendedTransparency {
+    /// Creates the accumulation targets at a size.
+    pub fn new(device: &GraphicsDevice, width: i32, height: i32) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe {
+            (native.engine.weighted_blended_transparency_create)(
+                device.handle()?,
+                width,
+                height,
+                &mut handle,
+            )
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.weighted_blended_transparency_destroy,
+            released: "the weighted-blended transparency has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+            device: device.clone(),
+        })
+    }
+
+    /// Whether this renderer can accumulate.
+    pub fn is_supported(&self) -> Result<bool> {
+        self.flag(self.native.engine.weighted_blended_transparency_is_supported)
+    }
+
+    /// Whether an accumulation is currently open.
+    pub fn is_accumulating(&self) -> Result<bool> {
+        self.flag(self.native.engine.weighted_blended_transparency_is_accumulating)
+    }
+
+    /// Why the renderer cannot accumulate; empty when it can.
+    pub fn unsupported_reason(&self) -> Result<String> {
+        let handle = self.core.get()?;
+        copy_text(&self.native, |api, destination, capacity, out_bytes| {
+            // SAFETY: the destination holds `capacity` writable bytes.
+            unsafe {
+                (api.weighted_blended_transparency_copy_unsupported_reason)(
+                    handle,
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+    }
+
+    /// Sizes the accumulation targets.
+    pub fn resize(&self, width: i32, height: i32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the sizes are by value.
+        self.native.check(unsafe {
+            (self.native.engine.weighted_blended_transparency_resize)(handle, width, height)
+        })
+    }
+
+    /// Opens the accumulation, for a camera far plane.
+    pub fn begin(&self, far_plane: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the value is by value.
+        self.native.check(unsafe {
+            (self.native.engine.weighted_blended_transparency_begin)(handle, far_plane)
+        })
+    }
+
+    /// Closes the accumulation.
+    pub fn end(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.weighted_blended_transparency_end)(handle) })
+    }
+
+    /// Resolves the accumulation into whatever target is bound.
+    pub fn resolve(&self, width: i32, height: i32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the sizes are by value.
+        self.native.check(unsafe {
+            (self.native.engine.weighted_blended_transparency_resolve)(handle, width, height)
+        })
+    }
+
+    /// A borrowed view of the accumulation target.
+    pub fn accumulation_texture(&self) -> Result<Option<BorrowedRenderTarget<'_>>> {
+        self.borrowed_texture(
+            self.native
+                .engine
+                .weighted_blended_transparency_get_accumulation_texture_ext,
+        )
+    }
+
+    /// A borrowed view of the revealage target.
+    pub fn revealage_texture(&self) -> Result<Option<BorrowedRenderTarget<'_>>> {
+        self.borrowed_texture(
+            self.native
+                .engine
+                .weighted_blended_transparency_get_revealage_texture_ext,
+        )
+    }
+
+    /// Releases the targets now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+
+    /// The weight one fragment contributes, from its alpha and depth.
+    ///
+    /// The technique's whole weighting function, as a pure value: a nearer
+    /// fragment must weigh more than a farther one at the same alpha, and that
+    /// is what makes the result order-independent.
+    pub fn weight(view_depth: f32, alpha: f32, far_plane: f32) -> Result<f32> {
+        let native = Native::process()?;
+        let mut value = 0.0_f32;
+        // SAFETY: every input is by value and the output is a live local.
+        native.check(unsafe {
+            (native.engine.weighted_blended_transparency_weight)(
+                view_depth, alpha, far_plane, &mut value,
+            )
+        })?;
+        Ok(value)
+    }
+
+    /// The accumulation shader's own GLSL.
+    pub fn accumulation_glsl() -> Result<String> {
+        let native = Native::process()?;
+        copy_text(&native, |api, destination, capacity, out_bytes| {
+            // SAFETY: the destination holds `capacity` writable bytes.
+            unsafe {
+                (api.weighted_blended_transparency_copy_accumulation_glsl)(
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+    }
+
+    fn flag(
+        &self,
+        route: unsafe extern "C" fn(
+            sys::CNA_WeightedBlendedTransparencyHandle,
+            *mut sys::CNA_Bool,
+        ) -> sys::CNA_Result,
+    ) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut value) })?;
+        Ok(value != 0)
+    }
+
+    fn borrowed_texture(
+        &self,
+        route: unsafe extern "C" fn(
+            sys::CNA_WeightedBlendedTransparencyHandle,
+            *mut sys::CNA_Handle,
+        ) -> sys::CNA_Result,
+    ) -> Result<Option<BorrowedRenderTarget<'_>>> {
+        let handle = self.core.get()?;
+        let mut texture = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut texture) })?;
+        if texture == sys::CNA_INVALID_HANDLE {
+            return Ok(None);
+        }
+        BorrowedRenderTarget::new(&self.native, &self.device, texture).map(Some)
+    }
+}
+
+impl Drop for WeightedBlendedTransparency {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// The sorted-draw path for transparency, when order matters.
+///
+/// `OWNED`, and device-free: the list is bookkeeping, so it needs no graphics
+/// device and is not registered against one.
+pub struct TransparentDrawList {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+    entries: Vec<Arc<SceneCallback>>,
+}
+
+impl TransparentDrawList {
+    /// Creates an empty list.
+    pub fn new() -> Result<Self> {
+        let native = Native::process()?;
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the output is a live local.
+        native.check(unsafe { (native.engine.transparent_draw_list_create)(&mut handle) })?;
+        Ok(Self {
+            core: Arc::new(EngineHandle {
+                native: Arc::clone(&native),
+                handle: Mutex::new(handle),
+                destroy: native.engine.transparent_draw_list_destroy,
+                released: "the transparent draw list has been released",
+            }),
+            native,
+            entries: Vec::new(),
+        })
+    }
+
+    /// Submits one entry with the bounds it occupies.
+    ///
+    /// The callback runs during [`TransparentDrawList::draw_sorted`], in the
+    /// order the list decides. CNA keeps the raw context, so the closure is
+    /// retained here for as long as the entry is in the list.
+    pub fn submit(
+        &mut self,
+        bounds: BoundingBox,
+        draw: impl FnMut() -> Result<()> + 'static,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let bounds = native_bounds(bounds);
+        let entry = SceneCallback::new(draw);
+        // SAFETY: the handle is owned, the bounds are borrowed for the call and
+        // the context is retained below.
+        self.native.check(unsafe {
+            (self.native.engine.transparent_draw_list_submit)(
+                handle,
+                &bounds,
+                Some(scene_trampoline),
+                entry.context(),
+            )
+        })?;
+        self.entries.push(entry);
+        Ok(())
+    }
+
+    /// How many entries the list holds.
+    pub fn count(&self) -> Result<u64> {
+        let handle = self.core.get()?;
+        let mut value = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.transparent_draw_list_get_count)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Removes every entry.
+    pub fn clear(&mut self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.transparent_draw_list_clear)(handle) })?;
+        self.entries.clear();
+        Ok(())
+    }
+
+    /// Draws every entry back to front for a camera.
+    ///
+    /// A callback that failed or panicked is reported as the Rust cause it had.
+    pub fn draw_sorted(&self, view: Matrix) -> Result<()> {
+        let handle = self.core.get()?;
+        let view = native_matrix(view);
+        // SAFETY: the handle is owned, the matrix is borrowed for the call, and
+        // every registered callback is alive because this value holds it.
+        let result = self.native.check(unsafe {
+            (self.native.engine.transparent_draw_list_draw_sorted)(handle, &view)
+        });
+        for entry in &self.entries {
+            if let Some(failure) = entry.take_failure() {
+                return Err(failure);
+            }
+        }
+        result
+    }
+
+    /// The order the list would draw its entries in, without drawing them.
+    pub fn sorted_order(&self, view: Matrix) -> Result<Vec<i32>> {
+        let handle = self.core.get()?;
+        let view = native_matrix(view);
+        let capacity = usize::try_from(self.count()?)
+            .map_err(|_| CnaError::InvalidInput("the entry count does not fit in memory"))?;
+        let mut buffer = vec![0_i32; capacity];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned, the matrix is borrowed for the call and
+        // the destination holds `capacity` writable indices.
+        self.native.check(unsafe {
+            (self.native.engine.transparent_draw_list_copy_sorted_order_ext)(
+                handle,
+                &view,
+                buffer.as_mut_ptr(),
+                capacity as u64,
+                &mut count,
+            )
+        })?;
+        let count = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("CNA reported more entries than fit in memory"))?;
+        buffer.truncate(count.min(capacity));
+        Ok(buffer)
+    }
+
+    /// Releases the list now rather than at drop.
+    pub fn release(&mut self) -> Result<()> {
+        let result = self.core.release();
+        self.entries.clear();
+        result
+    }
+
+    /// The camera position a view matrix implies.
+    pub fn camera_position_of(view: Matrix) -> Result<Vector3> {
+        let native = Native::process()?;
+        let view = native_matrix(view);
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the matrix is borrowed for the call and the output is a live local.
+        native.check(unsafe {
+            (native.engine.transparent_draw_list_camera_position_of)(&view, &mut value)
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// The key the list sorts one entry by.
+    ///
+    /// A pure function of the bounds and the camera, so the ordering is
+    /// predictable without submitting anything.
+    pub fn sort_key(bounds: BoundingBox, camera_position: Vector3) -> Result<f32> {
+        let native = Native::process()?;
+        let bounds = native_bounds(bounds);
+        let camera = native_vector3(camera_position);
+        let mut value = 0.0_f32;
+        // SAFETY: both inputs are borrowed for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.transparent_draw_list_sort_key)(&bounds, &camera, &mut value)
+        })?;
+        Ok(value)
+    }
+}
+
+impl Drop for TransparentDrawList {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}

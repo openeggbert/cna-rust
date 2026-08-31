@@ -771,6 +771,18 @@ pub type CNA_SpatialUpscalePassHandle = CNA_Handle;
 pub type CNA_SpotShadowMapHandle = CNA_Handle;
 pub type CNA_CubeShadowMapHandle = CNA_Handle;
 pub type CNA_CascadedShadowMapHandle = CNA_Handle;
+pub type CNA_DepthNormalPrepassHandle = CNA_Handle;
+pub type CNA_TransparentDrawListHandle = CNA_Handle;
+pub type CNA_WeightedBlendedTransparencyHandle = CNA_Handle;
+pub type CNA_DepthEncoding = u32;
+
+pub const CNA_DEPTH_ENCODING_AUTOMATIC: CNA_DepthEncoding = 0;
+pub const CNA_DEPTH_ENCODING_PACKED: CNA_DepthEncoding = 1;
+pub const CNA_DEPTH_ENCODING_HALF_FLOAT: CNA_DepthEncoding = 2;
+
+/// Called once per submitted entry, in the order the list decides.
+pub type CNA_TransparentDrawCallback =
+    Option<unsafe extern "C" fn(*mut c_void) -> CNA_Result>;
 pub type CNA_PunctualLightKindEXT = u32;
 
 pub const CNA_PUNCTUAL_LIGHT_KIND_EXT_NONE: CNA_PunctualLightKindEXT = 0;
@@ -9120,4 +9132,153 @@ pub type cna_point_light_ext_init_fn = unsafe extern "C" fn(*mut CNA_PointLightE
 pub type cna_spot_light_ext_init_fn = unsafe extern "C" fn(*mut CNA_SpotLightEXT) -> CNA_Result;
 pub type cna_punctual_light_ext_init_fn = unsafe extern "C" fn(
     *mut CNA_PunctualLightEXT,
+) -> CNA_Result;
+
+// --- CNA engine layer: the depth/normal prepass and transparency (engine_layer.h) ---
+pub type cna_depth_normal_prepass_begin_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle, i32, *const CNA_Matrix, *const CNA_Matrix, f32, f32,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_copy_depth_decode_glsl_fn = unsafe extern "C" fn(
+    CNA_Bool, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_copy_velocity_decode_glsl_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, i32, i32, CNA_DepthEncoding, *mut CNA_DepthNormalPrepassHandle,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_decode_velocity_ext_fn = unsafe extern "C" fn(
+    CNA_Color, *mut CNA_Vector2,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_destroy_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_end_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_get_depth_texture_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_get_normal_texture_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_get_pass_count_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_get_prepass_effect_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle, *mut CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_get_roughness_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_get_skinned_prepass_effect_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle, *mut CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_get_velocity_texture_ext_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_has_velocity_ext_fn = unsafe extern "C" fn(
+    CNA_Color, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_is_depth_packed_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_is_supported_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle, CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_is_using_multiple_render_targets_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_is_velocity_enabled_ext_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_pack_depth_fn = unsafe extern "C" fn(
+    f32, *mut f32, *mut f32, *mut f32, *mut f32,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_resize_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle, i32, i32,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_set_previous_camera_ext_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle, *const CNA_Matrix, *const CNA_Matrix,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_set_previous_world_ext_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle, *const CNA_Matrix,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_set_roughness_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle, f32,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_set_velocity_enabled_ext_fn = unsafe extern "C" fn(
+    CNA_DepthNormalPrepassHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_unpack_depth_fn = unsafe extern "C" fn(
+    f32, f32, f32, f32, *mut f32,
+) -> CNA_Result;
+pub type cna_depth_normal_prepass_uses_packed_depth_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_transparent_draw_list_camera_position_of_fn = unsafe extern "C" fn(
+    *const CNA_Matrix, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_transparent_draw_list_clear_fn = unsafe extern "C" fn(
+    CNA_TransparentDrawListHandle,
+) -> CNA_Result;
+pub type cna_transparent_draw_list_copy_sorted_order_ext_fn = unsafe extern "C" fn(
+    CNA_TransparentDrawListHandle, *const CNA_Matrix, *mut i32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_transparent_draw_list_create_fn = unsafe extern "C" fn(
+    *mut CNA_TransparentDrawListHandle,
+) -> CNA_Result;
+pub type cna_transparent_draw_list_destroy_fn = unsafe extern "C" fn(
+    CNA_TransparentDrawListHandle,
+) -> CNA_Result;
+pub type cna_transparent_draw_list_draw_sorted_fn = unsafe extern "C" fn(
+    CNA_TransparentDrawListHandle, *const CNA_Matrix,
+) -> CNA_Result;
+pub type cna_transparent_draw_list_get_count_fn = unsafe extern "C" fn(
+    CNA_TransparentDrawListHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_transparent_draw_list_sort_key_fn = unsafe extern "C" fn(
+    *const CNA_BoundingBox, *const CNA_Vector3, *mut f32,
+) -> CNA_Result;
+pub type cna_transparent_draw_list_submit_fn = unsafe extern "C" fn(
+    CNA_TransparentDrawListHandle, *const CNA_BoundingBox, CNA_TransparentDrawCallback, *mut c_void,
+) -> CNA_Result;
+pub type cna_weighted_blended_transparency_begin_fn = unsafe extern "C" fn(
+    CNA_WeightedBlendedTransparencyHandle, f32,
+) -> CNA_Result;
+pub type cna_weighted_blended_transparency_copy_accumulation_glsl_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_weighted_blended_transparency_copy_unsupported_reason_fn = unsafe extern "C" fn(
+    CNA_WeightedBlendedTransparencyHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_weighted_blended_transparency_create_fn = unsafe extern "C" fn(
+    CNA_Handle, i32, i32, *mut CNA_WeightedBlendedTransparencyHandle,
+) -> CNA_Result;
+pub type cna_weighted_blended_transparency_destroy_fn = unsafe extern "C" fn(
+    CNA_WeightedBlendedTransparencyHandle,
+) -> CNA_Result;
+pub type cna_weighted_blended_transparency_end_fn = unsafe extern "C" fn(
+    CNA_WeightedBlendedTransparencyHandle,
+) -> CNA_Result;
+pub type cna_weighted_blended_transparency_get_accumulation_texture_ext_fn = unsafe extern "C" fn(
+    CNA_WeightedBlendedTransparencyHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_weighted_blended_transparency_get_revealage_texture_ext_fn = unsafe extern "C" fn(
+    CNA_WeightedBlendedTransparencyHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_weighted_blended_transparency_is_accumulating_fn = unsafe extern "C" fn(
+    CNA_WeightedBlendedTransparencyHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_weighted_blended_transparency_is_supported_fn = unsafe extern "C" fn(
+    CNA_WeightedBlendedTransparencyHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_weighted_blended_transparency_resize_fn = unsafe extern "C" fn(
+    CNA_WeightedBlendedTransparencyHandle, i32, i32,
+) -> CNA_Result;
+pub type cna_weighted_blended_transparency_resolve_fn = unsafe extern "C" fn(
+    CNA_WeightedBlendedTransparencyHandle, i32, i32,
+) -> CNA_Result;
+pub type cna_weighted_blended_transparency_weight_fn = unsafe extern "C" fn(
+    f32, f32, f32, *mut f32,
 ) -> CNA_Result;

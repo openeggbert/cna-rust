@@ -135,6 +135,7 @@ the criterion above is unchanged, only its precondition has been met.
 | decals, cube-map skies and the analytic sky | `decal_pass`, `skybox`, `atmospheric_sky` | 38 | `VERIFIED_STATE` |
 | the seventeen screen-space passes, the fullscreen draw and the render-target scope | `bloom_pass`, `ssao_pass`, `ssr_pass`, `color_grade_pass`, `depth_of_field_pass`, `motion_blur_pass`, `height_fog_pass`, `volumetric_fog_pass`, `light_shaft_pass`, `lens_flare_pass`, `chromatic_aberration_pass`, `film_grain_pass`, `ascii_pass`, `aerial_perspective_pass`, `spatial_upscale_pass`, `contact_shadow_pass`, `fullscreen_pass`, `scoped_render_target` | 150 | `VERIFIED_STATE` |
 | spot, cube and cascaded shadow maps, and the punctual light values | `spot_shadow_map`, `cube_shadow_map`, `cascaded_shadow_map`, `point_light_ext`, `spot_light_ext`, `punctual_light_ext`, `shadow_cascade_state_ext` | 61 | `VERIFIED_STATE` |
+| the depth/normal prepass and both transparency paths | `depth_normal_prepass`, `weighted_blended_transparency`, `transparent_draw_list` | 49 | `VERIFIED_STATE` |
 
 ### What the GPU artifact changed about the evidence
 
@@ -177,6 +178,14 @@ three found something:
   passes, and the process then calls `std::terminate` at exit with no
   diagnostic. It took a bisection over one test's own body to find, and the fix
   is a separate Rust view type so the wrong release cannot be written.
+- **Two upstream argument orders disagree with their own doc comments.**
+  `cna_weighted_blended_transparency_weight` takes `(view_depth, alpha, ...)`
+  where the summary reads "for one fragment's depth and coverage" but the
+  `@param` list is the authority, and `cna_height_fog_pass_optical_depth` puts
+  the ray geometry before the fog parameters. Both compile silently either way
+  because every argument is a `float`; the curves are what caught them -- fog
+  integrated to zero over any distance, and the transparency weight *rose* with
+  depth, which would have made the accumulation order-dependent.
 - **A bare `BUFFER_TOO_SMALL` carries no message.** `CopyValueRange` returns the
   code without going through `Fail`, so the thread-local last-error still holds
   whatever the previous failing call said. Sizing the SSAO kernel from

@@ -36,12 +36,20 @@ Both are useful. The offscreen path is the hardware one and needs no display
 server; the Xvfb path is a real GL/Vulkan stack on a CPU rasteriser, which is
 what a machine without this GPU would have.
 
-`DISPLAY=:0` with `SDL_VIDEODRIVER=x11` is **not** usable from this session:
-the process blocks in `poll` before CNA prints anything and never creates a
-window. The host session is Wayland with Xwayland, and `SDL_VIDEODRIVER=wayland`
-against the same compositor works and reports the hardware, so the cause is the
-SDL3 X11 path against Xwayland rather than access or the GPU. It is recorded
-here because it is the obvious thing to try and it wastes several minutes.
+`DISPLAY=:0` with `SDL_VIDEODRIVER=x11` is **not** usable from this session,
+and trying it is worse than useless: the process blocks in `poll` before CNA
+prints anything, never creates a window, and **holds the X connection open**.
+One such run was left behind for about three hours and the machine's keyboard
+stopped responding until it was killed -- a hung SDL client can keep an input
+grab. The host session is Wayland with Xwayland, and `SDL_VIDEODRIVER=wayland`
+against the same compositor does work and does report the hardware, but it draws
+on the user's real desktop.
+
+**So nothing in this project runs against the live session.** Every windowed run
+goes to an Xvfb display with `SDL_VIDEODRIVER=x11`, and every one of them is
+wrapped in a `timeout` so a hang cannot outlive its command. `offscreen` reaches
+the hardware with no window and no grab and is the exception that stays
+available for hardware evidence.
 
 ## Renderers qualified through the Rust binding
 
@@ -107,6 +115,29 @@ The lesson is worth keeping: `cnanext` is a live dependency with other sessions
 committing to it, so every artifact in this document names the commit it was
 built from, and the ABI verifier is re-run against the artifact that the
 qualification actually used.
+
+## Renderer invariance
+
+The engine suite was run against the same OPENGLES3 artifact on the hardware
+(`offscreen`, AMD Radeon 780M) and on the virtual display (Xvfb `:247`, GL ES
+3.2 on llvmpipe). Every measured value agrees except the two that are honestly
+renderer-dependent:
+
+| | hardware | llvmpipe on Xvfb |
+|---|---|---|
+| scene target, GPU memory estimate | 320x180, 230,400 bytes | same |
+| scene-target readback | every pixel the cleared colour | same |
+| CPU/GPU particle paths | worst difference 0 over 32 slots | same |
+| compute dispatch over 16 elements | exact | same |
+| shadow map / cube / cascade presets | 1024, 512, 4x1024 | same |
+| GPU timer samples over 30 frames | 1 | 29 |
+| image binding for compute | unsupported | unsupported |
+
+The timer difference is the interesting one: a query resolves a frame or two
+after the work it timed, and the software rasteriser finishes sooner, so it
+collects nearly every frame where the hardware collects one. Both are the same
+contract -- poll before opening the next range -- measured on two very different
+schedules.
 
 ## What this unblocks
 

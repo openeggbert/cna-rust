@@ -19,8 +19,9 @@ use cna::extensions::engine::{
     FullscreenPass, HeightFogPass, LensFlarePass, LightShaftPass, LutInterpolation, MemoryBarrier,
     MotionBlurPass, RenderPipeline, ScopedRenderTarget, ShadowMap, Skybox, SpatialUpscalePass,
     CascadedShadowMap, CubeShadowMap, PointLight, PunctualLight, PunctualLightKind,
-    ShadowCascadeState, SpotLight, SpotShadowMap, SsaoPass, SsrPass, StorageBuffer, TonemapPass,
-    VolumetricFogPass,
+    DepthEncoding, DepthNormalPrepass, ShadowCascadeState, SpotLight, SpotShadowMap, SsaoPass,
+    SsrPass, StorageBuffer, TonemapPass, TransparentDrawList, VolumetricFogPass,
+    WeightedBlendedTransparency,
 };
 use cna::extensions::graphics::EffectFactoryExt;
 use cna::extensions::pbr::{
@@ -3204,5 +3205,344 @@ fn the_shadow_map_variants_cast_from_the_transforms_they_publish() {
         findings.cascade_supported,
         findings.cascade_count,
         findings.cascade_size,
+    );
+}
+
+/// What the prepass and transparency run measured.
+#[derive(Default)]
+struct FrameFindings {
+    engine_layer: i32,
+    prepass_supported: bool,
+    prepass_pass_count: i32,
+    prepass_mrt: Option<bool>,
+    prepass_packed: Option<bool>,
+    prepass_device_packed: Option<bool>,
+    prepass_depth_size: Option<(i32, i32)>,
+    prepass_normal_size: Option<(i32, i32)>,
+    prepass_velocity_before: Option<bool>,
+    prepass_velocity_after: Option<bool>,
+    depth_round_trip: Vec<(f32, f32)>,
+    velocity_samples: Vec<(u32, bool, f32, f32)>,
+    glsl_bytes: Vec<(&'static str, usize)>,
+    round_trips: Vec<(&'static str, f32, f32)>,
+    oit_supported: bool,
+    oit_reason: String,
+    oit_accumulating: Vec<bool>,
+    oit_weights: Vec<(f32, f32)>,
+    list_counts: Vec<u64>,
+    list_order: Vec<i32>,
+    list_draws: usize,
+    sort_keys: Vec<(f32, f32)>,
+    camera_position: Option<(f32, f32, f32)>,
+}
+
+struct FrameGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<FrameFindings>>,
+}
+
+impl GameStateAccess for FrameGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for FrameGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+        let mut findings = FrameFindings {
+            engine_layer: version,
+            ..FrameFindings::default()
+        };
+
+        // The packing pair is a pure round trip, and the only thing a packed
+        // depth buffer relies on.
+        for value in [0.0_f32, 0.125, 0.5, 0.874_321, 1.0] {
+            let (r, g, b, a) = DepthNormalPrepass::pack_depth(value)?;
+            findings
+                .depth_round_trip
+                .push((value, DepthNormalPrepass::unpack_depth(r, g, b, a)?));
+        }
+        // The velocity encoding's two routes have to agree: a texel that
+        // "carries no velocity" must decode to no motion, and one that does
+        // must decode to some. Sampling a spread of texels is how a predicate
+        // that answered the same thing for all of them shows up.
+        for texel in [
+            Color::Transparent,
+            Color::Black,
+            Color::White,
+            Color::from_r_and_g_and_b_and_a_as_int32_and_int32_and_int32_and_int32(128, 128, 0, 0),
+            Color::from_r_and_g_and_b_and_a_as_int32_and_int32_and_int32_and_int32(
+                128, 128, 255, 255,
+            ),
+        ] {
+            let motion = DepthNormalPrepass::decode_velocity(texel)?;
+            findings.velocity_samples.push((
+                texel.PackedValue(),
+                DepthNormalPrepass::has_velocity(texel)?,
+                motion.X,
+                motion.Y,
+            ));
+        }
+        findings.prepass_device_packed = Some(DepthNormalPrepass::uses_packed_depth(&device)?);
+        findings.glsl_bytes.push((
+            "depth-decode",
+            DepthNormalPrepass::depth_decode_glsl(true)?.len(),
+        ));
+        findings.glsl_bytes.push((
+            "velocity-decode",
+            DepthNormalPrepass::velocity_decode_glsl()?.len(),
+        ));
+        findings.glsl_bytes.push((
+            "oit-accumulation",
+            WeightedBlendedTransparency::accumulation_glsl()?.len(),
+        ));
+
+        let prepass = DepthNormalPrepass::new(&device, 128, 96, DepthEncoding::Automatic)?;
+        findings.prepass_supported = prepass.is_supported(&device)?;
+        findings.prepass_pass_count = prepass.pass_count()?;
+        findings.prepass_mrt = Some(prepass.is_using_multiple_render_targets()?);
+        findings.prepass_packed = Some(prepass.is_depth_packed()?);
+        findings.prepass_velocity_before = Some(prepass.is_velocity_enabled()?);
+        prepass.set_velocity_enabled(true)?;
+        findings.prepass_velocity_after = Some(prepass.is_velocity_enabled()?);
+        prepass.set_roughness(0.375)?;
+        findings
+            .round_trips
+            .push(("prepass.roughness", 0.375, prepass.roughness()?));
+        if let Some(depth) = prepass.depth_texture()? {
+            findings.prepass_depth_size =
+                Some((depth.texture().Width(), depth.texture().Height()));
+        }
+        if let Some(normals) = prepass.normal_texture()? {
+            findings.prepass_normal_size =
+                Some((normals.texture().Width(), normals.texture().Height()));
+        }
+
+        let oit = WeightedBlendedTransparency::new(&device, 64, 64)?;
+        findings.oit_supported = oit.is_supported()?;
+        findings.oit_reason = oit.unsupported_reason()?;
+        findings.oit_accumulating.push(oit.is_accumulating()?);
+        if findings.oit_supported {
+            oit.begin(100.0)?;
+            findings.oit_accumulating.push(oit.is_accumulating()?);
+            oit.end()?;
+            findings.oit_accumulating.push(oit.is_accumulating()?);
+        }
+        for depth in [1.0_f32, 10.0, 50.0] {
+            findings
+                .oit_weights
+                .push((depth, WeightedBlendedTransparency::weight(depth, 0.5, 100.0)?));
+        }
+
+        // The sorted list draws back to front, so the entry furthest from the
+        // camera comes first. Submitting three boxes at known distances and
+        // reading the order back is the whole of that claim.
+        let view = Matrix::CreateLookAt(
+            Vector3::from_x_and_y_and_z(0.0, 0.0, 0.0),
+            Vector3::from_x_and_y_and_z(0.0, 0.0, -1.0),
+            Vector3::Up,
+        );
+        let camera = TransparentDrawList::camera_position_of(view)?;
+        findings.camera_position = Some((camera.X, camera.Y, camera.Z));
+        for distance in [5.0_f32, 40.0] {
+            let bounds = BoundingBox::new(
+                Vector3::from_x_and_y_and_z(-1.0, -1.0, -distance - 1.0),
+                Vector3::from_x_and_y_and_z(1.0, 1.0, -distance + 1.0),
+            );
+            findings
+                .sort_keys
+                .push((distance, TransparentDrawList::sort_key(bounds, camera)?));
+        }
+
+        let drawn = Arc::new(AtomicUsize::new(0));
+        let mut list = TransparentDrawList::new()?;
+        findings.list_counts.push(list.count()?);
+        for distance in [5.0_f32, 40.0, 20.0] {
+            let bounds = BoundingBox::new(
+                Vector3::from_x_and_y_and_z(-1.0, -1.0, -distance - 1.0),
+                Vector3::from_x_and_y_and_z(1.0, 1.0, -distance + 1.0),
+            );
+            let counter = Arc::clone(&drawn);
+            list.submit(bounds, move || {
+                counter.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            })?;
+        }
+        findings.list_counts.push(list.count()?);
+        findings.list_order = list.sorted_order(view)?;
+        list.draw_sorted(view)?;
+        findings.list_draws = drawn.load(Ordering::SeqCst);
+        list.clear()?;
+        findings.list_counts.push(list.count()?);
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+fn the_prepass_packs_depth_and_the_transparency_sorts_back_to_front() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(FrameFindings::default()));
+    let game = FrameGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with a prepass and both transparency paths");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+
+    for (label, expected, actual) in &findings.round_trips {
+        assert!(
+            (expected - actual).abs() < 1e-5,
+            "{label} round-trips: set {expected}, read {actual}"
+        );
+    }
+
+    // Packing and unpacking a depth is a round trip a packed buffer's every
+    // reader depends on. Eight bits per channel over four channels leaves room
+    // for far better than a thousandth.
+    println!("depth pack round trip: {:?}", findings.depth_round_trip);
+    for (value, back) in &findings.depth_round_trip {
+        assert!(
+            (value - back).abs() < 1e-3,
+            "packing and unpacking {value} gives {back} back"
+        );
+    }
+    println!("velocity samples: {:?}", findings.velocity_samples);
+    for (texel, has, x, y) in &findings.velocity_samples {
+        let moved = x.abs() + y.abs() > 1e-6;
+        assert_eq!(
+            *has, moved,
+            "texel {texel:#010x}: has_velocity says {has} and decode gives ({x}, {y})"
+        );
+    }
+    assert!(
+        findings.velocity_samples.iter().any(|(_, has, _, _)| *has)
+            && findings.velocity_samples.iter().any(|(_, has, _, _)| !*has),
+        "some texels carry motion and some do not: {:?}",
+        findings.velocity_samples
+    );
+
+    assert!(
+        findings.prepass_pass_count >= 1,
+        "the prepass needs at least one pass: {}",
+        findings.prepass_pass_count
+    );
+    // One pass with multiple render targets, more without. The two answers are
+    // the same fact, so they must agree.
+    assert_eq!(
+        findings.prepass_mrt == Some(true),
+        findings.prepass_pass_count == 1,
+        "a single-pass prepass is the one using multiple render targets: {} passes, mrt {:?}",
+        findings.prepass_pass_count,
+        findings.prepass_mrt
+    );
+    assert_eq!(
+        findings.prepass_packed, findings.prepass_device_packed,
+        "the prepass's encoding is the one the device would have chosen"
+    );
+    assert_eq!(
+        findings.prepass_depth_size,
+        Some((128, 96)),
+        "the depth target is the size the prepass was created at"
+    );
+    assert_eq!(
+        findings.prepass_normal_size,
+        Some((128, 96)),
+        "and so is the normal target"
+    );
+    assert_eq!(findings.prepass_velocity_before, Some(false));
+    assert_eq!(
+        findings.prepass_velocity_after,
+        Some(true),
+        "the velocity target turns on when asked"
+    );
+
+    // The weight falls off with depth, which is what makes the accumulation
+    // order-independent: a nearer fragment must weigh more.
+    println!("oit weights: {:?}", findings.oit_weights);
+    assert!(
+        findings
+            .oit_weights
+            .windows(2)
+            .all(|pair| pair[0].1 > pair[1].1),
+        "a nearer fragment weighs more: {:?}",
+        findings.oit_weights
+    );
+    if findings.oit_supported {
+        assert_eq!(
+            findings.oit_accumulating,
+            vec![false, true, false],
+            "the accumulation is open only between begin and end"
+        );
+        assert!(
+            findings.oit_reason.is_empty(),
+            "a supported accumulation has nothing to explain: {:?}",
+            findings.oit_reason
+        );
+    } else {
+        assert!(
+            !findings.oit_reason.is_empty(),
+            "an unsupported accumulation says why"
+        );
+        println!("order-independent transparency unsupported: {}", findings.oit_reason);
+    }
+
+    // Three entries at 5, 40 and 20 units, drawn back to front: the order is
+    // the middle index first, then the last, then the first.
+    assert_eq!(
+        findings.list_counts,
+        vec![0, 3, 0],
+        "the list counts what was submitted and forgets it on clear"
+    );
+    println!("sorted order: {:?}", findings.list_order);
+    assert_eq!(
+        findings.list_order,
+        vec![1, 2, 0],
+        "the list draws the furthest entry first: 40, then 20, then 5"
+    );
+    assert_eq!(
+        findings.list_draws, 3,
+        "every entry's callback ran exactly once"
+    );
+    assert_eq!(
+        findings.camera_position,
+        Some((0.0, 0.0, 0.0)),
+        "the camera position is the one the view matrix implies"
+    );
+    // The sort key grows with distance, which is what the order above follows
+    // from rather than restating it.
+    assert!(
+        findings.sort_keys[0].1 < findings.sort_keys[1].1,
+        "a farther box sorts later: {:?}",
+        findings.sort_keys
+    );
+
+    for (label, bytes) in &findings.glsl_bytes {
+        assert!(*bytes > 50, "{label} GLSL is real source, {bytes} bytes");
+    }
+
+    println!(
+        "frame plumbing: prepass supported={} passes={} packed={:?} | oit supported={} | \
+         glsl {:?}",
+        findings.prepass_supported,
+        findings.prepass_pass_count,
+        findings.prepass_packed,
+        findings.oit_supported,
+        findings.glsl_bytes,
     );
 }
