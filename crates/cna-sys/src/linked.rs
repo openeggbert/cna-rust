@@ -3213,6 +3213,20 @@ extern "C" {
         argument4: u64,
         argument5: *mut u64,
     ) -> CNA_Result;
+    pub fn cna_render_pipeline_settings_ext_init(
+        argument0: *mut CNA_RenderPipelineSettingsEXT,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_settings_ext_normalize(
+        argument0: *mut CNA_RenderPipelineSettingsEXT,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_settings_ext_apply_render_quality_preset(
+        argument0: *mut CNA_RenderPipelineSettingsEXT,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_settings_ext_apply_from_string(
+        argument0: *mut CNA_RenderPipelineSettingsEXT,
+        argument1: CNA_StringView,
+        argument2: *mut i32,
+    ) -> CNA_Result;
     pub fn cna_pbr_material_init(argument0: *mut CNA_PbrMaterial) -> CNA_Result;
     pub fn cna_render_pipeline_settings_init(
         argument0: *mut CNA_RenderPipelineSettings,

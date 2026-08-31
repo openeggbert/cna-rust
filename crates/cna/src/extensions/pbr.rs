@@ -519,3 +519,210 @@ impl Drop for PbrEffect {
         let _ = unsafe { (self.native.effect_destroy)(self.handle) };
     }
 }
+
+/// How transparent geometry is resolved.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[non_exhaustive]
+pub enum TransparencyMode {
+    None,
+    Sorted,
+    OrderIndependent,
+}
+
+identity!(
+    TransparencyMode, sys::CNA_TransparencyMode,
+    None => CNA_TRANSPARENCY_MODE_NONE,
+    Sorted => CNA_TRANSPARENCY_MODE_SORTED,
+    OrderIndependent => CNA_TRANSPARENCY_MODE_ORDER_INDEPENDENT,
+);
+
+/// The engine layer's complete render-pipeline settings.
+///
+/// Fifty fields, which is why this is an owned value with accessors rather
+/// than a public structure: a `#[repr(C)]` field set is the ABI's shape, not an
+/// API, and exposing it would make every later CNA field addition a breaking
+/// change here.
+///
+/// The value is meaningful on its own. `normalize` runs every field through
+/// the engine's own setter and reads it back, so a caller can see what a value
+/// will actually become before handing it to a pipeline -- upstream documents
+/// thirty-one such corrections, ten clamping to a two-sided range and
+/// twenty-one flooring.
+#[derive(Clone, Copy, Debug)]
+pub struct EngineRenderSettings {
+    inner: sys::CNA_RenderPipelineSettingsEXT,
+}
+
+macro_rules! settings_scalar {
+    ($get:ident, $set:ident, $field:ident, $type:ty, $doc:literal) => {
+        #[doc = $doc]
+        #[must_use]
+        pub const fn $get(&self) -> $type {
+            self.inner.$field
+        }
+
+        #[doc = $doc]
+        pub fn $set(&mut self, value: $type) -> &mut Self {
+            self.inner.$field = value;
+            self
+        }
+    };
+}
+
+macro_rules! settings_flag {
+    ($get:ident, $set:ident, $field:ident, $doc:literal) => {
+        #[doc = $doc]
+        #[must_use]
+        pub const fn $get(&self) -> bool {
+            self.inner.$field != sys::CNA_FALSE
+        }
+
+        #[doc = $doc]
+        pub fn $set(&mut self, value: bool) -> &mut Self {
+            self.inner.$field = if value { sys::CNA_TRUE } else { sys::CNA_FALSE };
+            self
+        }
+    };
+}
+
+impl EngineRenderSettings {
+    /// The engine's own defaults.
+    pub fn canonical_defaults() -> Result<Self> {
+        let native = Native::process()?;
+        let mut inner = sys::CNA_RenderPipelineSettingsEXT {
+            struct_size: core::mem::size_of::<sys::CNA_RenderPipelineSettingsEXT>() as u32,
+            struct_version: 1,
+            ..sys::CNA_RenderPipelineSettingsEXT::default()
+        };
+        // SAFETY: the structure is a caller-owned versioned output.
+        native.check(unsafe { (native.runtime.render_pipeline_settings_ext_init)(&mut inner) })?;
+        Ok(Self { inner })
+    }
+
+    /// Rewrites the settings as the engine would store them.
+    ///
+    /// This is the difference between what a caller asked for and what the
+    /// engine will use. Calling it is how a settings screen can show the value
+    /// that will actually take effect rather than the one that was typed.
+    pub fn normalize(&mut self) -> Result<&mut Self> {
+        let native = Native::process()?;
+        // SAFETY: the structure is this value's own and is updated in place.
+        native.check(unsafe {
+            (native.runtime.render_pipeline_settings_normalize)(&mut self.inner)
+        })?;
+        Ok(self)
+    }
+
+    /// Applies the preset the settings' own render quality names.
+    ///
+    /// Upstream derives only the fields a quality dial has been decided for --
+    /// today bloom's pyramid level count and the FXAA edge threshold -- and
+    /// deliberately leaves the rest alone rather than guessing. This does not
+    /// paper over that.
+    pub fn apply_quality_preset(&mut self) -> Result<&mut Self> {
+        let native = Native::process()?;
+        // SAFETY: the structure is this value's own and is updated in place.
+        native.check(unsafe {
+            (native.runtime.render_pipeline_settings_apply_render_quality_preset)(&mut self.inner)
+        })?;
+        Ok(self)
+    }
+
+    /// Applies serialized settings text, answering how many fields it recognised.
+    ///
+    /// Unrecognised fields are skipped rather than refused, which is what makes
+    /// the count meaningful: a caller compares it with what it meant to set and
+    /// can tell a typo from a stale key.
+    pub fn apply_from_text(&mut self, text: &str) -> Result<usize> {
+        let native = Native::process()?;
+        let view = sys::CNA_StringView {
+            data: text.as_ptr().cast::<core::ffi::c_char>(),
+            byte_length: text.len() as u64,
+        };
+        let mut applied = 0_i32;
+        // SAFETY: `text` is borrowed for the duration of the call and the
+        // structure is this value's own.
+        native.check(unsafe {
+            (native.runtime.render_pipeline_settings_apply_from_string)(
+                &mut self.inner,
+                view,
+                &mut applied,
+            )
+        })?;
+        usize::try_from(applied)
+            .map_err(|_| CnaError::InvalidInput("CNA reported a negative applied-field count"))
+    }
+
+    settings_flag!(hdr_enabled, set_hdr_enabled, hdr_enabled, "Whether HDR rendering is on.");
+    settings_flag!(bloom_enabled, set_bloom_enabled, bloom_enabled, "Whether the bloom pass runs.");
+    settings_flag!(ssao_enabled, set_ssao_enabled, ssao_enabled, "Whether the SSAO pass runs.");
+    settings_flag!(ssr_enabled, set_ssr_enabled, ssr_enabled, "Whether screen-space reflections run.");
+    settings_flag!(fxaa_enabled, set_fxaa_enabled, fxaa_enabled, "Whether FXAA runs.");
+    settings_flag!(dof_enabled, set_dof_enabled, dof_enabled, "Whether depth of field runs.");
+    settings_flag!(shadows_enabled, set_shadows_enabled, shadows_enabled, "Whether shadows render.");
+    settings_scalar!(exposure, set_exposure, exposure, f32, "Scene exposure multiplier.");
+    settings_scalar!(gamma, set_gamma, gamma, f32, "Display gamma.");
+    settings_scalar!(bloom_intensity, set_bloom_intensity, bloom_intensity, f32, "Bloom intensity.");
+    settings_scalar!(bloom_threshold, set_bloom_threshold, bloom_threshold, f32, "Bloom luminance threshold.");
+    settings_scalar!(bloom_iterations, set_bloom_iterations, bloom_iterations, i32, "Bloom pyramid level count.");
+    settings_scalar!(ssao_radius, set_ssao_radius, ssao_radius, f32, "SSAO sampling radius.");
+    settings_scalar!(ssao_intensity, set_ssao_intensity, ssao_intensity, f32, "SSAO intensity.");
+    settings_scalar!(ssao_sample_count, set_ssao_sample_count, ssao_sample_count, i32, "SSAO sample count.");
+    settings_scalar!(ssr_max_distance, set_ssr_max_distance, ssr_max_distance, f32, "How far SSR marches.");
+    settings_scalar!(ssr_step_count, set_ssr_step_count, ssr_step_count, i32, "How many SSR steps are taken.");
+    settings_scalar!(fxaa_edge_threshold, set_fxaa_edge_threshold, fxaa_edge_threshold_ext, f32, "FXAA edge threshold.");
+    settings_scalar!(motion_blur_strength, set_motion_blur_strength, motion_blur_strength, f32, "Motion-blur strength.");
+    settings_scalar!(film_grain_intensity, set_film_grain_intensity, film_grain_intensity, f32, "Film-grain intensity.");
+
+    /// The tonemapping operator.
+    pub fn tonemapping_mode(&self) -> Result<TonemappingMode> {
+        TonemappingMode::from_native(self.inner.tonemapping_mode).ok_or(
+            CnaError::UnsupportedRuntime("CNA named a tonemapping mode this build lacks"),
+        )
+    }
+
+    /// Sets the tonemapping operator.
+    pub fn set_tonemapping_mode(&mut self, value: TonemappingMode) -> &mut Self {
+        self.inner.tonemapping_mode = value.to_native();
+        self
+    }
+
+    /// The overall render-quality preset.
+    pub fn render_quality(&self) -> Result<RenderQuality> {
+        RenderQuality::from_native(self.inner.render_quality).ok_or(
+            CnaError::UnsupportedRuntime("CNA named a render quality this build lacks"),
+        )
+    }
+
+    /// Sets the overall render-quality preset.
+    pub fn set_render_quality(&mut self, value: RenderQuality) -> &mut Self {
+        self.inner.render_quality = value.to_native();
+        self
+    }
+
+    /// The shadow-map quality preset.
+    pub fn shadow_quality(&self) -> Result<ShadowQuality> {
+        ShadowQuality::from_native(self.inner.shadow_quality).ok_or(
+            CnaError::UnsupportedRuntime("CNA named a shadow quality this build lacks"),
+        )
+    }
+
+    /// Sets the shadow-map quality preset.
+    pub fn set_shadow_quality(&mut self, value: ShadowQuality) -> &mut Self {
+        self.inner.shadow_quality = value.to_native();
+        self
+    }
+
+    /// How transparent geometry is resolved.
+    pub fn transparency_mode(&self) -> Result<TransparencyMode> {
+        TransparencyMode::from_native(self.inner.transparency_mode).ok_or(
+            CnaError::UnsupportedRuntime("CNA named a transparency mode this build lacks"),
+        )
+    }
+
+    /// Sets how transparent geometry is resolved.
+    pub fn set_transparency_mode(&mut self, value: TransparencyMode) -> &mut Self {
+        self.inner.transparency_mode = value.to_native();
+        self
+    }
+}

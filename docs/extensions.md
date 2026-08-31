@@ -660,3 +660,63 @@ directions so a mapping that collapsed two variants onto one number would fail.
 non-owning handle slots, and a safe Rust value holding raw handles would be a
 raw-handle leak; textures belong on the effect, where the lifetime relationship
 is real.
+
+## Engine-layer render settings (RUST-EXT-010, 2026-08-31)
+
+The engine layer is 857 canonical routes, and binding it wholesale would be
+binding for a percentage. This is one coherent vertical slice, chosen because
+it is genuinely useful to a game -- it is what a graphics-settings screen is
+made of -- and because it can be tested semantically on a headless host, which
+most of the layer cannot.
+
+`EngineRenderSettings` owns CNA's 50-field settings value and exposes typed
+accessors rather than the structure. A `#[repr(C)]` field set is the ABI's
+shape, not an API: making it public would turn every later CNA field addition
+into a breaking change here.
+
+Three operations carry the real semantics, and all three were measured:
+
+### `normalize` -- what the engine will actually use
+
+Upstream runs every field through its own setter and reads it back, so a caller
+can see what a value will become *before* handing it to a pipeline. Thirty-one
+corrections are documented, ten clamping to a two-sided range and twenty-one
+flooring. Measured on this artifact:
+
+| Field | Asked | Used |
+|---|---:|---:|
+| `exposure` | -5.0 | 0.0 |
+| `gamma` | -1.0 | 0.01 -- a positive minimum, not zero, which a renderer would divide by |
+| `bloom_intensity` | -2.0 | 0.0 |
+| `ssao_radius` | -4.0 | 0.0 |
+| `bloom_iterations` | -7 | **-7** |
+| `ssao_sample_count` | -3 | **-3** |
+| `ssr_step_count` | -11 | **-11** |
+
+The last three are the point. The continuous fields are corrected; the integer
+counts are **not**, and are not among the thirty-one. A caller that assumed
+every field was corrected would hand the engine a negative bloom pyramid depth.
+The test asserts the exact pass-through rather than a range, so a future
+upstream change in either direction is visible.
+
+`normalize` is also idempotent, which is what makes it safe to call on every
+settings change.
+
+### `apply_quality_preset` -- only what has been decided
+
+Upstream derives only the fields a quality dial has been settled for -- today
+bloom's pyramid level count and the FXAA edge threshold -- and deliberately
+leaves the rest alone rather than guessing. The test asserts that Low and Ultra
+differ and that Ultra does not use fewer bloom levels, rather than asserting
+that every field follows the dial, which would be asserting a design upstream
+explicitly declined to commit to.
+
+### `apply_from_text` -- a count, not a boolean
+
+Unrecognised fields are skipped rather than refused, and the returned count is
+what makes that usable: a caller compares it with what it meant to set and can
+tell a typo from a stale key. Unrecognised text applies zero and succeeds;
+empty text is the degenerate case of the same rule.
+
+`PbrEffect` from `RUST-EXT-005` is the other engine-layer object already bound,
+so the layer now has two working slices rather than a survey.

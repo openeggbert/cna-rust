@@ -194,6 +194,9 @@ pub const CNA_CNB_METADATA_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_TEXTURE_INFO_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_MODEL_INFO_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_SPRITE_FONT_INFO_STRUCT_VERSION: u32 = 1;
+pub const CNA_TRANSPARENCY_MODE_NONE: CNA_TransparencyMode = 0;
+pub const CNA_TRANSPARENCY_MODE_SORTED: CNA_TransparencyMode = 1;
+pub const CNA_TRANSPARENCY_MODE_ORDER_INDEPENDENT: CNA_TransparencyMode = 2;
 pub const CNA_ALPHA_MODE_OPAQUE_EXT: CNA_AlphaModeEXT = 0;
 pub const CNA_ALPHA_MODE_MASK_EXT: CNA_AlphaModeEXT = 1;
 pub const CNA_ALPHA_MODE_BLEND_EXT: CNA_AlphaModeEXT = 2;
@@ -649,10 +652,66 @@ pub type CNA_CnbTextureDataHandle = CNA_Handle;
 pub type CNA_CnbModelDataHandle = CNA_Handle;
 pub type CNA_CnbLoaderHandle = CNA_Handle;
 pub type CNA_CnbWriterHandle = CNA_Handle;
+pub type CNA_TransparencyMode = u32;
 pub type CNA_AlphaModeEXT = u32;
 pub type CNA_TonemappingMode = u32;
 pub type CNA_RenderQuality = u32;
 pub type CNA_ShadowQuality = u32;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_RenderPipelineSettingsEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub hdr_enabled: CNA_Bool,
+    pub exposure: f32,
+    pub gamma: f32,
+    pub tonemapping_mode: CNA_TonemappingMode,
+    pub bloom_enabled: CNA_Bool,
+    pub bloom_intensity: f32,
+    pub bloom_threshold: f32,
+    pub bloom_iterations: i32,
+    pub ssao_enabled: CNA_Bool,
+    pub transparency_mode: CNA_TransparencyMode,
+    pub ssao_radius: f32,
+    pub ssao_intensity: f32,
+    pub ssao_sample_count: i32,
+    pub ssr_enabled: CNA_Bool,
+    pub ssr_max_distance: f32,
+    pub ssr_step_count: i32,
+    pub ssr_thickness: f32,
+    pub ssr_depth_bias: f32,
+    pub ssr_edge_fade: f32,
+    pub volumetric_fog_density: f32,
+    pub light_shaft_threshold: f32,
+    pub light_shaft_intensity: f32,
+    pub light_shaft_decay: f32,
+    pub height_fog_density: f32,
+    pub height_fog_falloff: f32,
+    pub height_fog_base_height: f32,
+    pub motion_blur_strength: f32,
+    pub motion_blur_max_distance: f32,
+    pub chromatic_aberration_strength: f32,
+    pub film_grain_intensity: f32,
+    pub lens_flare_threshold: f32,
+    pub lens_flare_intensity: f32,
+    pub lens_flare_dispersal: f32,
+    pub color_grade_enabled: CNA_Bool,
+    pub color_grade_strength: f32,
+    pub dof_enabled: CNA_Bool,
+    pub dof_focus_distance: f32,
+    pub dof_focal_length: f32,
+    pub doff_number: f32,
+    pub dof_max_radius: f32,
+    pub ssr_roughness_blur: f32,
+    pub ssr_intensity: f32,
+    pub fxaa_enabled: CNA_Bool,
+    pub fxaa_edge_threshold_ext: f32,
+    pub render_quality: CNA_RenderQuality,
+    pub shadow_quality: CNA_ShadowQuality,
+    pub shadows_enabled: CNA_Bool,
+    pub reserved: [u8; 4],
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -4595,6 +4654,18 @@ pub type cna_cnb_texture_data_get_level_count_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_cnb_texture_data_copy_level_fn = unsafe extern "C" fn(
     CNA_CnbTextureDataHandle, u64, u64, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_render_pipeline_settings_ext_init_fn = unsafe extern "C" fn(
+    *mut CNA_RenderPipelineSettingsEXT,
+) -> CNA_Result;
+pub type cna_render_pipeline_settings_ext_normalize_fn = unsafe extern "C" fn(
+    *mut CNA_RenderPipelineSettingsEXT,
+) -> CNA_Result;
+pub type cna_render_pipeline_settings_ext_apply_render_quality_preset_fn = unsafe extern "C" fn(
+    *mut CNA_RenderPipelineSettingsEXT,
+) -> CNA_Result;
+pub type cna_render_pipeline_settings_ext_apply_from_string_fn = unsafe extern "C" fn(
+    *mut CNA_RenderPipelineSettingsEXT, CNA_StringView, *mut i32,
 ) -> CNA_Result;
 pub type cna_pbr_material_init_fn = unsafe extern "C" fn(*mut CNA_PbrMaterial) -> CNA_Result;
 pub type cna_render_pipeline_settings_init_fn = unsafe extern "C" fn(

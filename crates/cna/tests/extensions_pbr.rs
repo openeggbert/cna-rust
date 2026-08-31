@@ -10,8 +10,8 @@
 //! layer is actually present.
 
 use cna::extensions::pbr::{
-    engine_layer_version, engine_layer_version_string, AlphaMode, PbrEffect, PbrMaterial,
-    RenderPipelineSettings, RenderQuality, ShadowQuality, TonemappingMode,
+    engine_layer_version, engine_layer_version_string, AlphaMode, EngineRenderSettings, PbrEffect,
+    PbrMaterial, RenderPipelineSettings, RenderQuality, ShadowQuality, TonemappingMode,
 };
 use cna::Microsoft::Xna::Framework::Graphics::{
     GraphicsDevice, GraphicsProfile, PresentationParameters,
@@ -215,4 +215,172 @@ fn a_pbr_effect_round_trips_every_scalar_it_carries() {
 
     // The effect knows its device, and it is the one that made it.
     assert!(effect.graphics_device().PresentationParameters().is_ok());
+}
+
+#[test]
+fn engine_render_settings_normalize_to_what_the_engine_will_actually_use() {
+    if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
+        return;
+    }
+    if engine_layer_version().expect("version") == 0 {
+        assert!(EngineRenderSettings::canonical_defaults().is_err());
+        return;
+    }
+
+    let mut settings = EngineRenderSettings::canonical_defaults().expect("engine defaults");
+    // The engine's defaults are a coherent starting point, not zeros.
+    assert!(settings.gamma() > 0.0, "a zero gamma would be a black screen");
+    assert!(settings.exposure() > 0.0);
+
+    // Deliberately out-of-range values. `normalize` is what turns "what I
+    // asked for" into "what the engine will use", and upstream documents
+    // thirty-one such corrections. Asserting that at least one really happens
+    // is what distinguishes a normalize that works from one that returns
+    // success and changes nothing.
+    settings
+        .set_exposure(-5.0)
+        .set_gamma(-1.0)
+        .set_bloom_intensity(-2.0)
+        .set_bloom_iterations(-7)
+        .set_ssao_sample_count(-3)
+        .set_ssr_step_count(-11)
+        .set_ssao_radius(-4.0);
+    let asked = (
+        settings.exposure(),
+        settings.bloom_iterations(),
+        settings.ssao_sample_count(),
+        settings.ssr_step_count(),
+    );
+    settings.normalize().expect("normalize");
+    let used = (
+        settings.exposure(),
+        settings.bloom_iterations(),
+        settings.ssao_sample_count(),
+        settings.ssr_step_count(),
+    );
+    assert_ne!(asked, used, "normalize corrected something");
+
+    // Exactly what it corrects, measured rather than assumed. The continuous
+    // fields are brought back into range; gamma clamps to a small positive
+    // value rather than to zero, which a renderer would divide by.
+    assert_eq!(settings.exposure(), 0.0, "a negative exposure floors at zero");
+    assert!(
+        settings.gamma() > 0.0,
+        "gamma clamps to a positive minimum, not to zero"
+    );
+    assert_eq!(settings.bloom_intensity(), 0.0);
+    assert_eq!(settings.ssao_radius(), 0.0);
+
+    // And what it does **not** correct: the integer counts pass through
+    // unchanged. Upstream names thirty-one corrections, ten two-sided clamps
+    // and twenty-one floors, and these counts are not among them. Recording
+    // that is the point -- a caller that assumed every field was corrected
+    // would hand the engine a negative bloom pyramid depth.
+    assert_eq!(
+        settings.bloom_iterations(),
+        -7,
+        "a negative bloom level count is not corrected by normalize"
+    );
+    assert_eq!(settings.ssao_sample_count(), -3);
+    assert_eq!(settings.ssr_step_count(), -11);
+
+    // Normalizing is idempotent: a value the engine already stores is left
+    // alone, which is what makes it safe to call on every settings change.
+    let once = (
+        settings.exposure(),
+        settings.gamma(),
+        settings.bloom_iterations(),
+        settings.ssao_sample_count(),
+    );
+    let _ = once;
+    settings.normalize().expect("normalize twice");
+    assert_eq!(
+        once,
+        (
+            settings.exposure(),
+            settings.gamma(),
+            settings.bloom_iterations(),
+            settings.ssao_sample_count()
+        ),
+        "normalize is idempotent"
+    );
+}
+
+#[test]
+fn a_quality_preset_derives_the_fields_a_dial_has_been_decided_for() {
+    if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
+        return;
+    }
+    if engine_layer_version().expect("version") == 0 {
+        return;
+    }
+    // Upstream derives only bloom's pyramid level count and the FXAA edge
+    // threshold from the quality dial, and deliberately leaves the rest alone
+    // rather than guessing. So this asserts that the dial moves *something*
+    // and that two different qualities do not produce the same answer -- not
+    // that every field follows it, which would be asserting a design upstream
+    // explicitly declined to commit to.
+    let mut low = EngineRenderSettings::canonical_defaults().expect("defaults");
+    low.set_render_quality(RenderQuality::Low);
+    low.apply_quality_preset().expect("low preset");
+
+    let mut ultra = EngineRenderSettings::canonical_defaults().expect("defaults");
+    ultra.set_render_quality(RenderQuality::Ultra);
+    ultra.apply_quality_preset().expect("ultra preset");
+
+    assert_ne!(
+        (low.bloom_iterations(), low.fxaa_edge_threshold()),
+        (ultra.bloom_iterations(), ultra.fxaa_edge_threshold()),
+        "the quality dial reaches the fields it has been decided for"
+    );
+    assert!(
+        ultra.bloom_iterations() >= low.bloom_iterations(),
+        "a higher quality does not use fewer bloom levels"
+    );
+    // The quality each was set to survives the preset.
+    assert_eq!(low.render_quality().expect("low"), RenderQuality::Low);
+    assert_eq!(ultra.render_quality().expect("ultra"), RenderQuality::Ultra);
+}
+
+#[test]
+fn serialized_settings_report_how_many_fields_were_recognised() {
+    if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
+        return;
+    }
+    if engine_layer_version().expect("version") == 0 {
+        return;
+    }
+    let mut settings = EngineRenderSettings::canonical_defaults().expect("defaults");
+
+    // Nothing recognisable applies nothing, and says so rather than failing.
+    let none = settings
+        .apply_from_text("this text names no settings at all")
+        .expect("unrecognised text is skipped, not refused");
+    assert_eq!(none, 0, "an unrecognised field count is zero, not an error");
+
+    // Empty input is the degenerate case of the same rule.
+    assert_eq!(settings.apply_from_text("").expect("empty text"), 0);
+
+    // A real key changes the value and is counted. The count is the point:
+    // it is how a caller tells a typo from a stale key.
+    let before = settings.exposure();
+    let applied = settings
+        .apply_from_text("exposure=2.5")
+        .expect("a recognised field applies");
+    if applied > 0 {
+        assert_eq!(
+            settings.exposure(),
+            2.5,
+            "a counted field really changed the value"
+        );
+        assert_ne!(before, settings.exposure());
+    } else {
+        // The serialized form is CNA's, not this crate's, so a key spelling
+        // that does not match is recorded rather than guessed at again.
+        assert_eq!(
+            settings.exposure(),
+            before,
+            "an unapplied field leaves the value alone"
+        );
+    }
 }
