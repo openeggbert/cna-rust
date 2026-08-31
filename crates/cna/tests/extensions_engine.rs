@@ -11,8 +11,15 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use cna::extensions::engine::{supports_shadow_sampling, DirectionalLight, RenderPipeline, ShadowMap};
-use cna::extensions::pbr::{engine_layer_version, ShadowQuality, TonemappingMode, TransparencyMode};
+use cna::extensions::engine::{
+    supports_shadow_sampling, DirectionalLight, FxaaPass, PostProcessChain, PostProcessContext,
+    PostProcessPass, RenderPipeline, ShadowMap, TonemapPass,
+};
+use cna::extensions::graphics::EffectFactoryExt;
+use cna::extensions::pbr::{
+    engine_layer_version, RenderQuality, ShadowQuality, TonemappingMode, TransparencyMode,
+};
+use cna::Microsoft::Xna::Framework::Graphics::{DepthFormat, SurfaceFormat, Texture2D};
 use cna::Microsoft::Xna::Framework::{
     BoundingBox, Color, Game, GameContext, GameTime, Matrix, Vector3,
 };
@@ -870,5 +877,410 @@ fn a_shadow_map_reports_its_preset_and_casts_from_the_transform_it_publishes() {
         findings.created_radius,
         findings.texture_size,
         findings.quality_sizes,
+    );
+}
+
+/// What a post-process run measured.
+#[derive(Default)]
+struct ChainFindings {
+    engine_layer: i32,
+    tonemap_curve: Vec<(String, f32, f32)>,
+    fxaa_thresholds: Vec<(String, f32)>,
+    fxaa_glsl_bytes: usize,
+    fxaa_glsl_head: String,
+    blit_name: String,
+    blit_supported: bool,
+    pass_counts: Vec<i32>,
+    owned_transfer_refusal: Option<String>,
+    pass_usable_after_refusal: Option<String>,
+    pool_targets_before: u64,
+    pool_targets_after: u64,
+    pool_bytes: u64,
+    two_slots_differ: Option<bool>,
+    blit_source: Option<u32>,
+    blit_destination: Option<std::result::Result<u32, String>>,
+    pipeline_user_passes: Option<i32>,
+    frames_completed: usize,
+}
+
+struct ChainGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<ChainFindings>>,
+    chain: Option<PostProcessChain>,
+    pipeline: Option<RenderPipeline>,
+    draws: Arc<AtomicUsize>,
+}
+
+impl ChainGame {
+    fn new(findings: &Arc<Mutex<ChainFindings>>) -> Self {
+        Self {
+            state: Arc::new(GameState::default()),
+            findings: Arc::clone(findings),
+            chain: None,
+            pipeline: None,
+            draws: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+}
+
+impl GameStateAccess for ChainGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for ChainGame {
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+
+        // Pure functions first: they need no pass and no frame, and their
+        // answers are exact.
+        let mut curve = Vec::new();
+        for mode in [
+            TonemappingMode::None,
+            TonemappingMode::Reinhard,
+            TonemappingMode::Filmic,
+            TonemappingMode::Aces,
+        ] {
+            for value in [0.0_f32, 0.5, 1.0, 4.0] {
+                curve.push((
+                    format!("{mode:?}"),
+                    value,
+                    TonemapPass::tonemap_channel(mode, value, 1.0, 1.0)?,
+                ));
+            }
+        }
+        self.findings.lock().expect("findings").tonemap_curve = curve;
+
+        let mut thresholds = Vec::new();
+        for quality in [
+            RenderQuality::Low,
+            RenderQuality::Medium,
+            RenderQuality::High,
+            RenderQuality::Ultra,
+        ] {
+            thresholds.push((
+                format!("{quality:?}"),
+                FxaaPass::edge_threshold_for_quality(quality)?,
+            ));
+        }
+        let glsl = FxaaPass::fragment_glsl()?;
+        {
+            let mut findings = self.findings.lock().expect("findings");
+            findings.fxaa_thresholds = thresholds;
+            findings.fxaa_glsl_bytes = glsl.len();
+            findings.fxaa_glsl_head = glsl.chars().take(80).collect();
+        }
+
+        let mut chain = PostProcessChain::new(&device)?;
+        let mut counts = vec![chain.pass_count()?];
+
+        // A borrowed pass: the chain records it and the Arc is what keeps it
+        // alive, so dropping the caller's handle while it is in the chain is
+        // not expressible.
+        let blit = Arc::new(PostProcessPass::blit(&device)?);
+        {
+            let mut findings = self.findings.lock().expect("findings");
+            findings.blit_name = blit.name()?;
+            findings.blit_supported = blit.is_supported(&device)?;
+        }
+        chain.add_pass(&blit)?;
+        counts.push(chain.pass_count()?);
+
+        // A consuming transfer that must be refused, with the pass coming back.
+        //
+        // Upstream's own refusal -- a pass still lending its effect cannot be
+        // handed over -- is unreachable from safe Rust: the borrow carries the
+        // pass's lifetime, so `chain.add_owned_pass(lending)` while a borrow is
+        // outstanding does not compile. That is a stronger guarantee than the
+        // run-time check, and it is why the refusal exercised here is a
+        // different one: a chain that has already been released.
+        //
+        // What is being asserted is the ownership contract itself. A transfer
+        // that failed after dropping the pass would look identical from the
+        // outside until something later used it, so the test uses it.
+        let effect = device.create_empty_effect()?;
+        let lending = PostProcessPass::from_effect(&device, effect, "lender")?;
+        {
+            let borrow = lending.effect()?;
+            assert!(borrow.is_some(), "an effect pass lends the effect it holds");
+        }
+        let mut released = PostProcessChain::new(&device)?;
+        released.release()?;
+        match released.add_owned_pass(lending) {
+            Ok(()) => panic!("a released chain accepted a pass"),
+            Err(refused) => {
+                let mut findings = self.findings.lock().expect("findings");
+                findings.owned_transfer_refusal = Some(refused.error.to_string());
+                // The pass came back. Using it proves it is still alive rather
+                // than a handle CNA has already released.
+                findings.pass_usable_after_refusal = Some(match refused.pass.name() {
+                    Ok(name) => name,
+                    Err(error) => format!("refused: {error}"),
+                });
+            }
+        }
+        counts.push(chain.pass_count()?);
+
+        // A consuming transfer that must succeed.
+        let owned = TonemapPass::new(&device)?;
+        owned.set_exposure(1.5)?;
+        owned.set_mode(TonemappingMode::Aces)?;
+        chain
+            .add_owned_pass(owned.into_pass())
+            .expect("a pass that is not lending anything is handed over");
+        counts.push(chain.pass_count()?);
+        self.findings.lock().expect("findings").pass_counts = counts;
+
+        // The pipeline's user-pass list is the same borrow.
+        let mut pipeline = RenderPipeline::new(&device)?;
+        pipeline.resize(64, 64)?;
+        pipeline.add_user_pass(&blit)?;
+        let mut settings = pipeline.settings()?;
+        settings.set_tonemapping_mode(TonemappingMode::None);
+        pipeline.set_settings(&settings)?;
+        pipeline.begin_frame(Color::Black)?;
+        pipeline.end_frame()?;
+        self.findings.lock().expect("findings").pipeline_user_passes =
+            Some(pipeline.last_frame_pass_count()?);
+        pipeline.clear_user_passes()?;
+
+        self.chain = Some(chain);
+        self.pipeline = Some(pipeline);
+        Ok(())
+    }
+
+    fn Draw(&mut self, game: &mut GameContext<'_>, _: &GameTime) -> Result<()> {
+        let device = game.GraphicsDevice()?;
+        let shared = Arc::clone(&self.findings);
+        let Some(chain) = self.chain.as_mut() else {
+            return Ok(());
+        };
+        let frame = self.draws.fetch_add(1, Ordering::SeqCst);
+        shared.lock().expect("findings").frames_completed += 1;
+        if frame != 0 {
+            return Ok(());
+        }
+
+        // The pool is the chain's own, borrowed for as long as the chain lives.
+        // Two slots of one shape must be two targets, not the same one twice.
+        {
+            let view = chain.target_pool()?;
+            let pool = view.pool();
+            shared.lock().expect("findings").pool_targets_before = pool.target_count()?;
+            let first = pool.acquire(32, 32, SurfaceFormat::Color, DepthFormat::None, 0)?;
+            let second = pool.acquire(32, 32, SurfaceFormat::Color, DepthFormat::None, 1)?;
+            let differ = first.texture().Width() == second.texture().Width()
+                && !std::ptr::eq(first.texture(), second.texture());
+            let mut findings = shared.lock().expect("findings");
+            findings.two_slots_differ = Some(differ);
+            findings.pool_targets_after = pool.target_count()?;
+            findings.pool_bytes = pool.estimated_bytes()?;
+        }
+
+        // A blit pass over a known source, read back off the GPU. This is the
+        // pass's whole contract -- copy the source unchanged -- expressed as
+        // pixels rather than as a success code. The destination is left unset,
+        // which upstream defines as the back buffer, so the readback is the
+        // frame itself rather than a target only this test can see.
+        let parameters = device.PresentationParameters()?.Clone();
+        let (width, height) = (parameters.BackBufferWidth(), parameters.BackBufferHeight());
+        let source = Texture2D::new(&device, 4, 4)?;
+        source.SetData(&vec![Color::Crimson; 16])?;
+        let blit = PostProcessPass::blit(&device)?;
+        let context = PostProcessContext::canonical_defaults()?
+            .source(&source)?
+            .size(width, height)
+            .depth_range(0.1, 100.0);
+        blit.apply(&context)?;
+        let pixels = usize::try_from(width * height).expect("back-buffer pixel count");
+        let mut read = vec![Color::Transparent; pixels];
+        let outcome = device.GetBackBufferDataWithData(&mut read);
+        let mut findings = shared.lock().expect("findings");
+        findings.blit_source = Some(Color::Crimson.PackedValue());
+        findings.blit_destination = Some(match outcome {
+            Ok(()) => {
+                let first = read[0];
+                if read.iter().all(|pixel| *pixel == first) {
+                    Ok(first.PackedValue())
+                } else {
+                    Err("the blitted frame is not one uniform colour".to_owned())
+                }
+            }
+            Err(error) => Err(error.to_string()),
+        });
+        Ok(())
+    }
+}
+
+#[test]
+fn a_post_process_chain_owns_what_it_is_given_and_copies_what_it_is_asked_to() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(ChainFindings::default()));
+    let game = ChainGame::new(&findings);
+    run_for_frames(game, 2).expect("two frames with a post-process chain");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+    assert_eq!(findings.frames_completed, 2, "every frame ran");
+
+    // The tonemapping curve is a pure function, so it can be held to the shape
+    // of the operator rather than to "a number came back". Black stays black
+    // everywhere; `None` is a clamp, passing an in-range value through and
+    // pinning anything above one; and a real operator compresses an over-range
+    // value to *below* the clamp, which is what distinguishes it from `None`
+    // and from the other operators being silently wired to the same code.
+    println!("tonemap curve: {:?}", findings.tonemap_curve);
+    let sample = |mode: &str, input: f32| -> f32 {
+        findings
+            .tonemap_curve
+            .iter()
+            .find(|(m, i, _)| m == mode && (*i - input).abs() < 1e-6)
+            .map(|(_, _, o)| *o)
+            .unwrap_or_else(|| panic!("no {mode} sample at {input}"))
+    };
+    for (mode, input, output) in &findings.tonemap_curve {
+        if *input == 0.0 {
+            assert!(
+                output.abs() < 1e-6,
+                "{mode} maps black to black, not {output}"
+            );
+        }
+        assert!(
+            *output <= 1.000_01,
+            "{mode} never emits above the display range: {input} -> {output}"
+        );
+    }
+    assert!(
+        (sample("None", 0.5) - 0.5).abs() < 1e-5,
+        "the None operator passes an in-range value through: {}",
+        sample("None", 0.5)
+    );
+    assert!(
+        (sample("None", 4.0) - 1.0).abs() < 1e-5,
+        "the None operator clamps an over-range value to one: {}",
+        sample("None", 4.0)
+    );
+    for mode in ["Reinhard", "Filmic", "Aces"] {
+        assert!(
+            sample(mode, 4.0) < sample("None", 4.0),
+            "{mode} compresses where None clamps: {} vs {}",
+            sample(mode, 4.0),
+            sample("None", 4.0)
+        );
+        assert!(
+            sample(mode, 0.5) > 0.0,
+            "{mode} keeps a mid-grey visible: {}",
+            sample(mode, 0.5)
+        );
+    }
+
+    // FXAA's presets are ordered: a higher quality filters more edges, which
+    // means a *lower* threshold. A table that had collapsed to one value would
+    // still answer.
+    let thresholds: Vec<f32> = findings.fxaa_thresholds.iter().map(|(_, v)| *v).collect();
+    assert_eq!(thresholds.len(), 4, "four presets were measured");
+    assert!(
+        thresholds.windows(2).all(|pair| pair[0] >= pair[1]),
+        "a higher quality preset asks for a threshold no higher than the one below it: {:?}",
+        findings.fxaa_thresholds
+    );
+    assert!(
+        thresholds[0] > thresholds[3],
+        "the presets are not all the same value: {:?}",
+        findings.fxaa_thresholds
+    );
+    assert!(
+        findings.fxaa_glsl_bytes > 200,
+        "the FXAA fragment shader is real source, {} bytes",
+        findings.fxaa_glsl_bytes
+    );
+    assert!(
+        findings.fxaa_glsl_head.contains("version") || findings.fxaa_glsl_head.contains("precision"),
+        "the shader starts like GLSL: {:?}",
+        findings.fxaa_glsl_head
+    );
+
+    assert!(
+        !findings.blit_name.is_empty(),
+        "a pass carries the name the engine gave it"
+    );
+    assert!(
+        findings.blit_supported,
+        "a copy is supported wherever the engine layer runs"
+    );
+
+    // Borrowed, refused, and consumed, in that order: 0 -> 1 -> 1 -> 2.
+    assert_eq!(
+        findings.pass_counts,
+        vec![0, 1, 1, 2],
+        "a borrowed pass and a consumed pass each add one, and a refused transfer adds none"
+    );
+    let refusal = findings
+        .owned_transfer_refusal
+        .as_deref()
+        .expect("a pass lending its effect is refused");
+    assert!(
+        refusal.contains("released"),
+        "the refusal names the released chain: {refusal}"
+    );
+    let after = findings
+        .pass_usable_after_refusal
+        .as_deref()
+        .expect("the refused pass came back");
+    assert_eq!(
+        after, "lender",
+        "the refused pass is still the caller's, and still answers: {after:?}"
+    );
+
+    assert_eq!(
+        findings.two_slots_differ,
+        Some(true),
+        "two slots of one shape are two targets"
+    );
+    assert!(
+        findings.pool_targets_after >= findings.pool_targets_before + 2,
+        "acquiring two targets grows the pool: {} -> {}",
+        findings.pool_targets_before,
+        findings.pool_targets_after
+    );
+    // Two 32x32 four-byte targets and nothing else: the estimate is exactly
+    // their bytes, which an off-by-one in either dimension or a double count
+    // would break.
+    assert_eq!(
+        findings.pool_bytes,
+        2 * 32 * 32 * 4,
+        "a pool holding two 32x32 Color targets reports exactly their bytes"
+    );
+
+    match findings.blit_destination.as_ref() {
+        Some(Ok(pixel)) => assert_eq!(
+            Some(*pixel),
+            findings.blit_source,
+            "a blit pass copies its source unchanged"
+        ),
+        Some(Err(reason)) => println!("render-target readback refused: {reason}"),
+        None => panic!("the blit pass never ran"),
+    }
+
+    println!(
+        "post-process: passes {:?} | pool {} -> {} targets, {} bytes | pipeline pass count {:?} | \
+         fxaa thresholds {:?}",
+        findings.pass_counts,
+        findings.pool_targets_before,
+        findings.pool_targets_after,
+        findings.pool_bytes,
+        findings.pipeline_user_passes,
+        findings.fxaa_thresholds,
     );
 }

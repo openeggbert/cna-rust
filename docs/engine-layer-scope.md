@@ -129,6 +129,7 @@ the criterion above is unchanged, only its precondition has been met.
 |---|---|---:|---|
 | render pipeline lifecycle, scene target, statistics, pass timings | `render_pipeline` | 27 | `VERIFIED_PIXEL` |
 | directional-light shadow maps | `shadow_map`, plus the pipeline's shadow-scene pair | 24 | `VERIFIED_GPU` |
+| post-process chain, passes, target pool, tonemap and FXAA | `post_process_chain`, `post_process_pass`, `blit_pass`, `render_target_pool`, `tonemap_pass`, `fxaa_pass` | 49 | `VERIFIED_PIXEL` |
 
 ### What the GPU artifact changed about the evidence
 

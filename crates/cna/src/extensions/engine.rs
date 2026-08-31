@@ -51,9 +51,10 @@ use crate::graphics::{
     BorrowedHandle, Effect, GraphicsDevice, OwnedEngineChild, SurfaceFormat, Texture2D,
 };
 use crate::native::Native;
+use crate::graphics::{DepthFormat, RenderTarget2D};
 use crate::value::{BoundingBox, Color, Matrix, Vector3};
 
-use super::pbr::{EngineRenderSettings, ShadowQuality};
+use super::pbr::{EngineRenderSettings, RenderQuality, ShadowQuality, TonemappingMode};
 
 /// What one finished frame of the pipeline actually did.
 ///
@@ -273,6 +274,15 @@ impl EngineHandle {
         Ok(handle)
     }
 
+    /// Drops the handle without releasing it, for a route that consumed it.
+    fn forget(&self) {
+        let mut guard = self
+            .handle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        *guard = sys::CNA_INVALID_HANDLE;
+    }
+
     fn release(&self) -> Result<()> {
         let mut guard = self
             .handle
@@ -309,6 +319,7 @@ pub struct RenderPipeline {
     transparent: Option<Arc<SceneCallback>>,
     shadow_casters: Option<Arc<SceneCallback>>,
     shadow_map: Option<Arc<ShadowMap>>,
+    user_passes: Vec<Arc<PostProcessPass>>,
 }
 
 impl RenderPipeline {
@@ -341,6 +352,7 @@ impl RenderPipeline {
             transparent: None,
             shadow_casters: None,
             shadow_map: None,
+            user_passes: Vec::new(),
         })
     }
 
@@ -542,6 +554,30 @@ impl RenderPipeline {
             )
         })?;
         self.transparent = Some(scene);
+        Ok(())
+    }
+
+    /// Appends a caller-owned post-process pass to run after the built-in ones.
+    ///
+    /// **Borrowed:** the pipeline records the pass and never owns it, so the
+    /// [`Arc`] is what keeps it alive for as long as it is registered.
+    pub fn add_user_pass(&mut self, pass: &Arc<PostProcessPass>) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: both handles are live; retention follows on success.
+        self.native.check(unsafe {
+            (self.native.engine.render_pipeline_add_user_pass)(handle, pass.core.get()?)
+        })?;
+        self.user_passes.push(Arc::clone(pass));
+        Ok(())
+    }
+
+    /// Removes every caller-owned pass.
+    pub fn clear_user_passes(&mut self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.render_pipeline_clear_user_passes)(handle) })?;
+        self.user_passes.clear();
         Ok(())
     }
 
@@ -855,6 +891,7 @@ impl RenderPipeline {
         self.transparent = None;
         self.shadow_casters = None;
         self.shadow_map = None;
+        self.user_passes.clear();
         self.depth = None;
         self.normals = None;
         self.velocity = None;
@@ -1329,5 +1366,1011 @@ fn native_bounds(value: BoundingBox) -> sys::CNA_BoundingBox {
     sys::CNA_BoundingBox {
         min: native_vector3(value.Min),
         max: native_vector3(value.Max),
+    }
+}
+
+/// One frame's inputs to a post-process pass or chain.
+///
+/// A typed Rust value rather than the C structure. The ABI's version-2 form
+/// grew a borrowed `settings` pointer, so a caller that filled the structure by
+/// hand would have to get `struct_size` right or silently lose fields; here the
+/// versioning is filled from CNA's own initializer and the borrow is a Rust
+/// reference with a lifetime.
+///
+/// The source and destination are `BORROWED`: CNA reads them for the call and
+/// retains nothing, and the Rust references say so.
+pub struct PostProcessContext<'frame> {
+    inner: sys::CNA_PostProcessContext,
+    frame: PhantomData<&'frame ()>,
+}
+
+impl<'frame> PostProcessContext<'frame> {
+    /// CNA's own defaults: no textures, zero size, identity matrices, no
+    /// settings and no previous frame.
+    pub fn canonical_defaults() -> Result<Self> {
+        let native = Native::process()?;
+        let mut inner = sys::CNA_PostProcessContext::default();
+        // SAFETY: the structure is a caller-owned versioned output.
+        native.check(unsafe { (native.engine.post_process_context_init)(&mut inner) })?;
+        Ok(Self {
+            inner,
+            frame: PhantomData,
+        })
+    }
+
+    /// The colour input the pass reads.
+    #[must_use]
+    pub fn source(mut self, texture: &'frame Texture2D) -> Result<Self> {
+        self.inner.source = texture.handle()?;
+        Ok(self)
+    }
+
+    /// The linear-depth input, for a pass that reads depth.
+    #[must_use]
+    pub fn source_depth(mut self, texture: &'frame Texture2D) -> Result<Self> {
+        self.inner.source_depth = texture.handle()?;
+        Ok(self)
+    }
+
+    /// The normals input, for a pass that reads normals.
+    #[must_use]
+    pub fn source_normals(mut self, texture: &'frame Texture2D) -> Result<Self> {
+        self.inner.source_normals = texture.handle()?;
+        Ok(self)
+    }
+
+    /// The velocity input, for a pass that reads velocity.
+    #[must_use]
+    pub fn source_velocity(mut self, texture: &'frame Texture2D) -> Result<Self> {
+        self.inner.source_velocity = texture.handle()?;
+        Ok(self)
+    }
+
+    /// The destination render target; the back buffer when this is not set.
+    #[must_use]
+    pub fn destination(mut self, target: &'frame RenderTarget2D) -> Result<Self> {
+        self.inner.destination = target.handle()?;
+        Ok(self)
+    }
+
+    /// The destination size in pixels.
+    #[must_use]
+    pub const fn size(mut self, width: i32, height: i32) -> Self {
+        self.inner.width = width;
+        self.inner.height = height;
+        self
+    }
+
+    /// Seconds since the previous frame.
+    #[must_use]
+    pub const fn elapsed_seconds(mut self, value: f32) -> Self {
+        self.inner.elapsed_seconds = value;
+        self
+    }
+
+    /// The camera's depth range.
+    #[must_use]
+    pub const fn depth_range(mut self, near_plane: f32, far_plane: f32) -> Self {
+        self.inner.near_plane = near_plane;
+        self.inner.far_plane = far_plane;
+        self
+    }
+
+    /// The camera matrices a reprojecting pass reads.
+    #[must_use]
+    pub fn camera(mut self, projection: Matrix, inverse_projection: Matrix, inverse_view: Matrix) -> Self {
+        self.inner.projection = native_matrix(projection);
+        self.inner.inverse_projection = native_matrix(inverse_projection);
+        self.inner.inverse_view = native_matrix(inverse_view);
+        self
+    }
+
+    /// The previous frame's view-projection, which marks the frame as having one.
+    #[must_use]
+    pub fn previous_view_projection(mut self, value: Matrix) -> Self {
+        self.inner.previous_view_projection = native_matrix(value);
+        self.inner.has_previous_frame = sys::CNA_TRUE;
+        self
+    }
+
+    /// The settings a pass reads, borrowed for the frame.
+    ///
+    /// The pointer CNA keeps is the caller's, not a copy, which is why this
+    /// takes a reference whose lifetime the context carries.
+    #[must_use]
+    pub fn settings(mut self, settings: &'frame EngineRenderSettings) -> Self {
+        self.inner.settings = settings.as_native();
+        self
+    }
+
+    const fn as_native(&self) -> &sys::CNA_PostProcessContext {
+        &self.inner
+    }
+}
+
+/// One engine-layer post-process pass.
+///
+/// `OWNED`: created by [`PostProcessPass::blit`] or
+/// [`PostProcessPass::from_effect`], released exactly once. A pass created with
+/// [`PostProcessPass::owning_effect`] releases the effect with it.
+pub struct PostProcessPass {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+    device: GraphicsDevice,
+    /// The effect a borrowing pass draws through, kept alive by this value
+    /// because CNA holds a raw pointer to it and retains nothing.
+    borrowed_effect: Option<Effect>,
+}
+
+impl PostProcessPass {
+    /// A pass that copies its source to its destination unchanged.
+    pub fn blit(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe { (native.engine.blit_pass_create)(device.handle()?, &mut handle) })?;
+        Ok(Self::adopt(native, device, handle, None))
+    }
+
+    /// A pass that draws its source through an effect it does **not** own.
+    ///
+    /// CNA keeps a raw pointer to the effect and retains nothing, so the pass
+    /// takes it: Rust is then what guarantees the effect outlives the pass,
+    /// which is the invariant upstream states and cannot enforce.
+    pub fn from_effect(device: &GraphicsDevice, effect: Effect, name: &str) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        let view = string_view(name);
+        // SAFETY: the device and effect handles are live, and `name` is
+        // borrowed for the duration of the call.
+        native.check(unsafe {
+            (native.engine.post_process_effect_pass_create)(
+                device.handle()?,
+                effect.native_handle()?,
+                view,
+                &mut handle,
+            )
+        })?;
+        Ok(Self::adopt(native, device, handle, Some(effect)))
+    }
+
+    /// A pass that **takes over** an effect.
+    ///
+    /// The consuming form. On success CNA owns the effect and the Rust value
+    /// hands over its handle without destroying it; on failure the effect comes
+    /// back untouched, so a refused call never strands a resource. That is why
+    /// the error carries the effect rather than dropping it.
+    pub fn owning_effect(
+        device: &GraphicsDevice,
+        effect: Effect,
+        name: &str,
+    ) -> std::result::Result<Self, EffectNotTransferred> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        let view = string_view(name);
+        let device_handle = match device.handle() {
+            Ok(value) => value,
+            Err(error) => return Err(EffectNotTransferred { effect, error }),
+        };
+        let effect_handle = match effect.native_handle() {
+            Ok(value) => value,
+            Err(error) => return Err(EffectNotTransferred { effect, error }),
+        };
+        // SAFETY: the handles are live and `name` is borrowed for the call. The
+        // effect is relinquished only after the route reports success, so a
+        // refusal leaves this value still owning it.
+        let result = native.check(unsafe {
+            (native.engine.post_process_effect_pass_create_owning)(
+                device_handle,
+                effect_handle,
+                view,
+                &mut handle,
+            )
+        });
+        match result {
+            Ok(()) => {
+                effect.relinquish();
+                Ok(Self::adopt(native, device, handle, None))
+            }
+            Err(error) => Err(EffectNotTransferred { effect, error }),
+        }
+    }
+
+    fn adopt(
+        native: &Arc<Native>,
+        device: &GraphicsDevice,
+        handle: sys::CNA_Handle,
+        borrowed_effect: Option<Effect>,
+    ) -> Self {
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.post_process_pass_destroy,
+            released: "the post-process pass has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Self {
+            core,
+            native: Arc::clone(native),
+            device: device.clone(),
+            borrowed_effect,
+        }
+    }
+
+    /// The pass's own name, as the engine records it.
+    pub fn name(&self) -> Result<String> {
+        let handle = self.core.get()?;
+        copy_text(&self.native, |api, destination, capacity, out_bytes| {
+            // SAFETY: the destination holds `capacity` writable bytes.
+            unsafe { (api.post_process_pass_copy_name)(handle, destination, capacity, out_bytes) }
+        })
+    }
+
+    /// Whether the pass can do its real work on a device.
+    ///
+    /// A pass that answers `false` is not broken: upstream's contract is that
+    /// such a pass degrades -- typically to a copy -- rather than failing. Ask
+    /// this to know which you will get, not to decide whether calling is safe.
+    pub fn is_supported(&self, device: &GraphicsDevice) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: both handles are live and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.post_process_pass_is_supported)(
+                handle,
+                device.handle()?,
+                &mut value,
+            )
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Runs the pass over one frame's inputs.
+    pub fn apply(&self, context: &PostProcessContext<'_>) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the context is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.post_process_pass_apply)(handle, context.as_native())
+        })
+    }
+
+    /// The effect an effect pass draws through, borrowed from the pass.
+    pub fn effect(&self) -> Result<Option<BorrowedEffect<'_>>> {
+        let handle = self.core.get()?;
+        let mut effect = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.post_process_effect_pass_get_effect)(handle, &mut effect)
+        })?;
+        if effect == sys::CNA_INVALID_HANDLE {
+            return Ok(None);
+        }
+        Ok(Some(BorrowedEffect::new(
+            &self.native,
+            &self.device,
+            effect,
+        )))
+    }
+
+    /// Replaces the effect an effect pass draws through, borrowing the new one.
+    ///
+    /// A pass created by [`PostProcessPass::owning_effect`] still owns the
+    /// effect it was given: setting a new one does not release it, exactly as
+    /// the canonical setter does not.
+    pub fn set_effect(&mut self, effect: Option<Effect>) -> Result<()> {
+        let handle = self.core.get()?;
+        let effect_handle = match effect.as_ref() {
+            Some(value) => value.native_handle()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        // SAFETY: the handle is owned and the effect handle is live for the call.
+        self.native.check(unsafe {
+            (self.native.engine.post_process_effect_pass_set_effect)(handle, effect_handle)
+        })?;
+        self.borrowed_effect = effect;
+        Ok(())
+    }
+
+    /// Releases the pass now rather than at drop.
+    pub fn release(&mut self) -> Result<()> {
+        let result = self.core.release();
+        self.borrowed_effect = None;
+        result
+    }
+}
+
+impl Drop for PostProcessPass {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// An effect a consuming route refused to take over.
+///
+/// Upstream's contract is that a refused transfer leaves the caller owning what
+/// it owned, and this type is how that reaches Rust: the effect comes back with
+/// the failure rather than being dropped inside a call that did nothing.
+pub struct EffectNotTransferred {
+    /// The effect, still owned by the caller.
+    pub effect: Effect,
+    /// Why the transfer was refused.
+    pub error: CnaError,
+}
+
+impl core::fmt::Debug for EffectNotTransferred {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("EffectNotTransferred")
+            .field("error", &self.error)
+            .finish_non_exhaustive()
+    }
+}
+
+impl core::fmt::Display for EffectNotTransferred {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(formatter, "the effect was not taken over: {}", self.error)
+    }
+}
+
+impl std::error::Error for EffectNotTransferred {}
+
+/// A pass a consuming route refused to take over.
+pub struct PassNotTransferred {
+    /// The pass, still owned by the caller.
+    pub pass: PostProcessPass,
+    /// Why the transfer was refused.
+    pub error: CnaError,
+}
+
+impl core::fmt::Debug for PassNotTransferred {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("PassNotTransferred")
+            .field("error", &self.error)
+            .finish_non_exhaustive()
+    }
+}
+
+impl core::fmt::Display for PassNotTransferred {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(formatter, "the pass was not taken over: {}", self.error)
+    }
+}
+
+impl std::error::Error for PassNotTransferred {}
+
+/// An ordered chain of post-process passes over pooled intermediate targets.
+pub struct PostProcessChain {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+    device: GraphicsDevice,
+    /// Passes the chain only borrows. CNA keeps raw pointers to them, so this
+    /// value is what keeps them alive for as long as they are in the chain.
+    borrowed: Vec<Arc<PostProcessPass>>,
+    /// Effects that belonged to passes the chain has taken over. The chain owns
+    /// the passes now, but a borrowing pass's effect was never the pass's to
+    /// own, so it moves here and outlives the chain's use of it.
+    owned_effects: Vec<Effect>,
+}
+
+impl PostProcessChain {
+    /// Creates an empty chain.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe {
+            (native.engine.post_process_chain_create)(device.handle()?, &mut handle)
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.post_process_chain_destroy,
+            released: "the post-process chain has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+            device: device.clone(),
+            borrowed: Vec::new(),
+            owned_effects: Vec::new(),
+        })
+    }
+
+    /// The device this chain allocates its intermediates on.
+    #[must_use]
+    pub const fn graphics_device(&self) -> &GraphicsDevice {
+        &self.device
+    }
+
+    /// Appends a pass the caller keeps owning.
+    ///
+    /// The chain holds a raw pointer to it and releases nothing, so the [`Arc`]
+    /// is what keeps it alive: a pass dropped while still in a chain would
+    /// leave CNA reading freed memory, which is precisely what the shared
+    /// reference prevents.
+    pub fn add_pass(&mut self, pass: &Arc<PostProcessPass>) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: both handles are live; retention follows on success.
+        self.native.check(unsafe {
+            (self.native.engine.post_process_chain_add_pass)(handle, pass.core.get()?)
+        })?;
+        self.borrowed.push(Arc::clone(pass));
+        Ok(())
+    }
+
+    /// Appends a pass and hands ownership of it to the chain.
+    ///
+    /// The consuming form, and the one route in the engine layer that
+    /// invalidates a handle the caller still holds. On success the chain owns
+    /// the pass and the Rust value forgets its handle; on failure -- a pass
+    /// that is still lending its effect is the documented case -- the pass
+    /// comes back untouched.
+    pub fn add_owned_pass(
+        &mut self,
+        mut pass: PostProcessPass,
+    ) -> std::result::Result<(), PassNotTransferred> {
+        let handle = match self.core.get() {
+            Ok(value) => value,
+            Err(error) => return Err(PassNotTransferred { pass, error }),
+        };
+        let pass_handle = match pass.core.get() {
+            Ok(value) => value,
+            Err(error) => return Err(PassNotTransferred { pass, error }),
+        };
+        // SAFETY: both handles are live. The Rust handle is forgotten only
+        // after the route reports success.
+        let result = self.native.check(unsafe {
+            (self.native.engine.post_process_chain_add_owned_pass)(handle, pass_handle)
+        });
+        match result {
+            Ok(()) => {
+                pass.core.forget();
+                // The effect a borrowing pass kept alive has to outlive the
+                // chain now, so it moves here rather than dying with the
+                // Rust-side pass value.
+                if let Some(effect) = pass.borrowed_effect.take() {
+                    self.owned_effects.push(effect);
+                }
+                Ok(())
+            }
+            Err(error) => Err(PassNotTransferred { pass, error }),
+        }
+    }
+
+    /// Removes every pass, releasing the ones the chain owns.
+    pub fn clear(&mut self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.post_process_chain_clear)(handle) })?;
+        self.borrowed.clear();
+        self.owned_effects.clear();
+        Ok(())
+    }
+
+    /// How many passes the chain holds.
+    pub fn pass_count(&self) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.post_process_chain_get_pass_count)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Runs every pass in order, ping-ponging between pooled targets.
+    pub fn apply(&self, context: &PostProcessContext<'_>) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the context is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.post_process_chain_apply)(handle, context.as_native())
+        })
+    }
+
+    /// Releases the chain's pooled intermediate targets.
+    pub fn reset_targets(&mut self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.post_process_chain_reset_targets)(handle) })
+    }
+
+    /// Turns GPU timing on or off, answering what the renderer actually did.
+    pub fn set_gpu_timing_enabled(&self, value: bool) -> Result<bool> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the flag is a canonical boolean.
+        self.native.check(unsafe {
+            (self.native.engine.post_process_chain_set_gpu_timing_enabled)(
+                handle,
+                u8::from(value),
+            )
+        })?;
+        self.is_gpu_timing_enabled()
+    }
+
+    /// Whether GPU timing is on.
+    pub fn is_gpu_timing_enabled(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.post_process_chain_is_gpu_timing_enabled)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Every pass timing the chain recorded, in its order.
+    pub fn pass_timings(&self) -> Result<Vec<PassTiming>> {
+        let handle = self.core.get()?;
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.post_process_chain_get_pass_timing_count)(handle, &mut count)
+        })?;
+        let count = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("CNA reported more timings than fit in memory"))?;
+        let mut timings = Vec::with_capacity(count);
+        for index in 0..count {
+            let position = index as u64;
+            let mut timing = sys::CNA_PassTimingEXT::default();
+            // SAFETY: the handle is owned, the index is below the reported
+            // count, and the output is a live local.
+            self.native.check(unsafe {
+                (self.native.engine.post_process_chain_get_pass_timing)(
+                    handle,
+                    position,
+                    &mut timing,
+                )
+            })?;
+            let name = copy_text(&self.native, |api, destination, capacity, out_bytes| {
+                // SAFETY: the destination holds `capacity` writable bytes.
+                unsafe {
+                    (api.post_process_chain_copy_pass_timing_name)(
+                        handle,
+                        position,
+                        destination,
+                        capacity,
+                        out_bytes,
+                    )
+                }
+            })?;
+            timings.push(PassTiming {
+                name,
+                sample_count: timing.sample_count,
+                milliseconds: timing.milliseconds,
+            });
+        }
+        Ok(timings)
+    }
+
+    /// The chain's render-target pool, borrowed.
+    ///
+    /// A counted borrow upstream: destroying the chain is refused while the
+    /// pool handle is outstanding, which the Rust lifetime makes unwritable.
+    pub fn target_pool(&self) -> Result<RenderTargetPoolView<'_>> {
+        let handle = self.core.get()?;
+        let mut pool = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.post_process_chain_get_target_pool)(handle, &mut pool)
+        })?;
+        Ok(RenderTargetPoolView {
+            pool: RenderTargetPool {
+                core: Arc::new(EngineHandle {
+                    native: Arc::clone(&self.native),
+                    handle: Mutex::new(pool),
+                    destroy: self.native.engine.render_target_pool_destroy,
+                    released: "the render-target pool borrow has been released",
+                }),
+                native: Arc::clone(&self.native),
+                device: self.device.clone(),
+            },
+            owner: PhantomData,
+        })
+    }
+
+    /// Releases the chain now rather than at drop.
+    pub fn release(&mut self) -> Result<()> {
+        let result = self.core.release();
+        self.borrowed.clear();
+        self.owned_effects.clear();
+        result
+    }
+}
+
+impl Drop for PostProcessChain {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// A pool of reusable render targets.
+pub struct RenderTargetPool {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+    device: GraphicsDevice,
+}
+
+/// A chain's own pool, borrowed for as long as the chain lives.
+pub struct RenderTargetPoolView<'chain> {
+    pool: RenderTargetPool,
+    owner: PhantomData<&'chain ()>,
+}
+
+impl RenderTargetPoolView<'_> {
+    /// The pool itself.
+    #[must_use]
+    pub const fn pool(&self) -> &RenderTargetPool {
+        &self.pool
+    }
+}
+
+impl RenderTargetPool {
+    /// The number of targets the pool currently holds.
+    pub fn target_count(&self) -> Result<u64> {
+        let handle = self.core.get()?;
+        let mut value = 0_u64;
+        // SAFETY: the handle is live and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.render_target_pool_get_target_count)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// The estimated bytes the pool's targets hold.
+    pub fn estimated_bytes(&self) -> Result<u64> {
+        let handle = self.core.get()?;
+        let mut value = 0_u64;
+        // SAFETY: the handle is live and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.render_target_pool_get_estimated_bytes)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Releases every target the pool holds.
+    pub fn reset(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is live.
+        self.native
+            .check(unsafe { (self.native.engine.render_target_pool_reset)(handle) })
+    }
+
+    /// Borrows a target of the requested shape from the pool.
+    /// `slot` distinguishes two targets of the same shape, so a pass that needs
+    /// two intermediates of one size asks for slot 0 and slot 1 rather than
+    /// getting the same texture twice.
+    pub fn acquire(
+        &self,
+        width: i32,
+        height: i32,
+        format: SurfaceFormat,
+        depth: DepthFormat,
+        slot: i32,
+    ) -> Result<BorrowedRenderTarget<'_>> {
+        let handle = self.core.get()?;
+        let mut target = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is live and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.render_target_pool_acquire)(
+                handle,
+                width,
+                height,
+                format as u32,
+                depth as u32,
+                slot,
+                &mut target,
+            )
+        })?;
+        BorrowedRenderTarget::new(&self.native, &self.device, target)
+    }
+}
+
+/// CNA's size-then-copy text protocol over the engine table.
+fn copy_text(
+    native: &Arc<Native>,
+    mut route: impl FnMut(
+        &crate::native::engine::EngineApi,
+        *mut c_char,
+        u64,
+        *mut u64,
+    ) -> sys::CNA_Result,
+) -> Result<String> {
+    let api = &native.engine;
+    let mut required = 0_u64;
+    let probe = route(api, core::ptr::null_mut(), 0, &mut required);
+    if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+        native.check(probe)?;
+    }
+    let capacity =
+        usize::try_from(required).map_err(|_| CnaError::InvalidInput("CNA text is too large"))?;
+    if capacity == 0 {
+        return Ok(String::new());
+    }
+    let mut buffer = vec![0_u8; capacity];
+    let mut written = 0_u64;
+    native.check(route(
+        api,
+        buffer.as_mut_ptr().cast::<c_char>(),
+        required,
+        &mut written,
+    ))?;
+    let written =
+        usize::try_from(written).map_err(|_| CnaError::InvalidInput("CNA text is too large"))?;
+    buffer.truncate(written.min(capacity));
+    while buffer.last() == Some(&0) {
+        buffer.pop();
+    }
+    String::from_utf8(buffer).map_err(|_| CnaError::InvalidInput("CNA text is not valid UTF-8"))
+}
+
+fn string_view(value: &str) -> sys::CNA_StringView {
+    sys::CNA_StringView {
+        data: value.as_ptr().cast::<c_char>(),
+        byte_length: value.len() as u64,
+    }
+}
+
+impl RenderTargetPool {
+    /// Creates a pool of reusable render targets on a device.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe {
+            (native.engine.render_target_pool_create)(device.handle()?, &mut handle)
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.render_target_pool_destroy,
+            released: "the render-target pool has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+            device: device.clone(),
+        })
+    }
+}
+
+impl Drop for RenderTargetPool {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// A tonemapping post-process pass.
+///
+/// Wraps a [`PostProcessPass`] rather than replacing it: upstream's concrete
+/// passes are the same handle type driven through the same shared operations,
+/// so `apply`, `name` and `is_supported` come from the pass itself and only the
+/// tonemapping knobs live here.
+pub struct TonemapPass {
+    pass: PostProcessPass,
+}
+
+impl TonemapPass {
+    /// Creates a tonemapping pass on a device.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native
+            .check(unsafe { (native.engine.tonemap_pass_create)(device.handle()?, &mut handle) })?;
+        Ok(Self {
+            pass: PostProcessPass::adopt(native, device, handle, None),
+        })
+    }
+
+    /// The pass itself, for the operations every pass shares.
+    #[must_use]
+    pub const fn pass(&self) -> &PostProcessPass {
+        &self.pass
+    }
+
+    /// Hands the pass over, for adding to a chain.
+    #[must_use]
+    pub fn into_pass(self) -> PostProcessPass {
+        self.pass
+    }
+
+    /// The tonemapping operator.
+    pub fn mode(&self) -> Result<TonemappingMode> {
+        let handle = self.pass.core.get()?;
+        let mut value: sys::CNA_TonemappingMode = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.pass
+            .native
+            .check(unsafe { (self.pass.native.engine.tonemap_pass_get_mode)(handle, &mut value) })?;
+        TonemappingMode::from_native(value)
+            .ok_or(CnaError::InvalidInput("native tonemapping mode is unknown"))
+    }
+
+    /// Sets the tonemapping operator.
+    pub fn set_mode(&self, value: TonemappingMode) -> Result<()> {
+        let handle = self.pass.core.get()?;
+        // SAFETY: the handle is owned and the identity is canonical.
+        self.pass.native.check(unsafe {
+            (self.pass.native.engine.tonemap_pass_set_mode)(handle, value.to_native())
+        })
+    }
+
+    /// Whether the pass dithers its output to hide banding.
+    pub fn is_deband_enabled(&self) -> Result<bool> {
+        let handle = self.pass.core.get()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.pass.native.check(unsafe {
+            (self.pass.native.engine.tonemap_pass_is_deband_enabled)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Turns output dithering on or off.
+    pub fn set_deband_enabled(&self, value: bool) -> Result<()> {
+        let handle = self.pass.core.get()?;
+        // SAFETY: the handle is owned and the flag is a canonical boolean.
+        self.pass.native.check(unsafe {
+            (self.pass.native.engine.tonemap_pass_set_deband_enabled)(handle, u8::from(value))
+        })
+    }
+
+    /// The exposure multiplier.
+    pub fn exposure(&self) -> Result<f32> {
+        self.scalar(self.pass.native.engine.tonemap_pass_get_exposure)
+    }
+
+    /// Sets the exposure multiplier.
+    pub fn set_exposure(&self, value: f32) -> Result<()> {
+        self.set_scalar(self.pass.native.engine.tonemap_pass_set_exposure, value)
+    }
+
+    /// The gamma the pass encodes with.
+    pub fn gamma(&self) -> Result<f32> {
+        self.scalar(self.pass.native.engine.tonemap_pass_get_gamma)
+    }
+
+    /// Sets the gamma the pass encodes with.
+    pub fn set_gamma(&self, value: f32) -> Result<()> {
+        self.set_scalar(self.pass.native.engine.tonemap_pass_set_gamma, value)
+    }
+
+    /// How strongly the output is dithered.
+    pub fn deband_strength(&self) -> Result<f32> {
+        self.scalar(self.pass.native.engine.tonemap_pass_get_deband_strength)
+    }
+
+    /// Sets how strongly the output is dithered.
+    pub fn set_deband_strength(&self, value: f32) -> Result<()> {
+        self.set_scalar(self.pass.native.engine.tonemap_pass_set_deband_strength, value)
+    }
+
+    fn scalar(
+        &self,
+        route: unsafe extern "C" fn(
+            sys::CNA_PostProcessPassHandle,
+            *mut f32,
+        ) -> sys::CNA_Result,
+    ) -> Result<f32> {
+        let handle = self.pass.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.pass.native.check(unsafe { route(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    fn set_scalar(
+        &self,
+        route: unsafe extern "C" fn(sys::CNA_PostProcessPassHandle, f32) -> sys::CNA_Result,
+        value: f32,
+    ) -> Result<()> {
+        let handle = self.pass.core.get()?;
+        // SAFETY: the handle is owned and the value is by value.
+        self.pass.native.check(unsafe { route(handle, value) })
+    }
+
+    /// The tonemapped value of one scene-linear channel.
+    ///
+    /// A pure function of its arguments upstream, which is what makes it worth
+    /// binding on its own: a caller can check what the operator will do to a
+    /// value without rendering anything, and a test can assert the curve rather
+    /// than the fact that a pass exists.
+    pub fn tonemap_channel(
+        mode: TonemappingMode,
+        value: f32,
+        exposure: f32,
+        gamma: f32,
+    ) -> Result<f32> {
+        let native = Native::process()?;
+        let mut out = 0.0_f32;
+        // SAFETY: every input is by value and the output is a live local.
+        native.check(unsafe {
+            (native.engine.tonemap_pass_tonemap_channel)(
+                mode.to_native(),
+                value,
+                exposure,
+                gamma,
+                &mut out,
+            )
+        })?;
+        Ok(out)
+    }
+}
+
+/// An FXAA post-process pass.
+pub struct FxaaPass {
+    pass: PostProcessPass,
+}
+
+impl FxaaPass {
+    /// Creates an FXAA pass on a device.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe { (native.engine.fxaa_pass_create)(device.handle()?, &mut handle) })?;
+        Ok(Self {
+            pass: PostProcessPass::adopt(native, device, handle, None),
+        })
+    }
+
+    /// The pass itself, for the operations every pass shares.
+    #[must_use]
+    pub const fn pass(&self) -> &PostProcessPass {
+        &self.pass
+    }
+
+    /// Hands the pass over, for adding to a chain.
+    #[must_use]
+    pub fn into_pass(self) -> PostProcessPass {
+        self.pass
+    }
+
+    /// The luminance difference at which the filter starts working.
+    pub fn edge_threshold(&self) -> Result<f32> {
+        let handle = self.pass.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.pass.native.check(unsafe {
+            (self.pass.native.engine.fxaa_pass_get_edge_threshold)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Sets the luminance difference at which the filter starts working.
+    pub fn set_edge_threshold(&self, value: f32) -> Result<()> {
+        let handle = self.pass.core.get()?;
+        // SAFETY: the handle is owned and the value is by value.
+        self.pass.native.check(unsafe {
+            (self.pass.native.engine.fxaa_pass_set_edge_threshold)(handle, value)
+        })
+    }
+
+    /// The edge threshold a render-quality preset asks for.
+    pub fn edge_threshold_for_quality(quality: RenderQuality) -> Result<f32> {
+        let native = Native::process()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the identity is canonical and the output is a live local.
+        native.check(unsafe {
+            (native.engine.fxaa_pass_edge_threshold_for_quality)(quality.to_native(), &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// The pass's own fragment shader, as the engine compiles it.
+    pub fn fragment_glsl() -> Result<String> {
+        let native = Native::process()?;
+        copy_text(&native, |api, destination, capacity, out_bytes| {
+            // SAFETY: the destination holds `capacity` writable bytes.
+            unsafe { (api.fxaa_pass_copy_fragment_glsl)(destination, capacity, out_bytes) }
+        })
     }
 }

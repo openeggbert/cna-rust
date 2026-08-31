@@ -189,7 +189,7 @@ impl RenderTarget2D {
         self.state.dispose_with_event(self, value)
     }
 
-    pub(super) fn handle(&self) -> Result<sys::CNA_Handle> {
+    pub(crate) fn handle(&self) -> Result<sys::CNA_Handle> {
         self.state.require_handle()
     }
 }

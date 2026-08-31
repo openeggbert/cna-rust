@@ -6564,4 +6564,198 @@ extern "C" {
         argument0: CNA_RenderPipelineHandle,
         argument1: *mut CNA_ShadowMapHandle,
     ) -> CNA_Result;
+    pub fn cna_post_process_context_init(argument0: *mut CNA_PostProcessContext) -> CNA_Result;
+    pub fn cna_blit_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_post_process_effect_pass_create(
+        argument0: CNA_Handle,
+        argument1: CNA_EffectHandle,
+        argument2: CNA_StringView,
+        argument3: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_post_process_effect_pass_create_owning(
+        argument0: CNA_Handle,
+        argument1: CNA_EffectHandle,
+        argument2: CNA_StringView,
+        argument3: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_post_process_effect_pass_get_effect(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_post_process_effect_pass_set_effect(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_post_process_pass_apply(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *const CNA_PostProcessContext,
+    ) -> CNA_Result;
+    pub fn cna_post_process_pass_copy_name(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_post_process_pass_is_supported(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: CNA_Handle,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_post_process_pass_destroy(argument0: CNA_PostProcessPassHandle) -> CNA_Result;
+    pub fn cna_post_process_chain_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessChainHandle,
+    ) -> CNA_Result;
+    pub fn cna_post_process_chain_destroy(argument0: CNA_PostProcessChainHandle) -> CNA_Result;
+    pub fn cna_post_process_chain_add_pass(
+        argument0: CNA_PostProcessChainHandle,
+        argument1: CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_post_process_chain_add_owned_pass(
+        argument0: CNA_PostProcessChainHandle,
+        argument1: CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_post_process_chain_clear(argument0: CNA_PostProcessChainHandle) -> CNA_Result;
+    pub fn cna_post_process_chain_get_pass_count(
+        argument0: CNA_PostProcessChainHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_post_process_chain_apply(
+        argument0: CNA_PostProcessChainHandle,
+        argument1: *const CNA_PostProcessContext,
+    ) -> CNA_Result;
+    pub fn cna_post_process_chain_reset_targets(
+        argument0: CNA_PostProcessChainHandle,
+    ) -> CNA_Result;
+    pub fn cna_post_process_chain_get_target_pool(
+        argument0: CNA_PostProcessChainHandle,
+        argument1: *mut CNA_RenderTargetPoolHandle,
+    ) -> CNA_Result;
+    pub fn cna_post_process_chain_is_gpu_timing_enabled(
+        argument0: CNA_PostProcessChainHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_post_process_chain_set_gpu_timing_enabled(
+        argument0: CNA_PostProcessChainHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_post_process_chain_get_pass_timing_count(
+        argument0: CNA_PostProcessChainHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_post_process_chain_get_pass_timing(
+        argument0: CNA_PostProcessChainHandle,
+        argument1: u64,
+        argument2: *mut CNA_PassTimingEXT,
+    ) -> CNA_Result;
+    pub fn cna_post_process_chain_copy_pass_timing_name(
+        argument0: CNA_PostProcessChainHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_add_user_pass(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_clear_user_passes(argument0: CNA_RenderPipelineHandle) -> CNA_Result;
+    pub fn cna_render_target_pool_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_RenderTargetPoolHandle,
+    ) -> CNA_Result;
+    pub fn cna_render_target_pool_destroy(argument0: CNA_RenderTargetPoolHandle) -> CNA_Result;
+    pub fn cna_render_target_pool_acquire(
+        argument0: CNA_RenderTargetPoolHandle,
+        argument1: i32,
+        argument2: i32,
+        argument3: CNA_SurfaceFormat,
+        argument4: CNA_DepthFormat,
+        argument5: i32,
+        argument6: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_render_target_pool_reset(argument0: CNA_RenderTargetPoolHandle) -> CNA_Result;
+    pub fn cna_render_target_pool_get_target_count(
+        argument0: CNA_RenderTargetPoolHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_render_target_pool_get_estimated_bytes(
+        argument0: CNA_RenderTargetPoolHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_tonemap_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_tonemap_pass_get_mode(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut CNA_TonemappingMode,
+    ) -> CNA_Result;
+    pub fn cna_tonemap_pass_set_mode(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: CNA_TonemappingMode,
+    ) -> CNA_Result;
+    pub fn cna_tonemap_pass_get_exposure(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_tonemap_pass_set_exposure(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_tonemap_pass_get_gamma(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_tonemap_pass_set_gamma(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_tonemap_pass_is_deband_enabled(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_tonemap_pass_set_deband_enabled(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_tonemap_pass_get_deband_strength(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_tonemap_pass_set_deband_strength(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_tonemap_pass_tonemap_channel(
+        argument0: CNA_TonemappingMode,
+        argument1: f32,
+        argument2: f32,
+        argument3: f32,
+        argument4: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_fxaa_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PostProcessPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_fxaa_pass_get_edge_threshold(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_fxaa_pass_set_edge_threshold(
+        argument0: CNA_PostProcessPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_fxaa_pass_edge_threshold_for_quality(
+        argument0: CNA_RenderQuality,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_fxaa_pass_copy_fragment_glsl(
+        argument0: *mut c_char,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
 }

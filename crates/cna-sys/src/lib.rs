@@ -755,6 +755,59 @@ pub struct CNA_RenderPipelineSettingsEXT {
 
 pub type CNA_RenderPipelineHandle = CNA_Handle;
 pub type CNA_ShadowMapHandle = CNA_Handle;
+pub type CNA_PostProcessPassHandle = CNA_Handle;
+pub type CNA_PostProcessChainHandle = CNA_Handle;
+pub type CNA_RenderTargetPoolHandle = CNA_Handle;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_PostProcessContext {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub source: CNA_Handle,
+    pub source_depth: CNA_Handle,
+    pub source_normals: CNA_Handle,
+    pub source_velocity: CNA_Handle,
+    pub destination: CNA_Handle,
+    pub width: i32,
+    pub height: i32,
+    pub elapsed_seconds: f32,
+    pub near_plane: f32,
+    pub far_plane: f32,
+    pub has_previous_frame: CNA_Bool,
+    pub reserved: [u8; 3],
+    pub projection: CNA_Matrix,
+    pub inverse_projection: CNA_Matrix,
+    pub inverse_view: CNA_Matrix,
+    pub previous_view_projection: CNA_Matrix,
+    pub settings: *const CNA_RenderPipelineSettingsEXT,
+}
+
+impl Default for CNA_PostProcessContext {
+    fn default() -> Self {
+        Self {
+            struct_size: 0,
+            struct_version: 0,
+            source: CNA_INVALID_HANDLE,
+            source_depth: CNA_INVALID_HANDLE,
+            source_normals: CNA_INVALID_HANDLE,
+            source_velocity: CNA_INVALID_HANDLE,
+            destination: CNA_INVALID_HANDLE,
+            width: 0,
+            height: 0,
+            elapsed_seconds: 0.0,
+            near_plane: 0.0,
+            far_plane: 0.0,
+            has_previous_frame: CNA_FALSE,
+            reserved: [0; 3],
+            projection: CNA_Matrix::default(),
+            inverse_projection: CNA_Matrix::default(),
+            inverse_view: CNA_Matrix::default(),
+            previous_view_projection: CNA_Matrix::default(),
+            settings: core::ptr::null(),
+        }
+    }
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -7859,4 +7912,153 @@ pub type cna_render_pipeline_set_shadow_scene_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_render_pipeline_get_shadow_map_fn = unsafe extern "C" fn(
     CNA_RenderPipelineHandle, *mut CNA_ShadowMapHandle,
+) -> CNA_Result;
+
+// --- CNA engine layer: the post-process chain and its passes (engine_layer.h) ---
+pub type cna_post_process_context_init_fn = unsafe extern "C" fn(
+    *mut CNA_PostProcessContext,
+) -> CNA_Result;
+pub type cna_blit_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_post_process_effect_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_EffectHandle, CNA_StringView, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_post_process_effect_pass_create_owning_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_EffectHandle, CNA_StringView, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_post_process_effect_pass_get_effect_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_post_process_effect_pass_set_effect_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_post_process_pass_apply_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *const CNA_PostProcessContext,
+) -> CNA_Result;
+pub type cna_post_process_pass_copy_name_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_post_process_pass_is_supported_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_post_process_pass_destroy_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_post_process_chain_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessChainHandle,
+) -> CNA_Result;
+pub type cna_post_process_chain_destroy_fn = unsafe extern "C" fn(
+    CNA_PostProcessChainHandle,
+) -> CNA_Result;
+pub type cna_post_process_chain_add_pass_fn = unsafe extern "C" fn(
+    CNA_PostProcessChainHandle, CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_post_process_chain_add_owned_pass_fn = unsafe extern "C" fn(
+    CNA_PostProcessChainHandle, CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_post_process_chain_clear_fn = unsafe extern "C" fn(
+    CNA_PostProcessChainHandle,
+) -> CNA_Result;
+pub type cna_post_process_chain_get_pass_count_fn = unsafe extern "C" fn(
+    CNA_PostProcessChainHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_post_process_chain_apply_fn = unsafe extern "C" fn(
+    CNA_PostProcessChainHandle, *const CNA_PostProcessContext,
+) -> CNA_Result;
+pub type cna_post_process_chain_reset_targets_fn = unsafe extern "C" fn(
+    CNA_PostProcessChainHandle,
+) -> CNA_Result;
+pub type cna_post_process_chain_get_target_pool_fn = unsafe extern "C" fn(
+    CNA_PostProcessChainHandle, *mut CNA_RenderTargetPoolHandle,
+) -> CNA_Result;
+pub type cna_post_process_chain_is_gpu_timing_enabled_fn = unsafe extern "C" fn(
+    CNA_PostProcessChainHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_post_process_chain_set_gpu_timing_enabled_fn = unsafe extern "C" fn(
+    CNA_PostProcessChainHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_post_process_chain_get_pass_timing_count_fn = unsafe extern "C" fn(
+    CNA_PostProcessChainHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_post_process_chain_get_pass_timing_fn = unsafe extern "C" fn(
+    CNA_PostProcessChainHandle, u64, *mut CNA_PassTimingEXT,
+) -> CNA_Result;
+pub type cna_post_process_chain_copy_pass_timing_name_fn = unsafe extern "C" fn(
+    CNA_PostProcessChainHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_render_pipeline_add_user_pass_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_render_pipeline_clear_user_passes_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle,
+) -> CNA_Result;
+pub type cna_render_target_pool_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_RenderTargetPoolHandle,
+) -> CNA_Result;
+pub type cna_render_target_pool_destroy_fn = unsafe extern "C" fn(
+    CNA_RenderTargetPoolHandle,
+) -> CNA_Result;
+pub type cna_render_target_pool_acquire_fn = unsafe extern "C" fn(
+    CNA_RenderTargetPoolHandle, i32, i32, CNA_SurfaceFormat, CNA_DepthFormat, i32, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_render_target_pool_reset_fn = unsafe extern "C" fn(
+    CNA_RenderTargetPoolHandle,
+) -> CNA_Result;
+pub type cna_render_target_pool_get_target_count_fn = unsafe extern "C" fn(
+    CNA_RenderTargetPoolHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_render_target_pool_get_estimated_bytes_fn = unsafe extern "C" fn(
+    CNA_RenderTargetPoolHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_tonemap_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_tonemap_pass_get_mode_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut CNA_TonemappingMode,
+) -> CNA_Result;
+pub type cna_tonemap_pass_set_mode_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, CNA_TonemappingMode,
+) -> CNA_Result;
+pub type cna_tonemap_pass_get_exposure_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_tonemap_pass_set_exposure_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_tonemap_pass_get_gamma_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_tonemap_pass_set_gamma_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_tonemap_pass_is_deband_enabled_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_tonemap_pass_set_deband_enabled_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_tonemap_pass_get_deband_strength_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_tonemap_pass_set_deband_strength_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_tonemap_pass_tonemap_channel_fn = unsafe extern "C" fn(
+    CNA_TonemappingMode, f32, f32, f32, *mut f32,
+) -> CNA_Result;
+pub type cna_fxaa_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PostProcessPassHandle,
+) -> CNA_Result;
+pub type cna_fxaa_pass_get_edge_threshold_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_fxaa_pass_set_edge_threshold_fn = unsafe extern "C" fn(
+    CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+pub type cna_fxaa_pass_edge_threshold_for_quality_fn = unsafe extern "C" fn(
+    CNA_RenderQuality, *mut f32,
+) -> CNA_Result;
+pub type cna_fxaa_pass_copy_fragment_glsl_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
 ) -> CNA_Result;

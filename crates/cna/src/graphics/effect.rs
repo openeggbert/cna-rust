@@ -427,6 +427,19 @@ impl Effect {
     /// effect is the first -- and destroying one would free the owner's
     /// resource. This form never destroys the handle and re-validates the
     /// borrow on every native use.
+    /// The native handle, for a route that is about to take ownership of it.
+    ///
+    /// Paired with [`Effect::relinquish`]: read the handle, call the consuming
+    /// route, and only relinquish when it succeeded.
+    pub(crate) fn native_handle(&self) -> Result<sys::CNA_Handle> {
+        self.state.require_handle()
+    }
+
+    /// Forgets the handle after a consuming route has taken it.
+    pub(crate) fn relinquish(&self) {
+        self.state.relinquish();
+    }
+
     pub(crate) fn from_borrowed_handle(
         device: &GraphicsDevice,
         handle: sys::CNA_Handle,
