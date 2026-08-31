@@ -774,6 +774,14 @@ pub type CNA_CascadedShadowMapHandle = CNA_Handle;
 pub type CNA_DepthNormalPrepassHandle = CNA_Handle;
 pub type CNA_TransparentDrawListHandle = CNA_Handle;
 pub type CNA_WeightedBlendedTransparencyHandle = CNA_Handle;
+pub type CNA_HdrDisplayOutputHandle = CNA_Handle;
+pub type CNA_AutoExposureHandle = CNA_Handle;
+pub type CNA_CubeLutHandle = CNA_Handle;
+pub type CNA_DisplayColorSpace = u32;
+
+pub const CNA_DISPLAY_COLOR_SPACE_SRGB: CNA_DisplayColorSpace = 0;
+pub const CNA_DISPLAY_COLOR_SPACE_SCRGB: CNA_DisplayColorSpace = 1;
+pub const CNA_DISPLAY_COLOR_SPACE_HDR10: CNA_DisplayColorSpace = 2;
 pub type CNA_DepthEncoding = u32;
 
 pub const CNA_DEPTH_ENCODING_AUTOMATIC: CNA_DepthEncoding = 0;
@@ -9281,4 +9289,115 @@ pub type cna_weighted_blended_transparency_resolve_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_weighted_blended_transparency_weight_fn = unsafe extern "C" fn(
     f32, f32, f32, *mut f32,
+) -> CNA_Result;
+
+// --- CNA engine layer: HDR output, auto exposure and cube LUTs (engine_layer.h) ---
+pub type cna_auto_exposure_ext_apply_to_fn = unsafe extern "C" fn(
+    CNA_AutoExposureHandle, *mut CNA_RenderPipelineSettingsEXT,
+) -> CNA_Result;
+pub type cna_auto_exposure_ext_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_AutoExposureHandle,
+) -> CNA_Result;
+pub type cna_auto_exposure_ext_destroy_fn = unsafe extern "C" fn(
+    CNA_AutoExposureHandle,
+) -> CNA_Result;
+pub type cna_auto_exposure_ext_get_brightening_speed_fn = unsafe extern "C" fn(
+    CNA_AutoExposureHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_auto_exposure_ext_get_darkening_speed_fn = unsafe extern "C" fn(
+    CNA_AutoExposureHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_auto_exposure_ext_get_exposure_fn = unsafe extern "C" fn(
+    CNA_AutoExposureHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_auto_exposure_ext_get_key_value_fn = unsafe extern "C" fn(
+    CNA_AutoExposureHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_auto_exposure_ext_measure_average_luminance_fn = unsafe extern "C" fn(
+    CNA_AutoExposureHandle, CNA_Handle, *mut f32,
+) -> CNA_Result;
+pub type cna_auto_exposure_ext_set_adaptation_speeds_fn = unsafe extern "C" fn(
+    CNA_AutoExposureHandle, f32, f32,
+) -> CNA_Result;
+pub type cna_auto_exposure_ext_set_exposure_fn = unsafe extern "C" fn(
+    CNA_AutoExposureHandle, f32,
+) -> CNA_Result;
+pub type cna_auto_exposure_ext_set_exposure_range_fn = unsafe extern "C" fn(
+    CNA_AutoExposureHandle, f32, f32,
+) -> CNA_Result;
+pub type cna_auto_exposure_ext_set_key_value_fn = unsafe extern "C" fn(
+    CNA_AutoExposureHandle, f32,
+) -> CNA_Result;
+pub type cna_auto_exposure_ext_update_fn = unsafe extern "C" fn(
+    CNA_AutoExposureHandle, CNA_Handle, f32, *mut f32,
+) -> CNA_Result;
+pub type cna_cube_lut_copy_title_fn = unsafe extern "C" fn(
+    CNA_CubeLutHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cube_lut_create_strip_texture_fn = unsafe extern "C" fn(
+    CNA_CubeLutHandle, CNA_Handle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_cube_lut_create_volume_texture_fn = unsafe extern "C" fn(
+    CNA_CubeLutHandle, CNA_Handle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_cube_lut_destroy_fn = unsafe extern "C" fn(CNA_CubeLutHandle) -> CNA_Result;
+pub type cna_cube_lut_get_domain_max_fn = unsafe extern "C" fn(
+    CNA_CubeLutHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_cube_lut_get_domain_min_fn = unsafe extern "C" fn(
+    CNA_CubeLutHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_cube_lut_get_entry_fn = unsafe extern "C" fn(
+    CNA_CubeLutHandle, i32, i32, i32, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_cube_lut_get_size_fn = unsafe extern "C" fn(CNA_CubeLutHandle, *mut i32) -> CNA_Result;
+pub type cna_cube_lut_is_unit_domain_fn = unsafe extern "C" fn(
+    CNA_CubeLutHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_cube_lut_load_from_file_fn = unsafe extern "C" fn(
+    CNA_StringView, *mut CNA_CubeLutHandle,
+) -> CNA_Result;
+pub type cna_cube_lut_parse_fn = unsafe extern "C" fn(
+    CNA_StringView, *mut CNA_CubeLutHandle,
+) -> CNA_Result;
+pub type cna_hdr_display_output_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_HdrDisplayOutputHandle,
+) -> CNA_Result;
+pub type cna_hdr_display_output_decode_pq_fn = unsafe extern "C" fn(f32, *mut f32) -> CNA_Result;
+pub type cna_hdr_display_output_destroy_fn = unsafe extern "C" fn(
+    CNA_HdrDisplayOutputHandle,
+) -> CNA_Result;
+pub type cna_hdr_display_output_draw_fn = unsafe extern "C" fn(
+    CNA_HdrDisplayOutputHandle, CNA_Handle, CNA_Handle, i32, i32,
+) -> CNA_Result;
+pub type cna_hdr_display_output_encode_fn = unsafe extern "C" fn(
+    CNA_DisplayColorSpace, *const CNA_Vector3, f32, f32, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_hdr_display_output_encode_pq_fn = unsafe extern "C" fn(f32, *mut f32) -> CNA_Result;
+pub type cna_hdr_display_output_get_color_space_fn = unsafe extern "C" fn(
+    CNA_HdrDisplayOutputHandle, *mut CNA_DisplayColorSpace,
+) -> CNA_Result;
+pub type cna_hdr_display_output_get_paper_white_nits_fn = unsafe extern "C" fn(
+    CNA_HdrDisplayOutputHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_hdr_display_output_get_peak_nits_fn = unsafe extern "C" fn(
+    CNA_HdrDisplayOutputHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_hdr_display_output_is_supported_fn = unsafe extern "C" fn(
+    CNA_HdrDisplayOutputHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_hdr_display_output_rec709_to_rec2020_fn = unsafe extern "C" fn(
+    *const CNA_Vector3, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_hdr_display_output_roll_off_fn = unsafe extern "C" fn(
+    f32, f32, *mut f32,
+) -> CNA_Result;
+pub type cna_hdr_display_output_set_color_space_fn = unsafe extern "C" fn(
+    CNA_HdrDisplayOutputHandle, CNA_DisplayColorSpace,
+) -> CNA_Result;
+pub type cna_hdr_display_output_set_paper_white_nits_fn = unsafe extern "C" fn(
+    CNA_HdrDisplayOutputHandle, f32,
+) -> CNA_Result;
+pub type cna_hdr_display_output_set_peak_nits_fn = unsafe extern "C" fn(
+    CNA_HdrDisplayOutputHandle, f32,
 ) -> CNA_Result;

@@ -7338,3 +7338,545 @@ impl Drop for TransparentDrawList {
         let _ = self.core.release();
     }
 }
+
+/// Which colour space a display expects.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum DisplayColorSpace {
+    /// Ordinary sRGB, the only one a non-HDR display has.
+    #[default]
+    Srgb,
+    /// Linear scRGB, where values above one are brighter than white.
+    ScRgb,
+    /// HDR10: Rec.2020 primaries with the PQ transfer function.
+    Hdr10,
+}
+
+impl DisplayColorSpace {
+    const fn from_native(value: sys::CNA_DisplayColorSpace) -> Option<Self> {
+        Some(match value {
+            sys::CNA_DISPLAY_COLOR_SPACE_SRGB => Self::Srgb,
+            sys::CNA_DISPLAY_COLOR_SPACE_SCRGB => Self::ScRgb,
+            sys::CNA_DISPLAY_COLOR_SPACE_HDR10 => Self::Hdr10,
+            _ => return None,
+        })
+    }
+
+    const fn to_native(self) -> sys::CNA_DisplayColorSpace {
+        match self {
+            Self::Srgb => sys::CNA_DISPLAY_COLOR_SPACE_SRGB,
+            Self::ScRgb => sys::CNA_DISPLAY_COLOR_SPACE_SCRGB,
+            Self::Hdr10 => sys::CNA_DISPLAY_COLOR_SPACE_HDR10,
+        }
+    }
+}
+
+/// The final encode into whatever the display expects.
+///
+/// `OWNED`. Creation succeeds on a display that is not HDR at all; ask
+/// [`HdrDisplayOutput::is_supported`] rather than reading success as capability.
+pub struct HdrDisplayOutput {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl HdrDisplayOutput {
+    /// Creates the output on a device.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe {
+            (native.engine.hdr_display_output_create)(device.handle()?, &mut handle)
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.hdr_display_output_destroy,
+            released: "the HDR display output has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+        })
+    }
+
+    /// Whether this renderer and display can present HDR at all.
+    pub fn is_supported(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native
+            .check(unsafe { (self.native.engine.hdr_display_output_is_supported)(handle, &mut value) })?;
+        Ok(value != 0)
+    }
+
+    /// The colour space the output encodes into.
+    pub fn color_space(&self) -> Result<DisplayColorSpace> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_DisplayColorSpace = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.hdr_display_output_get_color_space)(handle, &mut value)
+        })?;
+        DisplayColorSpace::from_native(value)
+            .ok_or(CnaError::InvalidInput("native display colour space is unknown"))
+    }
+
+    /// Sets the colour space the output encodes into.
+    pub fn set_color_space(&self, value: DisplayColorSpace) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the identity is canonical.
+        self.native.check(unsafe {
+            (self.native.engine.hdr_display_output_set_color_space)(handle, value.to_native())
+        })
+    }
+
+    /// How bright diffuse white is, in nits.
+    pub fn paper_white_nits(&self) -> Result<f32> {
+        self.scalar(self.native.engine.hdr_display_output_get_paper_white_nits)
+    }
+
+    /// Sets how bright diffuse white is.
+    pub fn set_paper_white_nits(&self, value: f32) -> Result<()> {
+        self.set_scalar(self.native.engine.hdr_display_output_set_paper_white_nits, value)
+    }
+
+    /// The brightest the display can go, in nits.
+    pub fn peak_nits(&self) -> Result<f32> {
+        self.scalar(self.native.engine.hdr_display_output_get_peak_nits)
+    }
+
+    /// Sets the brightest the display can go.
+    pub fn set_peak_nits(&self, value: f32) -> Result<()> {
+        self.set_scalar(self.native.engine.hdr_display_output_set_peak_nits, value)
+    }
+
+    /// Encodes a scene-referred source into the bound target.
+    pub fn draw(&self, source: &Texture2D, width: i32, height: i32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned, the texture handle is live and the
+        // destination is the currently bound target.
+        self.native.check(unsafe {
+            (self.native.engine.hdr_display_output_draw)(
+                handle,
+                source.handle()?,
+                sys::CNA_INVALID_HANDLE,
+                width,
+                height,
+            )
+        })
+    }
+
+    /// Releases the output now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+
+    /// Encodes one linear colour for a colour space, as the shader would.
+    ///
+    /// A pure function, so the whole encode is checkable without a display that
+    /// can show it -- which matters here more than anywhere else, because no
+    /// display on this host can.
+    pub fn encode(
+        space: DisplayColorSpace,
+        linear: Vector3,
+        paper_white_nits: f32,
+        peak_nits: f32,
+    ) -> Result<Vector3> {
+        let native = Native::process()?;
+        let linear = native_vector3(linear);
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the colour is borrowed for the call and the output is a live local.
+        native.check(unsafe {
+            (native.engine.hdr_display_output_encode)(
+                space.to_native(),
+                &linear,
+                paper_white_nits,
+                peak_nits,
+                &mut value,
+            )
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// The PQ transfer function, from nits to a signal value.
+    pub fn encode_pq(nits: f32) -> Result<f32> {
+        let native = Native::process()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the value is by value and the output is a live local.
+        native.check(unsafe { (native.engine.hdr_display_output_encode_pq)(nits, &mut value) })?;
+        Ok(value)
+    }
+
+    /// The inverse PQ transfer function, from a signal value back to nits.
+    pub fn decode_pq(signal: f32) -> Result<f32> {
+        let native = Native::process()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the value is by value and the output is a live local.
+        native.check(unsafe { (native.engine.hdr_display_output_decode_pq)(signal, &mut value) })?;
+        Ok(value)
+    }
+
+    /// Converts a Rec.709 colour into Rec.2020 primaries.
+    pub fn rec709_to_rec2020(color: Vector3) -> Result<Vector3> {
+        let native = Native::process()?;
+        let color = native_vector3(color);
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the colour is borrowed for the call and the output is a live local.
+        native.check(unsafe {
+            (native.engine.hdr_display_output_rec709_to_rec2020)(&color, &mut value)
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// Rolls a value off towards a peak, so nothing clips hard.
+    pub fn roll_off(value: f32, peak: f32) -> Result<f32> {
+        let native = Native::process()?;
+        let mut out = 0.0_f32;
+        // SAFETY: both inputs are by value and the output is a live local.
+        native.check(unsafe { (native.engine.hdr_display_output_roll_off)(value, peak, &mut out) })?;
+        Ok(out)
+    }
+
+    fn scalar(
+        &self,
+        route: unsafe extern "C" fn(
+            sys::CNA_HdrDisplayOutputHandle,
+            *mut f32,
+        ) -> sys::CNA_Result,
+    ) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    fn set_scalar(
+        &self,
+        route: unsafe extern "C" fn(sys::CNA_HdrDisplayOutputHandle, f32) -> sys::CNA_Result,
+        value: f32,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the value is by value.
+        self.native.check(unsafe { route(handle, value) })
+    }
+}
+
+impl Drop for HdrDisplayOutput {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// Eye adaptation: an exposure that follows the scene's own brightness.
+pub struct AutoExposure {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl AutoExposure {
+    /// Creates the adaptation on a device.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe {
+            (native.engine.auto_exposure_ext_create)(device.handle()?, &mut handle)
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.auto_exposure_ext_destroy,
+            released: "the auto exposure has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+        })
+    }
+
+    /// The exposure the adaptation has settled on.
+    pub fn exposure(&self) -> Result<f32> {
+        self.scalar(self.native.engine.auto_exposure_ext_get_exposure)
+    }
+
+    /// Sets the exposure directly, as a starting point.
+    pub fn set_exposure(&self, value: f32) -> Result<()> {
+        self.set_scalar(self.native.engine.auto_exposure_ext_set_exposure, value)
+    }
+
+    /// The middle-grey the adaptation aims the average luminance at.
+    pub fn key_value(&self) -> Result<f32> {
+        self.scalar(self.native.engine.auto_exposure_ext_get_key_value)
+    }
+
+    /// Sets the middle-grey it aims for.
+    pub fn set_key_value(&self, value: f32) -> Result<()> {
+        self.set_scalar(self.native.engine.auto_exposure_ext_set_key_value, value)
+    }
+
+    /// How quickly the exposure rises when the scene darkens.
+    pub fn brightening_speed(&self) -> Result<f32> {
+        self.scalar(self.native.engine.auto_exposure_ext_get_brightening_speed)
+    }
+
+    /// How quickly it falls when the scene brightens.
+    pub fn darkening_speed(&self) -> Result<f32> {
+        self.scalar(self.native.engine.auto_exposure_ext_get_darkening_speed)
+    }
+
+    /// Sets both adaptation speeds.
+    ///
+    /// One route rather than two, because upstream sets them together: an eye
+    /// that brightened and darkened at unrelated rates would be a different
+    /// model, not a differently configured one.
+    pub fn set_adaptation_speeds(&self, brightening: f32, darkening: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and both values are by value.
+        self.native.check(unsafe {
+            (self.native.engine.auto_exposure_ext_set_adaptation_speeds)(
+                handle,
+                brightening,
+                darkening,
+            )
+        })
+    }
+
+    /// Bounds the exposure the adaptation may reach.
+    pub fn set_exposure_range(&self, minimum: f32, maximum: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and both values are by value.
+        self.native.check(unsafe {
+            (self.native.engine.auto_exposure_ext_set_exposure_range)(handle, minimum, maximum)
+        })
+    }
+
+    /// The average luminance of a scene texture, as the adaptation measures it.
+    pub fn measure_average_luminance(&self, scene: &Texture2D) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: both handles are live and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.auto_exposure_ext_measure_average_luminance)(
+                handle,
+                scene.handle()?,
+                &mut value,
+            )
+        })?;
+        Ok(value)
+    }
+
+    /// Advances the adaptation by one frame, answering the new exposure.
+    pub fn update(&self, scene: &Texture2D, elapsed_seconds: f32) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: both handles are live and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.auto_exposure_ext_update)(
+                handle,
+                scene.handle()?,
+                elapsed_seconds,
+                &mut value,
+            )
+        })?;
+        Ok(value)
+    }
+
+    /// Writes the settled exposure into a pipeline's settings.
+    pub fn apply_to(&self, settings: &mut EngineRenderSettings) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the structure is updated in place.
+        self.native.check(unsafe {
+            (self.native.engine.auto_exposure_ext_apply_to)(handle, settings.as_native_mut())
+        })
+    }
+
+    /// Releases the adaptation now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+
+    fn scalar(
+        &self,
+        route: unsafe extern "C" fn(sys::CNA_AutoExposureHandle, *mut f32) -> sys::CNA_Result,
+    ) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    fn set_scalar(
+        &self,
+        route: unsafe extern "C" fn(sys::CNA_AutoExposureHandle, f32) -> sys::CNA_Result,
+        value: f32,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the value is by value.
+        self.native.check(unsafe { route(handle, value) })
+    }
+}
+
+impl Drop for AutoExposure {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// A parsed Adobe `.cube` colour lookup table.
+///
+/// `OWNED`, and device-free: parsing is text work, so the table exists before
+/// any device does and is not registered against one. The textures it builds
+/// *are* the caller's, handed over outright rather than borrowed.
+pub struct CubeLut {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl CubeLut {
+    /// Parses a `.cube` document from text.
+    pub fn parse(text: &str) -> Result<Self> {
+        let native = Native::process()?;
+        let view = string_view(text);
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the text is borrowed for the call and the output is a live local.
+        native.check(unsafe { (native.engine.cube_lut_parse)(view, &mut handle) })?;
+        Ok(Self::adopt(&native, handle))
+    }
+
+    /// Reads and parses a `.cube` file.
+    pub fn load_from_file(path: &str) -> Result<Self> {
+        let native = Native::process()?;
+        let view = string_view(path);
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the path is borrowed for the call and the output is a live local.
+        native.check(unsafe { (native.engine.cube_lut_load_from_file)(view, &mut handle) })?;
+        Ok(Self::adopt(&native, handle))
+    }
+
+    fn adopt(native: &Arc<Native>, handle: sys::CNA_Handle) -> Self {
+        Self {
+            core: Arc::new(EngineHandle {
+                native: Arc::clone(native),
+                handle: Mutex::new(handle),
+                destroy: native.engine.cube_lut_destroy,
+                released: "the cube LUT has been released",
+            }),
+            native: Arc::clone(native),
+        }
+    }
+
+    /// The table's edge length in entries.
+    pub fn size(&self) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native
+            .check(unsafe { (self.native.engine.cube_lut_get_size)(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    /// The table's own title, as the document declared it.
+    pub fn title(&self) -> Result<String> {
+        let handle = self.core.get()?;
+        copy_text(&self.native, |api, destination, capacity, out_bytes| {
+            // SAFETY: the destination holds `capacity` writable bytes.
+            unsafe { (api.cube_lut_copy_title)(handle, destination, capacity, out_bytes) }
+        })
+    }
+
+    /// One entry, by its three grid indices.
+    pub fn entry(&self, red: i32, green: i32, blue: i32) -> Result<Vector3> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.cube_lut_get_entry)(handle, red, green, blue, &mut value)
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// The lowest input the table maps.
+    pub fn domain_min(&self) -> Result<Vector3> {
+        self.vector3(self.native.engine.cube_lut_get_domain_min)
+    }
+
+    /// The highest input the table maps.
+    pub fn domain_max(&self) -> Result<Vector3> {
+        self.vector3(self.native.engine.cube_lut_get_domain_max)
+    }
+
+    /// Whether the domain is the unit cube, which a shader can skip rescaling.
+    pub fn is_unit_domain(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native
+            .check(unsafe { (self.native.engine.cube_lut_is_unit_domain)(handle, &mut value) })?;
+        Ok(value != 0)
+    }
+
+    /// Builds the strip texture a colour-grade pass samples.
+    ///
+    /// The texture is the caller's: CNA allocates it and hands it over.
+    pub fn create_strip_texture(&self, device: &GraphicsDevice) -> Result<Texture2D> {
+        let handle = self.core.get()?;
+        let mut texture = sys::CNA_INVALID_HANDLE;
+        // SAFETY: both handles are live and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.cube_lut_create_strip_texture)(
+                handle,
+                device.handle()?,
+                &mut texture,
+            )
+        })?;
+        Texture2D::from_owned_handle(device, texture)
+    }
+
+    /// Builds the volume texture a colour-grade pass samples.
+    pub fn create_volume_texture(&self, device: &GraphicsDevice) -> Result<Texture3D> {
+        let handle = self.core.get()?;
+        let mut texture = sys::CNA_INVALID_HANDLE;
+        // SAFETY: both handles are live and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.cube_lut_create_volume_texture)(
+                handle,
+                device.handle()?,
+                &mut texture,
+            )
+        })?;
+        Texture3D::from_owned_handle(device, texture)
+    }
+
+    /// Releases the table now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+
+    fn vector3(
+        &self,
+        route: unsafe extern "C" fn(
+            sys::CNA_CubeLutHandle,
+            *mut sys::CNA_Vector3,
+        ) -> sys::CNA_Result,
+    ) -> Result<Vector3> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut value) })?;
+        Ok(from_native_vector3(value))
+    }
+}
+
+impl Drop for CubeLut {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}

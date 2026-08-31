@@ -136,6 +136,7 @@ the criterion above is unchanged, only its precondition has been met.
 | the seventeen screen-space passes, the fullscreen draw and the render-target scope | `bloom_pass`, `ssao_pass`, `ssr_pass`, `color_grade_pass`, `depth_of_field_pass`, `motion_blur_pass`, `height_fog_pass`, `volumetric_fog_pass`, `light_shaft_pass`, `lens_flare_pass`, `chromatic_aberration_pass`, `film_grain_pass`, `ascii_pass`, `aerial_perspective_pass`, `spatial_upscale_pass`, `contact_shadow_pass`, `fullscreen_pass`, `scoped_render_target` | 150 | `VERIFIED_STATE` |
 | spot, cube and cascaded shadow maps, and the punctual light values | `spot_shadow_map`, `cube_shadow_map`, `cascaded_shadow_map`, `point_light_ext`, `spot_light_ext`, `punctual_light_ext`, `shadow_cascade_state_ext` | 61 | `VERIFIED_STATE` |
 | the depth/normal prepass and both transparency paths | `depth_normal_prepass`, `weighted_blended_transparency`, `transparent_draw_list` | 49 | `VERIFIED_STATE` |
+| HDR display output, auto exposure and `.cube` lookup tables | `hdr_display_output`, `auto_exposure_ext`, `cube_lut` | 39 | `VERIFIED_STATE` |
 
 ### What the GPU artifact changed about the evidence
 

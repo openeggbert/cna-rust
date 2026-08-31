@@ -8228,4 +8228,161 @@ extern "C" {
         argument2: f32,
         argument3: *mut f32,
     ) -> CNA_Result;
+    pub fn cna_auto_exposure_ext_apply_to(
+        argument0: CNA_AutoExposureHandle,
+        argument1: *mut CNA_RenderPipelineSettingsEXT,
+    ) -> CNA_Result;
+    pub fn cna_auto_exposure_ext_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_AutoExposureHandle,
+    ) -> CNA_Result;
+    pub fn cna_auto_exposure_ext_destroy(argument0: CNA_AutoExposureHandle) -> CNA_Result;
+    pub fn cna_auto_exposure_ext_get_brightening_speed(
+        argument0: CNA_AutoExposureHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_auto_exposure_ext_get_darkening_speed(
+        argument0: CNA_AutoExposureHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_auto_exposure_ext_get_exposure(
+        argument0: CNA_AutoExposureHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_auto_exposure_ext_get_key_value(
+        argument0: CNA_AutoExposureHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_auto_exposure_ext_measure_average_luminance(
+        argument0: CNA_AutoExposureHandle,
+        argument1: CNA_Handle,
+        argument2: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_auto_exposure_ext_set_adaptation_speeds(
+        argument0: CNA_AutoExposureHandle,
+        argument1: f32,
+        argument2: f32,
+    ) -> CNA_Result;
+    pub fn cna_auto_exposure_ext_set_exposure(
+        argument0: CNA_AutoExposureHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_auto_exposure_ext_set_exposure_range(
+        argument0: CNA_AutoExposureHandle,
+        argument1: f32,
+        argument2: f32,
+    ) -> CNA_Result;
+    pub fn cna_auto_exposure_ext_set_key_value(
+        argument0: CNA_AutoExposureHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_auto_exposure_ext_update(
+        argument0: CNA_AutoExposureHandle,
+        argument1: CNA_Handle,
+        argument2: f32,
+        argument3: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_cube_lut_copy_title(
+        argument0: CNA_CubeLutHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cube_lut_create_strip_texture(
+        argument0: CNA_CubeLutHandle,
+        argument1: CNA_Handle,
+        argument2: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_cube_lut_create_volume_texture(
+        argument0: CNA_CubeLutHandle,
+        argument1: CNA_Handle,
+        argument2: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_cube_lut_destroy(argument0: CNA_CubeLutHandle) -> CNA_Result;
+    pub fn cna_cube_lut_get_domain_max(
+        argument0: CNA_CubeLutHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_cube_lut_get_domain_min(
+        argument0: CNA_CubeLutHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_cube_lut_get_entry(
+        argument0: CNA_CubeLutHandle,
+        argument1: i32,
+        argument2: i32,
+        argument3: i32,
+        argument4: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_cube_lut_get_size(argument0: CNA_CubeLutHandle, argument1: *mut i32) -> CNA_Result;
+    pub fn cna_cube_lut_is_unit_domain(
+        argument0: CNA_CubeLutHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_cube_lut_load_from_file(
+        argument0: CNA_StringView,
+        argument1: *mut CNA_CubeLutHandle,
+    ) -> CNA_Result;
+    pub fn cna_cube_lut_parse(
+        argument0: CNA_StringView,
+        argument1: *mut CNA_CubeLutHandle,
+    ) -> CNA_Result;
+    pub fn cna_hdr_display_output_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_HdrDisplayOutputHandle,
+    ) -> CNA_Result;
+    pub fn cna_hdr_display_output_decode_pq(argument0: f32, argument1: *mut f32) -> CNA_Result;
+    pub fn cna_hdr_display_output_destroy(argument0: CNA_HdrDisplayOutputHandle) -> CNA_Result;
+    pub fn cna_hdr_display_output_draw(
+        argument0: CNA_HdrDisplayOutputHandle,
+        argument1: CNA_Handle,
+        argument2: CNA_Handle,
+        argument3: i32,
+        argument4: i32,
+    ) -> CNA_Result;
+    pub fn cna_hdr_display_output_encode(
+        argument0: CNA_DisplayColorSpace,
+        argument1: *const CNA_Vector3,
+        argument2: f32,
+        argument3: f32,
+        argument4: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_hdr_display_output_encode_pq(argument0: f32, argument1: *mut f32) -> CNA_Result;
+    pub fn cna_hdr_display_output_get_color_space(
+        argument0: CNA_HdrDisplayOutputHandle,
+        argument1: *mut CNA_DisplayColorSpace,
+    ) -> CNA_Result;
+    pub fn cna_hdr_display_output_get_paper_white_nits(
+        argument0: CNA_HdrDisplayOutputHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_hdr_display_output_get_peak_nits(
+        argument0: CNA_HdrDisplayOutputHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_hdr_display_output_is_supported(
+        argument0: CNA_HdrDisplayOutputHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_hdr_display_output_rec709_to_rec2020(
+        argument0: *const CNA_Vector3,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_hdr_display_output_roll_off(
+        argument0: f32,
+        argument1: f32,
+        argument2: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_hdr_display_output_set_color_space(
+        argument0: CNA_HdrDisplayOutputHandle,
+        argument1: CNA_DisplayColorSpace,
+    ) -> CNA_Result;
+    pub fn cna_hdr_display_output_set_paper_white_nits(
+        argument0: CNA_HdrDisplayOutputHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_hdr_display_output_set_peak_nits(
+        argument0: CNA_HdrDisplayOutputHandle,
+        argument1: f32,
+    ) -> CNA_Result;
 }

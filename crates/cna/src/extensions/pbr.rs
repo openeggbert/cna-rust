@@ -591,6 +591,11 @@ impl EngineRenderSettings {
         &self.inner
     }
 
+    /// The settings, for a route that updates them in place.
+    pub(crate) fn as_native_mut(&mut self) -> &mut sys::CNA_RenderPipelineSettingsEXT {
+        &mut self.inner
+    }
+
     /// Adopts a structure CNA filled, keeping the versioning fields it set.
     pub(crate) const fn from_native(inner: sys::CNA_RenderPipelineSettingsEXT) -> Self {
         Self { inner }

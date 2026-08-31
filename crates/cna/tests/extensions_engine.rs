@@ -19,13 +19,15 @@ use cna::extensions::engine::{
     FullscreenPass, HeightFogPass, LensFlarePass, LightShaftPass, LutInterpolation, MemoryBarrier,
     MotionBlurPass, RenderPipeline, ScopedRenderTarget, ShadowMap, Skybox, SpatialUpscalePass,
     CascadedShadowMap, CubeShadowMap, PointLight, PunctualLight, PunctualLightKind,
-    DepthEncoding, DepthNormalPrepass, ShadowCascadeState, SpotLight, SpotShadowMap, SsaoPass,
+    AutoExposure, CubeLut, DepthEncoding, DepthNormalPrepass, DisplayColorSpace,
+    HdrDisplayOutput, ShadowCascadeState, SpotLight, SpotShadowMap, SsaoPass,
     SsrPass, StorageBuffer, TonemapPass, TransparentDrawList, VolumetricFogPass,
     WeightedBlendedTransparency,
 };
 use cna::extensions::graphics::EffectFactoryExt;
 use cna::extensions::pbr::{
-    engine_layer_version, RenderQuality, ShadowQuality, TonemappingMode, TransparencyMode,
+    engine_layer_version, EngineRenderSettings, RenderQuality, ShadowQuality, TonemappingMode,
+    TransparencyMode,
 };
 use cna::Microsoft::Xna::Framework::Graphics::{
     DepthFormat, SurfaceFormat, Texture2D, TextureCube,
@@ -3544,5 +3546,295 @@ fn the_prepass_packs_depth_and_the_transparency_sorts_back_to_front() {
         findings.prepass_packed,
         findings.oit_supported,
         findings.glsl_bytes,
+    );
+}
+
+/// A three-entry `.cube` document, small enough to check by hand.
+///
+/// A size-two table has eight entries in blue-slowest order, and this one is
+/// the identity over a non-unit domain -- which is what makes both the entry
+/// lookup and the domain query say something a wrong parse would get wrong.
+const IDENTITY_CUBE: &str = "TITLE \"probe\"\n\
+LUT_3D_SIZE 2\n\
+DOMAIN_MIN 0.0 0.0 0.0\n\
+DOMAIN_MAX 2.0 2.0 2.0\n\
+0.0 0.0 0.0\n\
+1.0 0.0 0.0\n\
+0.0 1.0 0.0\n\
+1.0 1.0 0.0\n\
+0.0 0.0 1.0\n\
+1.0 0.0 1.0\n\
+0.0 1.0 1.0\n\
+1.0 1.0 1.0\n";
+
+/// What the display and exposure run measured.
+#[derive(Default)]
+struct DisplayFindings {
+    engine_layer: i32,
+    hdr_supported: bool,
+    hdr_color_space: Option<DisplayColorSpace>,
+    pq_round_trip: Vec<(f32, f32)>,
+    rec2020: Option<(f32, f32, f32)>,
+    roll_off: Vec<(f32, f32)>,
+    srgb_encode: Option<(f32, f32, f32)>,
+    hdr10_encode: Option<(f32, f32, f32)>,
+    exposure_round_trip: Vec<(&'static str, f32, f32)>,
+    exposure_applied: Option<f32>,
+    lut_title: String,
+    lut_size: i32,
+    lut_unit_domain: Option<bool>,
+    lut_domain_max: Option<(f32, f32, f32)>,
+    lut_entries: Vec<(i32, i32, i32, f32, f32, f32)>,
+    lut_strip_size: Option<(i32, i32)>,
+    lut_parse_refusal: Option<String>,
+}
+
+struct DisplayGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<DisplayFindings>>,
+}
+
+impl GameStateAccess for DisplayGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for DisplayGame {
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+        let mut findings = DisplayFindings {
+            engine_layer: version,
+            ..DisplayFindings::default()
+        };
+
+        // The PQ curve is an exact pair, and this host has no HDR display to
+        // show it on -- which is precisely why the pure functions matter.
+        for nits in [0.1_f32, 1.0, 100.0, 1_000.0, 10_000.0] {
+            let signal = HdrDisplayOutput::encode_pq(nits)?;
+            findings
+                .pq_round_trip
+                .push((nits, HdrDisplayOutput::decode_pq(signal)?));
+        }
+        let wide = HdrDisplayOutput::rec709_to_rec2020(Vector3::from_x_and_y_and_z(1.0, 1.0, 1.0))?;
+        findings.rec2020 = Some((wide.X, wide.Y, wide.Z));
+        for value in [0.0_f32, 0.5, 1.0, 4.0] {
+            findings
+                .roll_off
+                .push((value, HdrDisplayOutput::roll_off(value, 1.0)?));
+        }
+        let grey = Vector3::from_x_and_y_and_z(0.5, 0.5, 0.5);
+        let srgb = HdrDisplayOutput::encode(DisplayColorSpace::Srgb, grey, 100.0, 1_000.0)?;
+        let hdr10 = HdrDisplayOutput::encode(DisplayColorSpace::Hdr10, grey, 100.0, 1_000.0)?;
+        findings.srgb_encode = Some((srgb.X, srgb.Y, srgb.Z));
+        findings.hdr10_encode = Some((hdr10.X, hdr10.Y, hdr10.Z));
+
+        let output = HdrDisplayOutput::new(&device)?;
+        findings.hdr_supported = output.is_supported()?;
+        output.set_color_space(DisplayColorSpace::Hdr10)?;
+        output.set_paper_white_nits(203.0)?;
+        output.set_peak_nits(1_500.0)?;
+        findings.hdr_color_space = output.color_space().ok();
+        findings.exposure_round_trip.push((
+            "hdr.paper_white",
+            203.0,
+            output.paper_white_nits()?,
+        ));
+        findings
+            .exposure_round_trip
+            .push(("hdr.peak", 1_500.0, output.peak_nits()?));
+
+        let exposure = AutoExposure::new(&device)?;
+        exposure.set_exposure(1.75)?;
+        exposure.set_key_value(0.18)?;
+        exposure.set_adaptation_speeds(3.0, 1.5)?;
+        exposure.set_exposure_range(0.05, 8.0)?;
+        findings
+            .exposure_round_trip
+            .push(("exposure.value", 1.75, exposure.exposure()?));
+        findings
+            .exposure_round_trip
+            .push(("exposure.key", 0.18, exposure.key_value()?));
+        findings
+            .exposure_round_trip
+            .push(("exposure.brightening", 3.0, exposure.brightening_speed()?));
+        findings
+            .exposure_round_trip
+            .push(("exposure.darkening", 1.5, exposure.darkening_speed()?));
+        // Writing into the pipeline settings is the adaptation's whole output,
+        // so the value that lands there must be the one it settled on.
+        let mut settings = EngineRenderSettings::canonical_defaults()?;
+        exposure.apply_to(&mut settings)?;
+        findings.exposure_applied = Some(settings.exposure());
+
+        let lut = CubeLut::parse(IDENTITY_CUBE)?;
+        findings.lut_title = lut.title()?;
+        findings.lut_size = lut.size()?;
+        findings.lut_unit_domain = Some(lut.is_unit_domain()?);
+        let domain_max = lut.domain_max()?;
+        findings.lut_domain_max = Some((domain_max.X, domain_max.Y, domain_max.Z));
+        for (r, g, b) in [(0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 1, 1)] {
+            let entry = lut.entry(r, g, b)?;
+            findings
+                .lut_entries
+                .push((r, g, b, entry.X, entry.Y, entry.Z));
+        }
+        let strip = lut.create_strip_texture(&device)?;
+        findings.lut_strip_size = Some((strip.Width(), strip.Height()));
+        findings.lut_parse_refusal = CubeLut::parse("this is not a cube file")
+            .err()
+            .map(|error| error.to_string());
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+fn the_display_encode_and_the_lut_parser_answer_with_exact_values() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(DisplayFindings::default()));
+    let game = DisplayGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with an HDR output, an exposure and a LUT");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+
+    for (label, expected, actual) in &findings.exposure_round_trip {
+        assert!(
+            (expected - actual).abs() < 1e-3,
+            "{label} round-trips: set {expected}, read {actual}"
+        );
+    }
+    assert_eq!(
+        findings.hdr_color_space,
+        Some(DisplayColorSpace::Hdr10),
+        "the colour space round-trips as an identity, not as a number"
+    );
+
+    // PQ is a transfer function and its inverse, so the round trip is exact to
+    // within float precision across four decades of brightness.
+    println!("PQ round trip: {:?}", findings.pq_round_trip);
+    for (nits, back) in &findings.pq_round_trip {
+        assert!(
+            (nits - back).abs() <= nits.abs() * 1e-3 + 1e-4,
+            "encoding {nits} nits and decoding it back gives {back}"
+        );
+    }
+    // And it is a real curve, not the identity: a hundred nits does not encode
+    // to a hundred.
+    let hundred = findings
+        .pq_round_trip
+        .iter()
+        .find(|(nits, _)| (*nits - 100.0).abs() < 1e-6)
+        .map(|(_, _)| HdrDisplayOutput::encode_pq(100.0).expect("encode"))
+        .expect("a hundred-nit sample");
+    assert!(
+        (0.0..=1.0).contains(&hundred) && (hundred - 100.0).abs() > 1.0,
+        "PQ maps nits into a unit signal: 100 nits -> {hundred}"
+    );
+
+    // Rec.709 white is Rec.2020 white: the conversion preserves the white
+    // point, which is the one property that pins the matrix's rows.
+    let (r, g, b) = findings.rec2020.expect("a converted white");
+    assert!(
+        (r - 1.0).abs() < 1e-3 && (g - 1.0).abs() < 1e-3 && (b - 1.0).abs() < 1e-3,
+        "white stays white across the primaries: {r}, {g}, {b}"
+    );
+
+    // The roll-off never exceeds the peak and never lowers a value already
+    // below it by more than the shoulder it applies.
+    println!("roll off: {:?}", findings.roll_off);
+    assert!(
+        findings.roll_off[0].1.abs() < 1e-6,
+        "black rolls off to black: {:?}",
+        findings.roll_off[0]
+    );
+    for (value, rolled) in &findings.roll_off {
+        assert!(
+            *rolled <= 1.000_01,
+            "nothing exceeds the peak after roll-off: {value} -> {rolled}"
+        );
+    }
+    assert!(
+        findings.roll_off.windows(2).all(|pair| pair[0].1 <= pair[1].1),
+        "the roll-off is monotonic: {:?}",
+        findings.roll_off
+    );
+
+    // sRGB and HDR10 are different encodes of one colour. Two colour spaces
+    // that agreed would mean the space argument never reached the maths.
+    let srgb = findings.srgb_encode.expect("an sRGB encode");
+    let hdr10 = findings.hdr10_encode.expect("an HDR10 encode");
+    assert!(
+        (srgb.0 - hdr10.0).abs() > 1e-4,
+        "the colour space changes the encode: {srgb:?} vs {hdr10:?}"
+    );
+
+    assert_eq!(
+        findings.exposure_applied,
+        Some(1.75),
+        "the exposure the adaptation settled on is the one it writes into the settings"
+    );
+
+    // The parsed table is the document, entry for entry.
+    assert_eq!(findings.lut_title, "probe", "the title comes from the document");
+    assert_eq!(findings.lut_size, 2, "a LUT_3D_SIZE of two parses as two");
+    assert_eq!(
+        findings.lut_unit_domain,
+        Some(false),
+        "a domain of zero to two is not the unit cube"
+    );
+    assert_eq!(
+        findings.lut_domain_max,
+        Some((2.0, 2.0, 2.0)),
+        "and the domain maximum is the one the document declared"
+    );
+    println!("lut entries: {:?}", findings.lut_entries);
+    // Blue varies slowest in a `.cube` file, so entry (1, 0, 0) is the second
+    // line and entry (0, 0, 1) is the fifth. Reading them back in the wrong
+    // order is the single most likely parser bug there is.
+    assert_eq!(
+        findings.lut_entries,
+        vec![
+            (0, 0, 0, 0.0, 0.0, 0.0),
+            (1, 0, 0, 1.0, 0.0, 0.0),
+            (0, 1, 0, 0.0, 1.0, 0.0),
+            (0, 0, 1, 0.0, 0.0, 1.0),
+            (1, 1, 1, 1.0, 1.0, 1.0),
+        ],
+        "every entry is the line the document put at that grid position"
+    );
+    // A size-two table strips to two 2x2 slices side by side.
+    assert_eq!(
+        findings.lut_strip_size,
+        Some((4, 2)),
+        "a two-entry table strips to a 4x2 texture"
+    );
+    assert!(
+        findings.lut_parse_refusal.is_some(),
+        "text that is not a .cube document is refused rather than parsed into nothing"
+    );
+
+    println!(
+        "display: HDR supported={} | sRGB {:?} vs HDR10 {:?} | LUT '{}' size {}",
+        findings.hdr_supported,
+        findings.srgb_encode,
+        findings.hdr10_encode,
+        findings.lut_title,
+        findings.lut_size,
     );
 }
