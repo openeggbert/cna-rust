@@ -301,3 +301,68 @@ kind of entry here and the least interesting: XNA overloads `this[...]` by
 integer and by string, and Rust cannot give two methods one name, so the strict
 type keeps the metadata-selected string form and the integer operation arrives
 through a trait. Same collection, same handle, same identity rule.
+
+## `.cnb` Model (RUST-EXT-013, 2026-08-31)
+
+A Rust consumer can now author a compiled model, encode it as a `.cnb`
+document, parse that document back and read the whole graph out of it: bone
+names, parentage and per-bone transforms; meshes with their parent bone and
+their parts in draw order; each part's stride, counts, index element size,
+topology, primitive count and effect kind; each part's exact vertex and index
+bytes; and each part's material with all eleven factors and its eight texture
+slots by name.
+
+### Why it is not XNA's `Model`
+
+`cnb.h`'s model carries `baseColorFactor`, `metallicFactor`, `roughnessFactor`,
+`ior`, `KHR_materials_specular` state, `KHR_materials_unlit`, `alphaCutoff`,
+morph targets, punctual lights, and a flag saying whether the content was
+authored under glTF's lighting conventions.
+`Microsoft.Xna.Framework.Graphics.Model` exposes none of that. Projecting it
+onto XNA's object model would mean declaring members Microsoft never did, so
+the compiled model lives in `cna::extensions::content` and the strict XNA
+surface is untouched.
+
+Two facts are authored rather than inferred, and the projection keeps them
+that way: `applies_gltf_lighting_policy` decides whether a model expects the
+importer's default-light fallback or XNA's unlit `BasicEffect` start, and
+`has_bone_hierarchy` selects between attaching meshes to their named bone and
+giving every mesh its own child of the root. Both survive the round trip as
+written; neither is recomputed from the bone count.
+
+`CnbMaterialTexture` is an enum rather than an index because upstream warns
+that the eight texture **names** are not the same eight slots as the seven-long
+per-slot state arrays. A typed slot cannot be passed where a plain index
+belongs.
+
+### Three defects this slice found
+
+Writing a test that asserts exact structure -- rather than that decoding
+succeeded -- turned up three real problems, two of them in code that already
+shipped:
+
+1. **`CNA_CnbReadLimits` was missing `max_chunk_alignment`.** The Rust
+   structure declared six bounds where C declares seven. Padding hid it
+   exactly: both are 48 bytes and every declared field sat at the right offset,
+   so `sizeof`, alignment and offset checks all passed.
+
+2. **The layout gate could not have caught that.** It probes the fields the
+   manifest names, so a field absent from *both* the Rust struct and the
+   manifest is invisible whenever padding absorbs it. The verifier now asks
+   Clang for each structure's real field list and compares it with the
+   manifest, reporting `LAYOUT_FIELD_SET_MISMATCH`. It checks 103 structures
+   and found exactly the one above. Four mutation tests cover it, including one
+   for the prefix-matching trap that makes `CNA_Point` also print
+   `CNA_PointLightEXT`.
+
+3. **Tightening one read bound silently zeroed the others.** `None` was sent as
+   `0`, and CNA reads `0` as a literal limit, not "use the default" -- its
+   contract is "initialize with `cna_cnb_read_limits_init`, then lower whatever
+   a caller wants tighter". Setting only `max_file_size` therefore set
+   `max_chunk_count` to zero and refused every document. The projection now
+   seeds from CNA's own defaults and applies only the overrides the caller
+   gave, and a test asserts that tightening one bound leaves the rest alone.
+
+CNA validates model geometry properly: an index that addresses a vertex the
+part does not have is refused at decode time with the chunk, offset, part and
+index named. The fixture builds real indices because of it.

@@ -127,6 +127,65 @@ class ManifestAgreementTests(unittest.TestCase):
             self.assertIn(f"pub struct {layout} {{", source, layout)
 
 
+class LayoutFieldCoverageTests(unittest.TestCase):
+    """A field missing from both the Rust struct and the manifest must be seen.
+
+    Offsets and `sizeof` cannot catch that on their own: trailing padding can
+    absorb the missing field exactly, so every listed offset and the total size
+    still agree. `CNA_CnbReadLimits` did precisely that -- seven C fields
+    against six declared ones, all offsets correct, both 48 bytes -- and passed
+    the gate until this check existed.
+    """
+
+    def cna_root(self) -> Path | None:
+        import os
+
+        root = os.environ.get("CNA_ROOT")
+        return Path(root) if root else None
+
+    def test_a_dropped_trailing_field_is_reported(self):
+        root = self.cna_root()
+        if root is None:
+            self.skipTest("CNA_ROOT is not set")
+        manifest = {
+            "layouts": {
+                "CNA_CnbReadLimits": list(MANIFEST["layouts"]["CNA_CnbReadLimits"])[:-1]
+            }
+        }
+        checked, findings = VERIFY.layout_field_coverage(root, manifest)
+        self.assertEqual(checked, 1)
+        self.assertEqual([x["code"] for x in findings], ["LAYOUT_FIELD_SET_MISMATCH"])
+
+    def test_a_reordered_field_list_is_reported(self):
+        root = self.cna_root()
+        if root is None:
+            self.skipTest("CNA_ROOT is not set")
+        fields = list(MANIFEST["layouts"]["CNA_CnbReadLimits"])
+        fields[2], fields[3] = fields[3], fields[2]
+        _, findings = VERIFY.layout_field_coverage(root, {"layouts": {"CNA_CnbReadLimits": fields}})
+        self.assertEqual([x["code"] for x in findings], ["LAYOUT_FIELD_SET_MISMATCH"])
+
+    def test_the_checked_in_manifest_names_every_field(self):
+        root = self.cna_root()
+        if root is None:
+            self.skipTest("CNA_ROOT is not set")
+        checked, findings = VERIFY.layout_field_coverage(root, MANIFEST)
+        self.assertEqual(findings, [])
+        self.assertEqual(checked, len(MANIFEST["layouts"]))
+
+    def test_a_prefix_named_neighbour_is_not_mistaken_for_the_type(self):
+        # `-ast-dump-filter` matches by prefix, so CNA_Point also prints
+        # CNA_PointLightEXT. Reporting the neighbour's fields would be a false
+        # failure that trains readers to ignore this gate.
+        root = self.cna_root()
+        if root is None:
+            self.skipTest("CNA_ROOT is not set")
+        _, findings = VERIFY.layout_field_coverage(
+            root, {"layouts": {"CNA_Point": MANIFEST["layouts"]["CNA_Point"]}}
+        )
+        self.assertEqual(findings, [])
+
+
 class ProbeComparisonTests(unittest.TestCase):
     def test_probe_output_is_parsed_as_named_measurements(self):
         parsed = VERIFY.parse_probe_output("layout.X.size=8\nscalar.Y.align=4\n")

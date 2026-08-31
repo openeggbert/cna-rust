@@ -189,6 +189,30 @@ pub const CNA_CNB_ASSET_TYPE_CUSTOM_RANGE_FIRST: u32 = 0x8000_0000;
 pub const CNA_CNB_READ_LIMITS_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_METADATA_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_TEXTURE_INFO_STRUCT_VERSION: u32 = 1;
+pub const CNA_CNB_MODEL_INFO_STRUCT_VERSION: u32 = 1;
+pub const CNA_CNB_MODEL_BONE_STRUCT_VERSION: u32 = 1;
+pub const CNA_CNB_MODEL_PART_INFO_STRUCT_VERSION: u32 = 1;
+pub const CNA_CNB_MATERIAL_INFO_STRUCT_VERSION: u32 = 1;
+pub const CNA_CNB_MESH_INFO_STRUCT_VERSION: u32 = 1;
+pub const CNA_CNB_NO_INDEX: u32 = 0xFFFF_FFFF;
+pub const CNA_CNB_TEXTURE_SLOT_COUNT: u32 = 7;
+pub const CNA_CNB_EFFECT_KIND_BASIC: CNA_CnbEffectKind = 0;
+pub const CNA_CNB_EFFECT_KIND_SKINNED: CNA_CnbEffectKind = 1;
+pub const CNA_CNB_EFFECT_KIND_DUAL_TEXTURE: CNA_CnbEffectKind = 2;
+pub const CNA_CNB_EFFECT_KIND_PBR: CNA_CnbEffectKind = 3;
+pub const CNA_CNB_EFFECT_KIND_SKINNED_PBR: CNA_CnbEffectKind = 4;
+pub const CNA_CNB_EFFECT_KIND_EXTERNAL: CNA_CnbEffectKind = 5;
+pub const CNA_CNB_EFFECT_KIND_MAXIMUM: CNA_CnbEffectKind = CNA_CNB_EFFECT_KIND_EXTERNAL;
+pub const CNA_CNB_MATERIAL_TEXTURE_BASE_COLOR: CNA_CnbMaterialTextureSlot = 0;
+pub const CNA_CNB_MATERIAL_TEXTURE_SECOND: CNA_CnbMaterialTextureSlot = 1;
+pub const CNA_CNB_MATERIAL_TEXTURE_NORMAL: CNA_CnbMaterialTextureSlot = 2;
+pub const CNA_CNB_MATERIAL_TEXTURE_METALLIC_ROUGHNESS: CNA_CnbMaterialTextureSlot = 3;
+pub const CNA_CNB_MATERIAL_TEXTURE_EMISSIVE: CNA_CnbMaterialTextureSlot = 4;
+pub const CNA_CNB_MATERIAL_TEXTURE_OCCLUSION: CNA_CnbMaterialTextureSlot = 5;
+pub const CNA_CNB_MATERIAL_TEXTURE_SPECULAR: CNA_CnbMaterialTextureSlot = 6;
+pub const CNA_CNB_MATERIAL_TEXTURE_SPECULAR_COLOR: CNA_CnbMaterialTextureSlot = 7;
+pub const CNA_CNB_MATERIAL_TEXTURE_MAXIMUM: CNA_CnbMaterialTextureSlot =
+    CNA_CNB_MATERIAL_TEXTURE_SPECULAR_COLOR;
 pub const CNA_POWER_STATE_ERROR: CNA_PowerState = 0;
 pub const CNA_POWER_STATE_UNKNOWN: CNA_PowerState = 1;
 pub const CNA_POWER_STATE_ON_BATTERY: CNA_PowerState = 2;
@@ -557,6 +581,9 @@ pub type CNA_CnbCompression = u32;
 pub type CNA_CnbTextureFormat = u32;
 pub type CNA_CnbDocumentHandle = CNA_Handle;
 pub type CNA_CnbTextureDataHandle = CNA_Handle;
+pub type CNA_CnbModelDataHandle = CNA_Handle;
+pub type CNA_CnbEffectKind = u32;
+pub type CNA_CnbMaterialTextureSlot = u32;
 pub type CNA_PowerState = u32;
 pub type CNA_RendererFeature = u32;
 pub type CNA_RendererFeatureSupport = u32;
@@ -1295,6 +1322,7 @@ pub struct CNA_CnbReadLimits {
     pub max_chunk_count: u32,
     pub max_string_bytes: u32,
     pub max_array_element_count: u32,
+    pub max_chunk_alignment: u32,
 }
 
 #[repr(C)]
@@ -1318,6 +1346,91 @@ pub struct CNA_CnbTextureInfo {
     pub face_count: u32,
     pub mip_count: u32,
     pub representation_count: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbModelInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub bone_count: u64,
+    pub part_count: u64,
+    pub mesh_count: u64,
+    pub animation_count: u64,
+    pub light_count: u64,
+    pub has_skeleton: CNA_Bool,
+    pub applies_gltf_lighting_policy: CNA_Bool,
+    pub has_bone_hierarchy: CNA_Bool,
+    pub reserved: u8,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_CnbModelBone {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub parent: i32,
+    pub reserved: u32,
+    pub transform: [f32; 16],
+}
+
+impl Default for CNA_CnbModelBone {
+    fn default() -> Self {
+        Self {
+            struct_size: 0,
+            struct_version: 0,
+            parent: 0,
+            reserved: 0,
+            transform: [0.0; 16],
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbModelPartInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub vertex_stride: u32,
+    pub vertex_count: u32,
+    pub index_count: u32,
+    pub index_element_size: u32,
+    pub primitive_topology: u32,
+    pub primitive_count: u32,
+    pub effect_kind: CNA_CnbEffectKind,
+    pub vertex_color_enabled: CNA_Bool,
+    pub unlit: CNA_Bool,
+    pub reserved: [u8; 2],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbMaterialInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub base_color_factor: [f32; 4],
+    pub emissive_factor: [f32; 3],
+    pub specular_color_factor: [f32; 3],
+    pub metallic_factor: f32,
+    pub roughness_factor: f32,
+    pub ior: f32,
+    pub specular_factor: f32,
+    pub normal_scale: f32,
+    pub occlusion_strength: f32,
+    pub alpha_cutoff: f32,
+    pub alpha_mode: u32,
+    pub double_sided: CNA_Bool,
+    pub reserved: [u8; 3],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbMeshInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub parent_bone: i32,
+    pub reserved: u32,
+    pub part_index_count: u64,
 }
 
 #[repr(C)]
@@ -4215,6 +4328,87 @@ pub type cna_cnb_texture_data_get_level_count_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_cnb_texture_data_copy_level_fn = unsafe extern "C" fn(
     CNA_CnbTextureDataHandle, u64, u64, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_read_limits_init_fn = unsafe extern "C" fn(*mut CNA_CnbReadLimits) -> CNA_Result;
+pub type cna_cnb_model_create_fn = unsafe extern "C" fn(*mut CNA_CnbModelDataHandle) -> CNA_Result;
+pub type cna_cnb_model_destroy_fn = unsafe extern "C" fn(CNA_CnbModelDataHandle) -> CNA_Result;
+pub type cna_cnb_model_set_flags_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, CNA_Bool, CNA_Bool,
+) -> CNA_Result;
+pub type cna_cnb_model_add_bone_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, CNA_StringView, i32, *const f32, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_add_mesh_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, CNA_StringView, i32, *const u32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_add_part_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, *const CNA_CnbModelPartInfo, CNA_StringView, CNA_StringView, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_set_part_vertex_bytes_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *const u8, u64,
+) -> CNA_Result;
+pub type cna_cnb_model_set_part_index_bytes_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *const u8, u64,
+) -> CNA_Result;
+pub type cna_cnb_model_set_material_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *const CNA_CnbMaterialInfo,
+) -> CNA_Result;
+pub type cna_cnb_model_set_material_texture_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, CNA_CnbMaterialTextureSlot, CNA_StringView,
+) -> CNA_Result;
+pub type cna_cnb_encode_model_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, CNA_StringView, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_decode_model_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut CNA_CnbModelDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_model_get_info_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, *mut CNA_CnbModelInfo,
+) -> CNA_Result;
+pub type cna_cnb_model_get_bone_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut CNA_CnbModelBone,
+) -> CNA_Result;
+pub type cna_cnb_model_get_bone_name_size_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_copy_bone_name_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_get_mesh_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut CNA_CnbMeshInfo,
+) -> CNA_Result;
+pub type cna_cnb_model_get_mesh_name_size_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_copy_mesh_name_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_copy_mesh_part_indices_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut u32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_get_part_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut CNA_CnbModelPartInfo,
+) -> CNA_Result;
+pub type cna_cnb_model_get_part_name_size_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_copy_part_name_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_copy_part_vertex_bytes_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_copy_part_index_bytes_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_get_material_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut CNA_CnbMaterialInfo,
+) -> CNA_Result;
+pub type cna_cnb_model_get_material_texture_size_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, CNA_CnbMaterialTextureSlot, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_copy_material_texture_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, CNA_CnbMaterialTextureSlot, *mut c_char, u64, *mut u64,
 ) -> CNA_Result;
 pub type cna_cnb_texture_format_to_surface_format_fn = unsafe extern "C" fn(
     CNA_CnbTextureFormat, *mut CNA_SurfaceFormat,

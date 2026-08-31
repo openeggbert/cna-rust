@@ -106,6 +106,95 @@ def clang_function_declaration(cna_root: Path, symbol: str, source: Path) -> dic
     return None
 
 
+def clang_record_fields(cna_root: Path, type_name: str, source: Path) -> list[str] | None:
+    """Ask Clang for the exact field list of one canonical structure."""
+    completed = subprocess.run(
+        [
+            os.environ.get("CLANG", "clang"),
+            "-std=c11",
+            "-I", str(cna_root / "modules/c-api/include"),
+            "-Xclang", "-ast-dump=json",
+            "-Xclang", f"-ast-dump-filter={type_name}",
+            "-fsyntax-only", str(source),
+        ],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    decoder = json.JSONDecoder()
+    text = completed.stdout
+    position = 0
+    fields: list[str] | None = None
+    while position < len(text):
+        while position < len(text) and text[position].isspace():
+            position += 1
+        if position == len(text):
+            break
+        value, position = decoder.raw_decode(text, position)
+        # `-ast-dump-filter` matches by prefix, so a request for `CNA_Point`
+        # also prints `CNA_PointLightEXT`. Only the record whose own name is
+        # exactly the requested one counts, or -- for a typedef over an
+        # anonymous struct -- the unnamed record the typedef introduces.
+        if value.get("kind") == "RecordDecl" and value.get("completeDefinition"):
+            if value.get("name") not in (type_name, None):
+                continue
+            record = value
+        elif value.get("kind") == "TypedefDecl" and value.get("name") == type_name:
+            record = next(
+                (
+                    child
+                    for child in value.get("inner", [])
+                    if child.get("kind") == "RecordDecl" and child.get("completeDefinition")
+                ),
+                None,
+            )
+            if record is None:
+                continue
+        else:
+            continue
+        named = [
+            child["name"]
+            for child in record.get("inner", [])
+            if child.get("kind") == "FieldDecl" and child.get("name")
+        ]
+        if named:
+            fields = named
+    return fields
+
+
+def layout_field_coverage(cna_root: Path, manifest: dict) -> tuple[int, list[dict]]:
+    """Prove the layout manifest names every field its C structure declares.
+
+    Offsets and `sizeof` alone cannot see a field that is missing from *both*
+    the Rust structure and this manifest: trailing padding can absorb it
+    exactly, which is how `CNA_CnbReadLimits` carried seven C fields against
+    six declared ones while every listed offset and the total size still
+    matched. Asking Clang for the field list closes that hole.
+    """
+    findings: list[dict] = []
+    checked = 0
+    with tempfile.TemporaryDirectory() as directory:
+        source = Path(directory) / "records.c"
+        source.write_text('#include "CNA/C/cna.h"\n', encoding="utf-8")
+        for type_name, declared in manifest.get("layouts", {}).items():
+            actual = clang_record_fields(cna_root, type_name, source)
+            if actual is None:
+                findings.append({
+                    "code": "LAYOUT_TYPE_NOT_FOUND",
+                    "type": type_name,
+                })
+                continue
+            checked += 1
+            if list(declared) != actual:
+                findings.append({
+                    "code": "LAYOUT_FIELD_SET_MISMATCH",
+                    "type": type_name,
+                    "expected": actual,
+                    "actual": list(declared),
+                })
+    return checked, findings
+
+
 def canonical_c_type(value: str) -> dict:
     value = " ".join(value.replace("*", " * ").split())
     pointer_depth = value.count("*")
@@ -429,6 +518,11 @@ def main() -> int:
     )
     findings.extend(prototype_findings)
 
+    layout_fields_checked, layout_field_findings = layout_field_coverage(
+        Path(args.cna_root), manifest
+    )
+    findings.extend(layout_field_findings)
+
     exports: set[str] | None = None
     actual_version: int | None = None
     if args.library:
@@ -458,6 +552,10 @@ def main() -> int:
         ),
         "missingDeclarations": sum(x["code"] == "MISSING_DECLARATION" for x in findings),
         "arityMismatches": sum(x["code"] == "HEADER_ARITY_MISMATCH" for x in findings),
+        "layoutFieldSetsChecked": layout_fields_checked,
+        "layoutFieldSetMismatches": sum(
+            x["code"] in {"LAYOUT_FIELD_SET_MISMATCH", "LAYOUT_TYPE_NOT_FOUND"} for x in findings
+        ),
         "cRustProbeMeasurements": len(c_probe.keys() | rust_probe.keys()),
         "cRustProbeMismatches": sum(x["code"] == "C_RUST_ABI_PROBE_MISMATCH" for x in findings),
         "prototypeFunctionsChecked": prototype_functions,
