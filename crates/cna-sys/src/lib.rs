@@ -760,6 +760,36 @@ pub type CNA_PostProcessChainHandle = CNA_Handle;
 pub type CNA_RenderTargetPoolHandle = CNA_Handle;
 pub type CNA_GpuTimerHandle = CNA_Handle;
 pub type CNA_ParticleSystemHandle = CNA_Handle;
+pub type CNA_StorageBufferHandle = CNA_Handle;
+pub type CNA_ComputeShaderHandle = CNA_Handle;
+pub type CNA_GraphicsImageAccess = u32;
+pub type CNA_GraphicsMemoryBarrier = u32;
+
+pub const CNA_GRAPHICS_IMAGE_ACCESS_READ_ONLY: CNA_GraphicsImageAccess = 0;
+pub const CNA_GRAPHICS_IMAGE_ACCESS_WRITE_ONLY: CNA_GraphicsImageAccess = 1;
+pub const CNA_GRAPHICS_IMAGE_ACCESS_READ_WRITE: CNA_GraphicsImageAccess = 2;
+
+pub const CNA_GRAPHICS_MEMORY_BARRIER_NONE: CNA_GraphicsMemoryBarrier = 0;
+pub const CNA_GRAPHICS_MEMORY_BARRIER_VERTEX_ATTRIB_ARRAY: CNA_GraphicsMemoryBarrier = 1 << 0;
+pub const CNA_GRAPHICS_MEMORY_BARRIER_ELEMENT_ARRAY: CNA_GraphicsMemoryBarrier = 1 << 1;
+pub const CNA_GRAPHICS_MEMORY_BARRIER_UNIFORM: CNA_GraphicsMemoryBarrier = 1 << 2;
+pub const CNA_GRAPHICS_MEMORY_BARRIER_TEXTURE_FETCH: CNA_GraphicsMemoryBarrier = 1 << 3;
+pub const CNA_GRAPHICS_MEMORY_BARRIER_SHADER_IMAGE_ACCESS: CNA_GraphicsMemoryBarrier = 1 << 4;
+pub const CNA_GRAPHICS_MEMORY_BARRIER_SHADER_STORAGE: CNA_GraphicsMemoryBarrier = 1 << 5;
+pub const CNA_GRAPHICS_MEMORY_BARRIER_BUFFER_UPDATE: CNA_GraphicsMemoryBarrier = 1 << 6;
+pub const CNA_GRAPHICS_MEMORY_BARRIER_FRAMEBUFFER: CNA_GraphicsMemoryBarrier = 1 << 7;
+pub const CNA_GRAPHICS_MEMORY_BARRIER_INDIRECT_COMMAND: CNA_GraphicsMemoryBarrier = 1 << 8;
+/// Every bit above, folded together, exactly as the canonical macro defines it.
+pub const CNA_GRAPHICS_MEMORY_BARRIER_ALL: CNA_GraphicsMemoryBarrier =
+    CNA_GRAPHICS_MEMORY_BARRIER_VERTEX_ATTRIB_ARRAY
+        | CNA_GRAPHICS_MEMORY_BARRIER_ELEMENT_ARRAY
+        | CNA_GRAPHICS_MEMORY_BARRIER_UNIFORM
+        | CNA_GRAPHICS_MEMORY_BARRIER_TEXTURE_FETCH
+        | CNA_GRAPHICS_MEMORY_BARRIER_SHADER_IMAGE_ACCESS
+        | CNA_GRAPHICS_MEMORY_BARRIER_SHADER_STORAGE
+        | CNA_GRAPHICS_MEMORY_BARRIER_BUFFER_UPDATE
+        | CNA_GRAPHICS_MEMORY_BARRIER_FRAMEBUFFER
+        | CNA_GRAPHICS_MEMORY_BARRIER_INDIRECT_COMMAND;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -8189,4 +8219,75 @@ pub type cna_particle_system_set_softness_ext_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_particle_system_set_depth_input_ext_fn = unsafe extern "C" fn(
     CNA_ParticleSystemHandle, CNA_Handle, f32,
+) -> CNA_Result;
+
+// --- CNA engine layer: storage buffers and compute shaders (engine_layer.h) ---
+pub type cna_compute_shader_barrier_fn = unsafe extern "C" fn(
+    CNA_ComputeShaderHandle, CNA_GraphicsMemoryBarrier,
+) -> CNA_Result;
+pub type cna_compute_shader_bind_image_fn = unsafe extern "C" fn(
+    CNA_ComputeShaderHandle, i32, CNA_Handle, CNA_GraphicsImageAccess,
+) -> CNA_Result;
+pub type cna_compute_shader_bind_storage_buffer_fn = unsafe extern "C" fn(
+    CNA_ComputeShaderHandle, i32, CNA_StorageBufferHandle,
+) -> CNA_Result;
+pub type cna_compute_shader_bind_texture_fn = unsafe extern "C" fn(
+    CNA_ComputeShaderHandle, i32, CNA_StringView, CNA_Handle,
+) -> CNA_Result;
+pub type cna_compute_shader_copy_compile_error_fn = unsafe extern "C" fn(
+    CNA_ComputeShaderHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_compute_shader_create_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_ComputeShaderHandle,
+) -> CNA_Result;
+pub type cna_compute_shader_destroy_fn = unsafe extern "C" fn(
+    CNA_ComputeShaderHandle,
+) -> CNA_Result;
+pub type cna_compute_shader_dispatch_fn = unsafe extern "C" fn(
+    CNA_ComputeShaderHandle, i32, i32, i32,
+) -> CNA_Result;
+pub type cna_compute_shader_is_image_binding_supported_fn = unsafe extern "C" fn(
+    CNA_ComputeShaderHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_compute_shader_is_valid_fn = unsafe extern "C" fn(
+    CNA_ComputeShaderHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_compute_shader_set_uniform_float_fn = unsafe extern "C" fn(
+    CNA_ComputeShaderHandle, CNA_StringView, f32,
+) -> CNA_Result;
+pub type cna_compute_shader_set_uniform_int_fn = unsafe extern "C" fn(
+    CNA_ComputeShaderHandle, CNA_StringView, i32,
+) -> CNA_Result;
+pub type cna_graphics_memory_barrier_has_fn = unsafe extern "C" fn(
+    CNA_GraphicsMemoryBarrier, CNA_GraphicsMemoryBarrier, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_storage_buffer_create_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, *mut CNA_StorageBufferHandle,
+) -> CNA_Result;
+pub type cna_storage_buffer_create_typed_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, u64, *mut CNA_StorageBufferHandle,
+) -> CNA_Result;
+pub type cna_storage_buffer_destroy_fn = unsafe extern "C" fn(
+    CNA_StorageBufferHandle,
+) -> CNA_Result;
+pub type cna_storage_buffer_get_bytes_fn = unsafe extern "C" fn(
+    CNA_StorageBufferHandle, *mut c_void, u64,
+) -> CNA_Result;
+pub type cna_storage_buffer_get_byte_size_fn = unsafe extern "C" fn(
+    CNA_StorageBufferHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_storage_buffer_get_element_byte_size_fn = unsafe extern "C" fn(
+    CNA_StorageBufferHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_storage_buffer_get_element_count_fn = unsafe extern "C" fn(
+    CNA_StorageBufferHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_storage_buffer_get_elements_fn = unsafe extern "C" fn(
+    CNA_StorageBufferHandle, *mut c_void, u64, u64,
+) -> CNA_Result;
+pub type cna_storage_buffer_set_bytes_fn = unsafe extern "C" fn(
+    CNA_StorageBufferHandle, *const c_void, u64,
+) -> CNA_Result;
+pub type cna_storage_buffer_set_elements_fn = unsafe extern "C" fn(
+    CNA_StorageBufferHandle, *const c_void, u64, u64,
 ) -> CNA_Result;

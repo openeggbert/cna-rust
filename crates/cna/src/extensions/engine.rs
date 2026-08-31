@@ -3009,3 +3009,412 @@ fn native_vector4(value: Vector4) -> sys::CNA_Vector4 {
 fn from_native_vector4(value: sys::CNA_Vector4) -> Vector4 {
     Vector4::from_x_and_y_and_z_and_w(value.x, value.y, value.z, value.w)
 }
+
+/// What a memory barrier orders against later commands.
+///
+/// A bit set rather than an enum: upstream folds several orderings into one
+/// mask, and `CNA_GRAPHICS_MEMORY_BARRIER_ALL` is exactly the union of the
+/// rest, so a Rust value that could only hold one would not express what the
+/// route takes.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub struct MemoryBarrier(sys::CNA_GraphicsMemoryBarrier);
+
+impl MemoryBarrier {
+    /// No ordering at all.
+    pub const NONE: Self = Self(sys::CNA_GRAPHICS_MEMORY_BARRIER_NONE);
+    /// Orders vertex-attribute array reads.
+    pub const VERTEX_ATTRIB_ARRAY: Self =
+        Self(sys::CNA_GRAPHICS_MEMORY_BARRIER_VERTEX_ATTRIB_ARRAY);
+    /// Orders element-array reads.
+    pub const ELEMENT_ARRAY: Self = Self(sys::CNA_GRAPHICS_MEMORY_BARRIER_ELEMENT_ARRAY);
+    /// Orders uniform reads.
+    pub const UNIFORM: Self = Self(sys::CNA_GRAPHICS_MEMORY_BARRIER_UNIFORM);
+    /// Orders texture fetches.
+    pub const TEXTURE_FETCH: Self = Self(sys::CNA_GRAPHICS_MEMORY_BARRIER_TEXTURE_FETCH);
+    /// Orders shader image accesses.
+    pub const SHADER_IMAGE_ACCESS: Self =
+        Self(sys::CNA_GRAPHICS_MEMORY_BARRIER_SHADER_IMAGE_ACCESS);
+    /// Orders shader storage-buffer accesses.
+    pub const SHADER_STORAGE: Self = Self(sys::CNA_GRAPHICS_MEMORY_BARRIER_SHADER_STORAGE);
+    /// Orders buffer updates.
+    pub const BUFFER_UPDATE: Self = Self(sys::CNA_GRAPHICS_MEMORY_BARRIER_BUFFER_UPDATE);
+    /// Orders framebuffer accesses.
+    pub const FRAMEBUFFER: Self = Self(sys::CNA_GRAPHICS_MEMORY_BARRIER_FRAMEBUFFER);
+    /// Orders indirect-command reads.
+    pub const INDIRECT_COMMAND: Self = Self(sys::CNA_GRAPHICS_MEMORY_BARRIER_INDIRECT_COMMAND);
+    /// Every bit above, folded together.
+    pub const ALL: Self = Self(sys::CNA_GRAPHICS_MEMORY_BARRIER_ALL);
+
+    /// Whether this mask contains every bit of another.
+    ///
+    /// Asked of CNA rather than computed here: the mask is the ABI's, and a
+    /// Rust reimplementation of the test would agree right up until upstream
+    /// added a bit.
+    pub fn contains(self, bits: Self) -> Result<bool> {
+        let native = Native::process()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: both masks are by value and the output is a live local.
+        native.check(unsafe {
+            (native.engine.graphics_memory_barrier_has)(self.0, bits.0, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+}
+
+impl core::ops::BitOr for MemoryBarrier {
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self {
+        Self(self.0 | rhs.0)
+    }
+}
+
+/// How a compute shader may touch a bound image.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum ImageAccess {
+    /// The shader only reads.
+    ReadOnly,
+    /// The shader only writes.
+    WriteOnly,
+    /// The shader does both.
+    ReadWrite,
+}
+
+impl ImageAccess {
+    const fn to_native(self) -> sys::CNA_GraphicsImageAccess {
+        match self {
+            Self::ReadOnly => sys::CNA_GRAPHICS_IMAGE_ACCESS_READ_ONLY,
+            Self::WriteOnly => sys::CNA_GRAPHICS_IMAGE_ACCESS_WRITE_ONLY,
+            Self::ReadWrite => sys::CNA_GRAPHICS_IMAGE_ACCESS_READ_WRITE,
+        }
+    }
+}
+
+/// A shader-visible buffer of bytes.
+///
+/// `OWNED`. Created either as a flat byte range or as a count of fixed-size
+/// elements; the second form is the C shape of upstream's `StorageBufferT<T>`,
+/// and it remembers both numbers so a mismatched element size is refused rather
+/// than silently reinterpreted.
+pub struct StorageBuffer {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl StorageBuffer {
+    /// Creates a buffer of a given size in bytes.
+    pub fn with_byte_size(device: &GraphicsDevice, byte_size: u64) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe {
+            (native.engine.storage_buffer_create)(device.handle()?, byte_size, &mut handle)
+        })?;
+        Ok(Self::adopt(native, device, handle))
+    }
+
+    /// Creates a buffer sized as a count of fixed-size elements.
+    ///
+    /// `T` must be a plain value: bytes are what reach the GPU, which is the
+    /// same requirement upstream's template asserts.
+    pub fn with_elements<T: Copy>(device: &GraphicsDevice, element_count: u64) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe {
+            (native.engine.storage_buffer_create_typed)(
+                device.handle()?,
+                element_count,
+                core::mem::size_of::<T>() as u64,
+                &mut handle,
+            )
+        })?;
+        Ok(Self::adopt(native, device, handle))
+    }
+
+    fn adopt(native: &Arc<Native>, device: &GraphicsDevice, handle: sys::CNA_Handle) -> Self {
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.storage_buffer_destroy,
+            released: "the storage buffer has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Self {
+            core,
+            native: Arc::clone(native),
+        }
+    }
+
+    /// The buffer's size in bytes.
+    pub fn byte_size(&self) -> Result<u64> {
+        self.size(self.native.engine.storage_buffer_get_byte_size)
+    }
+
+    /// How many elements the buffer was created to hold; zero for a byte buffer.
+    pub fn element_count(&self) -> Result<u64> {
+        self.size(self.native.engine.storage_buffer_get_element_count)
+    }
+
+    /// The element size the buffer was created with; zero for a byte buffer.
+    pub fn element_byte_size(&self) -> Result<u64> {
+        self.size(self.native.engine.storage_buffer_get_element_byte_size)
+    }
+
+    /// Uploads raw bytes.
+    pub fn set_bytes(&self, data: &[u8]) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the slice is borrowed for the call
+        // with its own length passed alongside it.
+        self.native.check(unsafe {
+            (self.native.engine.storage_buffer_set_bytes)(
+                handle,
+                data.as_ptr().cast::<c_void>(),
+                data.len() as u64,
+            )
+        })
+    }
+
+    /// Reads raw bytes back.
+    pub fn get_bytes(&self, destination: &mut [u8]) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the destination holds its own length
+        // in writable bytes, which is the count passed alongside it.
+        self.native.check(unsafe {
+            (self.native.engine.storage_buffer_get_bytes)(
+                handle,
+                destination.as_mut_ptr().cast::<c_void>(),
+                destination.len() as u64,
+            )
+        })
+    }
+
+    /// Uploads elements, refusing more than the buffer holds.
+    pub fn set_elements<T: Copy>(&self, data: &[T]) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the slice is borrowed for the call
+        // with its element count and element size passed alongside it.
+        self.native.check(unsafe {
+            (self.native.engine.storage_buffer_set_elements)(
+                handle,
+                data.as_ptr().cast::<c_void>(),
+                data.len() as u64,
+                core::mem::size_of::<T>() as u64,
+            )
+        })
+    }
+
+    /// Reads the buffer's whole element range back.
+    pub fn get_elements<T: Copy>(&self, destination: &mut [T]) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the destination holds its own element
+        // count of writable elements of the size passed alongside it.
+        self.native.check(unsafe {
+            (self.native.engine.storage_buffer_get_elements)(
+                handle,
+                destination.as_mut_ptr().cast::<c_void>(),
+                destination.len() as u64,
+                core::mem::size_of::<T>() as u64,
+            )
+        })
+    }
+
+    /// Releases the buffer now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+
+    fn size(
+        &self,
+        route: unsafe extern "C" fn(sys::CNA_StorageBufferHandle, *mut u64) -> sys::CNA_Result,
+    ) -> Result<u64> {
+        let handle = self.core.get()?;
+        let mut value = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut value) })?;
+        Ok(value)
+    }
+}
+
+impl Drop for StorageBuffer {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// A compute shader compiled from GLSL ES 3.10 source.
+///
+/// `OWNED`. Creation succeeds even where the source did not compile, so
+/// [`ComputeShader::is_valid`] and [`ComputeShader::compile_error`] are the
+/// questions to ask: a handle is not a program.
+pub struct ComputeShader {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+    /// Buffers and textures bound to the shader. CNA keeps the binding, not the
+    /// resource, so this value is what keeps them alive while it points at them.
+    bound_buffers: Vec<Arc<StorageBuffer>>,
+    bound_textures: Vec<Texture2D>,
+}
+
+impl ComputeShader {
+    /// Compiles a compute shader from GLSL ES 3.10 source.
+    pub fn new(device: &GraphicsDevice, source: &str) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        let view = string_view(source);
+        // SAFETY: the device handle is live, `source` is borrowed for the call,
+        // and the output is a live local.
+        native.check(unsafe {
+            (native.engine.compute_shader_create)(device.handle()?, view, &mut handle)
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.compute_shader_destroy,
+            released: "the compute shader has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+            bound_buffers: Vec::new(),
+            bound_textures: Vec::new(),
+        })
+    }
+
+    /// Whether the shader compiled.
+    pub fn is_valid(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native
+            .check(unsafe { (self.native.engine.compute_shader_is_valid)(handle, &mut value) })?;
+        Ok(value != 0)
+    }
+
+    /// Why the shader did not compile; empty when it did.
+    pub fn compile_error(&self) -> Result<String> {
+        let handle = self.core.get()?;
+        copy_text(&self.native, |api, destination, capacity, out_bytes| {
+            // SAFETY: the destination holds `capacity` writable bytes.
+            unsafe { (api.compute_shader_copy_compile_error)(handle, destination, capacity, out_bytes) }
+        })
+    }
+
+    /// Whether this renderer supports binding an image for shader read/write.
+    pub fn is_image_binding_supported(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.compute_shader_is_image_binding_supported)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Sets a signed-integer uniform.
+    pub fn set_uniform_int(&self, name: &str, value: i32) -> Result<()> {
+        let handle = self.core.get()?;
+        let view = string_view(name);
+        // SAFETY: the handle is owned and `name` is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.compute_shader_set_uniform_int)(handle, view, value)
+        })
+    }
+
+    /// Sets a floating-point uniform.
+    pub fn set_uniform_float(&self, name: &str, value: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        let view = string_view(name);
+        // SAFETY: the handle is owned and `name` is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.compute_shader_set_uniform_float)(handle, view, value)
+        })
+    }
+
+    /// Binds a storage buffer to a numbered binding point.
+    ///
+    /// CNA records the binding, not the resource, so the [`Arc`] is what keeps
+    /// the buffer alive for as long as the shader points at it.
+    pub fn bind_storage_buffer(&mut self, binding: i32, buffer: &Arc<StorageBuffer>) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: both handles are live; retention follows on success.
+        self.native.check(unsafe {
+            (self.native.engine.compute_shader_bind_storage_buffer)(
+                handle,
+                binding,
+                buffer.core.get()?,
+            )
+        })?;
+        self.bound_buffers.push(Arc::clone(buffer));
+        Ok(())
+    }
+
+    /// Binds a texture to a numbered sampler unit.
+    pub fn bind_texture(&mut self, unit: i32, sampler: &str, texture: Texture2D) -> Result<()> {
+        let handle = self.core.get()?;
+        let view = string_view(sampler);
+        // SAFETY: the handle is owned, `sampler` is borrowed for the call, and
+        // the texture handle is live; retention follows on success.
+        self.native.check(unsafe {
+            (self.native.engine.compute_shader_bind_texture)(
+                handle,
+                unit,
+                view,
+                texture.handle()?,
+            )
+        })?;
+        self.bound_textures.push(texture);
+        Ok(())
+    }
+
+    /// Binds a texture as a read/write image.
+    pub fn bind_image(&mut self, unit: i32, texture: Texture2D, access: ImageAccess) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the texture handle is live;
+        // retention follows on success.
+        self.native.check(unsafe {
+            (self.native.engine.compute_shader_bind_image)(
+                handle,
+                unit,
+                texture.handle()?,
+                access.to_native(),
+            )
+        })?;
+        self.bound_textures.push(texture);
+        Ok(())
+    }
+
+    /// Dispatches the shader over a group grid.
+    pub fn dispatch(&self, groups_x: i32, groups_y: i32, groups_z: i32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the counts are by value.
+        self.native.check(unsafe {
+            (self.native.engine.compute_shader_dispatch)(handle, groups_x, groups_y, groups_z)
+        })
+    }
+
+    /// Orders the given memory accesses against later commands.
+    pub fn barrier(&self, bits: MemoryBarrier) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the mask is by value.
+        self.native
+            .check(unsafe { (self.native.engine.compute_shader_barrier)(handle, bits.0) })
+    }
+
+    /// Releases the shader now rather than at drop.
+    pub fn release(&mut self) -> Result<()> {
+        let result = self.core.release();
+        self.bound_buffers.clear();
+        self.bound_textures.clear();
+        result
+    }
+}
+
+impl Drop for ComputeShader {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}

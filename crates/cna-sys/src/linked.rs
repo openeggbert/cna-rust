@@ -6889,4 +6889,112 @@ extern "C" {
         argument1: CNA_Handle,
         argument2: f32,
     ) -> CNA_Result;
+    pub fn cna_compute_shader_barrier(
+        argument0: CNA_ComputeShaderHandle,
+        argument1: CNA_GraphicsMemoryBarrier,
+    ) -> CNA_Result;
+    pub fn cna_compute_shader_bind_image(
+        argument0: CNA_ComputeShaderHandle,
+        argument1: i32,
+        argument2: CNA_Handle,
+        argument3: CNA_GraphicsImageAccess,
+    ) -> CNA_Result;
+    pub fn cna_compute_shader_bind_storage_buffer(
+        argument0: CNA_ComputeShaderHandle,
+        argument1: i32,
+        argument2: CNA_StorageBufferHandle,
+    ) -> CNA_Result;
+    pub fn cna_compute_shader_bind_texture(
+        argument0: CNA_ComputeShaderHandle,
+        argument1: i32,
+        argument2: CNA_StringView,
+        argument3: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_compute_shader_copy_compile_error(
+        argument0: CNA_ComputeShaderHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_compute_shader_create(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_ComputeShaderHandle,
+    ) -> CNA_Result;
+    pub fn cna_compute_shader_destroy(argument0: CNA_ComputeShaderHandle) -> CNA_Result;
+    pub fn cna_compute_shader_dispatch(
+        argument0: CNA_ComputeShaderHandle,
+        argument1: i32,
+        argument2: i32,
+        argument3: i32,
+    ) -> CNA_Result;
+    pub fn cna_compute_shader_is_image_binding_supported(
+        argument0: CNA_ComputeShaderHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_compute_shader_is_valid(
+        argument0: CNA_ComputeShaderHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_compute_shader_set_uniform_float(
+        argument0: CNA_ComputeShaderHandle,
+        argument1: CNA_StringView,
+        argument2: f32,
+    ) -> CNA_Result;
+    pub fn cna_compute_shader_set_uniform_int(
+        argument0: CNA_ComputeShaderHandle,
+        argument1: CNA_StringView,
+        argument2: i32,
+    ) -> CNA_Result;
+    pub fn cna_graphics_memory_barrier_has(
+        argument0: CNA_GraphicsMemoryBarrier,
+        argument1: CNA_GraphicsMemoryBarrier,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_storage_buffer_create(
+        argument0: CNA_Handle,
+        argument1: u64,
+        argument2: *mut CNA_StorageBufferHandle,
+    ) -> CNA_Result;
+    pub fn cna_storage_buffer_create_typed(
+        argument0: CNA_Handle,
+        argument1: u64,
+        argument2: u64,
+        argument3: *mut CNA_StorageBufferHandle,
+    ) -> CNA_Result;
+    pub fn cna_storage_buffer_destroy(argument0: CNA_StorageBufferHandle) -> CNA_Result;
+    pub fn cna_storage_buffer_get_bytes(
+        argument0: CNA_StorageBufferHandle,
+        argument1: *mut c_void,
+        argument2: u64,
+    ) -> CNA_Result;
+    pub fn cna_storage_buffer_get_byte_size(
+        argument0: CNA_StorageBufferHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_storage_buffer_get_element_byte_size(
+        argument0: CNA_StorageBufferHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_storage_buffer_get_element_count(
+        argument0: CNA_StorageBufferHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_storage_buffer_get_elements(
+        argument0: CNA_StorageBufferHandle,
+        argument1: *mut c_void,
+        argument2: u64,
+        argument3: u64,
+    ) -> CNA_Result;
+    pub fn cna_storage_buffer_set_bytes(
+        argument0: CNA_StorageBufferHandle,
+        argument1: *const c_void,
+        argument2: u64,
+    ) -> CNA_Result;
+    pub fn cna_storage_buffer_set_elements(
+        argument0: CNA_StorageBufferHandle,
+        argument1: *const c_void,
+        argument2: u64,
+        argument3: u64,
+    ) -> CNA_Result;
 }

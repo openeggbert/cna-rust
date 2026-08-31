@@ -1727,7 +1727,30 @@
     "cna_particle_system_copy_particle_lookup_glsl": 3,
     "cna_particle_system_get_softness_ext": 2,
     "cna_particle_system_set_softness_ext": 2,
-    "cna_particle_system_set_depth_input_ext": 3
+    "cna_particle_system_set_depth_input_ext": 3,
+    "cna_compute_shader_barrier": 2,
+    "cna_compute_shader_bind_image": 4,
+    "cna_compute_shader_bind_storage_buffer": 3,
+    "cna_compute_shader_bind_texture": 4,
+    "cna_compute_shader_copy_compile_error": 4,
+    "cna_compute_shader_create": 3,
+    "cna_compute_shader_destroy": 1,
+    "cna_compute_shader_dispatch": 4,
+    "cna_compute_shader_is_image_binding_supported": 2,
+    "cna_compute_shader_is_valid": 2,
+    "cna_compute_shader_set_uniform_float": 3,
+    "cna_compute_shader_set_uniform_int": 3,
+    "cna_graphics_memory_barrier_has": 3,
+    "cna_storage_buffer_create": 3,
+    "cna_storage_buffer_create_typed": 4,
+    "cna_storage_buffer_destroy": 1,
+    "cna_storage_buffer_get_bytes": 3,
+    "cna_storage_buffer_get_byte_size": 2,
+    "cna_storage_buffer_get_element_byte_size": 2,
+    "cna_storage_buffer_get_element_count": 2,
+    "cna_storage_buffer_get_elements": 4,
+    "cna_storage_buffer_set_bytes": 3,
+    "cna_storage_buffer_set_elements": 4
   },
   "layouts": {
     "CNA_InviteAcceptedEventInfo": ["struct_size", "struct_version", "gamer", "is_current_session", "reserved"],
@@ -1859,7 +1882,7 @@
     "CNA_Particle": ["position", "velocity", "state"],
     "CNA_ParticleEmitterSettings": ["struct_size", "struct_version", "position", "direction", "gravity", "start_color", "end_color", "cone_angle", "speed", "speed_variance", "lifetime", "lifetime_variance", "drag", "emission_rate", "start_size", "end_size"]
   },
-  "scalarTypes": ["CNA_Bool", "CNA_Handle", "CNA_NativeHandleValue", "CNA_DisplayOrientation", "CNA_GameEvent", "CNA_GameWindowEvent", "CNA_GraphicsDeviceManagerEvent", "CNA_GraphicsDeviceStatus", "CNA_GraphicsProfile", "CNA_PresentInterval", "CNA_DepthFormat", "CNA_RenderTargetUsage", "CNA_CubeMapFace", "CNA_RenderTargetKind", "CNA_ShaderStage", "CNA_PlayerIndex", "CNA_GamePadButtonFlags", "CNA_TouchLocationState", "CNA_GestureType", "CNA_FileMode", "CNA_FileAccess", "CNA_FileShare", "CNA_SeekOrigin", "CNA_TextureDataType", "CNA_TextureImageFormat", "CNA_BufferUsage", "CNA_IndexElementSize", "CNA_SetDataOptions", "CNA_ClearOptions", "CNA_PrimitiveType", "CNA_UserVertexSource", "CNA_VertexElementFormat", "CNA_VertexElementUsage", "CNA_VertexType", "CNA_Blend", "CNA_BlendFunction", "CNA_ColorWriteChannels", "CNA_CompareFunction", "CNA_StencilOperation", "CNA_CullMode", "CNA_FillMode", "CNA_TextureAddressMode", "CNA_TextureFilter", "CNA_EffectParameterClass", "CNA_EffectParameterType", "CNA_EffectValueType", "CNA_EffectTextureType", "CNA_AudioChannels", "CNA_SoundState", "CNA_AudioStopOptions", "CNA_MicrophoneState", "CNA_AudioEventRegistrationHandle", "CNA_MediaState", "CNA_MediaSourceType", "CNA_VideoSoundtrackType", "CNA_MediaPlayerEventRegistrationHandle", "CNA_GamerPresenceMode", "CNA_NotificationPosition", "CNA_GamerZone", "CNA_LeaderboardKey", "CNA_LeaderboardOutcome", "CNA_MessageBoxIcon", "CNA_ControllerSensitivity", "CNA_GameDifficulty", "CNA_GamerPrivilegeSetting", "CNA_RacingCameraAngle", "CNA_AvatarBodyType", "CNA_AvatarRendererState", "CNA_AvatarEyebrow", "CNA_AvatarEye", "CNA_AvatarMouth", "CNA_AvatarAnimationPreset", "CNA_AvatarBone", "CNA_PropertyValueKind", "CNA_NetworkSessionEndReason", "CNA_NetworkSessionJoinError", "CNA_NetworkSessionState", "CNA_NetworkSessionType", "CNA_SendDataOptions", "CNA_NetworkEventType", "CNA_SignedInGamerHandle", "CNA_GamerHandle", "CNA_GamerProfileHandle", "CNA_GamerCollectionHandle", "CNA_GamerEnumeratorHandle", "CNA_AchievementHandle", "CNA_AchievementCollectionHandle", "CNA_PropertyDictionaryHandle", "CNA_LeaderboardReaderHandle", "CNA_LeaderboardEntryHandle", "CNA_AvatarDescriptionHandle", "CNA_AvatarAnimationHandle", "CNA_AvatarRendererHandle", "CNA_NetworkSessionPropertiesHandle", "CNA_NetworkSessionPropertyEnumeratorHandle", "CNA_PacketWriterHandle", "CNA_PacketReaderHandle", "CNA_NetworkGamerHandle", "CNA_NetworkMachineHandle", "CNA_AvailableNetworkSessionHandle", "CNA_AvailableNetworkSessionCollectionHandle", "CNA_NetworkSessionHandle", "CNA_NetworkSessionEventRegistrationHandle", "CNA_RenderPipelineHandle", "CNA_ShadowMapHandle", "CNA_PostProcessPassHandle", "CNA_PostProcessChainHandle", "CNA_RenderTargetPoolHandle", "CNA_GpuTimerHandle", "CNA_ParticleSystemHandle"],
+  "scalarTypes": ["CNA_Bool", "CNA_Handle", "CNA_NativeHandleValue", "CNA_DisplayOrientation", "CNA_GameEvent", "CNA_GameWindowEvent", "CNA_GraphicsDeviceManagerEvent", "CNA_GraphicsDeviceStatus", "CNA_GraphicsProfile", "CNA_PresentInterval", "CNA_DepthFormat", "CNA_RenderTargetUsage", "CNA_CubeMapFace", "CNA_RenderTargetKind", "CNA_ShaderStage", "CNA_PlayerIndex", "CNA_GamePadButtonFlags", "CNA_TouchLocationState", "CNA_GestureType", "CNA_FileMode", "CNA_FileAccess", "CNA_FileShare", "CNA_SeekOrigin", "CNA_TextureDataType", "CNA_TextureImageFormat", "CNA_BufferUsage", "CNA_IndexElementSize", "CNA_SetDataOptions", "CNA_ClearOptions", "CNA_PrimitiveType", "CNA_UserVertexSource", "CNA_VertexElementFormat", "CNA_VertexElementUsage", "CNA_VertexType", "CNA_Blend", "CNA_BlendFunction", "CNA_ColorWriteChannels", "CNA_CompareFunction", "CNA_StencilOperation", "CNA_CullMode", "CNA_FillMode", "CNA_TextureAddressMode", "CNA_TextureFilter", "CNA_EffectParameterClass", "CNA_EffectParameterType", "CNA_EffectValueType", "CNA_EffectTextureType", "CNA_AudioChannels", "CNA_SoundState", "CNA_AudioStopOptions", "CNA_MicrophoneState", "CNA_AudioEventRegistrationHandle", "CNA_MediaState", "CNA_MediaSourceType", "CNA_VideoSoundtrackType", "CNA_MediaPlayerEventRegistrationHandle", "CNA_GamerPresenceMode", "CNA_NotificationPosition", "CNA_GamerZone", "CNA_LeaderboardKey", "CNA_LeaderboardOutcome", "CNA_MessageBoxIcon", "CNA_ControllerSensitivity", "CNA_GameDifficulty", "CNA_GamerPrivilegeSetting", "CNA_RacingCameraAngle", "CNA_AvatarBodyType", "CNA_AvatarRendererState", "CNA_AvatarEyebrow", "CNA_AvatarEye", "CNA_AvatarMouth", "CNA_AvatarAnimationPreset", "CNA_AvatarBone", "CNA_PropertyValueKind", "CNA_NetworkSessionEndReason", "CNA_NetworkSessionJoinError", "CNA_NetworkSessionState", "CNA_NetworkSessionType", "CNA_SendDataOptions", "CNA_NetworkEventType", "CNA_SignedInGamerHandle", "CNA_GamerHandle", "CNA_GamerProfileHandle", "CNA_GamerCollectionHandle", "CNA_GamerEnumeratorHandle", "CNA_AchievementHandle", "CNA_AchievementCollectionHandle", "CNA_PropertyDictionaryHandle", "CNA_LeaderboardReaderHandle", "CNA_LeaderboardEntryHandle", "CNA_AvatarDescriptionHandle", "CNA_AvatarAnimationHandle", "CNA_AvatarRendererHandle", "CNA_NetworkSessionPropertiesHandle", "CNA_NetworkSessionPropertyEnumeratorHandle", "CNA_PacketWriterHandle", "CNA_PacketReaderHandle", "CNA_NetworkGamerHandle", "CNA_NetworkMachineHandle", "CNA_AvailableNetworkSessionHandle", "CNA_AvailableNetworkSessionCollectionHandle", "CNA_NetworkSessionHandle", "CNA_NetworkSessionEventRegistrationHandle", "CNA_RenderPipelineHandle", "CNA_ShadowMapHandle", "CNA_PostProcessPassHandle", "CNA_PostProcessChainHandle", "CNA_RenderTargetPoolHandle", "CNA_GpuTimerHandle", "CNA_ParticleSystemHandle", "CNA_StorageBufferHandle", "CNA_ComputeShaderHandle", "CNA_GraphicsImageAccess", "CNA_GraphicsMemoryBarrier"],
   "constants": [
     "CNA_GAMER_PRESENCE_MODE_NONE", "CNA_GAMER_PRESENCE_MODE_SINGLE_PLAYER", "CNA_GAMER_PRESENCE_MODE_MULTIPLAYER", "CNA_GAMER_PRESENCE_MODE_LOCAL_CO_OP",
     "CNA_GAMER_PRESENCE_MODE_LOCAL_VERSUS", "CNA_GAMER_PRESENCE_MODE_ONLINE_CO_OP", "CNA_GAMER_PRESENCE_MODE_ONLINE_VERSUS", "CNA_GAMER_PRESENCE_MODE_VERSUS_COMPUTER",
@@ -2102,7 +2125,7 @@
     "CNA_CNB_MATERIAL_TEXTURE_MAXIMUM",
     "CNA_POWER_STATE_ERROR", "CNA_POWER_STATE_UNKNOWN", "CNA_POWER_STATE_ON_BATTERY",
     "CNA_POWER_STATE_NO_BATTERY", "CNA_POWER_STATE_CHARGING", "CNA_POWER_STATE_CHARGED"
-  ],
+  , "CNA_GRAPHICS_MEMORY_BARRIER_NONE", "CNA_GRAPHICS_IMAGE_ACCESS_READ_ONLY", "CNA_GRAPHICS_IMAGE_ACCESS_WRITE_ONLY", "CNA_GRAPHICS_IMAGE_ACCESS_READ_WRITE", "CNA_GRAPHICS_MEMORY_BARRIER_VERTEX_ATTRIB_ARRAY", "CNA_GRAPHICS_MEMORY_BARRIER_ELEMENT_ARRAY", "CNA_GRAPHICS_MEMORY_BARRIER_UNIFORM", "CNA_GRAPHICS_MEMORY_BARRIER_TEXTURE_FETCH", "CNA_GRAPHICS_MEMORY_BARRIER_SHADER_IMAGE_ACCESS", "CNA_GRAPHICS_MEMORY_BARRIER_SHADER_STORAGE", "CNA_GRAPHICS_MEMORY_BARRIER_BUFFER_UPDATE", "CNA_GRAPHICS_MEMORY_BARRIER_FRAMEBUFFER", "CNA_GRAPHICS_MEMORY_BARRIER_INDIRECT_COMMAND", "CNA_GRAPHICS_MEMORY_BARRIER_ALL"],
   "callbackSignatures": {
     "CNA_InputDeviceHotplugCallback": {
       "cReturn": "void",

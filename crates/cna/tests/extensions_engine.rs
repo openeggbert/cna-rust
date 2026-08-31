@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use cna::extensions::engine::{
     supports_shadow_sampling, DirectionalLight, FxaaPass, GpuTimer, Particle,
     ParticleEmitterSettings, ParticleSystem, PostProcessChain, PostProcessContext, PostProcessPass,
-    RenderPipeline, ShadowMap, TonemapPass,
+    ComputeShader, MemoryBarrier, RenderPipeline, ShadowMap, StorageBuffer, TonemapPass,
 };
 use cna::extensions::graphics::EffectFactoryExt;
 use cna::extensions::pbr::{
@@ -1779,4 +1779,247 @@ fn the_cpu_and_gpu_particle_paths_are_one_simulation() {
         worst < 1e-3,
         "the CPU and GPU paths produce the same particles; worst difference {worst}"
     );
+}
+
+/// A compute shader with one deterministic answer.
+///
+/// Each invocation reads its own slot, multiplies by a uniform and adds its own
+/// index. There is no reduction, no shared memory and no ordering, so the exact
+/// output is a closed form the test computes itself -- which is the difference
+/// between checking that a dispatch happened and checking what it computed.
+const DOUBLE_AND_INDEX_GLSL: &str = "#version 310 es\n\
+layout(local_size_x = 8) in;\n\
+layout(std430, binding = 0) buffer Values { int values[]; };\n\
+uniform int uFactor;\n\
+void main() {\n\
+    uint index = gl_GlobalInvocationID.x;\n\
+    if (index >= uint(values.length())) { return; }\n\
+    values[index] = values[index] * uFactor + int(index);\n\
+}\n";
+
+/// What a compute run measured.
+#[derive(Default)]
+struct ComputeFindings {
+    engine_layer: i32,
+    barrier_contains_self: Option<bool>,
+    barrier_all_contains_storage: Option<bool>,
+    barrier_storage_contains_all: Option<bool>,
+    byte_buffer_size: u64,
+    byte_round_trip: Option<Vec<u8>>,
+    element_count: u64,
+    element_byte_size: u64,
+    element_round_trip: Option<Vec<i32>>,
+    oversized_upload_refused: Option<String>,
+    wrong_element_size_refused: Option<String>,
+    shader_valid: Option<bool>,
+    shader_compile_error: String,
+    broken_shader_valid: Option<bool>,
+    broken_shader_error: String,
+    dispatched: Option<std::result::Result<Vec<i32>, String>>,
+    image_binding_supported: Option<bool>,
+}
+
+struct ComputeGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<ComputeFindings>>,
+}
+
+impl GameStateAccess for ComputeGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for ComputeGame {
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+
+        // The barrier mask is CNA's, so the containment test is asked of it.
+        {
+            let mut findings = self.findings.lock().expect("findings");
+            findings.barrier_contains_self =
+                Some(MemoryBarrier::SHADER_STORAGE.contains(MemoryBarrier::SHADER_STORAGE)?);
+            findings.barrier_all_contains_storage =
+                Some(MemoryBarrier::ALL.contains(MemoryBarrier::SHADER_STORAGE)?);
+            findings.barrier_storage_contains_all =
+                Some(MemoryBarrier::SHADER_STORAGE.contains(MemoryBarrier::ALL)?);
+        }
+
+        // A flat byte buffer round-trips its bytes.
+        let bytes = StorageBuffer::with_byte_size(&device, 16)?;
+        let payload: Vec<u8> = (0..16_u8).collect();
+        bytes.set_bytes(&payload)?;
+        let mut read = vec![0_u8; 16];
+        bytes.get_bytes(&mut read)?;
+        {
+            let mut findings = self.findings.lock().expect("findings");
+            findings.byte_buffer_size = bytes.byte_size()?;
+            findings.byte_round_trip = Some(read);
+        }
+
+        // A typed buffer remembers both numbers, which is what lets it refuse
+        // an overlong upload and a mismatched element size instead of quietly
+        // reinterpreting the bytes.
+        let values = Arc::new(StorageBuffer::with_elements::<i32>(&device, 16)?);
+        let input: Vec<i32> = (0..16_i32).map(|index| index + 1).collect();
+        values.set_elements(&input)?;
+        let mut back = vec![0_i32; 16];
+        values.get_elements(&mut back)?;
+        {
+            let mut findings = self.findings.lock().expect("findings");
+            findings.element_count = values.element_count()?;
+            findings.element_byte_size = values.element_byte_size()?;
+            findings.element_round_trip = Some(back);
+            findings.oversized_upload_refused = values
+                .set_elements(&vec![0_i32; 17])
+                .err()
+                .map(|error| error.to_string());
+            findings.wrong_element_size_refused = values
+                .set_elements(&vec![0_i16; 16])
+                .err()
+                .map(|error| error.to_string());
+        }
+
+        // A source that cannot compile is refused at creation, with the
+        // compiler's own diagnostic in the failure. Measuring that here is what
+        // keeps `is_valid` honest: it describes a shader that was created, and
+        // a caller does not get one that silently does nothing.
+        let broken =
+            ComputeShader::new(&device, "#version 310 es\nvoid main() { not_a_function(); }\n");
+        {
+            let mut findings = self.findings.lock().expect("findings");
+            findings.broken_shader_valid = Some(broken.is_ok());
+            findings.broken_shader_error = match broken {
+                Ok(_) => String::new(),
+                Err(error) => error.to_string(),
+            };
+        }
+
+        let mut shader = ComputeShader::new(&device, DOUBLE_AND_INDEX_GLSL)?;
+        let valid = shader.is_valid()?;
+        {
+            let mut findings = self.findings.lock().expect("findings");
+            findings.shader_valid = Some(valid);
+            findings.shader_compile_error = shader.compile_error()?;
+            findings.image_binding_supported = Some(shader.is_image_binding_supported()?);
+        }
+        if !valid {
+            return Ok(());
+        }
+
+        shader.bind_storage_buffer(0, &values)?;
+        shader.set_uniform_int("uFactor", 3)?;
+        shader.dispatch(2, 1, 1)?;
+        shader.barrier(MemoryBarrier::SHADER_STORAGE | MemoryBarrier::BUFFER_UPDATE)?;
+        let mut computed = vec![0_i32; 16];
+        self.findings.lock().expect("findings").dispatched =
+            Some(match values.get_elements(&mut computed) {
+                Ok(()) => Ok(computed),
+                Err(error) => Err(error.to_string()),
+            });
+        Ok(())
+    }
+}
+
+#[test]
+fn a_compute_dispatch_produces_the_exact_values_it_was_asked_for() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(ComputeFindings::default()));
+    let game = ComputeGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with a compute dispatch");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+
+    // A mask contains itself and is contained by ALL, and the reverse is false.
+    // The third assertion is the one that matters: a containment test that
+    // always answered true would pass the first two.
+    assert_eq!(findings.barrier_contains_self, Some(true));
+    assert_eq!(findings.barrier_all_contains_storage, Some(true));
+    assert_eq!(
+        findings.barrier_storage_contains_all,
+        Some(false),
+        "one bit does not contain every bit"
+    );
+
+    assert_eq!(findings.byte_buffer_size, 16, "the buffer is the size asked");
+    assert_eq!(
+        findings.byte_round_trip.as_deref(),
+        Some((0..16_u8).collect::<Vec<u8>>().as_slice()),
+        "a byte buffer round-trips its bytes"
+    );
+
+    assert_eq!(findings.element_count, 16, "the element count is remembered");
+    assert_eq!(
+        findings.element_byte_size, 4,
+        "and so is the element size, which is what makes a mismatch detectable"
+    );
+    assert_eq!(
+        findings.element_round_trip.as_deref(),
+        Some((1..=16_i32).collect::<Vec<i32>>().as_slice()),
+        "a typed buffer round-trips its elements"
+    );
+    assert!(
+        findings.oversized_upload_refused.is_some(),
+        "seventeen elements into a sixteen-element buffer is refused"
+    );
+    assert!(
+        findings.wrong_element_size_refused.is_some(),
+        "a two-byte element into a four-byte buffer is refused rather than reinterpreted"
+    );
+
+    assert_eq!(
+        findings.broken_shader_valid,
+        Some(false),
+        "a source that cannot compile is refused rather than producing a shader that does nothing"
+    );
+    assert!(
+        findings.broken_shader_error.contains("did not compile"),
+        "and the failure carries the compiler's own diagnostic: {:?}",
+        findings.broken_shader_error
+    );
+
+    match findings.shader_valid {
+        Some(true) => {
+            assert!(
+                findings.shader_compile_error.is_empty(),
+                "a shader that compiled has no compile error: {:?}",
+                findings.shader_compile_error
+            );
+            // The dispatch's whole answer, computed here from the same closed
+            // form the shader implements: value * 3 + index over sixteen slots
+            // across two groups of eight.
+            let expected: Vec<i32> = (0..16_i32).map(|index| (index + 1) * 3 + index).collect();
+            match findings.dispatched.as_ref() {
+                Some(Ok(actual)) => assert_eq!(
+                    actual, &expected,
+                    "the dispatch computed value * 3 + index for every slot"
+                ),
+                Some(Err(reason)) => panic!("the readback after a dispatch failed: {reason}"),
+                None => panic!("the dispatch never ran"),
+            }
+            println!(
+                "compute: dispatch verified over 16 elements; image binding supported = {:?}",
+                findings.image_binding_supported
+            );
+        }
+        Some(false) => println!(
+            "this renderer did not compile the compute shader: {}",
+            findings.shader_compile_error
+        ),
+        None => panic!("the shader was never created"),
+    }
 }
