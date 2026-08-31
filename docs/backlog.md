@@ -78,7 +78,7 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-ABI-013 | Gate that both acquisition modes declare the same routes | `tools/native-abi/verify.py` | DONE |
 | RUST-EXT-009 | Sensors: accelerometer, compass, gyroscope | `sensors.h`, `input_devices.h` | DONE, real readings `HARDWARE_PENDING` |
 | RUST-EXT-010a | Engine layer: render-pipeline settings, presets, normalization, text | `engine_layer.h` | DONE |
-| RUST-EXT-010b | Further engine-layer slices: render-target pool, shadow maps, particles, decals, GPU timers | `engine_layer.h` | READY |
+| RUST-EXT-010b | The other 848 engine-layer routes across 224 families | `engine_layer.h` | **scoped**: reachable on this artifact -- every engine object constructs -- but a headless device renders nothing, so their semantics cannot be asserted beyond "it returned success". A slice qualifies when its semantics can be asserted exactly; a GPU-backed artifact is the trigger. See [docs/engine-layer-scope.md](engine-layer-scope.md) | PRODUCT_DECISION_REQUIRED |
 
 ## Platform and packaging
 
