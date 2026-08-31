@@ -18,7 +18,9 @@ use cna::extensions::engine::{
     ColorGradePass, ComputeShader, ContactShadowPass, DecalPass, DepthOfFieldPass, FilmGrainPass,
     FullscreenPass, HeightFogPass, LensFlarePass, LightShaftPass, LutInterpolation, MemoryBarrier,
     MotionBlurPass, RenderPipeline, ScopedRenderTarget, ShadowMap, Skybox, SpatialUpscalePass,
-    SsaoPass, SsrPass, StorageBuffer, TonemapPass, VolumetricFogPass,
+    CascadedShadowMap, CubeShadowMap, PointLight, PunctualLight, PunctualLightKind,
+    ShadowCascadeState, SpotLight, SpotShadowMap, SsaoPass, SsrPass, StorageBuffer, TonemapPass,
+    VolumetricFogPass,
 };
 use cna::extensions::graphics::EffectFactoryExt;
 use cna::extensions::pbr::{
@@ -2869,5 +2871,338 @@ fn the_screen_space_passes_carry_their_knobs_and_compute_their_curves() {
         findings.round_trips.len(),
         findings.supported,
         findings.glsl_bytes
+    );
+}
+
+/// What the shadow-variant run measured.
+#[derive(Default)]
+struct VariantFindings {
+    engine_layer: i32,
+    spot_supported: bool,
+    spot_size: i32,
+    spot_position: Option<(f32, f32, f32)>,
+    spot_range: f32,
+    spot_view_projection_matches: Option<bool>,
+    cube_supported: bool,
+    cube_size: i32,
+    cube_size_for_quality: i32,
+    cube_position: Option<(f32, f32, f32)>,
+    cube_face_views: Vec<(f32, f32, f32)>,
+    cube_face_projection_symmetric: Option<bool>,
+    cascade_supported: bool,
+    cascade_count: i32,
+    cascade_size: i32,
+    split_distances: Vec<f32>,
+    selected: Vec<(f32, i32)>,
+    frustum_corners: Vec<(f32, f32, f32)>,
+    bounding_radius: f32,
+    snap_moved: Option<(f32, f32)>,
+    cascade_state_defaults: Option<(i32, f32, bool)>,
+    punctual_defaults: Option<(PunctualLightKind, bool, bool)>,
+    round_trips: Vec<(&'static str, f32, f32)>,
+}
+
+struct VariantGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<VariantFindings>>,
+}
+
+impl GameStateAccess for VariantGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for VariantGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+        let mut findings = VariantFindings {
+            engine_layer: version,
+            ..VariantFindings::default()
+        };
+
+        // Pure values first.
+        let state = ShadowCascadeState::canonical_defaults()?;
+        findings.cascade_state_defaults = Some((state.count, state.blend_band, state.debug_tint));
+        let punctual = PunctualLight::canonical_defaults()?;
+        findings.punctual_defaults = Some((
+            punctual.kind,
+            punctual.has_shadow_cube,
+            punctual.has_shadow_map,
+        ));
+
+        // A spot light's shadow transform is a pure function of the light, and
+        // the map must cast from exactly that. Comparing them is what catches a
+        // map casting from a frustum the caller cannot predict.
+        let mut light = SpotLight::canonical_defaults()?;
+        light.position = Vector3::from_x_and_y_and_z(2.0, 6.0, -3.0);
+        light.direction = Vector3::from_x_and_y_and_z(0.0, -1.0, 0.0);
+        light.range = 25.0;
+        light.inner_angle = 0.3;
+        light.outer_angle = 0.6;
+
+        let spot = SpotShadowMap::new(&device, ShadowQuality::Medium)?;
+        findings.spot_supported = spot.is_supported()?;
+        findings.spot_size = spot.size()?;
+        spot.set_depth_bias(0.0015)?;
+        findings
+            .round_trips
+            .push(("spot.depth_bias", 0.0015, spot.depth_bias()?));
+        spot.begin(light)?;
+        spot.end()?;
+        let position = spot.light_position()?;
+        findings.spot_position = Some((position.X, position.Y, position.Z));
+        findings.spot_range = spot.light_range()?;
+        let expected = light.compute_light_view()? * light.compute_light_projection()?;
+        findings.spot_view_projection_matches = Some(spot.light_view_projection()? == expected);
+
+        let mut point = PointLight::canonical_defaults()?;
+        point.position = Vector3::from_x_and_y_and_z(-1.0, 3.0, 4.0);
+        point.range = 12.0;
+
+        let cube = CubeShadowMap::new(&device, ShadowQuality::Low)?;
+        findings.cube_supported = cube.is_supported()?;
+        findings.cube_size = cube.size()?;
+        findings.cube_size_for_quality = CubeShadowMap::size_for_quality(ShadowQuality::Low)?;
+        cube.set_depth_bias(0.002)?;
+        findings
+            .round_trips
+            .push(("cube.depth_bias", 0.002, cube.depth_bias()?));
+        cube.update(point)?;
+        let position = cube.light_position()?;
+        findings.cube_position = Some((position.X, position.Y, position.Z));
+        findings
+            .round_trips
+            .push(("cube.light_range", 12.0, cube.light_range()?));
+
+        // The six face views must look six different ways. Transforming the
+        // same world point through each and collecting the results is how a
+        // table that had collapsed to one face shows up.
+        for face in 0..6 {
+            let view = CubeShadowMap::compute_face_view(face, point.position)?;
+            // An asymmetric offset, so no two faces can map it to the same
+            // view-space point: a probe along one axis alone would collide on
+            // the four faces perpendicular to it and prove nothing.
+            let seen = Vector3::Transform(
+                Vector3::from_x_and_y_and_z(
+                    point.position.X + 0.3,
+                    point.position.Y + 0.7,
+                    point.position.Z + 1.1,
+                ),
+                view,
+            );
+            findings.cube_face_views.push((seen.X, seen.Y, seen.Z));
+        }
+        let projection = CubeShadowMap::compute_face_projection(point.range)?;
+        findings.cube_face_projection_symmetric = Some(
+            (projection.M11 - projection.M22).abs() < 1e-5
+                && projection.M12.abs() < 1e-6
+                && projection.M21.abs() < 1e-6,
+        );
+
+        let cascaded = CascadedShadowMap::new(&device, ShadowQuality::Medium, 4)?;
+        findings.cascade_supported = cascaded.is_supported()?;
+        findings.cascade_count = cascaded.cascade_count()?;
+        findings.cascade_size = cascaded.cascade_size()?;
+        cascaded.set_split_lambda(0.75)?;
+        cascaded.set_blend_band(0.15)?;
+        cascaded.set_debug_tint_enabled(true)?;
+        findings
+            .round_trips
+            .push(("cascade.split_lambda", 0.75, cascaded.split_lambda()?));
+        findings
+            .round_trips
+            .push(("cascade.blend_band", 0.15, cascaded.blend_band()?));
+        findings.round_trips.push((
+            "cascade.debug_tint",
+            1.0,
+            f32::from(u8::from(cascaded.is_debug_tint_enabled()?)),
+        ));
+
+        let sun = DirectionalLight::canonical_defaults()?;
+        let camera_view = Matrix::CreateLookAt(
+            Vector3::from_x_and_y_and_z(0.0, 2.0, 10.0),
+            Vector3::Zero,
+            Vector3::Up,
+        );
+        let camera_projection =
+            Matrix::CreatePerspectiveFieldOfView(1.0, 16.0 / 9.0, 0.5, 200.0);
+        cascaded.update(sun, camera_view, camera_projection)?;
+        for index in 0..cascaded.cascade_count()? {
+            findings.split_distances.push(cascaded.split_distance(index)?);
+        }
+        for depth in [0.0_f32, 1.0, 20.0, 150.0, 500.0] {
+            findings.selected.push((depth, cascaded.select_cascade(depth)?));
+        }
+
+        let corners = CascadedShadowMap::compute_frustum_corners(camera_view, camera_projection)?;
+        findings.frustum_corners = corners.iter().map(|c| (c.X, c.Y, c.Z)).collect();
+        let (centre, radius) = CascadedShadowMap::compute_bounding_sphere(&corners)?;
+        findings.bounding_radius = radius;
+        let snapped = CascadedShadowMap::snap_to_texel_grid(centre, radius, 1024)?;
+        findings.snap_moved = Some((
+            (snapped.X - centre.X).abs(),
+            2.0 * radius / 1024.0,
+        ));
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+fn the_shadow_map_variants_cast_from_the_transforms_they_publish() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(VariantFindings::default()));
+    let game = VariantGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with three shadow-map variants");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+
+    for (label, expected, actual) in &findings.round_trips {
+        assert!(
+            (expected - actual).abs() < 1e-5,
+            "{label} round-trips: set {expected}, read {actual}"
+        );
+    }
+
+    // A spot map casts from exactly the composition of the two pure functions,
+    // and remembers the light it was opened for.
+    assert_eq!(
+        findings.spot_position,
+        Some((2.0, 6.0, -3.0)),
+        "the map remembers where its light was"
+    );
+    assert!(
+        (findings.spot_range - 25.0).abs() < 1e-5,
+        "and how far it reached: {}",
+        findings.spot_range
+    );
+    assert_eq!(
+        findings.spot_view_projection_matches,
+        Some(true),
+        "the spot map casts from the transform its own pure functions compute"
+    );
+    assert!(
+        u32::try_from(findings.spot_size).is_ok_and(u32::is_power_of_two),
+        "the spot map is a power-of-two square: {}",
+        findings.spot_size
+    );
+
+    assert_eq!(
+        findings.cube_position,
+        Some((-1.0, 3.0, 4.0)),
+        "the cube remembers where its light was"
+    );
+    assert_eq!(
+        findings.cube_size, findings.cube_size_for_quality,
+        "the cube's size is the one its preset selects"
+    );
+    // Six faces, six different views of one point.
+    println!("cube face views: {:?}", findings.cube_face_views);
+    let distinct: std::collections::BTreeSet<(u32, u32, u32)> = findings
+        .cube_face_views
+        .iter()
+        .map(|(x, y, z)| (x.to_bits(), y.to_bits(), z.to_bits()))
+        .collect();
+    assert_eq!(
+        distinct.len(),
+        6,
+        "the six cube faces look six different ways: {:?}",
+        findings.cube_face_views
+    );
+    assert_eq!(
+        findings.cube_face_projection_symmetric,
+        Some(true),
+        "a cube face's projection is the square ninety-degree frustum it has to be"
+    );
+
+    // Four cascades, strictly increasing splits, and a depth lands in the
+    // cascade its split covers.
+    assert_eq!(findings.cascade_count, 4, "four cascades were allocated");
+    assert!(
+        findings.cascade_size > 0,
+        "each cascade has a size: {}",
+        findings.cascade_size
+    );
+    println!("cascade splits: {:?}", findings.split_distances);
+    assert_eq!(findings.split_distances.len(), 4, "one split per cascade");
+    assert!(
+        findings
+            .split_distances
+            .windows(2)
+            .all(|pair| pair[0] < pair[1]),
+        "the splits strictly increase: {:?}",
+        findings.split_distances
+    );
+    println!("cascade selection: {:?}", findings.selected);
+    for (depth, index) in &findings.selected {
+        assert!(
+            (0..findings.cascade_count).contains(index),
+            "every depth lands in a real cascade: {depth} -> {index}"
+        );
+        let expected = findings
+            .split_distances
+            .iter()
+            .position(|split| depth <= split)
+            .unwrap_or(findings.split_distances.len() - 1);
+        assert_eq!(
+            *index as usize, expected,
+            "a depth lands in the first cascade whose split covers it: {depth} -> {index}"
+        );
+    }
+
+    // Eight corners, a sphere that encloses them, and a snap that moves the
+    // centre by less than one texel of the map it snaps to.
+    assert_eq!(findings.frustum_corners.len(), 8, "a frustum has eight corners");
+    assert!(
+        findings.bounding_radius > 0.0,
+        "the enclosing sphere has a radius: {}",
+        findings.bounding_radius
+    );
+    let (moved, texel) = findings.snap_moved.expect("a snapped centre");
+    assert!(
+        moved <= texel + 1e-4,
+        "snapping moves the centre by at most one texel: moved {moved}, texel {texel}"
+    );
+
+    let (count, blend, tint) = findings
+        .cascade_state_defaults
+        .expect("the cascade state defaults");
+    assert!(
+        count >= 0 && blend >= 0.0 && !tint,
+        "CNA's cascade-state defaults are a real, untinted starting state: {count}, {blend}, {tint}"
+    );
+    assert_eq!(
+        findings.punctual_defaults,
+        Some((PunctualLightKind::None, false, false)),
+        "a default punctual light is no light with no shadow resources"
+    );
+
+    println!(
+        "shadow variants: spot supported={} size={} | cube supported={} size={} | \
+         cascaded supported={} count={} size={}",
+        findings.spot_supported,
+        findings.spot_size,
+        findings.cube_supported,
+        findings.cube_size,
+        findings.cascade_supported,
+        findings.cascade_count,
+        findings.cascade_size,
     );
 }

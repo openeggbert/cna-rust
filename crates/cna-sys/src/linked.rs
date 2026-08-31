@@ -7776,4 +7776,239 @@ extern "C" {
         argument0: CNA_PostProcessPassHandle,
         argument1: f32,
     ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_apply_to_receiver(
+        argument0: CNA_CascadedShadowMapHandle,
+        argument1: CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_begin(
+        argument0: CNA_CascadedShadowMapHandle,
+        argument1: i32,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_compute_bounding_sphere(
+        argument0: *const CNA_Vector3,
+        argument1: *mut CNA_Vector3,
+        argument2: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_compute_frustum_corners(
+        argument0: *const CNA_Matrix,
+        argument1: *const CNA_Matrix,
+        argument2: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_compute_split_distances(
+        argument0: f32,
+        argument1: f32,
+        argument2: i32,
+        argument3: f32,
+        argument4: *mut f32,
+        argument5: u64,
+        argument6: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_create(
+        argument0: CNA_Handle,
+        argument1: CNA_ShadowQuality,
+        argument2: i32,
+        argument3: *mut CNA_CascadedShadowMapHandle,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_destroy(argument0: CNA_CascadedShadowMapHandle) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_end(argument0: CNA_CascadedShadowMapHandle) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_get_blend_band(
+        argument0: CNA_CascadedShadowMapHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_get_cascade_count(
+        argument0: CNA_CascadedShadowMapHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_get_cascade_matrix(
+        argument0: CNA_CascadedShadowMapHandle,
+        argument1: i32,
+        argument2: *mut CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_get_cascade_size(
+        argument0: CNA_CascadedShadowMapHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_get_caster_effect(
+        argument0: CNA_CascadedShadowMapHandle,
+        argument1: *mut CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_get_shadow_texture(
+        argument0: CNA_CascadedShadowMapHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_get_split_distance(
+        argument0: CNA_CascadedShadowMapHandle,
+        argument1: i32,
+        argument2: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_get_split_lambda(
+        argument0: CNA_CascadedShadowMapHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_is_debug_tint_enabled(
+        argument0: CNA_CascadedShadowMapHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_is_supported(
+        argument0: CNA_CascadedShadowMapHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_select_cascade(
+        argument0: CNA_CascadedShadowMapHandle,
+        argument1: f32,
+        argument2: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_set_blend_band(
+        argument0: CNA_CascadedShadowMapHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_set_debug_tint_enabled(
+        argument0: CNA_CascadedShadowMapHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_set_split_lambda(
+        argument0: CNA_CascadedShadowMapHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_snap_to_texel_grid(
+        argument0: *const CNA_Vector3,
+        argument1: f32,
+        argument2: i32,
+        argument3: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_cascaded_shadow_map_update(
+        argument0: CNA_CascadedShadowMapHandle,
+        argument1: *const CNA_DirectionalLightEXT,
+        argument2: *const CNA_Matrix,
+        argument3: *const CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_cube_shadow_map_begin(
+        argument0: CNA_CubeShadowMapHandle,
+        argument1: i32,
+    ) -> CNA_Result;
+    pub fn cna_cube_shadow_map_compute_face_projection(
+        argument0: f32,
+        argument1: *mut CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_cube_shadow_map_compute_face_view(
+        argument0: CNA_CubeMapFace,
+        argument1: *const CNA_Vector3,
+        argument2: *mut CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_cube_shadow_map_create(
+        argument0: CNA_Handle,
+        argument1: CNA_ShadowQuality,
+        argument2: *mut CNA_CubeShadowMapHandle,
+    ) -> CNA_Result;
+    pub fn cna_cube_shadow_map_destroy(argument0: CNA_CubeShadowMapHandle) -> CNA_Result;
+    pub fn cna_cube_shadow_map_end(argument0: CNA_CubeShadowMapHandle) -> CNA_Result;
+    pub fn cna_cube_shadow_map_get_caster_effect(
+        argument0: CNA_CubeShadowMapHandle,
+        argument1: *mut CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_cube_shadow_map_get_depth_bias(
+        argument0: CNA_CubeShadowMapHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_cube_shadow_map_get_light_position(
+        argument0: CNA_CubeShadowMapHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_cube_shadow_map_get_light_range(
+        argument0: CNA_CubeShadowMapHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_cube_shadow_map_get_quality(
+        argument0: CNA_CubeShadowMapHandle,
+        argument1: *mut CNA_ShadowQuality,
+    ) -> CNA_Result;
+    pub fn cna_cube_shadow_map_get_shadow_texture(
+        argument0: CNA_CubeShadowMapHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_cube_shadow_map_get_size(
+        argument0: CNA_CubeShadowMapHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_cube_shadow_map_is_supported(
+        argument0: CNA_CubeShadowMapHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_cube_shadow_map_set_depth_bias(
+        argument0: CNA_CubeShadowMapHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_cube_shadow_map_size_for_quality(
+        argument0: CNA_ShadowQuality,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_cube_shadow_map_update(
+        argument0: CNA_CubeShadowMapHandle,
+        argument1: *const CNA_PointLightEXT,
+    ) -> CNA_Result;
+    pub fn cna_shadow_cascade_state_ext_init(
+        argument0: *mut CNA_ShadowCascadeStateEXT,
+    ) -> CNA_Result;
+    pub fn cna_spot_shadow_map_begin(
+        argument0: CNA_SpotShadowMapHandle,
+        argument1: *const CNA_SpotLightEXT,
+    ) -> CNA_Result;
+    pub fn cna_spot_shadow_map_compute_light_projection(
+        argument0: *const CNA_SpotLightEXT,
+        argument1: *mut CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_spot_shadow_map_compute_light_view(
+        argument0: *const CNA_SpotLightEXT,
+        argument1: *mut CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_spot_shadow_map_create(
+        argument0: CNA_Handle,
+        argument1: CNA_ShadowQuality,
+        argument2: *mut CNA_SpotShadowMapHandle,
+    ) -> CNA_Result;
+    pub fn cna_spot_shadow_map_destroy(argument0: CNA_SpotShadowMapHandle) -> CNA_Result;
+    pub fn cna_spot_shadow_map_end(argument0: CNA_SpotShadowMapHandle) -> CNA_Result;
+    pub fn cna_spot_shadow_map_get_caster_effect(
+        argument0: CNA_SpotShadowMapHandle,
+        argument1: *mut CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_spot_shadow_map_get_depth_bias(
+        argument0: CNA_SpotShadowMapHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_spot_shadow_map_get_light_position(
+        argument0: CNA_SpotShadowMapHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_spot_shadow_map_get_light_range(
+        argument0: CNA_SpotShadowMapHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_spot_shadow_map_get_light_view_projection(
+        argument0: CNA_SpotShadowMapHandle,
+        argument1: *mut CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_spot_shadow_map_get_quality(
+        argument0: CNA_SpotShadowMapHandle,
+        argument1: *mut CNA_ShadowQuality,
+    ) -> CNA_Result;
+    pub fn cna_spot_shadow_map_get_shadow_texture(
+        argument0: CNA_SpotShadowMapHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_spot_shadow_map_get_size(
+        argument0: CNA_SpotShadowMapHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_spot_shadow_map_is_supported(
+        argument0: CNA_SpotShadowMapHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_spot_shadow_map_set_depth_bias(
+        argument0: CNA_SpotShadowMapHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_point_light_ext_init(argument0: *mut CNA_PointLightEXT) -> CNA_Result;
+    pub fn cna_spot_light_ext_init(argument0: *mut CNA_SpotLightEXT) -> CNA_Result;
+    pub fn cna_punctual_light_ext_init(argument0: *mut CNA_PunctualLightEXT) -> CNA_Result;
 }

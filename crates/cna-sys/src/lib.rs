@@ -768,6 +768,93 @@ pub type CNA_AtmosphericSkyHandle = CNA_Handle;
 pub type CNA_FullscreenPassHandle = CNA_Handle;
 pub type CNA_ScopedRenderTargetHandle = CNA_Handle;
 pub type CNA_SpatialUpscalePassHandle = CNA_Handle;
+pub type CNA_SpotShadowMapHandle = CNA_Handle;
+pub type CNA_CubeShadowMapHandle = CNA_Handle;
+pub type CNA_CascadedShadowMapHandle = CNA_Handle;
+pub type CNA_PunctualLightKindEXT = u32;
+
+pub const CNA_PUNCTUAL_LIGHT_KIND_EXT_NONE: CNA_PunctualLightKindEXT = 0;
+pub const CNA_PUNCTUAL_LIGHT_KIND_EXT_POINT: CNA_PunctualLightKindEXT = 1;
+pub const CNA_PUNCTUAL_LIGHT_KIND_EXT_SPOT: CNA_PunctualLightKindEXT = 2;
+pub const CNA_SHADOW_CASCADE_MAX_EXT: i32 = 4;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_PointLightEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub position: CNA_Vector3,
+    pub color: CNA_Vector3,
+    pub intensity: f32,
+    pub range: f32,
+    pub casts_shadows: CNA_Bool,
+    pub reserved: [u8; 3],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_SpotLightEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub position: CNA_Vector3,
+    pub direction: CNA_Vector3,
+    pub color: CNA_Vector3,
+    pub intensity: f32,
+    pub range: f32,
+    pub inner_angle: f32,
+    pub outer_angle: f32,
+    pub casts_shadows: CNA_Bool,
+    pub reserved: [u8; 3],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_PunctualLightEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub kind: CNA_PunctualLightKindEXT,
+    pub reserved: u32,
+    pub position: CNA_Vector3,
+    pub direction: CNA_Vector3,
+    pub diffuse_color: CNA_Vector3,
+    pub range: f32,
+    pub inner_angle: f32,
+    pub outer_angle: f32,
+    pub shadow_depth_bias: f32,
+    pub shadow_cube: CNA_Handle,
+    pub shadow_map: CNA_Handle,
+    pub shadow_view_projection: CNA_Matrix,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CNA_ShadowCascadeStateEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub count: i32,
+    pub blend_band: f32,
+    pub world_to_atlas: [CNA_Matrix; 4],
+    pub split_distance: [f32; 4],
+    pub camera_view: CNA_Matrix,
+    pub debug_tint: CNA_Bool,
+    pub reserved: [u8; 3],
+}
+
+impl Default for CNA_ShadowCascadeStateEXT {
+    fn default() -> Self {
+        Self {
+            struct_size: 0,
+            struct_version: 0,
+            count: 0,
+            blend_band: 0.0,
+            world_to_atlas: [CNA_Matrix::default(); 4],
+            split_distance: [0.0; 4],
+            camera_view: CNA_Matrix::default(),
+            debug_tint: CNA_FALSE,
+            reserved: [0; 3],
+        }
+    }
+}
 pub type CNA_LutInterpolation = u32;
 
 pub const CNA_LUT_INTERPOLATION_TRILINEAR: CNA_LutInterpolation = 0;
@@ -8856,4 +8943,181 @@ pub type cna_volumetric_fog_pass_set_light_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_volumetric_fog_pass_set_range_fn = unsafe extern "C" fn(
     CNA_PostProcessPassHandle, f32,
+) -> CNA_Result;
+
+// --- CNA engine layer: spot, cube and cascaded shadow maps (engine_layer.h) ---
+pub type cna_cascaded_shadow_map_apply_to_receiver_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle, CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_begin_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle, i32,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_compute_bounding_sphere_fn = unsafe extern "C" fn(
+    *const CNA_Vector3, *mut CNA_Vector3, *mut f32,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_compute_frustum_corners_fn = unsafe extern "C" fn(
+    *const CNA_Matrix, *const CNA_Matrix, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_compute_split_distances_fn = unsafe extern "C" fn(
+    f32, f32, i32, f32, *mut f32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_create_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_ShadowQuality, i32, *mut CNA_CascadedShadowMapHandle,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_destroy_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_end_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_get_blend_band_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_get_cascade_count_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_get_cascade_matrix_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle, i32, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_get_cascade_size_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_get_caster_effect_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle, *mut CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_get_shadow_texture_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_get_split_distance_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle, i32, *mut f32,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_get_split_lambda_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_is_debug_tint_enabled_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_is_supported_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_select_cascade_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle, f32, *mut i32,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_set_blend_band_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle, f32,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_set_debug_tint_enabled_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_set_split_lambda_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle, f32,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_snap_to_texel_grid_fn = unsafe extern "C" fn(
+    *const CNA_Vector3, f32, i32, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_cascaded_shadow_map_update_fn = unsafe extern "C" fn(
+    CNA_CascadedShadowMapHandle, *const CNA_DirectionalLightEXT, *const CNA_Matrix, *const CNA_Matrix,
+) -> CNA_Result;
+pub type cna_cube_shadow_map_begin_fn = unsafe extern "C" fn(
+    CNA_CubeShadowMapHandle, i32,
+) -> CNA_Result;
+pub type cna_cube_shadow_map_compute_face_projection_fn = unsafe extern "C" fn(
+    f32, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_cube_shadow_map_compute_face_view_fn = unsafe extern "C" fn(
+    CNA_CubeMapFace, *const CNA_Vector3, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_cube_shadow_map_create_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_ShadowQuality, *mut CNA_CubeShadowMapHandle,
+) -> CNA_Result;
+pub type cna_cube_shadow_map_destroy_fn = unsafe extern "C" fn(
+    CNA_CubeShadowMapHandle,
+) -> CNA_Result;
+pub type cna_cube_shadow_map_end_fn = unsafe extern "C" fn(CNA_CubeShadowMapHandle) -> CNA_Result;
+pub type cna_cube_shadow_map_get_caster_effect_fn = unsafe extern "C" fn(
+    CNA_CubeShadowMapHandle, *mut CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_cube_shadow_map_get_depth_bias_fn = unsafe extern "C" fn(
+    CNA_CubeShadowMapHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_cube_shadow_map_get_light_position_fn = unsafe extern "C" fn(
+    CNA_CubeShadowMapHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_cube_shadow_map_get_light_range_fn = unsafe extern "C" fn(
+    CNA_CubeShadowMapHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_cube_shadow_map_get_quality_fn = unsafe extern "C" fn(
+    CNA_CubeShadowMapHandle, *mut CNA_ShadowQuality,
+) -> CNA_Result;
+pub type cna_cube_shadow_map_get_shadow_texture_fn = unsafe extern "C" fn(
+    CNA_CubeShadowMapHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_cube_shadow_map_get_size_fn = unsafe extern "C" fn(
+    CNA_CubeShadowMapHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_cube_shadow_map_is_supported_fn = unsafe extern "C" fn(
+    CNA_CubeShadowMapHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_cube_shadow_map_set_depth_bias_fn = unsafe extern "C" fn(
+    CNA_CubeShadowMapHandle, f32,
+) -> CNA_Result;
+pub type cna_cube_shadow_map_size_for_quality_fn = unsafe extern "C" fn(
+    CNA_ShadowQuality, *mut i32,
+) -> CNA_Result;
+pub type cna_cube_shadow_map_update_fn = unsafe extern "C" fn(
+    CNA_CubeShadowMapHandle, *const CNA_PointLightEXT,
+) -> CNA_Result;
+pub type cna_shadow_cascade_state_ext_init_fn = unsafe extern "C" fn(
+    *mut CNA_ShadowCascadeStateEXT,
+) -> CNA_Result;
+pub type cna_spot_shadow_map_begin_fn = unsafe extern "C" fn(
+    CNA_SpotShadowMapHandle, *const CNA_SpotLightEXT,
+) -> CNA_Result;
+pub type cna_spot_shadow_map_compute_light_projection_fn = unsafe extern "C" fn(
+    *const CNA_SpotLightEXT, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_spot_shadow_map_compute_light_view_fn = unsafe extern "C" fn(
+    *const CNA_SpotLightEXT, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_spot_shadow_map_create_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_ShadowQuality, *mut CNA_SpotShadowMapHandle,
+) -> CNA_Result;
+pub type cna_spot_shadow_map_destroy_fn = unsafe extern "C" fn(
+    CNA_SpotShadowMapHandle,
+) -> CNA_Result;
+pub type cna_spot_shadow_map_end_fn = unsafe extern "C" fn(CNA_SpotShadowMapHandle) -> CNA_Result;
+pub type cna_spot_shadow_map_get_caster_effect_fn = unsafe extern "C" fn(
+    CNA_SpotShadowMapHandle, *mut CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_spot_shadow_map_get_depth_bias_fn = unsafe extern "C" fn(
+    CNA_SpotShadowMapHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_spot_shadow_map_get_light_position_fn = unsafe extern "C" fn(
+    CNA_SpotShadowMapHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_spot_shadow_map_get_light_range_fn = unsafe extern "C" fn(
+    CNA_SpotShadowMapHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_spot_shadow_map_get_light_view_projection_fn = unsafe extern "C" fn(
+    CNA_SpotShadowMapHandle, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_spot_shadow_map_get_quality_fn = unsafe extern "C" fn(
+    CNA_SpotShadowMapHandle, *mut CNA_ShadowQuality,
+) -> CNA_Result;
+pub type cna_spot_shadow_map_get_shadow_texture_fn = unsafe extern "C" fn(
+    CNA_SpotShadowMapHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_spot_shadow_map_get_size_fn = unsafe extern "C" fn(
+    CNA_SpotShadowMapHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_spot_shadow_map_is_supported_fn = unsafe extern "C" fn(
+    CNA_SpotShadowMapHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_spot_shadow_map_set_depth_bias_fn = unsafe extern "C" fn(
+    CNA_SpotShadowMapHandle, f32,
+) -> CNA_Result;
+pub type cna_point_light_ext_init_fn = unsafe extern "C" fn(*mut CNA_PointLightEXT) -> CNA_Result;
+pub type cna_spot_light_ext_init_fn = unsafe extern "C" fn(*mut CNA_SpotLightEXT) -> CNA_Result;
+pub type cna_punctual_light_ext_init_fn = unsafe extern "C" fn(
+    *mut CNA_PunctualLightEXT,
 ) -> CNA_Result;

@@ -5663,3 +5663,911 @@ impl Drop for ScopedRenderTarget {
         let _ = self.core.release();
     }
 }
+
+/// A point light: colour radiating from a position, falling off to a range.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct PointLight {
+    /// World-space position.
+    pub position: Vector3,
+    /// Linear RGB colour.
+    pub color: Vector3,
+    /// Scalar multiplier on [`PointLight::color`].
+    pub intensity: f32,
+    /// Distance at which the light stops contributing.
+    pub range: f32,
+    /// Whether this light should be given a shadow cube.
+    pub casts_shadows: bool,
+}
+
+impl PointLight {
+    /// CNA's own defaults, asked of the library rather than restated here.
+    pub fn canonical_defaults() -> Result<Self> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_PointLightEXT::default();
+        // SAFETY: the structure is a caller-owned versioned output.
+        native.check(unsafe { (native.engine.point_light_ext_init)(&mut value) })?;
+        Ok(Self {
+            position: from_native_vector3(value.position),
+            color: from_native_vector3(value.color),
+            intensity: value.intensity,
+            range: value.range,
+            casts_shadows: value.casts_shadows != 0,
+        })
+    }
+
+    fn to_native(self) -> sys::CNA_PointLightEXT {
+        sys::CNA_PointLightEXT {
+            struct_size: core::mem::size_of::<sys::CNA_PointLightEXT>() as u32,
+            struct_version: 1,
+            position: native_vector3(self.position),
+            color: native_vector3(self.color),
+            intensity: self.intensity,
+            range: self.range,
+            casts_shadows: u8::from(self.casts_shadows),
+            reserved: [0; 3],
+        }
+    }
+}
+
+/// A spot light: a cone of colour from a position along a direction.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct SpotLight {
+    /// World-space position.
+    pub position: Vector3,
+    /// The cone's axis.
+    pub direction: Vector3,
+    /// Linear RGB colour.
+    pub color: Vector3,
+    /// Scalar multiplier on [`SpotLight::color`].
+    pub intensity: f32,
+    /// Distance at which the light stops contributing.
+    pub range: f32,
+    /// The half angle the cone is at full brightness within, in radians.
+    pub inner_angle: f32,
+    /// The half angle the cone falls to nothing at, in radians.
+    pub outer_angle: f32,
+    /// Whether this light should be given a shadow map.
+    pub casts_shadows: bool,
+}
+
+impl SpotLight {
+    /// CNA's own defaults, asked of the library rather than restated here.
+    pub fn canonical_defaults() -> Result<Self> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_SpotLightEXT::default();
+        // SAFETY: the structure is a caller-owned versioned output.
+        native.check(unsafe { (native.engine.spot_light_ext_init)(&mut value) })?;
+        Ok(Self {
+            position: from_native_vector3(value.position),
+            direction: from_native_vector3(value.direction),
+            color: from_native_vector3(value.color),
+            intensity: value.intensity,
+            range: value.range,
+            inner_angle: value.inner_angle,
+            outer_angle: value.outer_angle,
+            casts_shadows: value.casts_shadows != 0,
+        })
+    }
+
+    fn to_native(self) -> sys::CNA_SpotLightEXT {
+        sys::CNA_SpotLightEXT {
+            struct_size: core::mem::size_of::<sys::CNA_SpotLightEXT>() as u32,
+            struct_version: 1,
+            position: native_vector3(self.position),
+            direction: native_vector3(self.direction),
+            color: native_vector3(self.color),
+            intensity: self.intensity,
+            range: self.range,
+            inner_angle: self.inner_angle,
+            outer_angle: self.outer_angle,
+            casts_shadows: u8::from(self.casts_shadows),
+            reserved: [0; 3],
+        }
+    }
+
+    /// The view transform a spot light's shadow map casts from.
+    pub fn compute_light_view(self) -> Result<Matrix> {
+        let native = Native::process()?;
+        let light = self.to_native();
+        let mut value = sys::CNA_Matrix::default();
+        // SAFETY: the light is borrowed for the call and the output is a live local.
+        native.check(unsafe {
+            (native.engine.spot_shadow_map_compute_light_view)(&light, &mut value)
+        })?;
+        Ok(from_native_matrix(value))
+    }
+
+    /// The projection a spot light's shadow map casts with.
+    pub fn compute_light_projection(self) -> Result<Matrix> {
+        let native = Native::process()?;
+        let light = self.to_native();
+        let mut value = sys::CNA_Matrix::default();
+        // SAFETY: the light is borrowed for the call and the output is a live local.
+        native.check(unsafe {
+            (native.engine.spot_shadow_map_compute_light_projection)(&light, &mut value)
+        })?;
+        Ok(from_native_matrix(value))
+    }
+}
+
+/// Declares one shadow-map variant over its own handle type.
+macro_rules! shadow_variant {
+    ($name:ident, $handle:ty, $destroy:ident, $released:literal, $doc:literal) => {
+        #[doc = $doc]
+        pub struct $name {
+            core: Arc<EngineHandle>,
+            native: Arc<Native>,
+            device: GraphicsDevice,
+        }
+
+        impl $name {
+            fn adopt(
+                native: &Arc<Native>,
+                device: &GraphicsDevice,
+                handle: sys::CNA_Handle,
+            ) -> Self {
+                let core = Arc::new(EngineHandle {
+                    native: Arc::clone(native),
+                    handle: Mutex::new(handle),
+                    destroy: native.engine.$destroy,
+                    released: $released,
+                });
+                let child: Arc<dyn OwnedEngineChild> =
+                    Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+                device.register_engine_child(&child);
+                Self {
+                    core,
+                    native: Arc::clone(native),
+                    device: device.clone(),
+                }
+            }
+
+            /// Releases the map now rather than at drop.
+            pub fn release(&self) -> Result<()> {
+                self.core.release()
+            }
+
+            #[allow(dead_code)]
+            fn flag(
+                &self,
+                route: unsafe extern "C" fn($handle, *mut sys::CNA_Bool) -> sys::CNA_Result,
+            ) -> Result<bool> {
+                let handle = self.core.get()?;
+                let mut value: sys::CNA_Bool = 0;
+                // SAFETY: the handle is owned and the output is a live local.
+                self.native.check(unsafe { route(handle, &mut value) })?;
+                Ok(value != 0)
+            }
+
+            #[allow(dead_code)]
+            fn scalar(
+                &self,
+                route: unsafe extern "C" fn($handle, *mut f32) -> sys::CNA_Result,
+            ) -> Result<f32> {
+                let handle = self.core.get()?;
+                let mut value = 0.0_f32;
+                // SAFETY: the handle is owned and the output is a live local.
+                self.native.check(unsafe { route(handle, &mut value) })?;
+                Ok(value)
+            }
+
+            #[allow(dead_code)]
+            fn set_scalar(
+                &self,
+                route: unsafe extern "C" fn($handle, f32) -> sys::CNA_Result,
+                value: f32,
+            ) -> Result<()> {
+                let handle = self.core.get()?;
+                // SAFETY: the handle is owned and the value is by value.
+                self.native.check(unsafe { route(handle, value) })
+            }
+
+            #[allow(dead_code)]
+            fn count(
+                &self,
+                route: unsafe extern "C" fn($handle, *mut i32) -> sys::CNA_Result,
+            ) -> Result<i32> {
+                let handle = self.core.get()?;
+                let mut value = 0_i32;
+                // SAFETY: the handle is owned and the output is a live local.
+                self.native.check(unsafe { route(handle, &mut value) })?;
+                Ok(value)
+            }
+
+            #[allow(dead_code)]
+            fn matrix(
+                &self,
+                route: unsafe extern "C" fn($handle, *mut sys::CNA_Matrix) -> sys::CNA_Result,
+            ) -> Result<Matrix> {
+                let handle = self.core.get()?;
+                let mut value = sys::CNA_Matrix::default();
+                // SAFETY: the handle is owned and the output is a live local.
+                self.native.check(unsafe { route(handle, &mut value) })?;
+                Ok(from_native_matrix(value))
+            }
+
+            #[allow(dead_code)]
+            fn vector3(
+                &self,
+                route: unsafe extern "C" fn($handle, *mut sys::CNA_Vector3) -> sys::CNA_Result,
+            ) -> Result<Vector3> {
+                let handle = self.core.get()?;
+                let mut value = sys::CNA_Vector3::default();
+                // SAFETY: the handle is owned and the output is a live local.
+                self.native.check(unsafe { route(handle, &mut value) })?;
+                Ok(from_native_vector3(value))
+            }
+
+            #[allow(dead_code)]
+            fn borrowed_texture(
+                &self,
+                route: unsafe extern "C" fn($handle, *mut sys::CNA_Handle) -> sys::CNA_Result,
+            ) -> Result<Option<BorrowedRenderTarget<'_>>> {
+                let handle = self.core.get()?;
+                let mut texture = sys::CNA_INVALID_HANDLE;
+                // SAFETY: the handle is owned and the output is a live local.
+                self.native.check(unsafe { route(handle, &mut texture) })?;
+                if texture == sys::CNA_INVALID_HANDLE {
+                    return Ok(None);
+                }
+                BorrowedRenderTarget::new(&self.native, &self.device, texture).map(Some)
+            }
+
+            #[allow(dead_code)]
+            fn borrowed_effect(
+                &self,
+                route: unsafe extern "C" fn(
+                    $handle,
+                    *mut sys::CNA_EffectHandle,
+                ) -> sys::CNA_Result,
+            ) -> Result<Option<BorrowedEffect<'_>>> {
+                let handle = self.core.get()?;
+                let mut effect = sys::CNA_INVALID_HANDLE;
+                // SAFETY: the handle is owned and the output is a live local.
+                self.native.check(unsafe { route(handle, &mut effect) })?;
+                if effect == sys::CNA_INVALID_HANDLE {
+                    return Ok(None);
+                }
+                Ok(Some(BorrowedEffect::new(
+                    &self.native,
+                    &self.device,
+                    effect,
+                )))
+            }
+        }
+
+        impl Drop for $name {
+            fn drop(&mut self) {
+                let _ = self.core.release();
+            }
+        }
+    };
+}
+
+shadow_variant!(
+    SpotShadowMap,
+    sys::CNA_SpotShadowMapHandle,
+    spot_shadow_map_destroy,
+    "the spot shadow map has been released",
+    "A spot-light shadow map: one square depth target, cast from a cone."
+);
+
+impl SpotShadowMap {
+    /// Creates a spot-light shadow map at a quality preset.
+    pub fn new(device: &GraphicsDevice, quality: ShadowQuality) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe {
+            (native.engine.spot_shadow_map_create)(
+                device.handle()?,
+                quality.to_native(),
+                &mut handle,
+            )
+        })?;
+        Ok(Self::adopt(native, device, handle))
+    }
+
+    /// Whether this renderer can cast into the map.
+    pub fn is_supported(&self) -> Result<bool> {
+        self.flag(self.native.engine.spot_shadow_map_is_supported)
+    }
+
+    /// Opens the shadow pass for a spot light.
+    pub fn begin(&self, light: SpotLight) -> Result<()> {
+        let handle = self.core.get()?;
+        let light = light.to_native();
+        // SAFETY: the handle is owned and the light is borrowed for the call.
+        self.native
+            .check(unsafe { (self.native.engine.spot_shadow_map_begin)(handle, &light) })
+    }
+
+    /// Closes the shadow pass.
+    pub fn end(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.spot_shadow_map_end)(handle) })
+    }
+
+    /// The transform from world space into the map, as of the last `begin`.
+    pub fn light_view_projection(&self) -> Result<Matrix> {
+        self.matrix(self.native.engine.spot_shadow_map_get_light_view_projection)
+    }
+
+    /// Where the light the map was last opened for is.
+    pub fn light_position(&self) -> Result<Vector3> {
+        self.vector3(self.native.engine.spot_shadow_map_get_light_position)
+    }
+
+    /// How far that light reaches.
+    pub fn light_range(&self) -> Result<f32> {
+        self.scalar(self.native.engine.spot_shadow_map_get_light_range)
+    }
+
+    /// The map's edge length in texels.
+    pub fn size(&self) -> Result<i32> {
+        self.count(self.native.engine.spot_shadow_map_get_size)
+    }
+
+    /// The quality preset the map was created with.
+    pub fn quality(&self) -> Result<ShadowQuality> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_ShadowQuality = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.spot_shadow_map_get_quality)(handle, &mut value)
+        })?;
+        ShadowQuality::from_native(value)
+            .ok_or(CnaError::InvalidInput("native shadow quality is unknown"))
+    }
+
+    /// The depth bias applied when casting.
+    pub fn depth_bias(&self) -> Result<f32> {
+        self.scalar(self.native.engine.spot_shadow_map_get_depth_bias)
+    }
+
+    /// Sets the depth bias applied when casting.
+    pub fn set_depth_bias(&self, value: f32) -> Result<()> {
+        self.set_scalar(self.native.engine.spot_shadow_map_set_depth_bias, value)
+    }
+
+    /// A borrowed view of the map's depth texture.
+    pub fn shadow_texture(&self) -> Result<Option<BorrowedRenderTarget<'_>>> {
+        self.borrowed_texture(self.native.engine.spot_shadow_map_get_shadow_texture)
+    }
+
+    /// The map's caster effect, borrowed for as long as the map lives.
+    pub fn caster_effect(&self) -> Result<Option<BorrowedEffect<'_>>> {
+        self.borrowed_effect(self.native.engine.spot_shadow_map_get_caster_effect)
+    }
+}
+
+shadow_variant!(
+    CubeShadowMap,
+    sys::CNA_CubeShadowMapHandle,
+    cube_shadow_map_destroy,
+    "the cube shadow map has been released",
+    "A point-light shadow cube: six faces, cast from a position."
+);
+
+impl CubeShadowMap {
+    /// Creates a shadow cube at a quality preset.
+    pub fn new(device: &GraphicsDevice, quality: ShadowQuality) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe {
+            (native.engine.cube_shadow_map_create)(
+                device.handle()?,
+                quality.to_native(),
+                &mut handle,
+            )
+        })?;
+        Ok(Self::adopt(native, device, handle))
+    }
+
+    /// Whether this renderer can cast into the cube.
+    pub fn is_supported(&self) -> Result<bool> {
+        self.flag(self.native.engine.cube_shadow_map_is_supported)
+    }
+
+    /// Gives the cube the light it casts from.
+    pub fn update(&self, light: PointLight) -> Result<()> {
+        let handle = self.core.get()?;
+        let light = light.to_native();
+        // SAFETY: the handle is owned and the light is borrowed for the call.
+        self.native
+            .check(unsafe { (self.native.engine.cube_shadow_map_update)(handle, &light) })
+    }
+
+    /// Opens the shadow pass for one face, numbered as XNA numbers cube faces.
+    pub fn begin_face(&self, face: i32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the index is by value.
+        self.native
+            .check(unsafe { (self.native.engine.cube_shadow_map_begin)(handle, face) })
+    }
+
+    /// Closes the face's shadow pass.
+    pub fn end_face(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.cube_shadow_map_end)(handle) })
+    }
+
+    /// Where the light the cube was last updated for is.
+    pub fn light_position(&self) -> Result<Vector3> {
+        self.vector3(self.native.engine.cube_shadow_map_get_light_position)
+    }
+
+    /// How far that light reaches.
+    pub fn light_range(&self) -> Result<f32> {
+        self.scalar(self.native.engine.cube_shadow_map_get_light_range)
+    }
+
+    /// The cube's edge length in texels.
+    pub fn size(&self) -> Result<i32> {
+        self.count(self.native.engine.cube_shadow_map_get_size)
+    }
+
+    /// The quality preset the cube was created with.
+    pub fn quality(&self) -> Result<ShadowQuality> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_ShadowQuality = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.cube_shadow_map_get_quality)(handle, &mut value)
+        })?;
+        ShadowQuality::from_native(value)
+            .ok_or(CnaError::InvalidInput("native shadow quality is unknown"))
+    }
+
+    /// The depth bias applied when casting.
+    pub fn depth_bias(&self) -> Result<f32> {
+        self.scalar(self.native.engine.cube_shadow_map_get_depth_bias)
+    }
+
+    /// Sets the depth bias applied when casting.
+    pub fn set_depth_bias(&self, value: f32) -> Result<()> {
+        self.set_scalar(self.native.engine.cube_shadow_map_set_depth_bias, value)
+    }
+
+    /// A borrowed view of the cube's depth texture.
+    pub fn shadow_texture(&self) -> Result<Option<BorrowedRenderTarget<'_>>> {
+        self.borrowed_texture(self.native.engine.cube_shadow_map_get_shadow_texture)
+    }
+
+    /// The cube's caster effect, borrowed for as long as it lives.
+    pub fn caster_effect(&self) -> Result<Option<BorrowedEffect<'_>>> {
+        self.borrowed_effect(self.native.engine.cube_shadow_map_get_caster_effect)
+    }
+
+    /// The cube edge length a quality preset selects.
+    pub fn size_for_quality(quality: ShadowQuality) -> Result<i32> {
+        let native = Native::process()?;
+        let mut value = 0_i32;
+        // SAFETY: the identity is canonical and the output is a live local.
+        native.check(unsafe {
+            (native.engine.cube_shadow_map_size_for_quality)(quality.to_native(), &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// The projection every cube face casts with, for a light range.
+    ///
+    /// One ninety-degree frustum, so this is a pure function of the range.
+    pub fn compute_face_projection(light_range: f32) -> Result<Matrix> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_Matrix::default();
+        // SAFETY: the range is by value and the output is a live local.
+        native.check(unsafe {
+            (native.engine.cube_shadow_map_compute_face_projection)(light_range, &mut value)
+        })?;
+        Ok(from_native_matrix(value))
+    }
+
+    /// The view transform one cube face casts with.
+    pub fn compute_face_view(face: i32, light_position: Vector3) -> Result<Matrix> {
+        let native = Native::process()?;
+        let position = native_vector3(light_position);
+        let mut value = sys::CNA_Matrix::default();
+        // SAFETY: the position is borrowed for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.cube_shadow_map_compute_face_view)(
+                face as u32,
+                &position,
+                &mut value,
+            )
+        })?;
+        Ok(from_native_matrix(value))
+    }
+}
+
+/// What a cascaded shadow map published for a receiver to read.
+///
+/// A typed Rust value over the ABI's fixed four-slot arrays: `count` says how
+/// many of them a frame actually filled, and the rest is padding no shader
+/// reads.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct ShadowCascadeState {
+    /// How many cascades the state describes.
+    pub count: i32,
+    /// How wide the blend between neighbouring cascades is.
+    pub blend_band: f32,
+    /// Each cascade's world-to-atlas transform.
+    pub world_to_atlas: [Matrix; 4],
+    /// Each cascade's far split distance.
+    pub split_distance: [f32; 4],
+    /// The camera view the splits were computed against.
+    pub camera_view: Matrix,
+    /// Whether each cascade is tinted for debugging.
+    pub debug_tint: bool,
+}
+
+impl ShadowCascadeState {
+    /// CNA's own defaults, asked of the library rather than restated here.
+    pub fn canonical_defaults() -> Result<Self> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_ShadowCascadeStateEXT::default();
+        // SAFETY: the structure is a caller-owned versioned output.
+        native.check(unsafe { (native.engine.shadow_cascade_state_ext_init)(&mut value) })?;
+        Ok(Self {
+            count: value.count,
+            blend_band: value.blend_band,
+            world_to_atlas: value.world_to_atlas.map(from_native_matrix),
+            split_distance: value.split_distance,
+            camera_view: from_native_matrix(value.camera_view),
+            debug_tint: value.debug_tint != 0,
+        })
+    }
+}
+
+shadow_variant!(
+    CascadedShadowMap,
+    sys::CNA_CascadedShadowMapHandle,
+    cascaded_shadow_map_destroy,
+    "the cascaded shadow map has been released",
+    "A cascaded directional shadow map: several splits into one atlas."
+);
+
+impl CascadedShadowMap {
+    /// Creates a cascaded shadow map at a quality preset and cascade count.
+    pub fn new(
+        device: &GraphicsDevice,
+        quality: ShadowQuality,
+        cascade_count: i32,
+    ) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe {
+            (native.engine.cascaded_shadow_map_create)(
+                device.handle()?,
+                quality.to_native(),
+                cascade_count,
+                &mut handle,
+            )
+        })?;
+        Ok(Self::adopt(native, device, handle))
+    }
+
+    /// Whether this renderer can cast into the atlas.
+    pub fn is_supported(&self) -> Result<bool> {
+        self.flag(self.native.engine.cascaded_shadow_map_is_supported)
+    }
+
+    /// Recomputes every cascade for a light and a camera.
+    pub fn update(
+        &self,
+        light: DirectionalLight,
+        camera_view: Matrix,
+        camera_projection: Matrix,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let light = light.to_native();
+        let view = native_matrix(camera_view);
+        let projection = native_matrix(camera_projection);
+        // SAFETY: the handle is owned and all three structures are borrowed for
+        // the call.
+        self.native.check(unsafe {
+            (self.native.engine.cascaded_shadow_map_update)(handle, &light, &view, &projection)
+        })
+    }
+
+    /// Opens the shadow pass for one cascade.
+    pub fn begin_cascade(&self, index: i32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the index is by value.
+        self.native
+            .check(unsafe { (self.native.engine.cascaded_shadow_map_begin)(handle, index) })
+    }
+
+    /// Closes the cascade's shadow pass.
+    pub fn end_cascade(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.cascaded_shadow_map_end)(handle) })
+    }
+
+    /// Gives a receiving effect every cascade's transform and split.
+    pub fn apply_to_receiver(&self, effect: &Effect) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: both handles are live for the call.
+        self.native.check(unsafe {
+            (self.native.engine.cascaded_shadow_map_apply_to_receiver)(
+                handle,
+                effect.native_handle()?,
+            )
+        })
+    }
+
+    /// How many cascades the map holds.
+    pub fn cascade_count(&self) -> Result<i32> {
+        self.count(self.native.engine.cascaded_shadow_map_get_cascade_count)
+    }
+
+    /// Each cascade's edge length in texels.
+    pub fn cascade_size(&self) -> Result<i32> {
+        self.count(self.native.engine.cascaded_shadow_map_get_cascade_size)
+    }
+
+    /// One cascade's world-to-atlas transform.
+    pub fn cascade_matrix(&self, index: i32) -> Result<Matrix> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_Matrix::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.cascaded_shadow_map_get_cascade_matrix)(
+                handle,
+                index,
+                &mut value,
+            )
+        })?;
+        Ok(from_native_matrix(value))
+    }
+
+    /// One cascade's far split distance.
+    pub fn split_distance(&self, index: i32) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.cascaded_shadow_map_get_split_distance)(handle, index, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Which cascade a view-space depth falls in.
+    pub fn select_cascade(&self, view_depth: f32) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.cascaded_shadow_map_select_cascade)(handle, view_depth, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// How the practical split scheme is weighted between uniform and logarithmic.
+    pub fn split_lambda(&self) -> Result<f32> {
+        self.scalar(self.native.engine.cascaded_shadow_map_get_split_lambda)
+    }
+
+    /// Sets how the split scheme is weighted.
+    pub fn set_split_lambda(&self, value: f32) -> Result<()> {
+        self.set_scalar(self.native.engine.cascaded_shadow_map_set_split_lambda, value)
+    }
+
+    /// How wide the blend between neighbouring cascades is.
+    pub fn blend_band(&self) -> Result<f32> {
+        self.scalar(self.native.engine.cascaded_shadow_map_get_blend_band)
+    }
+
+    /// Sets how wide that blend is.
+    pub fn set_blend_band(&self, value: f32) -> Result<()> {
+        self.set_scalar(self.native.engine.cascaded_shadow_map_set_blend_band, value)
+    }
+
+    /// Whether each cascade is tinted so it can be told apart.
+    pub fn is_debug_tint_enabled(&self) -> Result<bool> {
+        self.flag(self.native.engine.cascaded_shadow_map_is_debug_tint_enabled)
+    }
+
+    /// Turns the per-cascade debug tint on or off.
+    pub fn set_debug_tint_enabled(&self, value: bool) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the flag is a canonical boolean.
+        self.native.check(unsafe {
+            (self.native.engine.cascaded_shadow_map_set_debug_tint_enabled)(
+                handle,
+                u8::from(value),
+            )
+        })
+    }
+
+    /// A borrowed view of the atlas.
+    pub fn shadow_texture(&self) -> Result<Option<BorrowedRenderTarget<'_>>> {
+        self.borrowed_texture(self.native.engine.cascaded_shadow_map_get_shadow_texture)
+    }
+
+    /// The map's caster effect, borrowed for as long as the map lives.
+    pub fn caster_effect(&self) -> Result<Option<BorrowedEffect<'_>>> {
+        self.borrowed_effect(self.native.engine.cascaded_shadow_map_get_caster_effect)
+    }
+
+    /// The practical split scheme's distances, without a map.
+    pub fn compute_split_distances(
+        near_plane: f32,
+        far_plane: f32,
+        cascade_count: i32,
+        lambda: f32,
+    ) -> Result<Vec<f32>> {
+        let native = Native::process()?;
+        let capacity = usize::try_from(cascade_count.max(0))
+            .map_err(|_| CnaError::InvalidInput("the cascade count does not fit in memory"))?;
+        let mut buffer = vec![0.0_f32; capacity];
+        let mut count = 0_u64;
+        // SAFETY: the destination holds `capacity` writable floats, which is
+        // the count passed alongside it.
+        native.check(unsafe {
+            (native.engine.cascaded_shadow_map_compute_split_distances)(
+                near_plane,
+                far_plane,
+                cascade_count,
+                lambda,
+                buffer.as_mut_ptr(),
+                capacity as u64,
+                &mut count,
+            )
+        })?;
+        let count = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("CNA reported more splits than fit in memory"))?;
+        buffer.truncate(count.min(capacity));
+        Ok(buffer)
+    }
+
+    /// The eight world-space corners of a camera frustum.
+    pub fn compute_frustum_corners(view: Matrix, projection: Matrix) -> Result<[Vector3; 8]> {
+        let native = Native::process()?;
+        let view = native_matrix(view);
+        let projection = native_matrix(projection);
+        let mut corners = [sys::CNA_Vector3::default(); 8];
+        // SAFETY: both matrices are borrowed for the call and the destination
+        // is the eight corners upstream documents.
+        native.check(unsafe {
+            (native.engine.cascaded_shadow_map_compute_frustum_corners)(
+                &view,
+                &projection,
+                corners.as_mut_ptr(),
+            )
+        })?;
+        Ok(corners.map(from_native_vector3))
+    }
+
+    /// The sphere that encloses eight corners.
+    pub fn compute_bounding_sphere(corners: &[Vector3; 8]) -> Result<(Vector3, f32)> {
+        let native = Native::process()?;
+        let native_corners = corners.map(native_vector3);
+        let mut centre = sys::CNA_Vector3::default();
+        let mut radius = 0.0_f32;
+        // SAFETY: the corners are borrowed for the call and both outputs are
+        // live locals.
+        native.check(unsafe {
+            (native.engine.cascaded_shadow_map_compute_bounding_sphere)(
+                native_corners.as_ptr(),
+                &mut centre,
+                &mut radius,
+            )
+        })?;
+        Ok((from_native_vector3(centre), radius))
+    }
+
+    /// A centre snapped to the shadow map's texel grid.
+    ///
+    /// The pure function behind cascade stability: snapping is what stops a
+    /// cascade's texels swimming as the camera moves.
+    pub fn snap_to_texel_grid(centre: Vector3, radius: f32, size: i32) -> Result<Vector3> {
+        let native = Native::process()?;
+        let centre = native_vector3(centre);
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the centre is borrowed for the call and the output is a live local.
+        native.check(unsafe {
+            (native.engine.cascaded_shadow_map_snap_to_texel_grid)(
+                &centre,
+                radius,
+                size,
+                &mut value,
+            )
+        })?;
+        Ok(from_native_vector3(value))
+    }
+}
+
+/// Which kind of punctual light a [`PunctualLight`] describes.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum PunctualLightKind {
+    /// No light at all.
+    #[default]
+    None,
+    /// A point light.
+    Point,
+    /// A spot light.
+    Spot,
+}
+
+impl PunctualLightKind {
+    const fn from_native(value: sys::CNA_PunctualLightKindEXT) -> Option<Self> {
+        Some(match value {
+            sys::CNA_PUNCTUAL_LIGHT_KIND_EXT_NONE => Self::None,
+            sys::CNA_PUNCTUAL_LIGHT_KIND_EXT_POINT => Self::Point,
+            sys::CNA_PUNCTUAL_LIGHT_KIND_EXT_SPOT => Self::Spot,
+            _ => return None,
+        })
+    }
+}
+
+/// One punctual light as a shading effect reads it.
+///
+/// The union of a point and a spot light, plus the shadow resources a receiver
+/// samples. Its two shadow slots are non-owning handles upstream, so they are
+/// reported as *presence* rather than published as values -- a safe type
+/// holding a raw handle would be exactly the leak this crate refuses.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct PunctualLight {
+    /// Which kind of light this is.
+    pub kind: PunctualLightKind,
+    /// World-space position.
+    pub position: Vector3,
+    /// The cone's axis, for a spot light.
+    pub direction: Vector3,
+    /// Linear RGB colour.
+    pub diffuse_color: Vector3,
+    /// Distance at which the light stops contributing.
+    pub range: f32,
+    /// The half angle the cone is at full brightness within.
+    pub inner_angle: f32,
+    /// The half angle the cone falls to nothing at.
+    pub outer_angle: f32,
+    /// The bias a receiver applies when sampling the shadow.
+    pub shadow_depth_bias: f32,
+    /// Whether a shadow cube is attached.
+    pub has_shadow_cube: bool,
+    /// Whether a shadow map is attached.
+    pub has_shadow_map: bool,
+    /// The transform a receiver samples the shadow map with.
+    pub shadow_view_projection: Matrix,
+}
+
+impl PunctualLight {
+    /// CNA's own defaults, asked of the library rather than restated here.
+    pub fn canonical_defaults() -> Result<Self> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_PunctualLightEXT::default();
+        // SAFETY: the structure is a caller-owned versioned output.
+        native.check(unsafe { (native.engine.punctual_light_ext_init)(&mut value) })?;
+        Ok(Self {
+            kind: PunctualLightKind::from_native(value.kind).ok_or(CnaError::InvalidInput(
+                "native punctual light kind is unknown",
+            ))?,
+            position: from_native_vector3(value.position),
+            direction: from_native_vector3(value.direction),
+            diffuse_color: from_native_vector3(value.diffuse_color),
+            range: value.range,
+            inner_angle: value.inner_angle,
+            outer_angle: value.outer_angle,
+            shadow_depth_bias: value.shadow_depth_bias,
+            has_shadow_cube: value.shadow_cube != sys::CNA_INVALID_HANDLE,
+            has_shadow_map: value.shadow_map != sys::CNA_INVALID_HANDLE,
+            shadow_view_projection: from_native_matrix(value.shadow_view_projection),
+        })
+    }
+}
