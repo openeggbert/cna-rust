@@ -813,6 +813,42 @@ pub type CNA_EnvironmentProcessorHandle = CNA_Handle;
 pub type CNA_LightProbeVolumeHandle = CNA_Handle;
 pub type CNA_LightProbeBakerHandle = CNA_Handle;
 pub type CNA_ShaderEffectFactoryHandle = CNA_Handle;
+pub type CNA_AreaLightBrdfTableHandle = CNA_Handle;
+pub type CNA_AreaLightShapeEXT = u32;
+
+pub const CNA_AREA_LIGHT_SHAPE_RECTANGLE_EXT: CNA_AreaLightShapeEXT = 0;
+pub const CNA_AREA_LIGHT_SHAPE_DISC_EXT: CNA_AreaLightShapeEXT = 1;
+pub const CNA_AREA_LIGHT_SHAPE_TUBE_EXT: CNA_AreaLightShapeEXT = 2;
+pub const CNA_AREA_LIGHT_BRDF_TABLE_DEFAULT_SIZE: i32 = 32;
+pub const CNA_AREA_LIGHT_BRDF_TABLE_DEFAULT_SAMPLE_COUNT: i32 = 64;
+pub const CNA_AREA_LIGHT_QUAD_CORNER_COUNT: i32 = 4;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_AreaLightEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub shape: CNA_AreaLightShapeEXT,
+    pub two_sided: CNA_Bool,
+    pub reserved0: [u8; 3],
+    pub position: CNA_Vector3,
+    pub right_axis: CNA_Vector3,
+    pub up_axis: CNA_Vector3,
+    pub color: CNA_Vector3,
+    pub intensity: f32,
+    pub range: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_AreaLightBrdfTerms {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub magnitude: f32,
+    pub fresnel: f32,
+    pub average_tangent: f32,
+    pub average_normal: f32,
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -10313,4 +10349,53 @@ pub type cna_debug_draw_add_probe_volume_gizmo_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_debug_draw_add_cluster_slice_gizmo_fn = unsafe extern "C" fn(
     CNA_DebugDrawHandle, CNA_ClusteredLightGridHandle, *const CNA_Matrix, CNA_Color,
+) -> CNA_Result;
+pub type cna_area_light_brdf_table_copy_lookup_glsl_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_area_light_brdf_table_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_AreaLightBrdfTableHandle,
+) -> CNA_Result;
+pub type cna_area_light_brdf_table_create_with_size_fn = unsafe extern "C" fn(
+    CNA_Handle, i32, i32, *mut CNA_AreaLightBrdfTableHandle,
+) -> CNA_Result;
+pub type cna_area_light_brdf_table_destroy_fn = unsafe extern "C" fn(
+    CNA_AreaLightBrdfTableHandle,
+) -> CNA_Result;
+pub type cna_area_light_brdf_table_evaluate_fn = unsafe extern "C" fn(
+    f32, f32, i32, *mut CNA_AreaLightBrdfTerms,
+) -> CNA_Result;
+pub type cna_area_light_brdf_table_get_generation_milliseconds_fn = unsafe extern "C" fn(
+    CNA_AreaLightBrdfTableHandle, *mut f64,
+) -> CNA_Result;
+pub type cna_area_light_brdf_table_get_sample_count_fn = unsafe extern "C" fn(
+    CNA_AreaLightBrdfTableHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_area_light_brdf_table_get_size_fn = unsafe extern "C" fn(
+    CNA_AreaLightBrdfTableHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_area_light_brdf_table_get_texture_fn = unsafe extern "C" fn(
+    CNA_AreaLightBrdfTableHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_area_light_ext_init_fn = unsafe extern "C" fn(*mut CNA_AreaLightEXT) -> CNA_Result;
+pub type cna_area_light_ext_is_valid_fn = unsafe extern "C" fn(
+    *const CNA_AreaLightEXT, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_area_light_shading_contribution_fn = unsafe extern "C" fn(
+    *const CNA_AreaLightEXT, *const CNA_Vector3, *const CNA_Vector3, *const CNA_Vector3, *const CNA_Vector3, f32, f32, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_area_light_shading_copy_shading_glsl_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_area_light_shading_coverage_fn = unsafe extern "C" fn(
+    *const CNA_Vector3, *const CNA_Vector3, *const CNA_Vector3, f32, CNA_Bool, *mut f32,
+) -> CNA_Result;
+pub type cna_area_light_shading_lobe_scale_for_fn = unsafe extern "C" fn(
+    f32, *mut f32,
+) -> CNA_Result;
+pub type cna_area_light_shading_quad_of_fn = unsafe extern "C" fn(
+    *const CNA_AreaLightEXT, *const CNA_Vector3, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_set_area_light_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, *const CNA_AreaLightEXT, CNA_AreaLightBrdfTableHandle,
 ) -> CNA_Result;

@@ -24,7 +24,8 @@ use cna::extensions::engine::{
     FullscreenPass, HeightFogPass, LensFlarePass, LightShaftPass, LutInterpolation, MemoryBarrier,
     MotionBlurPass, RenderPipeline, ScopedRenderTarget, ShadowMap, Skybox, SpatialUpscalePass,
     CascadedShadowMap, CubeShadowMap, PointLight, PunctualLight, PunctualLightKind,
-    AutoExposure, ClusteredLight, ClusteredLightAssignment, ClusteredLightGrid,
+    AreaLight, AreaLightBrdfTable, AreaLightShading, AreaLightShape, AutoExposure,
+    ClusteredLight, ClusteredLightAssignment, ClusteredLightGrid,
     ClusteredLightBuffer, ClusteredLightCompute, ClusteredLightSet, ClusteredLightType,
     ClusteredForwardEffect, ClusteredShadingMaterial, ClusteredShadowPolicy, CubeLut,
     DebugDraw, DepthEncoding, EnvironmentProcessor, ImageBasedLight, LightProbe,
@@ -7666,5 +7667,434 @@ fn the_factory_caches_by_name_and_the_gltf_bridge_builds_what_the_importer_read(
     assert!(
         transmits,
         "and a non-zero transmission factor turns transmission on"
+    );
+}
+
+/// What the area-light run measured.
+#[derive(Default)]
+struct AreaLightFindings {
+    engine_layer: i32,
+    defaults: Option<(AreaLightShape, bool, f32, f32)>,
+    validity: Vec<(&'static str, bool)>,
+    quads: Vec<(&'static str, [(f32, f32, f32); 4])>,
+    contributions: Vec<(&'static str, (f32, f32, f32))>,
+    table: Option<(i32, i32, f64, Option<(i32, i32)>)>,
+    sized_table: Option<(i32, i32)>,
+    bad_table: bool,
+    terms: Vec<(f32, f32, f32, f32)>,
+    lobe_scales: Vec<(f32, f32)>,
+    coverage: Vec<(&'static str, f32)>,
+    glsl: (usize, usize),
+    area_light_on_effect: Option<String>,
+}
+
+struct AreaLightGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<AreaLightFindings>>,
+}
+
+impl GameStateAccess for AreaLightGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+fn quad_triples(quad: [Vector3; 4]) -> [(f32, f32, f32); 4] {
+    [
+        triple(quad[0]),
+        triple(quad[1]),
+        triple(quad[2]),
+        triple(quad[3]),
+    ]
+}
+
+impl Game for AreaLightGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+        let mut findings = AreaLightFindings {
+            engine_layer: version,
+            ..AreaLightFindings::default()
+        };
+
+        let defaults = AreaLight::canonical_defaults()?;
+        findings.defaults = Some((
+            defaults.shape,
+            defaults.two_sided,
+            defaults.intensity,
+            defaults.range,
+        ));
+
+        // A light two units above the origin, facing down at it.
+        let mut lamp = defaults;
+        lamp.position = Vector3::from_x_and_y_and_z(0.0, 2.0, 0.0);
+        lamp.right_axis = Vector3::from_x_and_y_and_z(1.0, 0.0, 0.0);
+        lamp.up_axis = Vector3::from_x_and_y_and_z(0.0, 0.0, 1.0);
+        lamp.color = Vector3::from_x_and_y_and_z(1.0, 1.0, 1.0);
+        lamp.intensity = 4.0;
+        lamp.range = 20.0;
+
+        findings.validity.push(("a lamp with two axes", lamp.is_valid()?));
+        let mut degenerate = lamp;
+        degenerate.right_axis = Vector3::Zero;
+        findings
+            .validity
+            .push(("with no width", degenerate.is_valid()?));
+        let mut negative_range = lamp;
+        negative_range.range = -1.0;
+        findings
+            .validity
+            .push(("with a negative range", negative_range.is_valid()?));
+        let mut parallel = lamp;
+        parallel.up_axis = parallel.right_axis;
+        findings
+            .validity
+            .push(("with parallel axes", parallel.is_valid()?));
+
+        let surface = Vector3::Zero;
+        for shape in [
+            AreaLightShape::Rectangle,
+            AreaLightShape::Disc,
+            AreaLightShape::Tube,
+        ] {
+            let mut shaped = lamp;
+            shaped.shape = shape;
+            let name = match shape {
+                AreaLightShape::Rectangle => "a rectangle",
+                AreaLightShape::Disc => "a disc",
+                _ => "a tube",
+            };
+            findings
+                .quads
+                .push((name, quad_triples(shaped.quad_seen_from(surface)?)));
+            findings.contributions.push((
+                name,
+                triple(shaped.contribution(
+                    surface,
+                    Vector3::Up,
+                    Vector3::from_x_and_y_and_z(0.0, 1.0, 3.0),
+                    Vector3::from_x_and_y_and_z(1.0, 1.0, 1.0),
+                    0.0,
+                    0.5,
+                )?),
+            ));
+        }
+        let mut facing_away = lamp;
+        facing_away.position = Vector3::from_x_and_y_and_z(0.0, -2.0, 0.0);
+        findings.contributions.push((
+            "from underneath",
+            triple(facing_away.contribution(
+                surface,
+                Vector3::Up,
+                Vector3::from_x_and_y_and_z(0.0, 1.0, 3.0),
+                Vector3::from_x_and_y_and_z(1.0, 1.0, 1.0),
+                0.0,
+                0.5,
+            )?),
+        ));
+        let mut out_of_range = lamp;
+        out_of_range.range = 0.5;
+        findings.contributions.push((
+            "beyond its own range",
+            triple(out_of_range.contribution(
+                surface,
+                Vector3::Up,
+                Vector3::from_x_and_y_and_z(0.0, 1.0, 3.0),
+                Vector3::from_x_and_y_and_z(1.0, 1.0, 1.0),
+                0.0,
+                0.5,
+            )?),
+        ));
+
+        // --- the BRDF table -------------------------------------------------
+        let table = AreaLightBrdfTable::new(&device)?;
+        findings.table = Some((
+            table.size()?,
+            table.sample_count()?,
+            table.generation_milliseconds()?,
+            table
+                .texture()?
+                .map(|texture| (texture.Width(), texture.Height())),
+        ));
+        let sized = AreaLightBrdfTable::with_size(&device, 8, 16)?;
+        findings.sized_table = Some((sized.size()?, sized.sample_count()?));
+        sized.release()?;
+        findings.bad_table = AreaLightBrdfTable::with_size(&device, 0, 16).is_err();
+
+        for (roughness, cos_theta) in [(0.1_f32, 1.0_f32), (0.5, 1.0), (1.0, 1.0), (0.5, 0.2)] {
+            let terms = AreaLightBrdfTable::evaluate(roughness, cos_theta, 64)?;
+            findings.terms.push((
+                terms.magnitude,
+                terms.fresnel,
+                terms.average_tangent,
+                terms.average_normal,
+            ));
+        }
+        for roughness in [0.0_f32, 0.25, 0.5, 1.0] {
+            findings
+                .lobe_scales
+                .push((roughness, AreaLightShading::lobe_scale_for(roughness)?));
+        }
+
+        let quad = lamp.quad_seen_from(surface)?;
+        findings.coverage.push((
+            "straight up at the lamp",
+            AreaLightShading::coverage(&quad, surface, Vector3::Up, 1.0, false)?,
+        ));
+        findings.coverage.push((
+            "straight down away from it",
+            AreaLightShading::coverage(
+                &quad,
+                surface,
+                Vector3::from_x_and_y_and_z(0.0, -1.0, 0.0),
+                1.0,
+                false,
+            )?,
+        ));
+        findings.coverage.push((
+            "away from it, two-sided",
+            AreaLightShading::coverage(
+                &quad,
+                surface,
+                Vector3::from_x_and_y_and_z(0.0, -1.0, 0.0),
+                1.0,
+                true,
+            )?,
+        ));
+        findings.glsl = (
+            AreaLightBrdfTable::lookup_glsl()?.len(),
+            AreaLightShading::shading_glsl()?.len(),
+        );
+
+        let effect = ClusteredForwardEffect::new(&device)?;
+        findings.area_light_on_effect = effect.set_area_light(lamp, &table).err().map(|e| e.to_string());
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn an_area_light_is_a_surface_and_its_table_is_the_lobe_it_shades_with() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(AreaLightFindings::default()));
+    let game = AreaLightGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with an area light and its BRDF table");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+
+    let (shape, two_sided, intensity, range) = findings.defaults.expect("CNA's own defaults");
+    println!("defaults: {shape:?} two-sided {two_sided} intensity {intensity} range {range}");
+    assert_eq!(
+        shape,
+        AreaLightShape::Rectangle,
+        "the default shape is a rectangle"
+    );
+    assert!(intensity > 0.0 && range > 0.0, "and it lights something");
+
+    println!("validity: {:?}", findings.validity);
+    assert_eq!(
+        findings.validity,
+        vec![
+            ("a lamp with two axes", true),
+            ("with no width", false),
+            ("with a negative range", false),
+            ("with parallel axes", false),
+        ],
+        "a light needs two independent axes and a positive range"
+    );
+
+    // Every shape shades as a quadrilateral. The rectangle's is its own corners
+    // at centre +- the two half-axes; the tube shades as the same rectangle,
+    // because a capsule's *shading* quad is the rectangle its axes span and the
+    // difference is in the energy rather than the outline; and the disc's is
+    // that rectangle scaled by sqrt(pi)/2, which is the equal-area conversion
+    // from an ellipse to a rectangle. All three are exact numbers, not merely
+    // "different".
+    println!("quads: {:?}", findings.quads);
+    assert_eq!(findings.quads.len(), 3);
+    let rectangle = findings.quads[0].1;
+    assert_eq!(
+        rectangle,
+        [
+            (-1.0, 2.0, -1.0),
+            (1.0, 2.0, -1.0),
+            (1.0, 2.0, 1.0),
+            (-1.0, 2.0, 1.0),
+        ],
+        "a rectangle's quad is its centre plus and minus its two half-axes, wound in order"
+    );
+    assert_eq!(
+        findings.quads[2].1, rectangle,
+        "a tube shades as the same rectangle its axes span"
+    );
+    let equal_area = std::f32::consts::PI.sqrt() / 2.0;
+    for (corner, expected) in findings.quads[1].1.iter().zip(rectangle.iter()) {
+        assert!(
+            (corner.0 - expected.0 * equal_area).abs() < 1e-5
+                && (corner.1 - expected.1).abs() < 1e-5
+                && (corner.2 - expected.2 * equal_area).abs() < 1e-5,
+            "a disc's quad is the rectangle scaled by sqrt(pi)/2: {corner:?} against {expected:?}"
+        );
+    }
+
+    println!("contributions: {:?}", findings.contributions);
+    let contribution = |name: &str| -> (f32, f32, f32) {
+        findings
+            .contributions
+            .iter()
+            .find(|(label, _)| *label == name)
+            .expect("a recorded contribution")
+            .1
+    };
+    for name in ["a rectangle", "a disc", "a tube"] {
+        let value = contribution(name);
+        assert!(
+            value.0 > 0.0,
+            "{name} above a surface facing up lights it: {value:?}"
+        );
+    }
+    assert!(
+        contribution("a rectangle") != contribution("a disc"),
+        "and the shapes do not shade identically: {:?} against {:?}",
+        contribution("a rectangle"),
+        contribution("a disc")
+    );
+    assert_eq!(
+        contribution("from underneath"),
+        (0.0, 0.0, 0.0),
+        "a one-sided lamp below a surface facing up lights nothing"
+    );
+    assert_eq!(
+        contribution("beyond its own range"),
+        (0.0, 0.0, 0.0),
+        "and neither does one further away than it reaches"
+    );
+
+    // --- the BRDF table -----------------------------------------------------
+    let (size, samples, milliseconds, texture) = findings.table.expect("a default table");
+    println!("table: {size} x {size}, {samples} samples, {milliseconds} ms, texture {texture:?}");
+    assert_eq!(
+        size,
+        AreaLightBrdfTable::DEFAULT_SIZE,
+        "a default table is CNA's own size"
+    );
+    assert_eq!(
+        samples,
+        AreaLightBrdfTable::DEFAULT_SAMPLE_COUNT,
+        "and CNA's own sample count"
+    );
+    assert!(
+        milliseconds >= 0.0,
+        "and reports how long it took: {milliseconds}"
+    );
+    assert_eq!(
+        texture,
+        Some((size, size)),
+        "the table's texture is square at the table's own size"
+    );
+    assert_eq!(
+        findings.sized_table,
+        Some((8, 16)),
+        "a table built to a size is that size, with that sample count"
+    );
+    assert!(findings.bad_table, "a size below one is refused");
+
+    // The lobe narrows as the surface smooths: magnitude at low roughness is
+    // higher than at high, and the average direction leans towards the normal.
+    println!("terms: {:?}", findings.terms);
+    for (magnitude, fresnel, tangent, normal) in &findings.terms {
+        assert!(
+            (0.0..=2.0).contains(magnitude),
+            "a lobe magnitude outside its range: {magnitude}"
+        );
+        assert!(
+            (0.0..=2.0).contains(fresnel),
+            "a Fresnel share outside its range: {fresnel}"
+        );
+        assert!(
+            tangent.is_finite() && normal.is_finite(),
+            "an average direction that is not a number: ({tangent}, {normal})"
+        );
+    }
+    assert!(
+        findings.terms[0].0 != findings.terms[2].0,
+        "roughness changes the lobe: {:?}",
+        findings.terms
+    );
+
+    // The lobe scale is what turns a roughness into a solid angle, so it has to
+    // grow with roughness rather than merely differ.
+    println!("lobe scales: {:?}", findings.lobe_scales);
+    assert!(
+        findings
+            .lobe_scales
+            .windows(2)
+            .all(|pair| pair[0].1 <= pair[1].1),
+        "a rougher surface has a wider lobe: {:?}",
+        findings.lobe_scales
+    );
+    // And it is roughness squared, with a floor of 0.02 so a mirror-smooth
+    // surface still has a lobe to integrate: 0 -> 0.02, 0.25 -> 0.0625,
+    // 0.5 -> 0.25, 1 -> 1. A curve that merely rose would pass the check above
+    // and fail this one.
+    for (roughness, scale) in &findings.lobe_scales {
+        let expected = (roughness * roughness).max(0.02);
+        assert!(
+            (scale - expected).abs() < 1e-6,
+            "roughness {roughness} has lobe scale {scale}, not {expected}"
+        );
+    }
+
+    // Coverage is the geometric term: a lobe pointing at the light sees it, one
+    // pointing away sees nothing unless the light emits from both faces.
+    println!("coverage: {:?}", findings.coverage);
+    let coverage = |name: &str| -> f32 {
+        findings
+            .coverage
+            .iter()
+            .find(|(label, _)| *label == name)
+            .expect("a recorded coverage")
+            .1
+    };
+    assert!(
+        coverage("straight up at the lamp") > 0.0,
+        "a lobe pointing at the light covers some of it"
+    );
+    assert_eq!(
+        coverage("straight down away from it"),
+        0.0,
+        "one pointing away covers none of it"
+    );
+    assert!(
+        coverage("away from it, two-sided") >= coverage("straight down away from it"),
+        "and a two-sided light is not less visible from behind: {:?}",
+        findings.coverage
+    );
+
+    assert!(
+        findings.glsl.0 > 0 && findings.glsl.1 > 0,
+        "both the table lookup and the shading are published as GLSL: {:?}",
+        findings.glsl
+    );
+    assert!(
+        findings.area_light_on_effect.is_none(),
+        "a clustered forward effect accepts an area light and its table: {:?}",
+        findings.area_light_on_effect
     );
 }

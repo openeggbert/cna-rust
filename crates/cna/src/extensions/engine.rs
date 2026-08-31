@@ -12058,3 +12058,457 @@ impl Drop for ShaderEffectFactory {
         let _ = self.core.release();
     }
 }
+
+/// Which shape an [`AreaLight`] emits from.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum AreaLightShape {
+    /// A rectangle spanned by the two half-axes.
+    Rectangle,
+    /// An ellipse inscribed in that rectangle.
+    Disc,
+    /// A capsule along the right axis, with the up axis as its radius.
+    Tube,
+}
+
+impl AreaLightShape {
+    const fn to_native(self) -> sys::CNA_AreaLightShapeEXT {
+        match self {
+            Self::Rectangle => sys::CNA_AREA_LIGHT_SHAPE_RECTANGLE_EXT,
+            Self::Disc => sys::CNA_AREA_LIGHT_SHAPE_DISC_EXT,
+            Self::Tube => sys::CNA_AREA_LIGHT_SHAPE_TUBE_EXT,
+        }
+    }
+
+    const fn from_native(value: sys::CNA_AreaLightShapeEXT) -> Option<Self> {
+        match value {
+            sys::CNA_AREA_LIGHT_SHAPE_RECTANGLE_EXT => Some(Self::Rectangle),
+            sys::CNA_AREA_LIGHT_SHAPE_DISC_EXT => Some(Self::Disc),
+            sys::CNA_AREA_LIGHT_SHAPE_TUBE_EXT => Some(Self::Tube),
+            _ => None,
+        }
+    }
+}
+
+/// A light with a shape: the third kind, after XNA's directional light and
+/// CNA's punctual one.
+///
+/// A light that is a *surface*, which is what almost every real light is. The
+/// difference is not brightness but the shape of what the light does -- a
+/// window is a bright rectangle in a polished floor, and that is not something
+/// a point light can be tuned into producing.
+///
+/// The shape is a **centre and two half-axes** rather than four corners, so all
+/// three shapes share one description and none can be given a non-planar or
+/// self-intersecting outline. The axes are half-extents: their lengths are half
+/// the rectangle's width and height, and the emitting side is the one they
+/// cross towards.
+///
+/// **There are no area-light shadows.** A soft-edged shadow needs many samples
+/// of the light's surface or a ray query, and this layer has neither, so an
+/// area light lights what faces it whether or not anything stands in the way.
+/// Said here because the failure looks like a shadow bug.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct AreaLight {
+    /// Which shape the light emits from.
+    pub shape: AreaLightShape,
+    /// Whether the light emits from both faces of its surface.
+    pub two_sided: bool,
+    /// World-space centre of the emitting surface.
+    pub position: Vector3,
+    /// Half-axis across the surface; its length is half the width.
+    pub right_axis: Vector3,
+    /// Half-axis up the surface; half the height, or the tube's radius.
+    pub up_axis: Vector3,
+    /// Emitted colour, linear and unbounded -- values above one are meaningful
+    /// in HDR.
+    pub color: Vector3,
+    /// Multiplier applied to [`AreaLight::color`].
+    pub intensity: f32,
+    /// Distance past which the light contributes nothing.
+    pub range: f32,
+}
+
+impl AreaLight {
+    /// How many corners the quadrilateral form of a light has.
+    pub const QUAD_CORNER_COUNT: i32 = sys::CNA_AREA_LIGHT_QUAD_CORNER_COUNT;
+
+    /// CNA's own defaults, asked of the library rather than restated here.
+    pub fn canonical_defaults() -> Result<Self> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_AreaLightEXT::default();
+        // SAFETY: the structure is a caller-owned versioned output.
+        native.check(unsafe { (native.engine.area_light_ext_init)(&mut value) })?;
+        Self::from_native(value)
+    }
+
+    /// Whether the light is usable.
+    pub fn is_valid(&self) -> Result<bool> {
+        let native = Native::process()?;
+        let value = self.to_native();
+        let mut valid = 0_u8;
+        // SAFETY: the light is borrowed for the call and the output is a live
+        // local.
+        native.check(unsafe { (native.engine.area_light_ext_is_valid)(&value, &mut valid) })?;
+        Ok(valid != 0)
+    }
+
+    /// The four world-space corners the light is shaded as, seen from a
+    /// surface point.
+    ///
+    /// Every shape reduces to a quadrilateral for shading; the disc and tube
+    /// differ in how that quadrilateral is placed, not in how many corners it
+    /// has.
+    pub fn quad_seen_from(&self, surface: Vector3) -> Result<[Vector3; 4]> {
+        let native = Native::process()?;
+        let light = self.to_native();
+        let surface = native_vector3(surface);
+        let mut corners = [sys::CNA_Vector3::default(); 4];
+        // SAFETY: the light and the point are borrowed for the call, and the
+        // destination holds the four corners the route documents.
+        native.check(unsafe {
+            (native.engine.area_light_shading_quad_of)(&light, &surface, corners.as_mut_ptr())
+        })?;
+        Ok([
+            from_native_vector3(corners[0]),
+            from_native_vector3(corners[1]),
+            from_native_vector3(corners[2]),
+            from_native_vector3(corners[3]),
+        ])
+    }
+
+    /// One area light's contribution to a surface point.
+    pub fn contribution(
+        &self,
+        surface: Vector3,
+        normal: Vector3,
+        camera_position: Vector3,
+        base_color: Vector3,
+        metallic: f32,
+        roughness: f32,
+    ) -> Result<Vector3> {
+        let native = Native::process()?;
+        let light = self.to_native();
+        let surface = native_vector3(surface);
+        let normal = native_vector3(normal);
+        let camera_position = native_vector3(camera_position);
+        let base_color = native_vector3(base_color);
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: every pointer is a live local borrowed for the call, and the
+        // output is one too.
+        native.check(unsafe {
+            (native.engine.area_light_shading_contribution)(
+                &light,
+                &surface,
+                &normal,
+                &camera_position,
+                &base_color,
+                metallic,
+                roughness,
+                &mut value,
+            )
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    fn to_native(self) -> sys::CNA_AreaLightEXT {
+        sys::CNA_AreaLightEXT {
+            struct_size: core::mem::size_of::<sys::CNA_AreaLightEXT>() as u32,
+            struct_version: 1,
+            shape: self.shape.to_native(),
+            two_sided: u8::from(self.two_sided),
+            reserved0: [0; 3],
+            position: native_vector3(self.position),
+            right_axis: native_vector3(self.right_axis),
+            up_axis: native_vector3(self.up_axis),
+            color: native_vector3(self.color),
+            intensity: self.intensity,
+            range: self.range,
+        }
+    }
+
+    fn from_native(value: sys::CNA_AreaLightEXT) -> Result<Self> {
+        Ok(Self {
+            shape: AreaLightShape::from_native(value.shape)
+                .ok_or(CnaError::InvalidInput("native area light shape is unknown"))?,
+            two_sided: value.two_sided != 0,
+            position: from_native_vector3(value.position),
+            right_axis: from_native_vector3(value.right_axis),
+            up_axis: from_native_vector3(value.up_axis),
+            color: from_native_vector3(value.color),
+            intensity: value.intensity,
+            range: value.range,
+        })
+    }
+}
+
+/// The four numbers a shader needs to turn a specular lobe into a coverage
+/// weight.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[non_exhaustive]
+pub struct AreaLightBrdfTerms {
+    /// Total energy of the lobe.
+    pub magnitude: f32,
+    /// The Fresnel-weighted share of it.
+    pub fresnel: f32,
+    /// Tangent component of the average direction.
+    pub average_tangent: f32,
+    /// Normal component of the average direction.
+    pub average_normal: f32,
+}
+
+/// The precomputed table an area-light shader reads its lobe terms from.
+///
+/// `OWNED`. Generating it costs real time -- [`generation_milliseconds`] says
+/// how much -- so it is built once and shared, and its texture is what a shader
+/// samples.
+///
+/// [`generation_milliseconds`]: Self::generation_milliseconds
+pub struct AreaLightBrdfTable {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+    device: GraphicsDevice,
+}
+
+impl AreaLightBrdfTable {
+    /// The table resolution used unless told otherwise.
+    pub const DEFAULT_SIZE: i32 = sys::CNA_AREA_LIGHT_BRDF_TABLE_DEFAULT_SIZE;
+    /// The sample count used unless told otherwise.
+    pub const DEFAULT_SAMPLE_COUNT: i32 = sys::CNA_AREA_LIGHT_BRDF_TABLE_DEFAULT_SAMPLE_COUNT;
+
+    fn wrap(native: &Arc<Native>, device: &GraphicsDevice, handle: sys::CNA_Handle) -> Self {
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.area_light_brdf_table_destroy,
+            released: "the area light BRDF table has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Self {
+            core,
+            native: Arc::clone(native),
+            device: device.clone(),
+        }
+    }
+
+    /// Builds a table at CNA's default resolution and sample count.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.area_light_brdf_table_create)(device.handle()?, &mut handle)
+        })?;
+        Ok(Self::wrap(native, device, handle))
+    }
+
+    /// Builds a table at a chosen resolution and sample count.
+    pub fn with_size(device: &GraphicsDevice, size: i32, sample_count: i32) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.area_light_brdf_table_create_with_size)(
+                device.handle()?,
+                size,
+                sample_count,
+                &mut handle,
+            )
+        })?;
+        Ok(Self::wrap(native, device, handle))
+    }
+
+    /// The table's texture, as an owned resource that aliases the table.
+    ///
+    /// Deliberately **not** a [`BorrowedRenderTarget`], which is what every
+    /// other texture accessor in this module answers with. Upstream publishes
+    /// this one through `CreateOwnedTexture2D` rather than
+    /// `CreateBorrowedRenderTarget2D`: the handle is an *owned* `Texture2D`
+    /// that counts against the game's children and is released with the texture
+    /// destroy, and releasing it through `cna_render_target_destroy` fails and
+    /// strands it. The handle aliases the table, so it keeps the table alive
+    /// and destroying it destroys nothing but the handle.
+    pub fn texture(&self) -> Result<Option<Texture2D>> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.area_light_brdf_table_get_texture)(handle, &mut value)
+        })?;
+        if value == sys::CNA_INVALID_HANDLE {
+            return Ok(None);
+        }
+        Texture2D::from_owned_handle(&self.device, value).map(Some)
+    }
+
+    /// The table's resolution.
+    pub fn size(&self) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.area_light_brdf_table_get_size)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// How many samples each entry was integrated with.
+    pub fn sample_count(&self) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.area_light_brdf_table_get_sample_count)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// How long building it actually took.
+    pub fn generation_milliseconds(&self) -> Result<f64> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self
+                .native
+                .engine
+                .area_light_brdf_table_get_generation_milliseconds)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// One table entry, computed directly rather than sampled.
+    ///
+    /// A pure function of its arguments, so it needs no table -- which is what
+    /// makes it the thing to compare a sampled entry against.
+    pub fn evaluate(roughness: f32, cos_theta: f32, sample_count: i32) -> Result<AreaLightBrdfTerms> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_AreaLightBrdfTerms {
+            struct_size: core::mem::size_of::<sys::CNA_AreaLightBrdfTerms>() as u32,
+            struct_version: 1,
+            ..sys::CNA_AreaLightBrdfTerms::default()
+        };
+        // SAFETY: the structure is a caller-owned versioned output.
+        native.check(unsafe {
+            (native.engine.area_light_brdf_table_evaluate)(
+                roughness,
+                cos_theta,
+                sample_count,
+                &mut value,
+            )
+        })?;
+        Ok(AreaLightBrdfTerms {
+            magnitude: value.magnitude,
+            fresnel: value.fresnel,
+            average_tangent: value.average_tangent,
+            average_normal: value.average_normal,
+        })
+    }
+
+    /// The GLSL that reads the table.
+    pub fn lookup_glsl() -> Result<String> {
+        let native = Native::process()?;
+        copy_text(&native, |api, destination, capacity, out_bytes| {
+            // SAFETY: CNA's size-then-copy protocol, driven by `copy_text`.
+            unsafe {
+                (api.area_light_brdf_table_copy_lookup_glsl)(destination, capacity, out_bytes)
+            }
+        })
+    }
+
+    /// Releases the table now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for AreaLightBrdfTable {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// The pure maths an area-light shader runs, exposed so a hand-written shader
+/// and this crate cannot drift apart.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub struct AreaLightShading;
+
+impl AreaLightShading {
+    /// How much of a lobe the quadrilateral covers, seen from a surface point.
+    pub fn coverage(
+        quad: &[Vector3; 4],
+        surface: Vector3,
+        lobe_axis: Vector3,
+        lobe_scale: f32,
+        two_sided: bool,
+    ) -> Result<f32> {
+        let native = Native::process()?;
+        let corners = [
+            native_vector3(quad[0]),
+            native_vector3(quad[1]),
+            native_vector3(quad[2]),
+            native_vector3(quad[3]),
+        ];
+        let surface = native_vector3(surface);
+        let lobe_axis = native_vector3(lobe_axis);
+        let mut value = 0.0_f32;
+        // SAFETY: the corner array holds the four the route reads, the two
+        // points are live locals, and the output is one too.
+        native.check(unsafe {
+            (native.engine.area_light_shading_coverage)(
+                corners.as_ptr(),
+                &surface,
+                &lobe_axis,
+                lobe_scale,
+                u8::from(two_sided),
+                &mut value,
+            )
+        })?;
+        Ok(value)
+    }
+
+    /// The lobe scale a roughness implies.
+    pub fn lobe_scale_for(roughness: f32) -> Result<f32> {
+        let native = Native::process()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the output is a live local.
+        native.check(unsafe {
+            (native.engine.area_light_shading_lobe_scale_for)(roughness, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// The GLSL that shades an area light.
+    pub fn shading_glsl() -> Result<String> {
+        let native = Native::process()?;
+        copy_text(&native, |api, destination, capacity, out_bytes| {
+            // SAFETY: CNA's size-then-copy protocol, driven by `copy_text`.
+            unsafe {
+                (api.area_light_shading_copy_shading_glsl)(destination, capacity, out_bytes)
+            }
+        })
+    }
+}
+
+impl ClusteredForwardEffect {
+    /// Gives the effect an area light and the table it shades with.
+    ///
+    /// Both are read for the call: the light is a value and the table is
+    /// referenced by the effect afterwards, so the caller keeps the table
+    /// alive.
+    pub fn set_area_light(&self, light: AreaLight, table: &AreaLightBrdfTable) -> Result<()> {
+        let handle = self.core.get()?;
+        let table = table.core.get()?;
+        let light = light.to_native();
+        // SAFETY: both handles are owned and the light is borrowed for the
+        // call.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_set_area_light)(handle, &light, table)
+        })
+    }
+}

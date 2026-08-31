@@ -7233,6 +7233,83 @@ extern "C" {
         argument1: u64,
         argument2: *mut u64,
     ) -> CNA_Result;
+    pub fn cna_area_light_brdf_table_copy_lookup_glsl(
+        argument0: *mut c_char,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_area_light_brdf_table_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_AreaLightBrdfTableHandle,
+    ) -> CNA_Result;
+    pub fn cna_area_light_brdf_table_create_with_size(
+        argument0: CNA_Handle,
+        argument1: i32,
+        argument2: i32,
+        argument3: *mut CNA_AreaLightBrdfTableHandle,
+    ) -> CNA_Result;
+    pub fn cna_area_light_brdf_table_destroy(argument0: CNA_AreaLightBrdfTableHandle) -> CNA_Result;
+    pub fn cna_area_light_brdf_table_evaluate(
+        argument0: f32,
+        argument1: f32,
+        argument2: i32,
+        argument3: *mut CNA_AreaLightBrdfTerms,
+    ) -> CNA_Result;
+    pub fn cna_area_light_brdf_table_get_generation_milliseconds(
+        argument0: CNA_AreaLightBrdfTableHandle,
+        argument1: *mut f64,
+    ) -> CNA_Result;
+    pub fn cna_area_light_brdf_table_get_sample_count(
+        argument0: CNA_AreaLightBrdfTableHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_area_light_brdf_table_get_size(
+        argument0: CNA_AreaLightBrdfTableHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_area_light_brdf_table_get_texture(
+        argument0: CNA_AreaLightBrdfTableHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_area_light_ext_init(argument0: *mut CNA_AreaLightEXT) -> CNA_Result;
+    pub fn cna_area_light_ext_is_valid(
+        argument0: *const CNA_AreaLightEXT,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_area_light_shading_contribution(
+        argument0: *const CNA_AreaLightEXT,
+        argument1: *const CNA_Vector3,
+        argument2: *const CNA_Vector3,
+        argument3: *const CNA_Vector3,
+        argument4: *const CNA_Vector3,
+        argument5: f32,
+        argument6: f32,
+        argument7: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_area_light_shading_copy_shading_glsl(
+        argument0: *mut c_char,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_area_light_shading_coverage(
+        argument0: *const CNA_Vector3,
+        argument1: *const CNA_Vector3,
+        argument2: *const CNA_Vector3,
+        argument3: f32,
+        argument4: CNA_Bool,
+        argument5: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_area_light_shading_lobe_scale_for(argument0: f32, argument1: *mut f32) -> CNA_Result;
+    pub fn cna_area_light_shading_quad_of(
+        argument0: *const CNA_AreaLightEXT,
+        argument1: *const CNA_Vector3,
+        argument2: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_set_area_light(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: *const CNA_AreaLightEXT,
+        argument2: CNA_AreaLightBrdfTableHandle,
+    ) -> CNA_Result;
     pub fn cna_atmospheric_sky_create(
         argument0: CNA_Handle,
         argument1: *mut CNA_AtmosphericSkyHandle,

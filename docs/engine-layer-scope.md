@@ -145,6 +145,7 @@ the criterion above is unchanged, only its precondition has been met.
 | probe volumes and the probe baker | `light_probe_volume_ext`, `light_probe_baker` | 27 | `VERIFIED_GPU` |
 | the material extension texture slots, material identity, thin-film iridescence and the skinned PBR effect | `pbr_material_extensions_*_texture`, `pbr_material_ext`, `thin_film_iridescence`, `skinned_pbr_effect` | 31 | `VERIFIED_STATE` |
 | the shader-effect factory, the glTF material bridge, the pipeline's skybox and the routes that were waiting on other families | `shader_effect_factory`, `gltf_material_*`, `render_pipeline_*_skybox`, the last `clustered_forward_effect` and `debug_draw` routes | 21 | `VERIFIED_GPU` |
+| area lights, their BRDF table and the shading maths | `area_light_ext`, `area_light_brdf_table`, `area_light_shading`, `clustered_forward_effect_set_area_light` | 17 | `VERIFIED_GPU` |
 
 ### What the GPU artifact changed about the evidence
 
@@ -378,4 +379,32 @@ three found something:
   overlay that stays empty until the grid is ready over one that refuses. The
   test asserts the line count is *unchanged* rather than that the call returned
   `Ok`, which is the difference between measuring the rule and measuring nothing.
+- **One texture accessor in the engine layer publishes an *owned* handle where
+  every other publishes a borrowed one.**
+  `cna_area_light_brdf_table_get_texture` goes through `CreateOwnedTexture2D`,
+  not `CreateBorrowedRenderTarget2D`: the handle counts against the game's own
+  children and is released with the texture destroy. Wrapping it in this
+  module's `BorrowedRenderTarget`, which releases through
+  `cna_render_target_destroy`, failed silently and stranded the child -- the
+  game then refused to shut down with "All owned C child resources must be
+  destroyed before the game". It is the same class of defect as the ASCII
+  effect's handle earlier in this document, found the same way, and the fix is
+  the same: the accessor answers a real `Texture2D` adopted with
+  `from_owned_handle`. Two accessors that look identical in the header are not
+  interchangeable, and only the implementation says which is which.
+- **A tube area light shades as the rectangle its axes span; a disc shades as
+  that rectangle scaled by `sqrt(pi)/2`.** All three shapes reduce to a
+  quadrilateral, and the disc's is the *equal-area* rectangle, so the two share
+  an area rather than a bounding box. The tube's quad is byte-identical to the
+  rectangle's -- the difference between them is energy, not outline -- which a
+  test asserting "the three shapes differ" fails on and a test asserting the
+  numbers catches correctly.
+- **The area-light lobe scale is `max(roughness^2, 0.02)`.** The floor is what
+  stops a mirror-smooth surface collapsing the lobe to a point, the same reason
+  the clustered forward effect floors roughness at 0.04. Pinned to the value
+  rather than to the direction of change.
+- **The BRDF table costs real time and says so.** A default 32x32 table with 64
+  samples per entry took 7.8 ms to integrate on this host, and its own
+  `generation_milliseconds` reports it -- which is why it is an object to build
+  once and share rather than a call to make per frame.
 
