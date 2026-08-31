@@ -46,7 +46,7 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-BEHAVIOR-004 | Repeated `Game` frame callback-context rebinding | `UPSTREAM_CNA_BLOCKED` | re-measured on cnanext `599d14e5` (ABI 0.21): `runtime.h` still has no context-rebind route, and `CNA_GameCallbacks` is still copied at create | BLOCKED_UPSTREAM |
 | RUST-BEHAVIOR-005 | `AudioEngine` renderer id and look-ahead | ignored by CNA | re-measured: still accepted and ignored, now stated upstream as a one-backend fact | DONE |
 | RUST-BEHAVIOR-006 | `GraphicsDeviceManager.RankDevices` | no candidate-ranking route | re-measured on cnanext `599d14e5` (ABI 0.21): `runtime_graphics_manager.h` has candidate and preference routes but still no ranking route | BLOCKED_UPSTREAM |
-| RUST-BEHAVIOR-007 | Media catalogs, picture tokens and `SavePicture` | `PLATFORM_PENDING` | re-measure | READY |
+| RUST-BEHAVIOR-007 | Media catalogs, picture tokens and `SavePicture` | was `PLATFORM_PENDING` wholesale | re-measured on cnanext `599d14e5`: 26 real pictures, a real root album, tokens answer absence, `SavePicture` preserves its name and joins the live saved-pictures album. Only cross-instance persistence remains provider-dependent | DONE |
 | RUST-BEHAVIOR-008 | Visualization spectrum on the dummy backend | `BACKEND_BLOCKED` | unchanged until a real audio backend is qualified | BLOCKED_HARDWARE |
 | RUST-BEHAVIOR-009 | Authored video decode | `BACKEND_BLOCKED`, `ASSET_PENDING` | needs a legal deterministic fixture | BLOCKED_ASSET |
 | RUST-BEHAVIOR-010 | `NetworkGamer`'s inherited `Gamer` members | not reachable | re-measured on cnanext `599d14e5`: `cna_gamer_*` still answers "The handle does not name a gamer this call can use", and the test now asserts that exact message | BLOCKED_UPSTREAM |

@@ -146,7 +146,82 @@ impl Game for MediaStressGame {
                 assert!(Arc::ptr_eq(&picture, &pictures.Item(0)?));
                 let _ = (picture.Name()?, picture.Width()?, picture.Height()?);
             }
-            assert!(library.SavedPictures()?.Count()? >= 0);
+            // `Count() >= 0` says nothing about a count, so this asserts the
+            // properties that can actually be wrong: the collection agrees
+            // with its own enumerator, and one past the end is refused.
+            let saved = library.SavedPictures()?;
+            let saved_count = saved.Count()?;
+            assert_eq!(saved.GetEnumerator()?.count(), saved_count as usize);
+            assert!(saved.Item(saved_count).is_err());
+
+            if cycle == 0 {
+                // RUST-BEHAVIOR-007, re-measured on cnanext 599d14e5.
+                //
+                // The provider on this host really does enumerate pictures --
+                // 26 of them in this run -- and really does have a root
+                // picture album, so neither is PLATFORM_PENDING any more.
+                assert!(
+                    library
+                        .RootPictureAlbum()?
+                        .is_some(),
+                    "the host provider exposes a root picture album"
+                );
+
+                // A token that names nothing is an ordinary "no picture",
+                // not a refusal -- which is XNA's own behaviour, where
+                // GetPictureFromToken returns null.
+                assert_eq!(
+                    library.GetPictureFromToken("")?.is_some(),
+                    false,
+                    "an empty token names no picture"
+                );
+                assert_eq!(
+                    library.GetPictureFromToken("no-such-token")?.is_some(),
+                    false,
+                    "an unknown token names no picture, rather than failing"
+                );
+
+                // SavePicture works and preserves the name exactly. What it
+                // does *not* do on this host is commit to the saved-pictures
+                // album, and the count staying put is how that is stated
+                // rather than assumed.
+                let before = saved_count;
+                let png: Vec<u8> = vec![0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+                let stored = library.SavePicture("cna-rust-probe", &png)?;
+                assert_eq!(
+                    stored.Name()?,
+                    "cna-rust-probe",
+                    "the requested name is preserved exactly"
+                );
+                // The bytes above are a PNG signature and nothing else, so the
+                // provider has no image to measure. Zero dimensions are the
+                // honest answer for that, and asserting them is what would
+                // catch a provider that started inventing a size.
+                assert_eq!((stored.Width()?, stored.Height()?), (0, 0));
+                // The live library *does* see it: the saved-pictures album
+                // grows by one. What does not happen is persistence across
+                // library instances -- a freshly constructed MediaLibrary
+                // reports none -- and that, precisely, is what remains
+                // provider-dependent.
+                assert_eq!(
+                    library.SavedPictures()?.Count()?,
+                    before + 1,
+                    "a saved picture joins the live library's saved-pictures album"
+                );
+                let fresh = MediaLibrary::new(game)?;
+                assert_eq!(
+                    fresh.SavedPictures()?.Count()?,
+                    0,
+                    "but a new library does not see it: the host provider does not \
+                     persist saved pictures, and that is the whole of what remains \
+                     PLATFORM_PENDING here"
+                );
+                assert!(
+                    fresh.Pictures()?.Count()? > 0,
+                    "while the ordinary picture catalogue is genuinely populated"
+                );
+                fresh.Dispose()?;
+            }
             let source = library.MediaSource()?;
             assert!(Arc::ptr_eq(&source, &library.MediaSource()?));
             let _ = (source.Name()?, source.MediaSourceType()?);

@@ -208,7 +208,12 @@
         "VERIFIED_NATIVE",
         "PLATFORM_PENDING"
       ],
-      "evidence": "The host provider returned 21 real Picture entries and native name/dimension/index routes were exercised without fabricated files. Deterministic image/thumbnail, token, SavePicture and picture-album provider qualification remains pending."
+      "evidence": "Re-measured on cnanext 599d14e5 (RUST-BEHAVIOR-007). The host provider returns 26 real Picture entries and a real root picture album, so neither is pending any more. GetPictureFromToken answers \"no picture\" for an empty and for an unknown token rather than refusing, which is XNA's own null. SavePicture preserves the requested name exactly, reports zero dimensions for bytes that are not a decodable image, and joins the live library's saved-pictures album. What remains provider-dependent is persistence: a freshly constructed MediaLibrary does not see it.",
+      "status": [
+        "VERIFIED_MANAGED",
+        "VERIFIED_NATIVE",
+        "PLATFORM_PENDING"
+      ]
     },
     {
       "capability": "MediaSource",
