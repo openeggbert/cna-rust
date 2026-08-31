@@ -322,6 +322,20 @@ honoured: XNA presents an independently created device to that window and
 `cna_graphics_device_create` takes no window at all. A non-default handle is
 refused rather than silently dropped.
 
+### The upstream secondary-context fix, verified independently
+
+cnanext `a2013068` "preserve active GL context across secondary devices" landed
+during this milestone. Rather than take it on trust, the same case creates an
+owned device *inside* a running `Game`, clears it, builds a texture on it,
+releases it, and then keeps using the game's own device -- reading exact pixel
+data back through it in `LoadContent` and clearing again in a later `Draw`. A
+secondary device that took the current context would show up as the game's own
+device failing, on that later frame if not immediately. It does not.
+
+This is a positive check against the fixed upstream, not a regression test
+against the broken one: this repository cannot revert cnanext to reproduce the
+original failure.
+
 ### Mutation controls
 
 The case is `independent-graphics-device` in `native_stress`. Planted defects

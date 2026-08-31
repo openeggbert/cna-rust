@@ -2776,9 +2776,13 @@ fn independent_graphics_device_case() {
         .expect("second device survives the first one's disposal");
 
     // 10. A game's device still refuses to dispose itself: adding an owned
-    //     device must not have relaxed the borrowed one.
-    run_for_frames(BorrowedDeviceDisposalGame::default(), 1)
-        .expect("a game device still refuses self-disposal");
+    //     device must not have relaxed the borrowed one. The same game also
+    //     creates a second device while it is running and keeps drawing,
+    //     which is the Rust-side check on cnanext a2013068 "preserve active
+    //     GL context across secondary devices": before that fix a secondary
+    //     device stole the running game's context.
+    run_for_frames(BorrowedDeviceDisposalGame::default(), 2)
+        .expect("a game device refuses self-disposal and survives a secondary device");
 
     // 11. Dropping the last clone releases a device that was never disposed,
     //     and a live child keeps it alive until the child goes first.
@@ -2835,6 +2839,7 @@ fn independent_graphics_device_case() {
 #[derive(Default)]
 struct BorrowedDeviceDisposalGame {
     state: Arc<GameState>,
+    frames_seen: Arc<AtomicUsize>,
 }
 
 impl GameStateAccess for BorrowedDeviceDisposalGame {
@@ -2853,6 +2858,43 @@ impl Game for BorrowedDeviceDisposalGame {
             "a borrowed device must refuse self-disposal, got {refusal:?}"
         );
         assert!(!device.IsDisposed()?, "a refused Dispose changes nothing");
+
+        // Create an owned device while this game is running, use it, and
+        // release it. The game's own device must keep working throughout and
+        // afterwards; a secondary device that took the current context would
+        // show up as the game's own draw failing.
+        let mut secondary = GraphicsDevice::new(
+            &independent_adapter(),
+            GraphicsProfile::Reach,
+            &independent_presentation(48, 48),
+        )?;
+        secondary.ClearWithColor(Color::Red)?;
+        let owned = Texture2D::new(&secondary, 1, 1)?;
+        owned.SetData(&[Color::Green])?;
+        device.ClearWithColor(Color::CornflowerBlue)?;
+        let borrowed = Texture2D::new(&device, 1, 1)?;
+        borrowed.SetData(&[Color::Blue])?;
+        let mut read = [Color::Transparent];
+        borrowed.GetData(&mut read)?;
+        assert_eq!(read, [Color::Blue], "the game's device still works");
+        secondary.DisposeWithNoArguments()?;
+        device.ClearWithColor(Color::CornflowerBlue)?;
+        borrowed.GetData(&mut read)?;
+        assert_eq!(
+            read,
+            [Color::Blue],
+            "the game's device survives a secondary device's whole life"
+        );
+        self.frames_seen.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+
+    fn Draw(&mut self, game: &mut GameContext<'_>, _time: &GameTime) -> Result<()> {
+        // Drawing after the secondary device existed is the actual context
+        // check: LoadContent alone would not exercise a later frame.
+        let device = game.GraphicsDevice()?;
+        device.ClearWithColor(Color::CornflowerBlue)?;
+        self.frames_seen.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 }
