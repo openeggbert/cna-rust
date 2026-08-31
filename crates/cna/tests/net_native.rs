@@ -181,18 +181,31 @@ fn a_local_gamer_joins_the_session_and_carries_its_signed_in_gamer() -> Result<(
     // The session it belongs to is the one that admitted it.
     assert_eq!(local.Session()?.MaxGamers()?, session.MaxGamers()?);
 
-    // CNA has no gamer-base access for a network gamer, so the gamertag a
-    // roster read could trivially have guessed from the published roster is a
-    // refusal instead. Reporting the refusal is the point.
-    assert!(matches!(local.Gamertag(), Err(CnaError::Native { .. })));
-    // The signed-in gamer behind a local gamer is answered when CNA has one
-    // and refused when it does not; either way the projection reports CNA
-    // rather than reaching around it.
-    match local.SignedInGamer() {
-        Ok(signed_in) => assert_eq!(signed_in.Gamertag()?, "host"),
-        Err(CnaError::Native { .. }) => {}
-        Err(other) => panic!("unexpected signed-in gamer failure: {other:?}"),
-    }
+    // CNA still has no gamer-base access for a network gamer, so the gamertag
+    // a roster read could trivially have guessed from the published roster is
+    // a refusal instead. Reporting the refusal is the point, and the message
+    // is CNA's own rather than a summary of it. (RUST-BEHAVIOR-010,
+    // re-measured on cnanext 599d14e5 and still blocked.)
+    assert!(
+        matches!(local.Gamertag(), Err(CnaError::Native { message, .. })
+            if message.contains("does not name a gamer this call can use")),
+        "a network gamer still cannot answer its inherited Gamer members"
+    );
+    assert!(matches!(local.DisplayName(), Err(CnaError::Native { .. })));
+
+    // The signed-in gamer behind a local gamer *is* reachable now.
+    // RUST-BEHAVIOR-011 recorded `NOT_SUPPORTED` -- "Signed-in gamers have no
+    // C representation yet" -- and cnanext has since grown one. This asserts
+    // the working path rather than tolerating either, so a regression fails
+    // here instead of passing quietly.
+    let signed_in = local
+        .SignedInGamer()
+        .expect("a local gamer answers the signed-in gamer behind it");
+    assert_eq!(
+        signed_in.Gamertag()?,
+        "host",
+        "and it is the gamer that was published, not some other one"
+    );
 
     // `IsReady` is session state a caller sets, and `ResetReady` clears it.
     local.SetIsReady(true)?;
@@ -460,6 +473,15 @@ fn an_async_create_completes_before_it_returns() -> Result<()> {
 
     let session = NetworkSession::EndCreate(&result)?;
     assert_eq!(session.SessionType()?, NetworkSessionType::Local);
+    // The asynchronous path used to substitute its own gamer limit and ignore
+    // the requested one; upstream changed that during this milestone, so the
+    // limit asked for above is the limit the session has. Asserting it means a
+    // regression to the old substitution fails here.
+    assert_eq!(
+        session.MaxGamers()?,
+        4,
+        "BeginCreate preserves the requested gamer limit"
+    );
     // One End per result.
     assert!(matches!(
         NetworkSession::EndCreate(&result),
