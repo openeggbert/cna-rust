@@ -95,8 +95,8 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-PACKAGE-003 | `cargo package -p cna-rust` needs `cna-rust-sys` published first | publish order recorded | BLOCKED_UPSTREAM |
 | RUST-PACKAGE-002 | MSRV 1.74 evidence | `tools/msrv/audit.py` denylist; two real violations found and fixed. Compiling with 1.74 is still `MSRV_RUNTIME_NOT_RUN` | DONE |
 | RUST-TEMPLATE-001 | Template against the live artifact | 60/600 frames on ABI 0.20 | DONE |
-| RUST-TEMPLATE-002 | Template modern-extension canary | `--extensions-smoke` | DONE |
-| RUST-TEMPLATE-003 | Generated standalone project on the live ABI | re-verified on ABI 0.21; the canary caught the generator dropping `cna-sys`'s new build script, now taken from the manifest | DONE |
+| RUST-TEMPLATE-002 | Template modern-extension canary | `--extensions-smoke` | DONE, and re-qualified on a renderer that draws: the canary used to fail outright on every GL-family renderer because its standalone-device half needs a windowless `GraphicsDevice`. It now tolerates exactly that refusal, keeps the `.cnb` model half that was being lost with it, and reports the engine-layer version |
+| RUST-TEMPLATE-003 | Generated standalone project on the live ABI | re-verified on ABI 0.21; the canary caught the generator dropping `cna-sys`'s new build script, now taken from the manifest. Re-generated and re-run against the `OPENGLES3` artifact with the engine layer bound: `--extensions-smoke`, `--frames 60` and `--stability-test` all exit zero | DONE |
 
 ## Qualification, 2026-08-31 (ABI 0.21 milestone)
 
