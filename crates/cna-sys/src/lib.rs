@@ -819,6 +819,50 @@ pub type CNA_InstancedRendererEXTHandle = CNA_Handle;
 pub type CNA_SkinnedModelEXTHandle = CNA_Handle;
 pub type CNA_SkinningDataHandle = CNA_Handle;
 pub type CNA_AnimationPlayerHandle = CNA_Handle;
+pub type CNA_MorphTargetDataEXTHandle = CNA_Handle;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_MorphTargetDeltaEXTDescriptor {
+    pub position_deltas: *const CNA_Vector3,
+    pub position_delta_count: u64,
+    pub normal_deltas: *const CNA_Vector3,
+    pub normal_delta_count: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_MorphWeightKeyframeEXTDescriptor {
+    pub time_seconds: f64,
+    pub weights: *const f32,
+    pub weight_count: u64,
+    pub in_tangents: *const f32,
+    pub in_tangent_count: u64,
+    pub out_tangents: *const f32,
+    pub out_tangent_count: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_MorphWeightTrackEXTDescriptor {
+    pub keyframes: *const CNA_MorphWeightKeyframeEXTDescriptor,
+    pub keyframe_count: u64,
+    pub step_interpolation: CNA_Bool,
+    pub cubic_spline: CNA_Bool,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_MorphTargetDataEXTDescriptor {
+    pub base_vertex_bytes: *const u8,
+    pub base_vertex_byte_count: u64,
+    pub stride: i32,
+    pub targets: *const CNA_MorphTargetDeltaEXTDescriptor,
+    pub target_count: u64,
+    pub weights: *const f32,
+    pub weight_count: u64,
+    pub weight_track: CNA_MorphWeightTrackEXTDescriptor,
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -10837,4 +10881,82 @@ pub type cna_skinning_data_set_skeleton_root_name_ext_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_skinning_data_set_skeleton_root_node_index_ext_fn = unsafe extern "C" fn(
     CNA_SkinningDataHandle, i32,
+) -> CNA_Result;
+pub type cna_model_mesh_part_get_morph_target_data_ext_fn = unsafe extern "C" fn(
+    CNA_ModelMeshPartHandle, *mut CNA_Bool, *mut CNA_MorphTargetDataEXTHandle,
+) -> CNA_Result;
+pub type cna_model_mesh_part_set_morph_target_data_ext_fn = unsafe extern "C" fn(
+    CNA_ModelMeshPartHandle, CNA_MorphTargetDataEXTHandle,
+) -> CNA_Result;
+pub type cna_model_mesh_part_set_morph_weights_ext_fn = unsafe extern "C" fn(
+    CNA_ModelMeshPartHandle, *const f32, u64,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_blend_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, *const f32, u64, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_copy_base_vertex_bytes_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_copy_normal_deltas_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, u64, *mut CNA_Vector3, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_copy_position_deltas_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, u64, *mut CNA_Vector3, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_copy_tangent_deltas_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, u64, *mut CNA_Vector3, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_copy_triangle_indices_ext_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, *mut u32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_copy_type_name_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_copy_weight_keyframe_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, u64, *mut f64, *mut f32, u64, *mut u64, *mut f32, u64, *mut u64, *mut f32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_copy_weights_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, *mut f32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_create_fn = unsafe extern "C" fn(
+    *const CNA_MorphTargetDataEXTDescriptor, *mut CNA_MorphTargetDataEXTHandle,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_destroy_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_get_base_vertex_byte_count_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_get_recompute_flat_normals_ext_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_get_stride_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_get_target_count_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_get_type_name_byte_count_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_get_weight_track_info_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, *mut u64, *mut CNA_Bool, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_set_recompute_flat_normals_ext_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_set_tangent_deltas_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, u64, *const CNA_Vector3, u64,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_set_triangle_indices_ext_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, *const u32, u64,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_set_weight_track_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, *const CNA_MorphWeightTrackEXTDescriptor,
+) -> CNA_Result;
+pub type cna_morph_target_data_ext_set_weights_fn = unsafe extern "C" fn(
+    CNA_MorphTargetDataEXTHandle, *const f32, u64,
+) -> CNA_Result;
+pub type cna_morph_weight_track_ext_evaluate_fn = unsafe extern "C" fn(
+    *const CNA_MorphWeightTrackEXTDescriptor, f64, *mut f32, u64, *mut u64,
 ) -> CNA_Result;

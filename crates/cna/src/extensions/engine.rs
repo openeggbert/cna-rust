@@ -13660,6 +13660,10 @@ impl NativeMeshPart {
     pub(crate) fn native_handle(&self) -> Result<sys::CNA_ModelMeshPartHandle> {
         self.core.get()
     }
+
+    pub(crate) fn api(&self) -> &Arc<Native> {
+        &self.native
+    }
 }
 
 impl Drop for NativeMeshPart {

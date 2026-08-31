@@ -9122,6 +9122,149 @@ extern "C" {
         argument0: CNA_InstancedRendererEXTHandle,
         argument1: CNA_Bool,
     ) -> CNA_Result;
+    pub fn cna_model_mesh_part_get_morph_target_data_ext(
+        argument0: CNA_ModelMeshPartHandle,
+        argument1: *mut CNA_Bool,
+        argument2: *mut CNA_MorphTargetDataEXTHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_part_set_morph_target_data_ext(
+        argument0: CNA_ModelMeshPartHandle,
+        argument1: CNA_MorphTargetDataEXTHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_part_set_morph_weights_ext(
+        argument0: CNA_ModelMeshPartHandle,
+        argument1: *const f32,
+        argument2: u64,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_blend(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: *const f32,
+        argument2: u64,
+        argument3: *mut u8,
+        argument4: u64,
+        argument5: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_copy_base_vertex_bytes(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: *mut u8,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_copy_normal_deltas(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: u64,
+        argument2: *mut CNA_Vector3,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_copy_position_deltas(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: u64,
+        argument2: *mut CNA_Vector3,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_copy_tangent_deltas(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: u64,
+        argument2: *mut CNA_Vector3,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_copy_triangle_indices_ext(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: *mut u32,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_copy_type_name(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_copy_weight_keyframe(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: u64,
+        argument2: *mut f64,
+        argument3: *mut f32,
+        argument4: u64,
+        argument5: *mut u64,
+        argument6: *mut f32,
+        argument7: u64,
+        argument8: *mut u64,
+        argument9: *mut f32,
+        argument10: u64,
+        argument11: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_copy_weights(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: *mut f32,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_create(
+        argument0: *const CNA_MorphTargetDataEXTDescriptor,
+        argument1: *mut CNA_MorphTargetDataEXTHandle,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_destroy(argument0: CNA_MorphTargetDataEXTHandle) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_get_base_vertex_byte_count(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_get_recompute_flat_normals_ext(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_get_stride(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_get_target_count(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_get_type_name_byte_count(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_get_weight_track_info(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: *mut u64,
+        argument2: *mut CNA_Bool,
+        argument3: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_set_recompute_flat_normals_ext(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_set_tangent_deltas(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: u64,
+        argument2: *const CNA_Vector3,
+        argument3: u64,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_set_triangle_indices_ext(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: *const u32,
+        argument2: u64,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_set_weight_track(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: *const CNA_MorphWeightTrackEXTDescriptor,
+    ) -> CNA_Result;
+    pub fn cna_morph_target_data_ext_set_weights(
+        argument0: CNA_MorphTargetDataEXTHandle,
+        argument1: *const f32,
+        argument2: u64,
+    ) -> CNA_Result;
+    pub fn cna_morph_weight_track_ext_evaluate(
+        argument0: *const CNA_MorphWeightTrackEXTDescriptor,
+        argument1: f64,
+        argument2: *mut f32,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
     pub fn cna_model_mesh_part_create(
         argument0: CNA_VertexBufferHandle,
         argument1: CNA_IndexBufferHandle,

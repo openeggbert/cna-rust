@@ -1600,3 +1600,713 @@ impl Drop for AnimationPlayer {
         let _ = self.release();
     }
 }
+
+/// One morph target's vertex deltas.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct MorphTargetDelta {
+    /// Position deltas, one per vertex of the base pose.
+    pub position_deltas: Vec<Vector3>,
+    /// Normal deltas, empty when the target does not move normals.
+    pub normal_deltas: Vec<Vector3>,
+}
+
+/// One keyframe of a morph-weight track.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct MorphWeightKeyframe {
+    /// When, in seconds.
+    pub time_seconds: f64,
+    /// One weight per morph target.
+    pub weights: Vec<f32>,
+    /// Incoming Hermite tangents, used only by a cubic-spline track.
+    pub in_tangents: Vec<f32>,
+    /// Outgoing Hermite tangents, used only by a cubic-spline track.
+    pub out_tangents: Vec<f32>,
+}
+
+/// How a morph-weight track is sampled between its keyframes.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct MorphWeightTrack {
+    /// The keyframes, in time order.
+    pub keyframes: Vec<MorphWeightKeyframe>,
+    /// Hold the lower keyframe's value rather than interpolating.
+    pub step_interpolation: bool,
+    /// Use the Hermite tangents rather than interpolating linearly.
+    pub cubic_spline: bool,
+}
+
+impl MorphWeightTrack {
+    /// The weights this track holds at a time.
+    ///
+    /// A pure function of the track, so it needs no morph data: the same
+    /// arithmetic a caller can check its own authoring against.
+    pub fn evaluate(&self, time_seconds: f64) -> Result<Vec<f32>> {
+        let native = Native::process()?;
+        let staged = StagedTrack::new(self);
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the count, and
+        // every array the descriptor points at is kept alive by `staged`.
+        let probe = unsafe {
+            (native.engine.morph_weight_track_ext_evaluate)(
+                &staged.descriptor,
+                time_seconds,
+                core::ptr::null_mut(),
+                0,
+                &mut required,
+            )
+        };
+        if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+            native.check(probe)?;
+        }
+        if required == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![0.0_f32; required as usize];
+        let mut count = 0_u64;
+        // SAFETY: the destination holds `required` writable floats.
+        native.check(unsafe {
+            (native.engine.morph_weight_track_ext_evaluate)(
+                &staged.descriptor,
+                time_seconds,
+                buffer.as_mut_ptr(),
+                required,
+                &mut count,
+            )
+        })?;
+        buffer.truncate(count as usize);
+        Ok(buffer)
+    }
+}
+
+/// A base pose, a set of morph targets and the weights that blend them.
+///
+/// `OWNED`. Everything is copied at construction, so nothing here borrows the
+/// caller's arrays past the call that reads them.
+pub struct MorphTargetData {
+    handle: Mutex<sys::CNA_MorphTargetDataEXTHandle>,
+    native: Arc<Native>,
+}
+
+impl MorphTargetData {
+    /// Creates morph data from a base pose and its targets.
+    ///
+    /// **The stride must be 32, 52 or 56 bytes**, and that list is narrower
+    /// than the renderer's own. `cna_morph_target_data_ext_create` checks the
+    /// literal three; CNA's canonical blender deliberately stopped doing that
+    /// and queries the stride table instead, because the list went stale when a
+    /// metallic-roughness material began selecting layouts of stride 48
+    /// (unskinned) and 68 (skinned) -- both of which carry a normal, and both
+    /// of which the old list silently excluded, so every physically based morph
+    /// target kept its base normals while its positions moved. The C entry
+    /// point still has the literal, so an ordinary glTF PBR mesh cannot be
+    /// handed to it at all. This is upstream's to fix; the binding reports the
+    /// refusal as it is rather than working around it.
+    pub fn new(
+        base_vertex_bytes: &[u8],
+        stride: i32,
+        targets: &[MorphTargetDelta],
+        weights: &[f32],
+        weight_track: &MorphWeightTrack,
+    ) -> Result<Self> {
+        let native = Native::process()?;
+        let staged_targets = StagedTargets::new(targets);
+        let staged_track = StagedTrack::new(weight_track);
+        let descriptor = sys::CNA_MorphTargetDataEXTDescriptor {
+            base_vertex_bytes: base_vertex_bytes.as_ptr(),
+            base_vertex_byte_count: base_vertex_bytes.len() as u64,
+            stride,
+            targets: staged_targets.descriptors.as_ptr(),
+            target_count: staged_targets.descriptors.len() as u64,
+            weights: weights.as_ptr(),
+            weight_count: weights.len() as u64,
+            weight_track: staged_track.descriptor,
+        };
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: every array the descriptor points at outlives the call, and
+        // the output is a live local.
+        native
+            .check(unsafe { (native.engine.morph_target_data_ext_create)(&descriptor, &mut handle) })?;
+        Ok(Self {
+            handle: Mutex::new(handle),
+            native,
+        })
+    }
+
+    fn get(&self) -> Result<sys::CNA_MorphTargetDataEXTHandle> {
+        let handle = *self
+            .handle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if handle == sys::CNA_INVALID_HANDLE {
+            return Err(CnaError::InvalidInput(
+                "the morph target data has been released",
+            ));
+        }
+        Ok(handle)
+    }
+
+    /// CNA's own name for the type.
+    pub fn type_name(&self) -> Result<String> {
+        let handle = self.get()?;
+        let mut required = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self
+                .native
+                .engine
+                .morph_target_data_ext_get_type_name_byte_count)(handle, &mut required)
+        })?;
+        read_text(required, |destination, capacity, out_bytes| {
+            // SAFETY: the handle is owned and the destination holds `capacity`
+            // writable bytes.
+            unsafe {
+                (self.native.engine.morph_target_data_ext_copy_type_name)(
+                    handle,
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+        .and_then(|text| text.ok_or(CnaError::InvalidInput("CNA text is not valid UTF-8")))
+    }
+
+    /// How many bytes one base-pose vertex occupies.
+    pub fn stride(&self) -> Result<i32> {
+        let handle = self.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.morph_target_data_ext_get_stride)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// How many morph targets it carries.
+    pub fn target_count(&self) -> Result<u64> {
+        let handle = self.get()?;
+        let mut value = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.morph_target_data_ext_get_target_count)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// The base pose, byte for byte.
+    pub fn base_vertex_bytes(&self) -> Result<Vec<u8>> {
+        let handle = self.get()?;
+        let mut required = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self
+                .native
+                .engine
+                .morph_target_data_ext_get_base_vertex_byte_count)(handle, &mut required)
+        })?;
+        if required == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![0_u8; required as usize];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `required`
+        // writable bytes.
+        self.native.check(unsafe {
+            (self.native.engine.morph_target_data_ext_copy_base_vertex_bytes)(
+                handle,
+                buffer.as_mut_ptr(),
+                required,
+                &mut count,
+            )
+        })?;
+        buffer.truncate(count as usize);
+        Ok(buffer)
+    }
+
+    /// One target's position deltas.
+    pub fn position_deltas(&self, target_index: u64) -> Result<Vec<Vector3>> {
+        self.deltas(
+            self.native.engine.morph_target_data_ext_copy_position_deltas,
+            target_index,
+        )
+    }
+
+    /// One target's normal deltas, empty when it moves no normals.
+    pub fn normal_deltas(&self, target_index: u64) -> Result<Vec<Vector3>> {
+        self.deltas(
+            self.native.engine.morph_target_data_ext_copy_normal_deltas,
+            target_index,
+        )
+    }
+
+    /// One target's tangent deltas, empty when it moves no tangents.
+    pub fn tangent_deltas(&self, target_index: u64) -> Result<Vec<Vector3>> {
+        self.deltas(
+            self.native.engine.morph_target_data_ext_copy_tangent_deltas,
+            target_index,
+        )
+    }
+
+    /// Sets one target's tangent deltas.
+    pub fn set_tangent_deltas(&self, target_index: u64, deltas: &[Vector3]) -> Result<()> {
+        let handle = self.get()?;
+        let native_deltas: Vec<sys::CNA_Vector3> = deltas.iter().copied().map(vector).collect();
+        // SAFETY: the handle is owned and the array is borrowed for the call
+        // with its own length.
+        self.native.check(unsafe {
+            (self.native.engine.morph_target_data_ext_set_tangent_deltas)(
+                handle,
+                target_index,
+                native_deltas.as_ptr(),
+                native_deltas.len() as u64,
+            )
+        })
+    }
+
+    fn deltas(
+        &self,
+        route: unsafe extern "C" fn(
+            sys::CNA_Handle,
+            u64,
+            *mut sys::CNA_Vector3,
+            u64,
+            *mut u64,
+        ) -> sys::CNA_Result,
+        target_index: u64,
+    ) -> Result<Vec<Vector3>> {
+        let handle = self.get()?;
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the count.
+        let probe =
+            unsafe { route(handle, target_index, core::ptr::null_mut(), 0, &mut required) };
+        if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+            self.native.check(probe)?;
+        }
+        if required == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![sys::CNA_Vector3::default(); required as usize];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `required`
+        // writable vectors.
+        self.native.check(unsafe {
+            route(handle, target_index, buffer.as_mut_ptr(), required, &mut count)
+        })?;
+        buffer.truncate(count as usize);
+        Ok(buffer.into_iter().map(from_vector).collect())
+    }
+
+    /// The current weights, one per target.
+    pub fn weights(&self) -> Result<Vec<f32>> {
+        let handle = self.get()?;
+        let required = self.target_count()?;
+        if required == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![0.0_f32; required as usize];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `required`
+        // writable floats.
+        self.native.check(unsafe {
+            (self.native.engine.morph_target_data_ext_copy_weights)(
+                handle,
+                buffer.as_mut_ptr(),
+                required,
+                &mut count,
+            )
+        })?;
+        buffer.truncate(count as usize);
+        Ok(buffer)
+    }
+
+    /// Sets them.
+    pub fn set_weights(&self, weights: &[f32]) -> Result<()> {
+        let handle = self.get()?;
+        // SAFETY: the handle is owned and the array is borrowed for the call
+        // with its own length.
+        self.native.check(unsafe {
+            (self.native.engine.morph_target_data_ext_set_weights)(
+                handle,
+                weights.as_ptr(),
+                weights.len() as u64,
+            )
+        })
+    }
+
+    /// Replaces the weight track.
+    pub fn set_weight_track(&self, track: &MorphWeightTrack) -> Result<()> {
+        let handle = self.get()?;
+        let staged = StagedTrack::new(track);
+        // SAFETY: the handle is owned and every array the descriptor points at
+        // is kept alive by `staged` for the call.
+        self.native.check(unsafe {
+            (self.native.engine.morph_target_data_ext_set_weight_track)(handle, &staged.descriptor)
+        })
+    }
+
+    /// The track's shape: how many keyframes and how they are sampled.
+    pub fn weight_track_info(&self) -> Result<(u64, bool, bool)> {
+        let handle = self.get()?;
+        let mut keyframes = 0_u64;
+        let mut step = 0_u8;
+        let mut cubic = 0_u8;
+        // SAFETY: the handle is owned and all three outputs are live locals.
+        self.native.check(unsafe {
+            (self.native.engine.morph_target_data_ext_get_weight_track_info)(
+                handle,
+                &mut keyframes,
+                &mut step,
+                &mut cubic,
+            )
+        })?;
+        Ok((keyframes, step != 0, cubic != 0))
+    }
+
+    /// One keyframe of the stored track.
+    pub fn weight_keyframe(&self, index: u64) -> Result<MorphWeightKeyframe> {
+        let handle = self.get()?;
+        let targets = self.target_count()?.max(1);
+        let mut time = 0.0_f64;
+        let mut weights = vec![0.0_f32; targets as usize];
+        let mut in_tangents = vec![0.0_f32; targets as usize];
+        let mut out_tangents = vec![0.0_f32; targets as usize];
+        let mut weight_count = 0_u64;
+        let mut in_count = 0_u64;
+        let mut out_count = 0_u64;
+        // SAFETY: the handle is owned and each destination holds the capacity
+        // passed alongside it.
+        self.native.check(unsafe {
+            (self.native.engine.morph_target_data_ext_copy_weight_keyframe)(
+                handle,
+                index,
+                &mut time,
+                weights.as_mut_ptr(),
+                weights.len() as u64,
+                &mut weight_count,
+                in_tangents.as_mut_ptr(),
+                in_tangents.len() as u64,
+                &mut in_count,
+                out_tangents.as_mut_ptr(),
+                out_tangents.len() as u64,
+                &mut out_count,
+            )
+        })?;
+        weights.truncate(weight_count as usize);
+        in_tangents.truncate(in_count as usize);
+        out_tangents.truncate(out_count as usize);
+        Ok(MorphWeightKeyframe {
+            time_seconds: time,
+            weights,
+            in_tangents,
+            out_tangents,
+        })
+    }
+
+    /// Blends the base pose and the targets by a set of weights.
+    ///
+    /// One weight per target: a shorter or longer array is refused rather than
+    /// padded, because a missing weight is not the same as a zero one.
+    pub fn blend(&self, weights: &[f32]) -> Result<Vec<u8>> {
+        let handle = self.get()?;
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the count.
+        let probe = unsafe {
+            (self.native.engine.morph_target_data_ext_blend)(
+                handle,
+                weights.as_ptr(),
+                weights.len() as u64,
+                core::ptr::null_mut(),
+                0,
+                &mut required,
+            )
+        };
+        if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+            self.native.check(probe)?;
+        }
+        if required == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![0_u8; required as usize];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `required`
+        // writable bytes.
+        self.native.check(unsafe {
+            (self.native.engine.morph_target_data_ext_blend)(
+                handle,
+                weights.as_ptr(),
+                weights.len() as u64,
+                buffer.as_mut_ptr(),
+                required,
+                &mut count,
+            )
+        })?;
+        buffer.truncate(count as usize);
+        Ok(buffer)
+    }
+
+    /// Whether blending recomputes flat normals from the blended positions.
+    pub fn recompute_flat_normals(&self) -> Result<bool> {
+        let handle = self.get()?;
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self
+                .native
+                .engine
+                .morph_target_data_ext_get_recompute_flat_normals_ext)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Sets it. Needs the triangle indices to have something to recompute from.
+    pub fn set_recompute_flat_normals(&self, value: bool) -> Result<()> {
+        let handle = self.get()?;
+        // SAFETY: the handle is owned.
+        self.native.check(unsafe {
+            (self
+                .native
+                .engine
+                .morph_target_data_ext_set_recompute_flat_normals_ext)(
+                handle,
+                u8::from(value),
+            )
+        })
+    }
+
+    /// The triangle indices flat-normal recomputation walks.
+    pub fn triangle_indices(&self) -> Result<Vec<u32>> {
+        let handle = self.get()?;
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the count.
+        let probe = unsafe {
+            (self.native.engine.morph_target_data_ext_copy_triangle_indices_ext)(
+                handle,
+                core::ptr::null_mut(),
+                0,
+                &mut required,
+            )
+        };
+        if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+            self.native.check(probe)?;
+        }
+        if required == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![0_u32; required as usize];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `required`
+        // writable indices.
+        self.native.check(unsafe {
+            (self.native.engine.morph_target_data_ext_copy_triangle_indices_ext)(
+                handle,
+                buffer.as_mut_ptr(),
+                required,
+                &mut count,
+            )
+        })?;
+        buffer.truncate(count as usize);
+        Ok(buffer)
+    }
+
+    /// Sets them.
+    pub fn set_triangle_indices(&self, indices: &[u32]) -> Result<()> {
+        let handle = self.get()?;
+        // SAFETY: the handle is owned and the array is borrowed for the call
+        // with its own length.
+        self.native.check(unsafe {
+            (self.native.engine.morph_target_data_ext_set_triangle_indices_ext)(
+                handle,
+                indices.as_ptr(),
+                indices.len() as u64,
+            )
+        })
+    }
+
+    /// Releases the data now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        let mut guard = self
+            .handle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let handle = *guard;
+        if handle == sys::CNA_INVALID_HANDLE {
+            return Ok(());
+        }
+        // SAFETY: the handle was published by this object's own create route
+        // and is released exactly once, here.
+        self.native
+            .check(unsafe { (self.native.engine.morph_target_data_ext_destroy)(handle) })?;
+        *guard = sys::CNA_INVALID_HANDLE;
+        Ok(())
+    }
+}
+
+impl Drop for MorphTargetData {
+    fn drop(&mut self) {
+        let _ = self.release();
+    }
+}
+
+impl NativeMeshPart {
+    /// Gives the part morph data to blend, or `None` to clear it.
+    ///
+    /// The data is **copied**, not borrowed: the part keeps its own, so the
+    /// caller's value stays theirs.
+    pub fn set_morph_target_data(&self, data: Option<&MorphTargetData>) -> Result<()> {
+        let handle = self.native_handle()?;
+        let native = self.api();
+        let data_handle = match data {
+            Some(data) => data.get()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        // SAFETY: both handles are live for the call.
+        native.check(unsafe {
+            (native.engine.model_mesh_part_set_morph_target_data_ext)(handle, data_handle)
+        })
+    }
+
+    /// Whether the part carries morph data.
+    ///
+    /// Reports presence rather than handing the data back: the handle upstream
+    /// publishes is the part's own, and a value that released it would free it
+    /// twice.
+    pub fn has_morph_target_data(&self) -> Result<bool> {
+        let handle = self.native_handle()?;
+        let native = self.api();
+        let mut has_data = 0_u8;
+        let mut data = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and both outputs are live locals.
+        native.check(unsafe {
+            (native.engine.model_mesh_part_get_morph_target_data_ext)(
+                handle, &mut has_data, &mut data,
+            )
+        })?;
+        Ok(has_data != 0)
+    }
+
+    /// Sets the weights the part blends its morph data with.
+    pub fn set_morph_weights(&self, weights: &[f32]) -> Result<()> {
+        let handle = self.native_handle()?;
+        let native = self.api();
+        // SAFETY: the handle is owned and the array is borrowed for the call
+        // with its own length.
+        native.check(unsafe {
+            (native.engine.model_mesh_part_set_morph_weights_ext)(
+                handle,
+                weights.as_ptr(),
+                weights.len() as u64,
+            )
+        })
+    }
+}
+
+/// One morph-weight track's keyframes, kept alive while CNA reads them.
+struct StagedTrack {
+    descriptor: sys::CNA_MorphWeightTrackEXTDescriptor,
+    _keyframes: Vec<sys::CNA_MorphWeightKeyframeEXTDescriptor>,
+    _arrays: Vec<Vec<f32>>,
+}
+
+impl StagedTrack {
+    fn new(track: &MorphWeightTrack) -> Self {
+        let mut arrays: Vec<Vec<f32>> = Vec::with_capacity(track.keyframes.len() * 3);
+        for keyframe in &track.keyframes {
+            arrays.push(keyframe.weights.clone());
+            arrays.push(keyframe.in_tangents.clone());
+            arrays.push(keyframe.out_tangents.clone());
+        }
+        let keyframes: Vec<sys::CNA_MorphWeightKeyframeEXTDescriptor> = track
+            .keyframes
+            .iter()
+            .enumerate()
+            .map(|(index, keyframe)| {
+                let weights = &arrays[index * 3];
+                let in_tangents = &arrays[index * 3 + 1];
+                let out_tangents = &arrays[index * 3 + 2];
+                sys::CNA_MorphWeightKeyframeEXTDescriptor {
+                    time_seconds: keyframe.time_seconds,
+                    weights: weights.as_ptr(),
+                    weight_count: weights.len() as u64,
+                    in_tangents: if in_tangents.is_empty() {
+                        core::ptr::null()
+                    } else {
+                        in_tangents.as_ptr()
+                    },
+                    in_tangent_count: in_tangents.len() as u64,
+                    out_tangents: if out_tangents.is_empty() {
+                        core::ptr::null()
+                    } else {
+                        out_tangents.as_ptr()
+                    },
+                    out_tangent_count: out_tangents.len() as u64,
+                }
+            })
+            .collect();
+        let descriptor = sys::CNA_MorphWeightTrackEXTDescriptor {
+            keyframes: if keyframes.is_empty() {
+                core::ptr::null()
+            } else {
+                keyframes.as_ptr()
+            },
+            keyframe_count: keyframes.len() as u64,
+            step_interpolation: u8::from(track.step_interpolation),
+            cubic_spline: u8::from(track.cubic_spline),
+        };
+        Self {
+            descriptor,
+            _keyframes: keyframes,
+            _arrays: arrays,
+        }
+    }
+}
+
+/// A set of morph targets' delta arrays, kept alive while CNA reads them.
+struct StagedTargets {
+    descriptors: Vec<sys::CNA_MorphTargetDeltaEXTDescriptor>,
+    _arrays: Vec<Vec<sys::CNA_Vector3>>,
+}
+
+impl StagedTargets {
+    fn new(targets: &[MorphTargetDelta]) -> Self {
+        let mut arrays: Vec<Vec<sys::CNA_Vector3>> = Vec::with_capacity(targets.len() * 2);
+        for target in targets {
+            arrays.push(target.position_deltas.iter().copied().map(vector).collect());
+            arrays.push(target.normal_deltas.iter().copied().map(vector).collect());
+        }
+        let descriptors = (0..targets.len())
+            .map(|index| {
+                let positions = &arrays[index * 2];
+                let normals = &arrays[index * 2 + 1];
+                sys::CNA_MorphTargetDeltaEXTDescriptor {
+                    position_deltas: positions.as_ptr(),
+                    position_delta_count: positions.len() as u64,
+                    normal_deltas: if normals.is_empty() {
+                        core::ptr::null()
+                    } else {
+                        normals.as_ptr()
+                    },
+                    normal_delta_count: normals.len() as u64,
+                }
+            })
+            .collect();
+        Self {
+            descriptors,
+            _arrays: arrays,
+        }
+    }
+}
+
+const fn vector(value: Vector3) -> sys::CNA_Vector3 {
+    sys::CNA_Vector3 {
+        x: value.X,
+        y: value.Y,
+        z: value.Z,
+    }
+}
+
+const fn from_vector(value: sys::CNA_Vector3) -> Vector3 {
+    Vector3 {
+        X: value.x,
+        Y: value.y,
+        Z: value.z,
+    }
+}

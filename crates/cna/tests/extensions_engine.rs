@@ -12,8 +12,8 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use cna::extensions::models::{
-    AnimationClip, AnimationPlayer, BoneTrack, ClipTargetSpace, Keyframe, SkinnedModel,
-    SkinningData,
+    AnimationClip, AnimationPlayer, BoneTrack, ClipTargetSpace, Keyframe, MorphTargetData,
+    MorphTargetDelta, MorphWeightKeyframe, MorphWeightTrack, SkinnedModel, SkinningData,
 };
 use cna::extensions::pbr::{
     GltfMaterialBridge, GltfMaterialExtensionSource, GltfMaterialExtensionTextures,
@@ -54,7 +54,7 @@ use cna::extensions::pbr::{
 use cna::Microsoft::Xna::Framework::Graphics::{
     BufferUsage, CubeMapFace, DepthFormat, IndexBuffer, IndexElementSize, PrimitiveType,
     SurfaceFormat, Texture2D, TextureCube, VertexBuffer, VertexElement,
-    VertexPositionColor,
+    VertexPositionColor, VertexPositionNormalTexture,
 };
 use cna::Microsoft::Xna::Framework::{
     BoundingBox, BoundingFrustum, BoundingSphere, Color, Game, GameContext, GameTime, Matrix,
@@ -10203,5 +10203,379 @@ fn an_animation_player_composes_the_three_transform_arrays_a_skinned_draw_needs(
         findings.data_alive_after_player,
         "releasing the player leaves its skinning data usable, \
          which is what retaining it is for"
+    );
+}
+
+/// What the morph-target run measured.
+#[derive(Default)]
+struct MorphFindings {
+    type_name: String,
+    shape: (i32, u64, usize),
+    deltas: Vec<(&'static str, usize, (f32, f32, f32))>,
+    weights: Vec<(&'static str, Vec<f32>)>,
+    blends: Vec<(&'static str, Vec<f32>)>,
+    wrong_weight_count_refused: bool,
+    stride_48_refused: Option<String>,
+    track_info: (u64, bool, bool),
+    keyframe: Option<(f64, Vec<f32>)>,
+    linear: Vec<(f64, Vec<f32>)>,
+    stepped: Vec<(f64, Vec<f32>)>,
+    flat_normals: Vec<(&'static str, bool)>,
+    triangles: Vec<u32>,
+    part: Vec<(&'static str, bool)>,
+    morph_without_buffer: Option<String>,
+}
+
+struct MorphGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<MorphFindings>>,
+}
+
+impl GameStateAccess for MorphGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+/// The one stride this test uses: position, normal and texture coordinate.
+///
+/// CNA's C API accepts only 32, 52 or 56 bytes here -- see the test's own note
+/// on why that list is narrower than the renderer's.
+const MORPH_STRIDE: i32 = 32;
+
+/// Three vertices in the stride-32 layout: position, normal, texture.
+fn base_pose() -> Vec<u8> {
+    let mut bytes = Vec::new();
+    for position in [[0.0_f32, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]] {
+        for value in position {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        // Normal, then texture coordinate: untouched by a position-only morph,
+        // and present so the stride is one the API accepts.
+        for value in [0.0_f32, 0.0, 1.0, 0.0, 0.0] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+    }
+    bytes
+}
+
+/// The three position floats of the first vertex of a blended buffer.
+fn read_positions(bytes: &[u8]) -> Vec<f32> {
+    bytes[..12]
+        .chunks_exact(4)
+        .map(|word| f32::from_le_bytes([word[0], word[1], word[2], word[3]]))
+        .collect()
+}
+
+impl Game for MorphGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let device = game.GraphicsDevice()?;
+        let mut findings = MorphFindings::default();
+        let base = base_pose();
+
+        // Two targets: the first pushes every vertex one unit along x, the
+        // second pushes them one unit along y.
+        let along = |axis: usize| MorphTargetDelta {
+            position_deltas: (0..3)
+                .map(|_| {
+                    let mut delta = [0.0_f32; 3];
+                    delta[axis] = 1.0;
+                    Vector3::from_x_and_y_and_z(delta[0], delta[1], delta[2])
+                })
+                .collect(),
+            normal_deltas: Vec::new(),
+        };
+        let targets = vec![along(0), along(1)];
+
+        // A two-keyframe weight track: the first target fades out as the
+        // second fades in.
+        let track = MorphWeightTrack {
+            keyframes: vec![
+                MorphWeightKeyframe {
+                    time_seconds: 0.0,
+                    weights: vec![1.0, 0.0],
+                    in_tangents: Vec::new(),
+                    out_tangents: Vec::new(),
+                },
+                MorphWeightKeyframe {
+                    time_seconds: 2.0,
+                    weights: vec![0.0, 1.0],
+                    in_tangents: Vec::new(),
+                    out_tangents: Vec::new(),
+                },
+            ],
+            step_interpolation: false,
+            cubic_spline: false,
+        };
+
+        let data = MorphTargetData::new(&base, MORPH_STRIDE, &targets, &[0.0, 0.0], &track)?;
+        findings.type_name = data.type_name()?;
+        findings.shape = (
+            data.stride()?,
+            data.target_count()?,
+            data.base_vertex_bytes()?.len(),
+        );
+        for (name, index) in [("the x target", 0_u64), ("the y target", 1)] {
+            let deltas = data.position_deltas(index)?;
+            findings
+                .deltas
+                .push((name, deltas.len(), triple(deltas[0])));
+        }
+        findings
+            .deltas
+            .push(("its normals", data.normal_deltas(0)?.len(), (0.0, 0.0, 0.0)));
+
+        findings.weights.push(("as created", data.weights()?));
+        data.set_weights(&[0.25, 0.75])?;
+        findings.weights.push(("after setting", data.weights()?));
+
+        // Blending is the whole point: the base pose plus each target times its
+        // weight. The first vertex starts at the origin, so the blended x and y
+        // are the weights themselves.
+        for (name, weights) in [
+            ("neither target", vec![0.0_f32, 0.0]),
+            ("all of the first", vec![1.0, 0.0]),
+            ("all of the second", vec![0.0, 1.0]),
+            ("half of each", vec![0.5, 0.5]),
+        ] {
+            let blended = data.blend(&weights)?;
+            findings
+                .blends
+                .push((name, read_positions(&blended)[..3].to_vec()));
+        }
+        findings.wrong_weight_count_refused = data.blend(&[1.0]).is_err();
+
+        // The stride list the C API enforces is narrower than the renderer's
+        // own table: 48 is `PositionNormalTangentTextureStream`, which the
+        // canonical blender handles and this route refuses.
+        findings.stride_48_refused = MorphTargetData::new(
+            &vec![0_u8; 48 * 3],
+            48,
+            &targets,
+            &[0.0, 0.0],
+            &MorphWeightTrack::default(),
+        )
+        .err()
+        .map(|error| error.to_string());
+
+        findings.track_info = data.weight_track_info()?;
+        let keyframe = data.weight_keyframe(1)?;
+        findings.keyframe = Some((keyframe.time_seconds, keyframe.weights.clone()));
+
+        // The track evaluates as a pure function of itself.
+        for time in [0.0_f64, 1.0, 2.0] {
+            findings.linear.push((time, track.evaluate(time)?));
+        }
+        let stepped = MorphWeightTrack {
+            step_interpolation: true,
+            ..track.clone()
+        };
+        for time in [0.0_f64, 1.0, 2.0] {
+            findings.stepped.push((time, stepped.evaluate(time)?));
+        }
+
+        findings
+            .flat_normals
+            .push(("as created", data.recompute_flat_normals()?));
+        data.set_triangle_indices(&[0, 1, 2])?;
+        findings.triangles = data.triangle_indices()?;
+        data.set_recompute_flat_normals(true)?;
+        findings
+            .flat_normals
+            .push(("after asking for them", data.recompute_flat_normals()?));
+
+        // A mesh part copies the data rather than borrowing it -- and needs a
+        // vertex buffer of the same stride to upload the blend into, which is
+        // what upstream refuses a part without.
+        let declaration = VertexPositionNormalTexture::VertexDeclaration();
+        let vertices = VertexBuffer::new(&device, declaration, 3, BufferUsage::None)?;
+        let indices =
+            IndexBuffer::new(&device, IndexElementSize::SixteenBits, 3, BufferUsage::None)?;
+        // Attaching the data to a part with no vertex buffer is allowed; it is
+        // *uploading* the blend that has nowhere to go, so that is where the
+        // refusal lands.
+        let bufferless = NativeMeshPart::new(None, None, 3, 1, 0, 0)?;
+        bufferless.set_morph_target_data(Some(&data))?;
+        findings.morph_without_buffer = bufferless
+            .set_morph_weights(&[0.5, 0.5])
+            .err()
+            .map(|error| error.to_string());
+        let part = NativeMeshPart::new(Some(vertices), Some(indices), 3, 1, 0, 0)?;
+        findings
+            .part
+            .push(("before", part.has_morph_target_data()?));
+        part.set_morph_target_data(Some(&data))?;
+        findings
+            .part
+            .push(("with data", part.has_morph_target_data()?));
+        part.set_morph_weights(&[0.5, 0.5])?;
+        part.set_morph_target_data(None)?;
+        findings
+            .part
+            .push(("after clearing", part.has_morph_target_data()?));
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn morph_targets_blend_the_base_pose_by_the_weights_they_are_given() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(MorphFindings::default()));
+    let game = MorphGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with morph target data");
+
+    let findings = findings.lock().expect("findings");
+    println!("type name: {:?}", findings.type_name);
+    assert!(!findings.type_name.is_empty(), "the data knows its own name");
+    assert_eq!(
+        findings.shape,
+        (MORPH_STRIDE, 2, MORPH_STRIDE as usize * 3),
+        "the stride, target count and base-pose size are the ones it was given"
+    );
+
+    println!("deltas: {:?}", findings.deltas);
+    assert_eq!(
+        findings.deltas[0],
+        ("the x target", 3, (1.0, 0.0, 0.0)),
+        "the first target moves along x"
+    );
+    assert_eq!(
+        findings.deltas[1],
+        ("the y target", 3, (0.0, 1.0, 0.0)),
+        "and the second along y"
+    );
+    assert_eq!(
+        findings.deltas[2].1, 0,
+        "a target with no normal deltas reports none rather than zeroes"
+    );
+
+    println!("weights: {:?}", findings.weights);
+    assert_eq!(findings.weights[0].1, vec![0.0, 0.0], "the weights start where they were set");
+    assert_eq!(findings.weights[1].1, vec![0.25, 0.75], "and round-trip");
+
+    // The blend is the arithmetic, not a state flag: the first vertex sits at
+    // the origin, so its blended position *is* the weight vector.
+    println!("blends: {:?}", findings.blends);
+    let blend = |name: &str| -> Vec<f32> {
+        findings
+            .blends
+            .iter()
+            .find(|(label, _)| *label == name)
+            .expect("a recorded blend")
+            .1
+            .clone()
+    };
+    assert_eq!(
+        blend("neither target"),
+        vec![0.0, 0.0, 0.0],
+        "with no weight the base pose comes back unchanged"
+    );
+    assert_eq!(
+        blend("all of the first"),
+        vec![1.0, 0.0, 0.0],
+        "all of the x target moves the vertex one along x"
+    );
+    assert_eq!(
+        blend("all of the second"),
+        vec![0.0, 1.0, 0.0],
+        "and all of the y target one along y"
+    );
+    assert_eq!(
+        blend("half of each"),
+        vec![0.5, 0.5, 0.0],
+        "and half of each is half of each, which is what makes this a blend"
+    );
+    assert!(
+        findings.wrong_weight_count_refused,
+        "a weight array that does not match the target count is refused rather than padded"
+    );
+
+    // `cna_morph_target_data_ext_create` checks the literal list {32, 52, 56}.
+    // The canonical C++ blender stopped doing that deliberately -- the list
+    // went stale when a metallic-roughness material started selecting layouts
+    // of stride 48 and 68, and every PBR morph target silently kept its base
+    // normals while its positions moved. The C++ side now queries the stride
+    // table; the C entry point does not, so an ordinary glTF PBR mesh cannot
+    // be handed to it at all. Pinned here so the day upstream fixes it, this
+    // test says so.
+    println!("stride 48: {:?}", findings.stride_48_refused);
+    let refused = findings
+        .stride_48_refused
+        .as_deref()
+        .expect("the C API refuses a stride its own renderer accepts");
+    assert!(
+        refused.contains("32, 52, or 56"),
+        "and refuses it against the stale literal list: {refused}"
+    );
+
+    assert_eq!(
+        findings.track_info,
+        (2, false, false),
+        "the stored track keeps its keyframes and its interpolation flags"
+    );
+    let (time, weights) = findings.keyframe.clone().expect("a stored keyframe");
+    assert!((time - 2.0).abs() < 1e-9, "read back at its own time");
+    assert_eq!(weights, vec![0.0, 1.0], "with its own weights");
+
+    // Linear and stepped sampling differ in exactly one place: between the
+    // keyframes. At the keyframes themselves they agree.
+    println!("linear: {:?}", findings.linear);
+    println!("stepped: {:?}", findings.stepped);
+    assert_eq!(findings.linear[0].1, vec![1.0, 0.0], "both start at the first keyframe");
+    assert_eq!(findings.linear[2].1, vec![0.0, 1.0], "and end at the last");
+    assert_eq!(
+        findings.linear[1].1,
+        vec![0.5, 0.5],
+        "linear sampling halfway is halfway between them"
+    );
+    assert_eq!(
+        findings.stepped[1].1,
+        vec![1.0, 0.0],
+        "and stepped sampling holds the lower keyframe instead"
+    );
+    assert_eq!(
+        findings.stepped[0].1, findings.linear[0].1,
+        "the two agree at a keyframe"
+    );
+
+    assert_eq!(
+        findings.flat_normals,
+        vec![("as created", false), ("after asking for them", true)],
+        "flat-normal recomputation is off until asked for"
+    );
+    assert_eq!(
+        findings.triangles,
+        vec![0, 1, 2],
+        "and the triangle list it walks round-trips"
+    );
+
+    // A part with no vertex buffer accepts the *data* and refuses the *upload*:
+    // the two are separate steps, and the failure lands on the one that needs
+    // somewhere to write.
+    let without = findings
+        .morph_without_buffer
+        .as_deref()
+        .expect("uploading a blend with no vertex buffer is refused");
+    assert!(
+        without.contains("no vertex buffer"),
+        "and refused for the missing buffer: {without}"
+    );
+    assert_eq!(
+        findings.part,
+        vec![
+            ("before", false),
+            ("with data", true),
+            ("after clearing", false),
+        ],
+        "a mesh part takes a copy of the morph data and can be cleared again"
     );
 }
