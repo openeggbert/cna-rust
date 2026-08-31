@@ -7,6 +7,7 @@
 
 pub mod content;
 pub mod devices;
+pub mod engine;
 pub mod events;
 pub mod gamer_services;
 pub mod graphics;

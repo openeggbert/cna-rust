@@ -19,19 +19,44 @@ use cna::Microsoft::Xna::Framework::Graphics::{
     GraphicsDevice, GraphicsProfile, PresentationParameters,
 };
 use cna::Microsoft::Xna::Framework::{GraphicsDeviceInformation, Vector3};
-use cna::CnaError;
+use cna::{CnaError, ErrorCategory, Result};
 
-fn device() -> GraphicsDevice {
-    let parameters = PresentationParameters::new();
-    parameters.SetBackBufferWidth(64);
-    parameters.SetBackBufferHeight(64);
-    GraphicsDevice::new(
-        &GraphicsDeviceInformation::new().Adapter(),
-        GraphicsProfile::HiDef,
-        &parameters,
-    )
-    .expect("an independent device for PBR")
+fn device() -> Option<GraphicsDevice> {
+    independent_device_or_skip(|| {
+        let parameters = PresentationParameters::new();
+        parameters.SetBackBufferWidth(64);
+        parameters.SetBackBufferHeight(64);
+        GraphicsDevice::new(
+            &GraphicsDeviceInformation::new().Adapter(),
+            GraphicsProfile::HiDef,
+            &parameters,
+        )
+    })
 }
+
+/// A device with no `Game` anywhere, or `None` when this renderer cannot make one.
+///
+/// EasyGL's context needs a platform surface, so every GL-family renderer
+/// refuses `cna_graphics_device_create` with a `Platform` failure naming the
+/// missing window, while `HEADLESS` creates one happily. That is a renderer
+/// capability rather than a binding fault, so it is reported and skipped --
+/// but *only* that exact refusal. Any other failure is still a failure, which
+/// is what keeps this from quietly hiding a regression.
+fn independent_device_or_skip(build: impl FnOnce() -> Result<GraphicsDevice>) -> Option<GraphicsDevice> {
+    match build() {
+        Ok(device) => Some(device),
+        Err(CnaError::Native {
+            category: ErrorCategory::Platform,
+            ref message,
+            ..
+        }) if message.contains("platform window id") => {
+            println!("this renderer cannot create a device without a window: {message}");
+            None
+        }
+        Err(error) => panic!("independent GraphicsDevice construction failed: {error}"),
+    }
+}
+
 
 #[test]
 fn the_engine_layer_reports_one_consistent_version() {
@@ -39,15 +64,32 @@ fn the_engine_layer_reports_one_consistent_version() {
         return;
     }
     let version = engine_layer_version().expect("the version query always answers");
-    let text = engine_layer_version_string().expect("the version string always answers");
-    // The two routes must agree. They are separate entry points over the same
-    // fact, and a build where one says "absent" while the other names a
-    // revision would send a consumer down the wrong path.
-    assert_eq!(
-        text,
-        format!("CNA engine layer {version}"),
-        "the numeric and textual version routes describe the same build"
-    );
+    // The two routes are not symmetric, and the asymmetry is the thing worth
+    // pinning. Without the engine layer, the numeric route answers zero while
+    // the textual one *refuses*; with it, both answer and must describe the
+    // same build. A test that expected the string to always answer would pass
+    // on one artifact and fail on the other for a reason that is not a bug.
+    match engine_layer_version_string() {
+        Ok(text) => {
+            assert_ne!(
+                version, 0,
+                "only a build with the engine layer answers the version string"
+            );
+            assert_eq!(
+                text,
+                format!("CNA engine layer {version}"),
+                "the numeric and textual version routes describe the same build"
+            );
+        }
+        Err(CnaError::Native {
+            category: ErrorCategory::NotSupported,
+            ..
+        }) => assert_eq!(
+            version, 0,
+            "only a build without the engine layer refuses the version string"
+        ),
+        Err(error) => panic!("unexpected engine-layer version-string failure: {error}"),
+    }
 }
 
 #[test]
@@ -146,18 +188,12 @@ fn a_pbr_effect_round_trips_every_scalar_it_carries() {
     if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
         return;
     }
-    if engine_layer_version().expect("version") == 0 {
-        // No engine layer in this build: the refusal is the correct behaviour
-        // and there is nothing further to assert.
-        let device = device();
-        assert!(
-            PbrEffect::new(&device).is_err(),
-            "a build with no engine layer refuses to create a PbrEffect"
-        );
-        return;
-    }
-
-    let device = device();
+    // No engine-layer branch here on purpose. `PbrEffect` is upstream's
+    // *effects* module, not its engine layer -- `cna_pbr_effect_create` carries
+    // no `CNA_CNAEXT` guard -- so it constructs and round-trips on a build
+    // whose engine-layer version is zero. This test previously asserted the
+    // opposite and had simply never been run on such a build.
+    let Some(device) = device() else { return };
     let effect = PbrEffect::new(&device).expect("a PbrEffect on an independent device");
 
     // Distinguishable values, so a property read back from a neighbouring
@@ -396,7 +432,7 @@ fn a_complete_material_round_trips_through_an_effect() {
     if engine_layer_version().expect("version") == 0 {
         return;
     }
-    let device = device();
+    let Some(device) = device() else { return };
     let effect = PbrEffect::new(&device).expect("a PbrEffect");
 
     let mut material = PbrMaterialFull::canonical_defaults().expect("material defaults");

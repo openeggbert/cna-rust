@@ -1,7 +1,7 @@
 //! Raw declarations for the reviewed CNA C ABI runtime/2D slice.
 //!
 //! These layouts and function-pointer types are derived from CNA's canonical
-//! `modules/c-api/include/CNA/C` headers at ABI 0.20.0. The crate deliberately
+//! `modules/c-api/include/CNA/C` headers at ABI 0.21.0. The crate deliberately
 //! does not add linker directives: the safe crate resolves a user-selected CNA
 //! shared library at runtime and checks its ABI version before loading symbols.
 
@@ -753,6 +753,51 @@ pub struct CNA_RenderPipelineSettingsEXT {
     pub reserved: [u8; 4],
 }
 
+pub type CNA_RenderPipelineHandle = CNA_Handle;
+pub type CNA_ShadowMapHandle = CNA_Handle;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_DirectionalLightEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub direction: CNA_Vector3,
+    pub color: CNA_Vector3,
+    pub intensity: f32,
+    pub casts_shadows: CNA_Bool,
+    pub reserved: [u8; 3],
+}
+
+/// Receives one draw request from inside an open render-pipeline frame.
+///
+/// Returning anything but `CNA_RESULT_SUCCESS` fails the frame that asked for
+/// it: CNA raises the result out of `end` rather than swallowing it.
+pub type CNA_RenderPipelineDrawCallback =
+    Option<unsafe extern "C" fn(*mut c_void) -> CNA_Result>;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_RenderPipelineFrameStatisticsEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub passes_run: i32,
+    pub target_switches: i32,
+    pub used_scene_target: CNA_Bool,
+    pub drew_skybox: CNA_Bool,
+    pub reserved: [u8; 2],
+    pub gpu_memory_estimate_bytes: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_PassTimingEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub sample_count: i32,
+    pub reserved: [u8; 4],
+    pub milliseconds: f64,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct CNA_TextureTransformEXT {
@@ -1195,6 +1240,13 @@ pub struct CNA_Vector4 {
     pub y: f32,
     pub z: f32,
     pub w: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_BoundingBox {
+    pub min: CNA_Vector3,
+    pub max: CNA_Vector3,
 }
 
 #[repr(C)]
@@ -7658,4 +7710,153 @@ pub type cna_signed_in_gamer_subscribe_signed_out_ext_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_write_leaderboards_event_info_init_fn = unsafe extern "C" fn(
     CNA_NetworkGamerHandle, CNA_Bool, *mut CNA_WriteLeaderboardsEventInfo,
+) -> CNA_Result;
+
+// --- CNA engine layer: the render pipeline (engine_layer.h) ---
+pub type cna_render_pipeline_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_RenderPipelineHandle,
+) -> CNA_Result;
+pub type cna_render_pipeline_destroy_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle,
+) -> CNA_Result;
+pub type cna_render_pipeline_get_settings_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, *mut CNA_RenderPipelineSettingsEXT,
+) -> CNA_Result;
+pub type cna_render_pipeline_set_settings_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, *const CNA_RenderPipelineSettingsEXT,
+) -> CNA_Result;
+pub type cna_render_pipeline_resize_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, i32, i32,
+) -> CNA_Result;
+pub type cna_render_pipeline_begin_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, *const CNA_Color,
+) -> CNA_Result;
+pub type cna_render_pipeline_end_fn = unsafe extern "C" fn(CNA_RenderPipelineHandle) -> CNA_Result;
+pub type cna_render_pipeline_set_depth_normal_inputs_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, CNA_Handle, CNA_Handle,
+) -> CNA_Result;
+pub type cna_render_pipeline_set_velocity_input_ext_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, CNA_Handle,
+) -> CNA_Result;
+pub type cna_render_pipeline_set_transparent_scene_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, CNA_RenderPipelineDrawCallback, *mut c_void,
+) -> CNA_Result;
+pub type cna_render_pipeline_set_camera_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, *const CNA_Matrix, *const CNA_Matrix, f32, f32,
+) -> CNA_Result;
+pub type cna_render_pipeline_set_skybox_camera_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, *const CNA_Matrix, *const CNA_Matrix,
+) -> CNA_Result;
+pub type cna_render_pipeline_copy_transparency_fallback_reason_ext_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_render_pipeline_set_gpu_timing_enabled_ext_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_render_pipeline_is_gpu_timing_enabled_ext_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_render_pipeline_did_skybox_draw_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_render_pipeline_did_shadow_pass_run_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_render_pipeline_get_scene_target_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_render_pipeline_get_scene_target_format_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, *mut CNA_SurfaceFormat,
+) -> CNA_Result;
+pub type cna_render_pipeline_is_using_scene_target_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_render_pipeline_get_last_frame_pass_count_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_render_pipeline_get_gpu_memory_estimate_bytes_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_render_pipeline_get_statistics_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, *mut CNA_RenderPipelineFrameStatisticsEXT,
+) -> CNA_Result;
+pub type cna_render_pipeline_release_device_resources_ext_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle,
+) -> CNA_Result;
+pub type cna_render_pipeline_get_pass_timing_count_ext_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_render_pipeline_get_pass_timing_ext_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, u64, *mut CNA_PassTimingEXT,
+) -> CNA_Result;
+pub type cna_render_pipeline_copy_pass_timing_name_ext_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+
+// --- CNA engine layer: directional-light shadow maps (engine_layer.h) ---
+pub type cna_directional_light_ext_init_fn = unsafe extern "C" fn(
+    *mut CNA_DirectionalLightEXT,
+) -> CNA_Result;
+pub type cna_graphics_device_supports_shadow_sampling_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_shadow_map_create_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_ShadowQuality, *mut CNA_ShadowMapHandle,
+) -> CNA_Result;
+pub type cna_shadow_map_destroy_fn = unsafe extern "C" fn(CNA_ShadowMapHandle) -> CNA_Result;
+pub type cna_shadow_map_is_supported_fn = unsafe extern "C" fn(
+    CNA_ShadowMapHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_shadow_map_begin_fn = unsafe extern "C" fn(
+    CNA_ShadowMapHandle, *const CNA_DirectionalLightEXT, *const CNA_BoundingBox,
+) -> CNA_Result;
+pub type cna_shadow_map_end_fn = unsafe extern "C" fn(CNA_ShadowMapHandle) -> CNA_Result;
+pub type cna_shadow_map_get_caster_effect_fn = unsafe extern "C" fn(
+    CNA_ShadowMapHandle, *mut CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_shadow_map_get_skinned_caster_effect_fn = unsafe extern "C" fn(
+    CNA_ShadowMapHandle, *mut CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_shadow_map_apply_caster_fn = unsafe extern "C" fn(CNA_ShadowMapHandle) -> CNA_Result;
+pub type cna_shadow_map_apply_skinned_caster_fn = unsafe extern "C" fn(
+    CNA_ShadowMapHandle, *const CNA_Matrix, u64, i32,
+) -> CNA_Result;
+pub type cna_shadow_map_get_shadow_texture_fn = unsafe extern "C" fn(
+    CNA_ShadowMapHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_shadow_map_get_light_view_projection_fn = unsafe extern "C" fn(
+    CNA_ShadowMapHandle, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_shadow_map_get_size_fn = unsafe extern "C" fn(
+    CNA_ShadowMapHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_shadow_map_get_quality_fn = unsafe extern "C" fn(
+    CNA_ShadowMapHandle, *mut CNA_ShadowQuality,
+) -> CNA_Result;
+pub type cna_shadow_map_get_depth_bias_fn = unsafe extern "C" fn(
+    CNA_ShadowMapHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_shadow_map_set_depth_bias_fn = unsafe extern "C" fn(
+    CNA_ShadowMapHandle, f32,
+) -> CNA_Result;
+pub type cna_shadow_map_get_filter_radius_fn = unsafe extern "C" fn(
+    CNA_ShadowMapHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_shadow_map_compute_light_view_fn = unsafe extern "C" fn(
+    *const CNA_DirectionalLightEXT, *const CNA_BoundingBox, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_shadow_map_compute_light_projection_fn = unsafe extern "C" fn(
+    *const CNA_Matrix, *const CNA_BoundingBox, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_shadow_map_size_for_quality_fn = unsafe extern "C" fn(
+    CNA_ShadowQuality, *mut i32,
+) -> CNA_Result;
+pub type cna_shadow_map_filter_radius_for_quality_fn = unsafe extern "C" fn(
+    CNA_ShadowQuality, *mut i32,
+) -> CNA_Result;
+pub type cna_render_pipeline_set_shadow_scene_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, CNA_ShadowMapHandle, *const CNA_DirectionalLightEXT, *const CNA_BoundingBox, CNA_RenderPipelineDrawCallback, *mut c_void,
+) -> CNA_Result;
+pub type cna_render_pipeline_get_shadow_map_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, *mut CNA_ShadowMapHandle,
 ) -> CNA_Result;

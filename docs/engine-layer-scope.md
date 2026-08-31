@@ -98,3 +98,55 @@ handles, and a safe value holding one would be a raw-handle leak.
 
 That leaves the criterion clean. Everything still unbound is unbound because
 its semantics cannot be asserted here, not because it was inconvenient.
+
+## 2026-08-31, later the same day: the trigger arrived
+
+A GPU-backed artifact now exists and is qualified. `docs/gpu-evidence.md`
+records it: an `OPENGLES3` build with `CNA_CNAEXT=ON` runs real frames on this
+host's AMD Radeon 780M through the Rust binding, and `OPENGL33` and `VULKAN`
+artifacts run the template's 60- and 600-frame canaries on the same hardware.
+
+The discriminator this document named has moved:
+
+```text
+current qualified renderer   OPENGLES3 (AMD Radeon 780M, GL ES 3.2)
+gpu memory estimate          230,400 bytes   (was 0)
+```
+
+That number is the pipeline's own scene target, 320 x 180 x 4 bytes, and the
+test asserts it as exactly that rather than as "greater than zero". The frame
+that filled it is read back off the GPU and every pixel equals the colour the
+frame cleared to. That is the assertion class this document said a headless
+device could not support.
+
+`RUST-EXT-010b` is therefore no longer one row. It is decomposed family by
+family, and each family is taken when its semantics can be asserted exactly --
+the criterion above is unchanged, only its precondition has been met.
+
+### Families bound since
+
+| Slice | Families | Routes | Qualification |
+|---|---|---:|---|
+| render pipeline lifecycle, scene target, statistics, pass timings | `render_pipeline` | 27 | `VERIFIED_PIXEL` |
+| directional-light shadow maps | `shadow_map`, plus the pipeline's shadow-scene pair | 24 | `VERIFIED_GPU` |
+
+### What the GPU artifact changed about the evidence
+
+Three things could not have been measured on the headless artifact, and all
+three found something:
+
+- **The scene target is handed out only inside an open frame.** Upstream's
+  `getSceneTarget` returns null unless `frameOpen_`, so a caller that asks
+  between frames sees "none" on a pipeline that has one and is reporting its
+  bytes. Nothing in the header says so; it was read from the implementation
+  after the first test measured `None` next to a non-zero memory estimate.
+- **A borrowed view is a handle, not a pointer.** `get_scene_target`,
+  `get_shadow_map`, `get_shadow_texture` and `get_caster_effect` each publish a
+  *new* handle that holds its owner alive and has to be released. Wrapping one
+  in a non-destroying Rust view leaked it, kept the pipeline alive past its own
+  device, and aborted the process at exit. Every borrow in this module now
+  carries its owner's Rust lifetime and releases on drop.
+- **The transparent-scene callback runs only when the transparency mode is not
+  `None`,** which is the default. A registration that never fires looks exactly
+  like a broken one.
+

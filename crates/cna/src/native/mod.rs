@@ -5,6 +5,7 @@ mod api;
 mod audio;
 mod device_manager;
 mod display;
+pub(crate) mod engine;
 mod error;
 #[cfg(feature = "native-fault-injection")]
 pub(crate) mod fault;

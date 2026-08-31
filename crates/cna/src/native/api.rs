@@ -10,6 +10,7 @@ use crate::error::{CnaError, Result};
 use super::loader::{library_candidates, Library};
 use super::loader::NativeSource;
 use super::audio::AudioApi;
+use super::engine::EngineApi;
 use super::gamer_services::GamerServicesApi;
 use super::net::NetApi;
 use super::media::MediaApi;
@@ -21,6 +22,7 @@ pub(crate) struct Native {
     pub(super) audio: AudioApi,
     pub(crate) media: MediaApi,
     pub(crate) runtime: RuntimeApi,
+    pub(crate) engine: EngineApi,
     pub(crate) gamer_services: GamerServicesApi,
     /// Resolved with the library so a CNA build missing any Net route fails at
     /// load. The safe `Microsoft.Xna.Framework.Net` projection is the next
@@ -198,7 +200,7 @@ pub(crate) struct Native {
     pub(super) render_target2d_create: sys::cna_render_target2d_create_fn,
     pub(super) render_target_cube_create: sys::cna_render_target_cube_create_fn,
     pub(super) render_target_get_info: sys::cna_render_target_get_info_fn,
-    pub(super) render_target_destroy: sys::cna_render_target_destroy_fn,
+    pub(crate) render_target_destroy: sys::cna_render_target_destroy_fn,
     pub(super) vertex_declaration_create_with_stride:
         sys::cna_vertex_declaration_create_with_stride_fn,
     pub(super) vertex_declaration_destroy: sys::cna_vertex_declaration_destroy_fn,
@@ -666,6 +668,7 @@ impl Native {
 
         Ok(Self {
             runtime: RuntimeApi::load(&source)?,
+            engine: EngineApi::load(&source)?,
             gamer_services: GamerServicesApi::load(&source)?,
             net: NetApi::load(&source)?,
             error_get_last_info: symbol!(cna_error_get_last_info,

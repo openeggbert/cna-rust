@@ -27,6 +27,7 @@ pub use buffer::{
     VertexBufferBase, VertexBufferBinding, VertexData,
 };
 pub use device::{BackBufferData, GraphicsDevice};
+pub(crate) use device::OwnedEngineChild;
 pub use device_collections::{SamplerStateCollection, TextureCollection, TextureRuntime};
 pub use display::{DisplayModeCollection, GraphicsAdapter};
 pub use effect::{

@@ -19,7 +19,7 @@ use crate::error::{CnaError, ErrorCategory, Result};
 use crate::extensions::events::EventHandler;
 use crate::value::{Matrix, Quaternion, Vector2, Vector3, Vector4};
 
-use super::resource::{ResourceKind, ResourceState};
+use super::resource::{BorrowedHandle, ResourceKind, ResourceState};
 use super::{
     GraphicsDevice, GraphicsResource, RenderTarget2D, RenderTargetCube, Texture, Texture2D,
     TextureCube,
@@ -415,6 +415,25 @@ impl Effect {
     pub(super) fn from_handle(device: &GraphicsDevice, handle: sys::CNA_Handle) -> Self {
         Self {
             state: ResourceState::new(device, handle, ResourceKind::Effect),
+            parameters: Mutex::new(None),
+            techniques: Mutex::new(None),
+            reflection_blueprint: Mutex::new(None),
+        }
+    }
+
+    /// Wraps an effect another native object owns, for the duration of a borrow.
+    ///
+    /// CNA's engine layer hands out effects it keeps -- a shadow map's caster
+    /// effect is the first -- and destroying one would free the owner's
+    /// resource. This form never destroys the handle and re-validates the
+    /// borrow on every native use.
+    pub(crate) fn from_borrowed_handle(
+        device: &GraphicsDevice,
+        handle: sys::CNA_Handle,
+        owner: Arc<dyn BorrowedHandle>,
+    ) -> Self {
+        Self {
+            state: ResourceState::borrowed(device, handle, ResourceKind::Effect, owner),
             parameters: Mutex::new(None),
             techniques: Mutex::new(None),
             reflection_blueprint: Mutex::new(None),

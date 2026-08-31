@@ -142,14 +142,14 @@ pub enum ShadowQuality {
 macro_rules! identity {
     ($name:ident, $native:ty, $($variant:ident => $constant:ident),+ $(,)?) => {
         impl $name {
-            const fn from_native(value: $native) -> Option<Self> {
+            pub(crate) const fn from_native(value: $native) -> Option<Self> {
                 Some(match value {
                     $(sys::$constant => Self::$variant,)+
                     _ => return None,
                 })
             }
 
-            const fn to_native(self) -> $native {
+            pub(crate) const fn to_native(self) -> $native {
                 match self {
                     $(Self::$variant => sys::$constant,)+
                 }
@@ -586,6 +586,16 @@ macro_rules! settings_flag {
 }
 
 impl EngineRenderSettings {
+    /// The settings exactly as the ABI carries them.
+    pub(crate) const fn as_native(&self) -> &sys::CNA_RenderPipelineSettingsEXT {
+        &self.inner
+    }
+
+    /// Adopts a structure CNA filled, keeping the versioning fields it set.
+    pub(crate) const fn from_native(inner: sys::CNA_RenderPipelineSettingsEXT) -> Self {
+        Self { inner }
+    }
+
     /// The engine's own defaults.
     pub fn canonical_defaults() -> Result<Self> {
         let native = Native::process()?;

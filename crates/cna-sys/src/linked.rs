@@ -6356,4 +6356,212 @@ extern "C" {
         argument1: CNA_Bool,
         argument2: *mut CNA_WriteLeaderboardsEventInfo,
     ) -> CNA_Result;
+    pub fn cna_render_pipeline_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_RenderPipelineHandle,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_destroy(argument0: CNA_RenderPipelineHandle) -> CNA_Result;
+    pub fn cna_render_pipeline_get_settings(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: *mut CNA_RenderPipelineSettingsEXT,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_set_settings(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: *const CNA_RenderPipelineSettingsEXT,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_resize(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: i32,
+        argument2: i32,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_begin(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: *const CNA_Color,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_end(argument0: CNA_RenderPipelineHandle) -> CNA_Result;
+    pub fn cna_render_pipeline_set_depth_normal_inputs(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: CNA_Handle,
+        argument2: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_set_velocity_input_ext(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_set_transparent_scene(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: CNA_RenderPipelineDrawCallback,
+        argument2: *mut c_void,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_set_camera(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: *const CNA_Matrix,
+        argument2: *const CNA_Matrix,
+        argument3: f32,
+        argument4: f32,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_set_skybox_camera(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: *const CNA_Matrix,
+        argument2: *const CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_copy_transparency_fallback_reason_ext(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_set_gpu_timing_enabled_ext(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_is_gpu_timing_enabled_ext(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_did_skybox_draw(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_did_shadow_pass_run(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_get_scene_target(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_get_scene_target_format(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: *mut CNA_SurfaceFormat,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_is_using_scene_target(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_get_last_frame_pass_count(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_get_gpu_memory_estimate_bytes(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_get_statistics(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: *mut CNA_RenderPipelineFrameStatisticsEXT,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_release_device_resources_ext(
+        argument0: CNA_RenderPipelineHandle,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_get_pass_timing_count_ext(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_get_pass_timing_ext(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: u64,
+        argument2: *mut CNA_PassTimingEXT,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_copy_pass_timing_name_ext(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_directional_light_ext_init(argument0: *mut CNA_DirectionalLightEXT) -> CNA_Result;
+    pub fn cna_graphics_device_supports_shadow_sampling_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_shadow_map_create(
+        argument0: CNA_Handle,
+        argument1: CNA_ShadowQuality,
+        argument2: *mut CNA_ShadowMapHandle,
+    ) -> CNA_Result;
+    pub fn cna_shadow_map_destroy(argument0: CNA_ShadowMapHandle) -> CNA_Result;
+    pub fn cna_shadow_map_is_supported(
+        argument0: CNA_ShadowMapHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_shadow_map_begin(
+        argument0: CNA_ShadowMapHandle,
+        argument1: *const CNA_DirectionalLightEXT,
+        argument2: *const CNA_BoundingBox,
+    ) -> CNA_Result;
+    pub fn cna_shadow_map_end(argument0: CNA_ShadowMapHandle) -> CNA_Result;
+    pub fn cna_shadow_map_get_caster_effect(
+        argument0: CNA_ShadowMapHandle,
+        argument1: *mut CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_shadow_map_get_skinned_caster_effect(
+        argument0: CNA_ShadowMapHandle,
+        argument1: *mut CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_shadow_map_apply_caster(argument0: CNA_ShadowMapHandle) -> CNA_Result;
+    pub fn cna_shadow_map_apply_skinned_caster(
+        argument0: CNA_ShadowMapHandle,
+        argument1: *const CNA_Matrix,
+        argument2: u64,
+        argument3: i32,
+    ) -> CNA_Result;
+    pub fn cna_shadow_map_get_shadow_texture(
+        argument0: CNA_ShadowMapHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_shadow_map_get_light_view_projection(
+        argument0: CNA_ShadowMapHandle,
+        argument1: *mut CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_shadow_map_get_size(
+        argument0: CNA_ShadowMapHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_shadow_map_get_quality(
+        argument0: CNA_ShadowMapHandle,
+        argument1: *mut CNA_ShadowQuality,
+    ) -> CNA_Result;
+    pub fn cna_shadow_map_get_depth_bias(
+        argument0: CNA_ShadowMapHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_shadow_map_set_depth_bias(
+        argument0: CNA_ShadowMapHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_shadow_map_get_filter_radius(
+        argument0: CNA_ShadowMapHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_shadow_map_compute_light_view(
+        argument0: *const CNA_DirectionalLightEXT,
+        argument1: *const CNA_BoundingBox,
+        argument2: *mut CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_shadow_map_compute_light_projection(
+        argument0: *const CNA_Matrix,
+        argument1: *const CNA_BoundingBox,
+        argument2: *mut CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_shadow_map_size_for_quality(
+        argument0: CNA_ShadowQuality,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_shadow_map_filter_radius_for_quality(
+        argument0: CNA_ShadowQuality,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_set_shadow_scene(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: CNA_ShadowMapHandle,
+        argument2: *const CNA_DirectionalLightEXT,
+        argument3: *const CNA_BoundingBox,
+        argument4: CNA_RenderPipelineDrawCallback,
+        argument5: *mut c_void,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_get_shadow_map(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: *mut CNA_ShadowMapHandle,
+    ) -> CNA_Result;
 }

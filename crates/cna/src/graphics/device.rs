@@ -78,6 +78,19 @@ impl DeviceOwner {
     }
 }
 
+/// A native child of a device that this crate owns but `ResourceState` does not model.
+///
+/// CNA's engine layer registers its objects as owned graphics resources of the
+/// parent game, and the game refuses to be destroyed while one is outstanding.
+/// Those objects are not XNA graphics resources -- a render pipeline is not a
+/// `Texture2D` -- so they are not `ResourceKind`s; they register here instead
+/// and are released on the same shutdown path, before the game is destroyed.
+pub(crate) trait OwnedEngineChild: Send + Sync {
+    /// Releases the native child. Called at most once per child; a child that
+    /// was already released by its own `Drop` answers `Ok(())`.
+    fn release_native(&self) -> Result<()>;
+}
+
 /// Shared validity and child-resource registry for one graphics device.
 pub(super) struct DeviceState {
     native: Arc<Native>,
@@ -85,6 +98,7 @@ pub(super) struct DeviceState {
     handle: Mutex<sys::CNA_Handle>,
     alive: AtomicBool,
     resources: Mutex<Vec<Weak<ResourceState>>>,
+    engine_children: Mutex<Vec<Weak<dyn OwnedEngineChild>>>,
     presentation_parameters: PresentationParameters,
     display_mode: OnceLock<DisplayMode>,
     disposing: EventHandlers<EventArgs>,
@@ -174,6 +188,15 @@ impl DeviceState {
         &self.native
     }
 
+    pub(crate) fn register_engine_child(&self, child: &Arc<dyn OwnedEngineChild>) {
+        let mut children = self
+            .engine_children
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        children.retain(|entry| entry.strong_count() != 0);
+        children.push(Arc::downgrade(child));
+    }
+
     pub(super) fn register(&self, resource: &Arc<ResourceState>) {
         let mut resources = self
             .resources
@@ -250,6 +273,25 @@ impl DeviceState {
     }
 
     pub(super) fn dispose_resources(&self) -> Result<()> {
+        // Engine children first. They hold device resources of their own, and
+        // CNA counts them against the game's owned-child total, so a pipeline
+        // released after its targets would be released after the check it
+        // exists to satisfy.
+        let children = self
+            .engine_children
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .filter_map(Weak::upgrade)
+            .collect::<Vec<_>>();
+        let mut child_error = None;
+        for child in children.into_iter().rev() {
+            if let Err(error) = child.release_native() {
+                if child_error.is_none() {
+                    child_error = Some(error);
+                }
+            }
+        }
         let resources = self
             .resources
             .lock()
@@ -257,7 +299,7 @@ impl DeviceState {
             .iter()
             .filter_map(Weak::upgrade)
             .collect::<Vec<_>>();
-        let mut first_error = None;
+        let mut first_error = child_error;
         for resource in resources.into_iter().rev() {
             if let Err(error) = resource.dispose_native() {
                 if first_error.is_none() {
@@ -343,6 +385,7 @@ impl GraphicsDevice {
                 handle: Mutex::new(handle),
                 alive: AtomicBool::new(true),
                 resources: Mutex::new(Vec::new()),
+                engine_children: Mutex::new(Vec::new()),
                 presentation_parameters: PresentationParameters::new(),
                 display_mode: OnceLock::new(),
                 disposing: EventHandlers::new(),
@@ -1913,6 +1956,14 @@ impl GraphicsDevice {
 
     pub(crate) fn dispose_resources(&self) -> Result<()> {
         self.state.dispose_resources()
+    }
+
+    /// Registers a native engine child so device shutdown releases it.
+    ///
+    /// The child keeps the strong reference; this registry holds a weak one, so
+    /// a child dropped in the ordinary way simply disappears from it.
+    pub(crate) fn register_engine_child(&self, child: &Arc<dyn OwnedEngineChild>) {
+        self.state.register_engine_child(child);
     }
 
     pub(crate) fn enter_callback(&self) -> Result<()> {

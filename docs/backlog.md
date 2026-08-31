@@ -79,7 +79,7 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-EXT-009 | Sensors: accelerometer, compass, gyroscope | `sensors.h`, `input_devices.h` | DONE, real readings `HARDWARE_PENDING` |
 | RUST-EXT-010a | Engine layer: render-pipeline settings, presets, normalization, text | `engine_layer.h` | DONE |
 | RUST-EXT-010c | Engine layer: the `KHR_materials_*` extension set | `engine_layer.h` | DONE |
-| RUST-EXT-010b | The other 808 engine-layer routes across 224 families | `engine_layer.h` | **scoped**: reachable on this artifact -- every engine object constructs -- but a headless device renders nothing, so their semantics cannot be asserted beyond "it returned success". A slice qualifies when its semantics can be asserted exactly; a GPU-backed artifact is the trigger. See [docs/engine-layer-scope.md](engine-layer-scope.md) | PRODUCT_DECISION_REQUIRED |
+| RUST-EXT-010b | The other 808 engine-layer routes across 224 families | `engine_layer.h` | **reopened**: the trigger the scope decision named has arrived. A GPU-backed artifact runs real frames through the Rust binding on the host's AMD Radeon 780M under `OPENGL33` and `VULKAN`, and this session built an `OPENGLES3` artifact with `CNA_CNAEXT=ON` so the engine layer is actually present. See [docs/gpu-evidence.md](gpu-evidence.md). The row is no longer one task: it is decomposed family by family in [docs/engine-layer-scope.md](engine-layer-scope.md) | IN_PROGRESS |
 
 ## Platform and packaging
 

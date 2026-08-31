@@ -18,7 +18,7 @@ use cna::Microsoft::Xna::Framework::Graphics::{
     GraphicsDevice, GraphicsProfile, PresentationParameters,
 };
 use cna::Microsoft::Xna::Framework::GraphicsDeviceInformation;
-use cna::CnaError;
+use cna::{CnaError, ErrorCategory, Result};
 
 /// A 4x2 image whose every pixel is distinguishable, so a byte that moves is
 /// visible rather than averaged away.
@@ -562,17 +562,42 @@ impl CnbLoader for CountingLoader {
 ///
 /// Both come from `GraphicsDevice::new`, so this whole test runs with no
 /// `Game` in the process at all.
-fn loader_host() -> (GraphicsDevice, NativeContentManager) {
-    let adapter = GraphicsDeviceInformation::new().Adapter();
-    let parameters = PresentationParameters::new();
-    parameters.SetBackBufferWidth(64);
-    parameters.SetBackBufferHeight(64);
-    let device = GraphicsDevice::new(&adapter, GraphicsProfile::Reach, &parameters)
-        .expect("independent device for a content manager");
+fn loader_host() -> Option<(GraphicsDevice, NativeContentManager)> {
+    let device = independent_device_or_skip(|| {
+        let adapter = GraphicsDeviceInformation::new().Adapter();
+        let parameters = PresentationParameters::new();
+        parameters.SetBackBufferWidth(64);
+        parameters.SetBackBufferHeight(64);
+        GraphicsDevice::new(&adapter, GraphicsProfile::Reach, &parameters)
+    })?;
     let manager =
         NativeContentManager::new(&device, "").expect("native content manager on that device");
-    (device, manager)
+    Some((device, manager))
 }
+
+/// A device with no `Game` anywhere, or `None` when this renderer cannot make one.
+///
+/// EasyGL's context needs a platform surface, so every GL-family renderer
+/// refuses `cna_graphics_device_create` with a `Platform` failure naming the
+/// missing window, while `HEADLESS` creates one happily. That is a renderer
+/// capability rather than a binding fault, so it is reported and skipped --
+/// but *only* that exact refusal. Any other failure is still a failure, which
+/// is what keeps this from quietly hiding a regression.
+fn independent_device_or_skip(build: impl FnOnce() -> Result<GraphicsDevice>) -> Option<GraphicsDevice> {
+    match build() {
+        Ok(device) => Some(device),
+        Err(CnaError::Native {
+            category: ErrorCategory::Platform,
+            ref message,
+            ..
+        }) if message.contains("platform window id") => {
+            println!("this renderer cannot create a device without a window: {message}");
+            None
+        }
+        Err(error) => panic!("independent GraphicsDevice construction failed: {error}"),
+    }
+}
+
 
 /// A document of a game's own type, carrying the canonical name CNA checks.
 fn custom_document(type_name: &str, content_name: &str) -> Vec<u8> {
@@ -589,7 +614,7 @@ fn a_rust_loader_decodes_a_game_s_own_asset_type() {
     if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
         return;
     }
-    let (_device, manager) = loader_host();
+    let Some((_device, manager)) = loader_host() else { return };
     let type_name = "CnaRust.Test.RoundTripAsset";
     let asset_type = AssetTypeId::custom(type_name).expect("custom identity");
 
@@ -700,7 +725,7 @@ fn a_loader_failure_and_a_loader_panic_are_both_contained() {
     if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
         return;
     }
-    let (_device, manager) = loader_host();
+    let Some((_device, manager)) = loader_host() else { return };
     for (label, fail, panic) in [("failing", true, false), ("panicking", false, true)] {
         let type_name = format!("CnaRust.Test.{label}Asset");
         let calls = Arc::new(AtomicUsize::new(0));
