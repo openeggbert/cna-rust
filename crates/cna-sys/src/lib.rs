@@ -817,6 +817,22 @@ pub type CNA_AreaLightBrdfTableHandle = CNA_Handle;
 pub type CNA_GpuInstanceCullerHandle = CNA_Handle;
 pub type CNA_InstancedRendererEXTHandle = CNA_Handle;
 pub type CNA_SkinnedModelEXTHandle = CNA_Handle;
+pub type CNA_SkinningDataHandle = CNA_Handle;
+pub type CNA_AnimationPlayerHandle = CNA_Handle;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_SkinningDataDescriptor {
+    pub bone_count: i32,
+    pub reserved: u32,
+    pub skeleton_hierarchy: *const i32,
+    pub bind_pose: *const CNA_Matrix,
+    pub inverse_bind_pose: *const CNA_Matrix,
+    pub skeleton_root_prefix: *const CNA_Matrix,
+    pub skeleton_root_prefix_count: u64,
+    pub clips: *const CNA_NamedAnimationClipEXTDescriptor,
+    pub clip_count: u64,
+}
 pub type CNA_ClipTargetSpaceEXT = u32;
 
 pub const CNA_CLIP_TARGET_SPACE_JOINT_PALETTE_EXT: CNA_ClipTargetSpaceEXT = 0;
@@ -10727,4 +10743,98 @@ pub type cna_skinned_model_ext_set_clip_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_skinned_model_ext_set_skeleton_fn = unsafe extern "C" fn(
     CNA_SkinnedModelEXTHandle, i32, *const i32, *const CNA_Matrix, *const CNA_Matrix,
+) -> CNA_Result;
+pub type cna_animation_player_copy_bone_transforms_fn = unsafe extern "C" fn(
+    CNA_AnimationPlayerHandle, *mut CNA_Matrix, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_animation_player_copy_current_clip_name_fn = unsafe extern "C" fn(
+    CNA_AnimationPlayerHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_animation_player_copy_skin_transforms_fn = unsafe extern "C" fn(
+    CNA_AnimationPlayerHandle, *mut CNA_Matrix, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_animation_player_copy_world_transforms_fn = unsafe extern "C" fn(
+    CNA_AnimationPlayerHandle, *mut CNA_Matrix, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_animation_player_create_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, *mut CNA_AnimationPlayerHandle,
+) -> CNA_Result;
+pub type cna_animation_player_destroy_fn = unsafe extern "C" fn(
+    CNA_AnimationPlayerHandle,
+) -> CNA_Result;
+pub type cna_animation_player_get_current_clip_info_fn = unsafe extern "C" fn(
+    CNA_AnimationPlayerHandle, *mut CNA_Bool, *mut f64, *mut u64,
+) -> CNA_Result;
+pub type cna_animation_player_get_current_clip_name_byte_count_fn = unsafe extern "C" fn(
+    CNA_AnimationPlayerHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_animation_player_get_current_position_fn = unsafe extern "C" fn(
+    CNA_AnimationPlayerHandle, *mut f64,
+) -> CNA_Result;
+pub type cna_animation_player_start_clip_fn = unsafe extern "C" fn(
+    CNA_AnimationPlayerHandle, CNA_StringView,
+) -> CNA_Result;
+pub type cna_animation_player_update_fn = unsafe extern "C" fn(
+    CNA_AnimationPlayerHandle, f64, CNA_Bool, CNA_Bool,
+) -> CNA_Result;
+pub type cna_skinning_data_copy_bind_pose_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, *mut CNA_Matrix, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinning_data_copy_clip_name_at_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinning_data_copy_clip_track_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, CNA_StringView, u64, *mut i32, *mut CNA_KeyframeEXT, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinning_data_copy_inverse_bind_pose_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, *mut CNA_Matrix, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinning_data_copy_skeleton_hierarchy_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, *mut i32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinning_data_copy_skeleton_root_name_ext_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinning_data_copy_skeleton_root_prefix_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, *mut CNA_Matrix, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinning_data_copy_type_name_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinning_data_create_fn = unsafe extern "C" fn(
+    *const CNA_SkinningDataDescriptor, *mut CNA_SkinningDataHandle,
+) -> CNA_Result;
+pub type cna_skinning_data_destroy_fn = unsafe extern "C" fn(CNA_SkinningDataHandle) -> CNA_Result;
+pub type cna_skinning_data_get_bone_count_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_skinning_data_get_clip_count_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_skinning_data_get_clip_info_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, CNA_StringView, *mut CNA_Bool, *mut f64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinning_data_get_clip_name_byte_count_at_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinning_data_get_clip_target_space_ext_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, u64, *mut CNA_ClipTargetSpaceEXT,
+) -> CNA_Result;
+pub type cna_skinning_data_get_skeleton_root_name_byte_count_ext_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_skinning_data_get_skeleton_root_node_index_ext_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_skinning_data_get_type_name_byte_count_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_skinning_data_set_clip_target_space_ext_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, u64, CNA_ClipTargetSpaceEXT,
+) -> CNA_Result;
+pub type cna_skinning_data_set_skeleton_root_name_ext_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, CNA_StringView,
+) -> CNA_Result;
+pub type cna_skinning_data_set_skeleton_root_node_index_ext_fn = unsafe extern "C" fn(
+    CNA_SkinningDataHandle, i32,
 ) -> CNA_Result;

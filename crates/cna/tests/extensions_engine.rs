@@ -11,7 +11,10 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use cna::extensions::models::{AnimationClip, BoneTrack, Keyframe, SkinnedModel};
+use cna::extensions::models::{
+    AnimationClip, AnimationPlayer, BoneTrack, ClipTargetSpace, Keyframe, SkinnedModel,
+    SkinningData,
+};
 use cna::extensions::pbr::{
     GltfMaterialBridge, GltfMaterialExtensionSource, GltfMaterialExtensionTextures,
     GltfMaterialSource, PbrMaterialExtensions, PbrMaterialFull, SkinnedPbrEffect,
@@ -9937,5 +9940,268 @@ fn a_skinned_model_evaluates_the_pose_the_skinned_effect_needs() {
         findings.moved[4],
         ("its source now", 0, 0),
         "and empties its source too"
+    );
+}
+
+/// What the skinning-data and animation-player run measured.
+#[derive(Default)]
+struct AnimationFindings {
+    type_name: String,
+    shape: (u64, u64, Vec<i32>),
+    prefix: (usize, usize),
+    partial_prefix_refused: bool,
+    clip_name: String,
+    clip_info: Option<(f64, u64)>,
+    target_space: Vec<(&'static str, String)>,
+    root: (i32, String),
+    before_start: (Option<(f64, u64)>, String, f64),
+    after_start: (Option<(f64, u64)>, String, f64),
+    positions: Vec<(&'static str, f64)>,
+    arrays: Vec<(&'static str, usize)>,
+    skin_differs: bool,
+    world_moves: Vec<(&'static str, f32)>,
+    data_alive_after_player: bool,
+}
+
+struct AnimationGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<AnimationFindings>>,
+}
+
+impl GameStateAccess for AnimationGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for AnimationGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, _game: &mut GameContext<'_>) -> Result<()> {
+        let mut findings = AnimationFindings::default();
+        let (parents, bind, inverse) = two_bone_skeleton();
+
+        // A partial root prefix is refused: it would place the rest of the
+        // skeleton somewhere arbitrary.
+        findings.partial_prefix_refused = SkinningData::new(
+            &parents,
+            &bind,
+            &inverse,
+            &[Matrix::Identity],
+            &[],
+        )
+        .is_err();
+
+        let data = Arc::new(SkinningData::new(
+            &parents,
+            &bind,
+            &inverse,
+            &[Matrix::Identity, Matrix::Identity],
+            &[("slide".to_owned(), slide_clip())],
+        )?);
+        findings.type_name = data.type_name()?;
+        findings.shape = (
+            data.bone_count()?,
+            data.clip_count()?,
+            data.skeleton_hierarchy()?,
+        );
+        findings.prefix = (
+            data.skeleton_root_prefix()?.len(),
+            data.bind_pose()?.len(),
+        );
+        findings.clip_name = data.clip_name_at(0)?;
+        findings.clip_info = data
+            .clip_info("slide")?
+            .map(|info| (info.duration_seconds, info.track_count));
+
+        findings.target_space.push((
+            "as created",
+            format!("{:?}", data.clip_target_space(0)?),
+        ));
+        data.set_clip_target_space(0, ClipTargetSpace::SceneNode)?;
+        findings
+            .target_space
+            .push(("after setting", format!("{:?}", data.clip_target_space(0)?)));
+        data.set_clip_target_space(0, ClipTargetSpace::JointPalette)?;
+
+        data.set_skeleton_root_node_index(7)?;
+        data.set_skeleton_root_name("hips")?;
+        findings.root = (data.skeleton_root_node_index()?, data.skeleton_root_name()?);
+
+        let player = AnimationPlayer::new(&data)?;
+        findings.before_start = (
+            player
+                .current_clip()?
+                .map(|info| (info.duration_seconds, info.track_count)),
+            player.current_clip_name()?,
+            player.current_position()?,
+        );
+        player.start_clip("slide")?;
+        findings.after_start = (
+            player
+                .current_clip()?
+                .map(|info| (info.duration_seconds, info.track_count)),
+            player.current_clip_name()?,
+            player.current_position()?,
+        );
+
+        // Seeking and advancing are different: the first sets the position,
+        // the second adds to it.
+        player.update(1.0, false, false)?;
+        findings.positions.push(("sought to one", player.current_position()?));
+        player.update(0.5, true, false)?;
+        findings
+            .positions
+            .push(("advanced by a half", player.current_position()?));
+        player.update(1.0, false, false)?;
+        findings.positions.push(("sought back to one", player.current_position()?));
+
+        let bones = player.bone_transforms()?;
+        let world = player.world_transforms()?;
+        let skin = player.skin_transforms()?;
+        findings.arrays.push(("bone", bones.len()));
+        findings.arrays.push(("world", world.len()));
+        findings.arrays.push(("skin", skin.len()));
+        // The three are different things: world is bone composed down the
+        // hierarchy, skin is world times the inverse bind pose.
+        findings.skin_differs = skin != world;
+
+        for (name, position) in [("start", 0.0_f64), ("middle", 1.0), ("end", 2.0)] {
+            player.update(position, false, false)?;
+            let world = player.world_transforms()?;
+            findings.world_moves.push((name, world[1].M41));
+        }
+
+        // Releasing the player leaves the data usable, which is what the
+        // retention is for.
+        player.release()?;
+        findings.data_alive_after_player = data.bone_count().is_ok();
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn an_animation_player_composes_the_three_transform_arrays_a_skinned_draw_needs() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(AnimationFindings::default()));
+    let game = AnimationGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with an animation player");
+
+    let findings = findings.lock().expect("findings");
+    println!("type name: {:?}", findings.type_name);
+    assert!(
+        !findings.type_name.is_empty(),
+        "the data knows the name the content pipeline writes for it"
+    );
+    assert!(
+        findings.partial_prefix_refused,
+        "a root prefix covering only some bones is refused rather than padded"
+    );
+
+    let (bones, clips, hierarchy) = findings.shape.clone();
+    assert_eq!(bones, 2, "the skeleton has the bones it was given");
+    assert_eq!(clips, 1, "and the clip it was given");
+    assert_eq!(hierarchy, vec![-1, 0], "with the hierarchy it was given");
+    assert_eq!(
+        findings.prefix,
+        (2, 2),
+        "a full root prefix is kept, one matrix per bone"
+    );
+    assert_eq!(findings.clip_name, "slide", "the clip keeps its name");
+    let (duration, tracks) = findings.clip_info.expect("the clip is found by name");
+    assert!((duration - 2.0).abs() < 1e-9, "and its duration");
+    assert_eq!(tracks, 1, "and its track count");
+
+    println!("target space: {:?}", findings.target_space);
+    assert_eq!(
+        findings.target_space[0].1, "JointPalette",
+        "a clip targets the joint palette by default"
+    );
+    assert_eq!(
+        findings.target_space[1].1, "SceneNode",
+        "and the space round-trips -- the two are never interchangeable"
+    );
+    assert_eq!(
+        findings.root,
+        (7, "hips".to_owned()),
+        "the skeleton root index and name both round-trip"
+    );
+
+    // A player has no clip until one is started, and the empty state is a
+    // *state* rather than a failure.
+    println!("before start: {:?}", findings.before_start);
+    assert_eq!(findings.before_start.0, None, "no clip before one is started");
+    assert!(findings.before_start.1.is_empty(), "and no clip name");
+    let (info, name, position) = findings.after_start.clone();
+    assert_eq!(
+        info,
+        Some((2.0, 1)),
+        "starting a clip makes it the current one, with its shape"
+    );
+    assert_eq!(name, "slide", "and its name");
+    assert_eq!(position, 0.0, "and starts it at the beginning");
+
+    // Seeking and advancing are different operations, which one flag chooses
+    // between: a binding that passed the wrong one would still move the clock.
+    println!("positions: {:?}", findings.positions);
+    let at = |name: &str| -> f64 {
+        findings
+            .positions
+            .iter()
+            .find(|(label, _)| *label == name)
+            .expect("a recorded position")
+            .1
+    };
+    assert!((at("sought to one") - 1.0).abs() < 1e-9, "seeking sets the position");
+    assert!(
+        (at("advanced by a half") - 1.5).abs() < 1e-9,
+        "advancing adds to it: {}",
+        at("advanced by a half")
+    );
+    assert!(
+        (at("sought back to one") - 1.0).abs() < 1e-9,
+        "and seeking again sets it rather than adding"
+    );
+
+    println!("arrays: {:?}", findings.arrays);
+    for (name, length) in &findings.arrays {
+        assert_eq!(*length, 2, "the {name} array has one entry per bone");
+    }
+    assert!(
+        findings.skin_differs,
+        "the skin transforms are the world transforms times the inverse bind pose, \
+         so the two arrays are not the same thing"
+    );
+
+    // The pose really moves: the child bone's world translation follows the
+    // clip, exactly as the skinned model's own evaluation does.
+    println!("world moves: {:?}", findings.world_moves);
+    let x = |name: &str| -> f32 {
+        findings
+            .world_moves
+            .iter()
+            .find(|(label, _)| *label == name)
+            .expect("a recorded world transform")
+            .1
+    };
+    assert!((x("start") - 0.0).abs() < 1e-4, "at the start: {}", x("start"));
+    assert!(
+        (x("middle") - 2.0).abs() < 1e-3,
+        "halfway through: {}",
+        x("middle")
+    );
+    assert!((x("end") - 4.0).abs() < 1e-4, "and at the end: {}", x("end"));
+
+    assert!(
+        findings.data_alive_after_player,
+        "releasing the player leaves its skinning data usable, \
+         which is what retaining it is for"
     );
 }

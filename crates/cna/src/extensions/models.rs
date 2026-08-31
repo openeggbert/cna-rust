@@ -991,3 +991,612 @@ fn read_text(
     }
     Ok(String::from_utf8(buffer).ok())
 }
+
+/// The skeleton and clips an [`AnimationPlayer`] plays.
+///
+/// `OWNED`, and immutable except for the two extension knobs -- the clip target
+/// space and the skeleton root identity. Everything else is fixed at
+/// construction, because a player holds the data and a skeleton that changed
+/// underneath it would invalidate the pose it is halfway through computing.
+pub struct SkinningData {
+    handle: Mutex<sys::CNA_SkinningDataHandle>,
+    native: Arc<Native>,
+}
+
+impl SkinningData {
+    /// Creates skinning data from a skeleton, an optional root prefix and a set
+    /// of named clips.
+    ///
+    /// `skeleton_root_prefix` is either empty or one matrix per bone: a partial
+    /// prefix is refused rather than padded, because a prefix that covered only
+    /// some bones would place the rest of the skeleton somewhere arbitrary.
+    pub fn new(
+        skeleton_hierarchy: &[i32],
+        bind_pose: &[Matrix],
+        inverse_bind_pose: &[Matrix],
+        skeleton_root_prefix: &[Matrix],
+        clips: &[(String, AnimationClip)],
+    ) -> Result<Self> {
+        let native = Native::process()?;
+        let bone_count = i32::try_from(skeleton_hierarchy.len())
+            .map_err(|_| CnaError::InvalidInput("more bones than a skeleton can hold"))?;
+        if bind_pose.len() != skeleton_hierarchy.len()
+            || inverse_bind_pose.len() != skeleton_hierarchy.len()
+        {
+            return Err(CnaError::InvalidInput(
+                "a skeleton needs one parent index and two matrices per bone",
+            ));
+        }
+        let bind: Vec<sys::CNA_Matrix> = bind_pose.iter().copied().map(matrix).collect();
+        let inverse: Vec<sys::CNA_Matrix> =
+            inverse_bind_pose.iter().copied().map(matrix).collect();
+        let prefix: Vec<sys::CNA_Matrix> =
+            skeleton_root_prefix.iter().copied().map(matrix).collect();
+        let staged = StagedClips::new(clips);
+        let descriptor = sys::CNA_SkinningDataDescriptor {
+            bone_count,
+            reserved: 0,
+            skeleton_hierarchy: skeleton_hierarchy.as_ptr(),
+            bind_pose: bind.as_ptr(),
+            inverse_bind_pose: inverse.as_ptr(),
+            skeleton_root_prefix: if prefix.is_empty() {
+                core::ptr::null()
+            } else {
+                prefix.as_ptr()
+            },
+            skeleton_root_prefix_count: prefix.len() as u64,
+            clips: staged.named.as_ptr(),
+            clip_count: staged.named.len() as u64,
+        };
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: every array the descriptor points at outlives the call, and
+        // the output is a live local.
+        native.check(unsafe { (native.engine.skinning_data_create)(&descriptor, &mut handle) })?;
+        Ok(Self {
+            handle: Mutex::new(handle),
+            native,
+        })
+    }
+
+    fn get(&self) -> Result<sys::CNA_SkinningDataHandle> {
+        let handle = *self
+            .handle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if handle == sys::CNA_INVALID_HANDLE {
+            return Err(CnaError::InvalidInput("the skinning data has been released"));
+        }
+        Ok(handle)
+    }
+
+    /// CNA's own name for the type, as the content pipeline writes it.
+    pub fn type_name(&self) -> Result<String> {
+        let handle = self.get()?;
+        let mut required = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.skinning_data_get_type_name_byte_count)(handle, &mut required)
+        })?;
+        read_text(required, |destination, capacity, out_bytes| {
+            // SAFETY: the handle is owned and the destination holds `capacity`
+            // writable bytes.
+            unsafe {
+                (self.native.engine.skinning_data_copy_type_name)(
+                    handle,
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+        .and_then(|text| text.ok_or(CnaError::InvalidInput("CNA text is not valid UTF-8")))
+    }
+
+    /// How many bones the skeleton has.
+    pub fn bone_count(&self) -> Result<u64> {
+        let handle = self.get()?;
+        let mut value = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.skinning_data_get_bone_count)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// The parent index of every bone.
+    pub fn skeleton_hierarchy(&self) -> Result<Vec<i32>> {
+        let handle = self.get()?;
+        let required = self.bone_count()?;
+        let mut buffer = vec![0_i32; required as usize];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `required`
+        // writable values.
+        self.native.check(unsafe {
+            (self.native.engine.skinning_data_copy_skeleton_hierarchy)(
+                handle,
+                buffer.as_mut_ptr(),
+                required,
+                &mut count,
+            )
+        })?;
+        buffer.truncate(count as usize);
+        Ok(buffer)
+    }
+
+    /// The local bind pose of every bone.
+    pub fn bind_pose(&self) -> Result<Vec<Matrix>> {
+        self.matrices(self.native.engine.skinning_data_copy_bind_pose)
+    }
+
+    /// The inverse global bind pose of every bone.
+    pub fn inverse_bind_pose(&self) -> Result<Vec<Matrix>> {
+        self.matrices(self.native.engine.skinning_data_copy_inverse_bind_pose)
+    }
+
+    /// The root prefix, empty when there is none.
+    pub fn skeleton_root_prefix(&self) -> Result<Vec<Matrix>> {
+        self.matrices(self.native.engine.skinning_data_copy_skeleton_root_prefix)
+    }
+
+    fn matrices(
+        &self,
+        route: unsafe extern "C" fn(
+            sys::CNA_Handle,
+            *mut sys::CNA_Matrix,
+            u64,
+            *mut u64,
+        ) -> sys::CNA_Result,
+    ) -> Result<Vec<Matrix>> {
+        let handle = self.get()?;
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the count.
+        let probe = unsafe { route(handle, core::ptr::null_mut(), 0, &mut required) };
+        if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+            self.native.check(probe)?;
+        }
+        if required == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![sys::CNA_Matrix::default(); required as usize];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `required`
+        // writable matrices.
+        self.native
+            .check(unsafe { route(handle, buffer.as_mut_ptr(), required, &mut count) })?;
+        buffer.truncate(count as usize);
+        Ok(buffer.into_iter().map(from_matrix).collect())
+    }
+
+    /// How many clips it carries.
+    pub fn clip_count(&self) -> Result<u64> {
+        let handle = self.get()?;
+        let mut value = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.skinning_data_get_clip_count)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// The name of the clip at an index.
+    pub fn clip_name_at(&self, index: u64) -> Result<String> {
+        let handle = self.get()?;
+        let mut required = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.skinning_data_get_clip_name_byte_count_at)(
+                handle, index, &mut required,
+            )
+        })?;
+        read_text(required, |destination, capacity, out_bytes| {
+            // SAFETY: the handle is owned and the destination holds `capacity`
+            // writable bytes.
+            unsafe {
+                (self.native.engine.skinning_data_copy_clip_name_at)(
+                    handle,
+                    index,
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+        .and_then(|text| text.ok_or(CnaError::InvalidInput("CNA text is not valid UTF-8")))
+    }
+
+    /// The shape of the clip under a name, or `None` when there is none.
+    pub fn clip_info(&self, name: &str) -> Result<Option<ClipInfo>> {
+        let handle = self.get()?;
+        let mut found = 0_u8;
+        let mut duration = 0.0_f64;
+        let mut tracks = 0_u64;
+        // SAFETY: the handle is owned, the name is borrowed for the call, and
+        // all three outputs are live locals.
+        self.native.check(unsafe {
+            (self.native.engine.skinning_data_get_clip_info)(
+                handle,
+                view(name),
+                &mut found,
+                &mut duration,
+                &mut tracks,
+            )
+        })?;
+        Ok((found != 0).then_some(ClipInfo {
+            duration_seconds: duration,
+            track_count: tracks,
+        }))
+    }
+
+    /// One track of the clip under a name.
+    pub fn clip_track(&self, name: &str, track_index: u64) -> Result<BoneTrack> {
+        let handle = self.get()?;
+        let mut bone_index = 0_i32;
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the count.
+        let probe = unsafe {
+            (self.native.engine.skinning_data_copy_clip_track)(
+                handle,
+                view(name),
+                track_index,
+                &mut bone_index,
+                core::ptr::null_mut(),
+                0,
+                &mut required,
+            )
+        };
+        if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+            self.native.check(probe)?;
+        }
+        let mut buffer = vec![sys::CNA_KeyframeEXT::default(); required as usize];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `required`
+        // writable keyframes.
+        self.native.check(unsafe {
+            (self.native.engine.skinning_data_copy_clip_track)(
+                handle,
+                view(name),
+                track_index,
+                &mut bone_index,
+                buffer.as_mut_ptr(),
+                required,
+                &mut count,
+            )
+        })?;
+        buffer.truncate(count as usize);
+        Ok(BoneTrack {
+            bone_index,
+            keyframes: buffer.into_iter().map(Keyframe::from_native).collect(),
+        })
+    }
+
+    /// Which index space the clip at an index targets.
+    pub fn clip_target_space(&self, index: u64) -> Result<ClipTargetSpace> {
+        let handle = self.get()?;
+        let mut value: sys::CNA_ClipTargetSpaceEXT = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.skinning_data_get_clip_target_space_ext)(handle, index, &mut value)
+        })?;
+        ClipTargetSpace::from_native(value)
+            .ok_or(CnaError::InvalidInput("native clip target space is unknown"))
+    }
+
+    /// Sets it.
+    pub fn set_clip_target_space(&self, index: u64, value: ClipTargetSpace) -> Result<()> {
+        let handle = self.get()?;
+        // SAFETY: the handle is owned and the identity is canonical.
+        self.native.check(unsafe {
+            (self.native.engine.skinning_data_set_clip_target_space_ext)(
+                handle,
+                index,
+                value.to_native(),
+            )
+        })
+    }
+
+    /// Which scene node the skeleton hangs from, or a negative value for none.
+    pub fn skeleton_root_node_index(&self) -> Result<i32> {
+        let handle = self.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self
+                .native
+                .engine
+                .skinning_data_get_skeleton_root_node_index_ext)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Sets it.
+    pub fn set_skeleton_root_node_index(&self, value: i32) -> Result<()> {
+        let handle = self.get()?;
+        // SAFETY: the handle is owned.
+        self.native.check(unsafe {
+            (self
+                .native
+                .engine
+                .skinning_data_set_skeleton_root_node_index_ext)(handle, value)
+        })
+    }
+
+    /// The name of that node, empty when there is none.
+    pub fn skeleton_root_name(&self) -> Result<String> {
+        let handle = self.get()?;
+        let mut required = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self
+                .native
+                .engine
+                .skinning_data_get_skeleton_root_name_byte_count_ext)(
+                handle, &mut required
+            )
+        })?;
+        read_text(required, |destination, capacity, out_bytes| {
+            // SAFETY: the handle is owned and the destination holds `capacity`
+            // writable bytes.
+            unsafe {
+                (self.native.engine.skinning_data_copy_skeleton_root_name_ext)(
+                    handle,
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+        .and_then(|text| text.ok_or(CnaError::InvalidInput("CNA text is not valid UTF-8")))
+    }
+
+    /// Sets it.
+    pub fn set_skeleton_root_name(&self, name: &str) -> Result<()> {
+        let handle = self.get()?;
+        // SAFETY: the handle is owned and the name is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.skinning_data_set_skeleton_root_name_ext)(handle, view(name))
+        })
+    }
+
+    /// Releases the data now rather than at drop.
+    ///
+    /// Refused while a player still holds it: upstream retains the data, and a
+    /// player whose skeleton vanished would compute a pose from nothing.
+    pub fn release(&self) -> Result<()> {
+        let mut guard = self
+            .handle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let handle = *guard;
+        if handle == sys::CNA_INVALID_HANDLE {
+            return Ok(());
+        }
+        // SAFETY: the handle was published by this object's own create route
+        // and is released exactly once, here; the slot is cleared only once the
+        // destroy has succeeded.
+        self.native
+            .check(unsafe { (self.native.engine.skinning_data_destroy)(handle) })?;
+        *guard = sys::CNA_INVALID_HANDLE;
+        Ok(())
+    }
+}
+
+impl Drop for SkinningData {
+    fn drop(&mut self) {
+        let _ = self.release();
+    }
+}
+
+/// Plays one clip of a [`SkinningData`] and keeps the three transform arrays a
+/// skinned draw needs.
+///
+/// `OWNED`. The data is `RETAINED_DEPENDENCY`: upstream retains it, and this
+/// value holds the Rust side so the data outlives the player that reads it.
+///
+/// The three arrays are different things and are not interchangeable: the bone
+/// transforms are each bone's local pose, the world transforms are those
+/// composed down the hierarchy, and the skin transforms are the world
+/// transforms times the inverse bind pose -- the last is what a shader wants.
+pub struct AnimationPlayer {
+    handle: Mutex<sys::CNA_AnimationPlayerHandle>,
+    native: Arc<Native>,
+    /// The data upstream retains. Held so the Rust value cannot release it
+    /// while this player still reads it.
+    data: Arc<SkinningData>,
+}
+
+impl AnimationPlayer {
+    /// Creates a player over some skinning data.
+    pub fn new(data: &Arc<SkinningData>) -> Result<Self> {
+        let native = Arc::clone(&data.native);
+        let handle_in = data.get()?;
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the data handle is live for the call and the output is a live
+        // local.
+        native.check(unsafe { (native.engine.animation_player_create)(handle_in, &mut handle) })?;
+        Ok(Self {
+            handle: Mutex::new(handle),
+            native,
+            data: Arc::clone(data),
+        })
+    }
+
+    /// The data this player is keeping alive.
+    #[must_use]
+    pub fn skinning_data(&self) -> &Arc<SkinningData> {
+        &self.data
+    }
+
+    fn get(&self) -> Result<sys::CNA_AnimationPlayerHandle> {
+        let handle = *self
+            .handle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if handle == sys::CNA_INVALID_HANDLE {
+            return Err(CnaError::InvalidInput(
+                "the animation player has been released",
+            ));
+        }
+        Ok(handle)
+    }
+
+    /// Starts a clip by name, from the beginning.
+    pub fn start_clip(&self, name: &str) -> Result<()> {
+        let handle = self.get()?;
+        // SAFETY: the handle is owned and the name is borrowed for the call.
+        self.native
+            .check(unsafe { (self.native.engine.animation_player_start_clip)(handle, view(name)) })
+    }
+
+    /// Advances or seeks the current clip and recomputes every transform.
+    ///
+    /// `relative_to_current_time` chooses between the two: `true` adds to the
+    /// current position, `false` seeks to it.
+    pub fn update(
+        &self,
+        time_seconds: f64,
+        relative_to_current_time: bool,
+        loop_clip: bool,
+    ) -> Result<()> {
+        let handle = self.get()?;
+        // SAFETY: the handle is owned.
+        self.native.check(unsafe {
+            (self.native.engine.animation_player_update)(
+                handle,
+                time_seconds,
+                u8::from(relative_to_current_time),
+                u8::from(loop_clip),
+            )
+        })
+    }
+
+    /// Where in the clip the player is, in seconds.
+    pub fn current_position(&self) -> Result<f64> {
+        let handle = self.get()?;
+        let mut value = 0.0_f64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.animation_player_get_current_position)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// The shape of the clip being played, or `None` before one is started.
+    pub fn current_clip(&self) -> Result<Option<ClipInfo>> {
+        let handle = self.get()?;
+        let mut has_clip = 0_u8;
+        let mut duration = 0.0_f64;
+        let mut tracks = 0_u64;
+        // SAFETY: the handle is owned and all three outputs are live locals.
+        self.native.check(unsafe {
+            (self.native.engine.animation_player_get_current_clip_info)(
+                handle,
+                &mut has_clip,
+                &mut duration,
+                &mut tracks,
+            )
+        })?;
+        Ok((has_clip != 0).then_some(ClipInfo {
+            duration_seconds: duration,
+            track_count: tracks,
+        }))
+    }
+
+    /// The name of the clip being played, empty before one is started.
+    pub fn current_clip_name(&self) -> Result<String> {
+        let handle = self.get()?;
+        let mut required = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self
+                .native
+                .engine
+                .animation_player_get_current_clip_name_byte_count)(
+                handle, &mut required
+            )
+        })?;
+        read_text(required, |destination, capacity, out_bytes| {
+            // SAFETY: the handle is owned and the destination holds `capacity`
+            // writable bytes.
+            unsafe {
+                (self.native.engine.animation_player_copy_current_clip_name)(
+                    handle,
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+        .and_then(|text| text.ok_or(CnaError::InvalidInput("CNA text is not valid UTF-8")))
+    }
+
+    /// Each bone's local pose.
+    pub fn bone_transforms(&self) -> Result<Vec<Matrix>> {
+        self.transforms(self.native.engine.animation_player_copy_bone_transforms)
+    }
+
+    /// Those poses composed down the hierarchy.
+    pub fn world_transforms(&self) -> Result<Vec<Matrix>> {
+        self.transforms(self.native.engine.animation_player_copy_world_transforms)
+    }
+
+    /// The world transforms times the inverse bind pose: what a shader wants.
+    pub fn skin_transforms(&self) -> Result<Vec<Matrix>> {
+        self.transforms(self.native.engine.animation_player_copy_skin_transforms)
+    }
+
+    fn transforms(
+        &self,
+        route: unsafe extern "C" fn(
+            sys::CNA_Handle,
+            *mut sys::CNA_Matrix,
+            u64,
+            *mut u64,
+        ) -> sys::CNA_Result,
+    ) -> Result<Vec<Matrix>> {
+        let handle = self.get()?;
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the count.
+        let probe = unsafe { route(handle, core::ptr::null_mut(), 0, &mut required) };
+        if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+            self.native.check(probe)?;
+        }
+        if required == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![sys::CNA_Matrix::default(); required as usize];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `required`
+        // writable matrices.
+        self.native
+            .check(unsafe { route(handle, buffer.as_mut_ptr(), required, &mut count) })?;
+        buffer.truncate(count as usize);
+        Ok(buffer.into_iter().map(from_matrix).collect())
+    }
+
+    /// Releases the player now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        let mut guard = self
+            .handle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let handle = *guard;
+        if handle == sys::CNA_INVALID_HANDLE {
+            return Ok(());
+        }
+        // SAFETY: the handle was published by this object's own create route
+        // and is released exactly once, here.
+        self.native
+            .check(unsafe { (self.native.engine.animation_player_destroy)(handle) })?;
+        *guard = sys::CNA_INVALID_HANDLE;
+        Ok(())
+    }
+}
+
+impl Drop for AnimationPlayer {
+    fn drop(&mut self) {
+        // The player first, then the data it holds: upstream retains the data
+        // for as long as a player reads it, and releasing the data first is
+        // refused.
+        let _ = self.release();
+    }
+}

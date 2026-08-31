@@ -3509,6 +3509,166 @@ extern "C" {
         argument0: CNA_PbrMaterialExtensionsHandle,
         argument1: CNA_Handle,
     ) -> CNA_Result;
+    pub fn cna_animation_player_copy_bone_transforms(
+        argument0: CNA_AnimationPlayerHandle,
+        argument1: *mut CNA_Matrix,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_animation_player_copy_current_clip_name(
+        argument0: CNA_AnimationPlayerHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_animation_player_copy_skin_transforms(
+        argument0: CNA_AnimationPlayerHandle,
+        argument1: *mut CNA_Matrix,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_animation_player_copy_world_transforms(
+        argument0: CNA_AnimationPlayerHandle,
+        argument1: *mut CNA_Matrix,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_animation_player_create(
+        argument0: CNA_SkinningDataHandle,
+        argument1: *mut CNA_AnimationPlayerHandle,
+    ) -> CNA_Result;
+    pub fn cna_animation_player_destroy(argument0: CNA_AnimationPlayerHandle) -> CNA_Result;
+    pub fn cna_animation_player_get_current_clip_info(
+        argument0: CNA_AnimationPlayerHandle,
+        argument1: *mut CNA_Bool,
+        argument2: *mut f64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_animation_player_get_current_clip_name_byte_count(
+        argument0: CNA_AnimationPlayerHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_animation_player_get_current_position(
+        argument0: CNA_AnimationPlayerHandle,
+        argument1: *mut f64,
+    ) -> CNA_Result;
+    pub fn cna_animation_player_start_clip(
+        argument0: CNA_AnimationPlayerHandle,
+        argument1: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_animation_player_update(
+        argument0: CNA_AnimationPlayerHandle,
+        argument1: f64,
+        argument2: CNA_Bool,
+        argument3: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_copy_bind_pose(
+        argument0: CNA_SkinningDataHandle,
+        argument1: *mut CNA_Matrix,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_copy_clip_name_at(
+        argument0: CNA_SkinningDataHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_copy_clip_track(
+        argument0: CNA_SkinningDataHandle,
+        argument1: CNA_StringView,
+        argument2: u64,
+        argument3: *mut i32,
+        argument4: *mut CNA_KeyframeEXT,
+        argument5: u64,
+        argument6: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_copy_inverse_bind_pose(
+        argument0: CNA_SkinningDataHandle,
+        argument1: *mut CNA_Matrix,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_copy_skeleton_hierarchy(
+        argument0: CNA_SkinningDataHandle,
+        argument1: *mut i32,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_copy_skeleton_root_name_ext(
+        argument0: CNA_SkinningDataHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_copy_skeleton_root_prefix(
+        argument0: CNA_SkinningDataHandle,
+        argument1: *mut CNA_Matrix,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_copy_type_name(
+        argument0: CNA_SkinningDataHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_create(
+        argument0: *const CNA_SkinningDataDescriptor,
+        argument1: *mut CNA_SkinningDataHandle,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_destroy(argument0: CNA_SkinningDataHandle) -> CNA_Result;
+    pub fn cna_skinning_data_get_bone_count(
+        argument0: CNA_SkinningDataHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_get_clip_count(
+        argument0: CNA_SkinningDataHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_get_clip_info(
+        argument0: CNA_SkinningDataHandle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_Bool,
+        argument3: *mut f64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_get_clip_name_byte_count_at(
+        argument0: CNA_SkinningDataHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_get_clip_target_space_ext(
+        argument0: CNA_SkinningDataHandle,
+        argument1: u64,
+        argument2: *mut CNA_ClipTargetSpaceEXT,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_get_skeleton_root_name_byte_count_ext(
+        argument0: CNA_SkinningDataHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_get_skeleton_root_node_index_ext(
+        argument0: CNA_SkinningDataHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_get_type_name_byte_count(
+        argument0: CNA_SkinningDataHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_set_clip_target_space_ext(
+        argument0: CNA_SkinningDataHandle,
+        argument1: u64,
+        argument2: CNA_ClipTargetSpaceEXT,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_set_skeleton_root_name_ext(
+        argument0: CNA_SkinningDataHandle,
+        argument1: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_skinning_data_set_skeleton_root_node_index_ext(
+        argument0: CNA_SkinningDataHandle,
+        argument1: i32,
+    ) -> CNA_Result;
     pub fn cna_skinned_model_ext_add_part(
         argument0: CNA_SkinnedModelEXTHandle,
         argument1: CNA_StringView,
