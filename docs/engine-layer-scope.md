@@ -140,6 +140,7 @@ the criterion above is unchanged, only its precondition has been met.
 | debug drawing, frustum culling and levels of detail | `debug_draw`, `frustum_culler_ext`, `lod_group_ext` | 41 | `VERIFIED_STATE` |
 | the clustered light set, the cluster grid and the light-to-cluster assignment | `clustered_light_ext`, `clustered_light_set`, `clustered_light_grid`, `clustered_light_assignment` | 43 | `VERIFIED_STATE` |
 | the shadow budget, the light upload buffer and the compute sort | `clustered_shadow_policy`, `clustered_light_buffer`, `clustered_light_compute` | 30 | `VERIFIED_GPU` |
+| the clustered forward effect | `clustered_forward_effect` (23 of 29; the other six wait on the PBR material extensions, the light probes and the area lights) | 23 | `VERIFIED_STATE` |
 
 ### What the GPU artifact changed about the evidence
 
@@ -252,4 +253,23 @@ three found something:
   artifact on this host either has the engine layer *and* compute, or neither,
   so `NOT_MEASURED_HERE` is the honest label for the fallback branch rather
   than `VERIFIED`.
+- **`EngineHandle::release` was clearing the slot before the destroy, and CNA
+  refuses some destroys.** Upstream declines to destroy an object while a
+  counted borrow taken from it is outstanding -- the clustered forward effect's
+  shader effect is one -- and this module's release had already replaced the
+  handle with `INVALID` by the time it saw that refusal. The only handle anyone
+  held to a live native object was gone: every later call answered "has been
+  released", the object stayed owned by the game, and the process aborted at
+  exit with `terminate called without an active exception`. Release now clears
+  the slot **only after** the destroy has succeeded, so a refused destroy leaves
+  the value callable. This was reachable by every family in this module, and it
+  took a family whose refusal is *documented* to surface it.
+- **The clustered forward effect's clamps are three different rules, all
+  measured.** Base colour and metallic clamp to zero-to-one; roughness clamps
+  to **0.04**-to-one, because a perfectly smooth surface collapses the specular
+  lobe to a point the shader cannot integrate; and the ambient term is only
+  *floored* at zero -- a channel above one survives, because a brighter-than-
+  white ambient is a choice while a negative one would subtract light that was
+  never added. A single "clamped to 0..1" assumption would have been wrong for
+  two of the four.
 

@@ -287,18 +287,30 @@ impl EngineHandle {
         *guard = sys::CNA_INVALID_HANDLE;
     }
 
+    /// Releases the handle, keeping it when CNA refuses to destroy it.
+    ///
+    /// The refusal is a reachable state, not a theoretical one: upstream
+    /// declines to destroy an object while a counted borrow taken from it is
+    /// still outstanding. Clearing the slot first and reporting the error
+    /// afterwards would drop the only handle anyone had to a live native
+    /// object -- every later call would answer "has been released" and the
+    /// process would abort at exit with the child still owned. So the slot is
+    /// cleared only once the destroy has actually succeeded.
     fn release(&self) -> Result<()> {
         let mut guard = self
             .handle
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let handle = core::mem::replace(&mut *guard, sys::CNA_INVALID_HANDLE);
+        let handle = *guard;
         if handle == sys::CNA_INVALID_HANDLE {
             return Ok(());
         }
         // SAFETY: the handle was published by this object's own create route
-        // and is released exactly once, here.
-        self.native.check(unsafe { (self.destroy)(handle) })
+        // and is released exactly once, here -- the slot is cleared only on
+        // success, so a refused destroy leaves it callable rather than lost.
+        self.native.check(unsafe { (self.destroy)(handle) })?;
+        *guard = sys::CNA_INVALID_HANDLE;
+        Ok(())
     }
 }
 
@@ -10018,6 +10030,441 @@ impl ClusteredLightCompute {
 }
 
 impl Drop for ClusteredLightCompute {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// The material terms one clustered light shades a surface point with.
+///
+/// A value, and the reason [`ClusteredForwardEffect::contribution`] takes one:
+/// the C route has sixteen inputs, eight of which the canonical overload
+/// defaults and C cannot. [`Default`] fills in exactly those documented
+/// neutral values, so "the effects you are not using" costs nothing to get
+/// right.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct ClusteredShadingMaterial {
+    /// The material's base colour.
+    pub base_color: Vector3,
+    /// How metallic the material is.
+    pub metallic: f32,
+    /// The material's roughness.
+    pub roughness: f32,
+    /// Clearcoat strength.
+    pub clearcoat: f32,
+    /// Clearcoat roughness.
+    pub clearcoat_roughness: f32,
+    /// Sheen colour.
+    pub sheen_color: Vector3,
+    /// Sheen roughness.
+    pub sheen_roughness: f32,
+    /// Iridescence strength.
+    pub iridescence: f32,
+    /// Iridescence index of refraction; CNA's neutral value is `1.3`.
+    pub iridescence_ior: f32,
+    /// Iridescence film thickness in nanometres; CNA's neutral value is `400`.
+    pub iridescence_thickness: f32,
+    /// Subsurface colour.
+    pub subsurface_color: Vector3,
+    /// How far light wraps around the terminator; CNA's neutral value is `0.5`.
+    pub subsurface_wrap: f32,
+}
+
+impl Default for ClusteredShadingMaterial {
+    fn default() -> Self {
+        Self {
+            base_color: Vector3::from_x_and_y_and_z(1.0, 1.0, 1.0),
+            metallic: 0.0,
+            roughness: 0.5,
+            clearcoat: 0.0,
+            clearcoat_roughness: 0.0,
+            sheen_color: Vector3::Zero,
+            sheen_roughness: 0.0,
+            iridescence: 0.0,
+            iridescence_ior: 1.3,
+            iridescence_thickness: 400.0,
+            subsurface_color: Vector3::Zero,
+            subsurface_wrap: 0.5,
+        }
+    }
+}
+
+/// The shader that walks a cluster's light list and shades a surface with it.
+///
+/// `OWNED`. Its shader effect is a **counted borrow**: releasing this effect is
+/// refused while a [`BorrowedEffect`] taken from it is still alive, which is
+/// why [`effect`](Self::effect) hands out a lifetime-bound view.
+///
+/// The opaque frame it refracts against is a `RETAINED_DEPENDENCY`: CNA stores
+/// a raw `Texture2D*` and retains nothing, so
+/// [`set_opaque_frame`](Self::set_opaque_frame) *takes* the texture and this
+/// value holds it for exactly as long as CNA points at it.
+///
+/// Creation succeeds on a renderer that cannot run the shader; ask
+/// [`is_supported`](Self::is_supported).
+pub struct ClusteredForwardEffect {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+    device: GraphicsDevice,
+    opaque_frame: Option<Texture2D>,
+}
+
+impl ClusteredForwardEffect {
+    /// The most lights one fragment walks before the shader stops accumulating.
+    pub const MAX_LIGHTS_PER_FRAGMENT: i32 =
+        sys::CNA_CLUSTERED_FORWARD_MAX_LIGHTS_PER_FRAGMENT_EXT;
+
+    /// Creates the effect on a device.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut effect = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.clustered_forward_effect_create)(device.handle()?, &mut effect)
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(effect),
+            destroy: native.engine.clustered_forward_effect_destroy,
+            released: "the clustered forward effect has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+            device: device.clone(),
+            opaque_frame: None,
+        })
+    }
+
+    /// Whether the effect's shader exists and links.
+    pub fn is_supported(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_is_supported)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Prepares the effect to shade with an uploaded light buffer.
+    ///
+    /// Refuses when the buffer holds nothing -- there is no cluster table for
+    /// the shader to walk -- and when the material transmits without an opaque
+    /// frame to refract against, which is a refusal rather than an
+    /// approximation because a transmissive material drawn without one is an
+    /// opaque object where a glass one was asked for.
+    pub fn begin(
+        &self,
+        world: Matrix,
+        view: Matrix,
+        projection: Matrix,
+        camera_position: Vector3,
+        lights: &ClusteredLightBuffer,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let buffer = lights.core.get()?;
+        let world = native_matrix(world);
+        let view = native_matrix(view);
+        let projection = native_matrix(projection);
+        let camera_position = native_vector3(camera_position);
+        // SAFETY: both handles are owned, and the matrices and the position are
+        // borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_begin)(
+                handle,
+                &world,
+                &view,
+                &projection,
+                &camera_position,
+                buffer,
+            )
+        })
+    }
+
+    /// The shader effect, borrowed for as long as the view lives.
+    ///
+    /// `None` on a renderer where the shader did not link.
+    pub fn effect(&self) -> Result<Option<BorrowedEffect<'_>>> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_get_effect)(handle, &mut value)
+        })?;
+        if value == sys::CNA_INVALID_HANDLE {
+            return Ok(None);
+        }
+        Ok(Some(BorrowedEffect::new(&self.native, &self.device, value)))
+    }
+
+    /// Whether an area light is bound.
+    pub fn has_area_light(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_has_area_light)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Unbinds any area light.
+    pub fn clear_area_light(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.clustered_forward_effect_clear_area_light)(handle) })
+    }
+
+    /// Whether a light probe is bound.
+    pub fn has_light_probe(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_has_light_probe)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Unbinds any light probe.
+    pub fn clear_light_probe(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_clear_light_probe)(handle)
+        })
+    }
+
+    /// The material's base colour.
+    pub fn base_color(&self) -> Result<Vector3> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_get_base_color)(handle, &mut value)
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// Sets it, **clamping** each channel to zero-to-one rather than refusing.
+    pub fn set_base_color(&self, color: Vector3) -> Result<()> {
+        let handle = self.core.get()?;
+        let color = native_vector3(color);
+        // SAFETY: the handle is owned and the colour is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_set_base_color)(handle, &color)
+        })
+    }
+
+    /// How metallic the material is.
+    pub fn metallic(&self) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_get_metallic)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Sets it, **clamped** to zero-to-one.
+    pub fn set_metallic(&self, metallic: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_set_metallic)(handle, metallic)
+        })
+    }
+
+    /// The material's roughness.
+    pub fn roughness(&self) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_get_roughness)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Sets it, **clamped to 0.04-to-one**.
+    ///
+    /// The floor is not zero and is not a typo: a perfectly smooth surface
+    /// collapses the specular lobe to a point the shader cannot integrate, so
+    /// the canonical setter refuses to go below it by clamping.
+    pub fn set_roughness(&self, roughness: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_set_roughness)(handle, roughness)
+        })
+    }
+
+    /// The material's index of refraction.
+    pub fn ior(&self) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_get_ior)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Sets it.
+    pub fn set_ior(&self, ior: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.clustered_forward_effect_set_ior)(handle, ior) })
+    }
+
+    /// The ambient term.
+    pub fn ambient(&self) -> Result<Vector3> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_get_ambient)(handle, &mut value)
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// Sets it, **flooring** each channel at zero -- and only flooring: a
+    /// channel above one is kept, because an ambient brighter than white is a
+    /// choice while a negative one would subtract light that was never added.
+    pub fn set_ambient(&self, ambient: Vector3) -> Result<()> {
+        let handle = self.core.get()?;
+        let ambient = native_vector3(ambient);
+        // SAFETY: the handle is owned and the term is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_set_ambient)(handle, &ambient)
+        })
+    }
+
+    /// The opaque frame the effect refracts against, viewed for a borrow.
+    pub fn opaque_frame(&self) -> Result<Option<BorrowedRenderTarget<'_>>> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_get_opaque_frame)(handle, &mut value)
+        })?;
+        if value == sys::CNA_INVALID_HANDLE {
+            return Ok(None);
+        }
+        BorrowedRenderTarget::new(&self.native, &self.device, value).map(Some)
+    }
+
+    /// Whether a frame to refract against is bound.
+    pub fn has_opaque_frame(&self) -> Result<bool> {
+        Ok(self.opaque_frame()?.is_some())
+    }
+
+    /// Gives the effect a copy of the opaque frame to refract against.
+    ///
+    /// CNA keeps a raw pointer and retains nothing, so this **takes** the
+    /// texture: the effect holds it for exactly as long as CNA points at it,
+    /// and `None` unbinds and releases the previous one.
+    pub fn set_opaque_frame(&mut self, frame: Option<Texture2D>) -> Result<()> {
+        let handle = self.core.get()?;
+        let frame_handle = match frame.as_ref() {
+            Some(texture) => texture.handle()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        // SAFETY: the handle is owned and the texture handle is live for the
+        // call, kept alive afterwards by the value this stores.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_set_opaque_frame)(handle, frame_handle)
+        })?;
+        self.opaque_frame = frame;
+        Ok(())
+    }
+
+    /// The volume attenuation of a transmissive material.
+    ///
+    /// A pure function of its arguments, so it needs no effect.
+    pub fn volume_attenuation(
+        attenuation_color: Vector3,
+        attenuation_distance: f32,
+        thickness: f32,
+    ) -> Result<Vector3> {
+        let native = Native::process()?;
+        let color = native_vector3(attenuation_color);
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the colour is borrowed for the call and the output is a live
+        // local.
+        native.check(unsafe {
+            (native.engine.clustered_forward_effect_volume_attenuation)(
+                &color,
+                attenuation_distance,
+                thickness,
+                &mut value,
+            )
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// One light's contribution to a surface point.
+    ///
+    /// A pure function of its arguments, so it needs no effect either.
+    pub fn contribution(
+        light: ClusteredLight,
+        surface: Vector3,
+        normal: Vector3,
+        camera_position: Vector3,
+        material: ClusteredShadingMaterial,
+    ) -> Result<Vector3> {
+        let native = Native::process()?;
+        let light = light.to_native();
+        let surface = native_vector3(surface);
+        let normal = native_vector3(normal);
+        let camera_position = native_vector3(camera_position);
+        let base_color = native_vector3(material.base_color);
+        let sheen_color = native_vector3(material.sheen_color);
+        let subsurface_color = native_vector3(material.subsurface_color);
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: every pointer is a live local borrowed for the call, and the
+        // output is one too.
+        native.check(unsafe {
+            (native.engine.clustered_forward_effect_contribution)(
+                &light,
+                &surface,
+                &normal,
+                &camera_position,
+                &base_color,
+                material.metallic,
+                material.roughness,
+                material.clearcoat,
+                material.clearcoat_roughness,
+                &sheen_color,
+                material.sheen_roughness,
+                material.iridescence,
+                material.iridescence_ior,
+                material.iridescence_thickness,
+                &subsurface_color,
+                material.subsurface_wrap,
+                &mut value,
+            )
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// Releases the effect now rather than at drop.
+    ///
+    /// Refused while a [`BorrowedEffect`] taken from it is still alive.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for ClusteredForwardEffect {
     fn drop(&mut self) {
         let _ = self.core.release();
     }

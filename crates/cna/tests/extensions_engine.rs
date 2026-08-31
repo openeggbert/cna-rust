@@ -21,7 +21,8 @@ use cna::extensions::engine::{
     CascadedShadowMap, CubeShadowMap, PointLight, PunctualLight, PunctualLightKind,
     AutoExposure, ClusteredLight, ClusteredLightAssignment, ClusteredLightGrid,
     ClusteredLightBuffer, ClusteredLightCompute, ClusteredLightSet, ClusteredLightType,
-    ClusteredShadowPolicy, CubeLut, DebugDraw, DepthEncoding,
+    ClusteredForwardEffect, ClusteredShadingMaterial, ClusteredShadowPolicy, CubeLut,
+    DebugDraw, DepthEncoding,
     DepthNormalPrepass, DisplayColorSpace, FrustumCuller, HdrDisplayOutput, LodGroup,
     LodSelectionMode, ShadowCascadeState, SpotLight, SpotShadowMap, SsaoPass,
     SsrPass, StorageBuffer, TonemapPass, TransparentDrawList, VolumetricFogPass,
@@ -5333,5 +5334,378 @@ fn the_shadow_budget_the_upload_buffer_and_the_compute_sort_agree_with_the_cpu()
     assert!(
         findings.overflow[1].1,
         "one light per cluster is not, and the flag says so rather than the call failing"
+    );
+}
+
+/// What the clustered forward effect run measured.
+#[derive(Default)]
+struct ForwardFindings {
+    engine_layer: i32,
+    supported: bool,
+    effect_present: bool,
+    release_while_borrowed: Option<String>,
+    release_after_borrow: Option<String>,
+    base_color: Vec<((f32, f32, f32), (f32, f32, f32))>,
+    metallic: Vec<(f32, f32)>,
+    roughness: Vec<(f32, f32)>,
+    ior: Vec<(f32, f32)>,
+    ambient: Vec<((f32, f32, f32), (f32, f32, f32))>,
+    bound_extras: (bool, bool),
+    cleared_extras: (bool, bool),
+    begin_before_upload: Option<String>,
+    begin_after_upload: Option<String>,
+    frame_before: bool,
+    frame_after: Option<(i32, i32)>,
+    frame_cleared: bool,
+    attenuation: Vec<((f32, f32), (f32, f32, f32))>,
+    contributions: Vec<(&'static str, (f32, f32, f32))>,
+}
+
+struct ForwardGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<ForwardFindings>>,
+}
+
+impl GameStateAccess for ForwardGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+fn triple(value: Vector3) -> (f32, f32, f32) {
+    (value.X, value.Y, value.Z)
+}
+
+impl Game for ForwardGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+        let mut findings = ForwardFindings {
+            engine_layer: version,
+            ..ForwardFindings::default()
+        };
+        let (view, projection) = culling_camera();
+
+        let mut effect = ClusteredForwardEffect::new(&device)?;
+        findings.supported = effect.is_supported()?;
+        findings.effect_present = effect.effect()?.is_some();
+
+        // The shader effect is a counted borrow: releasing the owner while one
+        // is outstanding is refused, and allowed once it is dropped.
+        {
+            let borrowed = effect.effect()?;
+            findings.release_while_borrowed = effect.release().err().map(|e| e.to_string());
+            drop(borrowed);
+        }
+
+        // --- the material terms ---------------------------------------------
+        for probe in [
+            Vector3::from_x_and_y_and_z(0.25, 0.5, 0.75),
+            Vector3::from_x_and_y_and_z(2.0, -1.0, 0.5),
+        ] {
+            effect.set_base_color(probe)?;
+            findings
+                .base_color
+                .push((triple(probe), triple(effect.base_color()?)));
+        }
+        for probe in [0.25_f32, -1.0, 5.0] {
+            effect.set_metallic(probe)?;
+            findings.metallic.push((probe, effect.metallic()?));
+        }
+        for probe in [0.5_f32, 0.0, -1.0, 5.0] {
+            effect.set_roughness(probe)?;
+            findings.roughness.push((probe, effect.roughness()?));
+        }
+        for probe in [1.5_f32, 2.4] {
+            effect.set_ior(probe)?;
+            findings.ior.push((probe, effect.ior()?));
+        }
+        for probe in [
+            Vector3::from_x_and_y_and_z(0.1, 0.2, 0.3),
+            Vector3::from_x_and_y_and_z(-1.0, 0.5, 2.0),
+        ] {
+            effect.set_ambient(probe)?;
+            findings
+                .ambient
+                .push((triple(probe), triple(effect.ambient()?)));
+        }
+
+        findings.bound_extras = (effect.has_area_light()?, effect.has_light_probe()?);
+        effect.clear_area_light()?;
+        effect.clear_light_probe()?;
+        findings.cleared_extras = (effect.has_area_light()?, effect.has_light_probe()?);
+
+        // --- beginning a frame ------------------------------------------------
+        let lights = ClusteredLightSet::new(&device)?;
+        let mut lamp = clustered_light_at(0.0, 0.0, -10.0, 30.0)?;
+        lamp.intensity = 2.0;
+        lights.add(lamp)?;
+        let grid = ClusteredLightGrid::new(&device, 4, 3, 8)?;
+        grid.set_projection(projection, 1.0, 100.0)?;
+        let assignment = ClusteredLightAssignment::new(&device)?;
+        assignment.assign(&grid, view, &lights.bounds()?)?;
+        let buffer = ClusteredLightBuffer::new(&device)?;
+
+        findings.begin_before_upload = effect
+            .begin(Matrix::Identity, view, projection, Vector3::Zero, &buffer)
+            .err()
+            .map(|e| e.to_string());
+        buffer.upload(&lights, &grid, &assignment)?;
+        findings.begin_after_upload = effect
+            .begin(Matrix::Identity, view, projection, Vector3::Zero, &buffer)
+            .err()
+            .map(|e| e.to_string());
+
+        // --- the opaque frame --------------------------------------------------
+        findings.frame_before = effect.has_opaque_frame()?;
+        let frame = Texture2D::new(&device, 40, 24)?;
+        effect.set_opaque_frame(Some(frame))?;
+        findings.frame_after = effect
+            .opaque_frame()?
+            .map(|view| (view.texture().Width(), view.texture().Height()));
+        effect.set_opaque_frame(None)?;
+        findings.frame_cleared = effect.has_opaque_frame()?;
+
+        // --- the pure functions -------------------------------------------------
+        let half = Vector3::from_x_and_y_and_z(0.5, 0.5, 0.5);
+        for (distance, thickness) in [(1.0_f32, 0.0_f32), (1.0, 1.0), (1.0, 2.0), (2.0, 1.0)] {
+            findings.attenuation.push((
+                (distance, thickness),
+                triple(ClusteredForwardEffect::volume_attenuation(
+                    half, distance, thickness,
+                )?),
+            ));
+        }
+
+        let surface = Vector3::Zero;
+        let up = Vector3::Up;
+        let camera = Vector3::from_x_and_y_and_z(0.0, 5.0, 0.0);
+        let mut overhead = ClusteredLight::canonical_defaults()?;
+        overhead.position = Vector3::from_x_and_y_and_z(0.0, 3.0, 0.0);
+        overhead.range = 20.0;
+        let material = ClusteredShadingMaterial::default();
+        findings.contributions.push((
+            "a lamp overhead",
+            triple(ClusteredForwardEffect::contribution(
+                overhead, surface, up, camera, material,
+            )?),
+        ));
+        let mut brighter = overhead;
+        brighter.intensity = 2.0;
+        findings.contributions.push((
+            "twice as bright",
+            triple(ClusteredForwardEffect::contribution(
+                brighter, surface, up, camera, material,
+            )?),
+        ));
+        let mut below = overhead;
+        below.position = Vector3::from_x_and_y_and_z(0.0, -3.0, 0.0);
+        findings.contributions.push((
+            "the same lamp underneath",
+            triple(ClusteredForwardEffect::contribution(
+                below, surface, up, camera, material,
+            )?),
+        ));
+        let mut out_of_range = overhead;
+        out_of_range.range = 1.0;
+        findings.contributions.push((
+            "out of its own range",
+            triple(ClusteredForwardEffect::contribution(
+                out_of_range,
+                surface,
+                up,
+                camera,
+                material,
+            )?),
+        ));
+
+        findings.release_after_borrow = effect.release().err().map(|e| e.to_string());
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn the_clustered_forward_effect_clamps_what_it_documents_and_shades_what_it_is_given() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(ForwardFindings::default()));
+    let game = ForwardGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with a clustered forward effect");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+
+    println!(
+        "supported: {} effect present: {}",
+        findings.supported, findings.effect_present
+    );
+    assert_eq!(
+        findings.effect_present, findings.supported,
+        "the shader effect is handed out exactly when the shader linked"
+    );
+
+    // Ownership: the borrow is counted, and the count is what refuses.
+    if findings.effect_present {
+        assert!(
+            findings.release_while_borrowed.is_some(),
+            "releasing the effect while its shader is borrowed is refused"
+        );
+    }
+    assert!(
+        findings.release_after_borrow.is_none(),
+        "and allowed once the borrow is gone: {:?}",
+        findings.release_after_borrow
+    );
+
+    // --- the material terms ------------------------------------------------
+    println!("base colour: {:?}", findings.base_color);
+    assert_eq!(
+        findings.base_color[0].1,
+        (0.25, 0.5, 0.75),
+        "a colour inside the range round-trips untouched"
+    );
+    assert_eq!(
+        findings.base_color[1].1,
+        (1.0, 0.0, 0.5),
+        "and one outside it is clamped per channel, not refused or scaled"
+    );
+
+    println!("metallic: {:?}", findings.metallic);
+    assert_eq!(
+        findings.metallic,
+        vec![(0.25, 0.25), (-1.0, 0.0), (5.0, 1.0)],
+        "metallic is clamped to zero-to-one"
+    );
+
+    // The roughness floor is 0.04, not zero: a smooth surface collapses the
+    // specular lobe, so the setter clamps rather than accepting it.
+    println!("roughness: {:?}", findings.roughness);
+    assert_eq!(
+        findings.roughness,
+        vec![(0.5, 0.5), (0.0, 0.04), (-1.0, 0.04), (5.0, 1.0)],
+        "roughness is clamped to 0.04-to-one"
+    );
+
+    println!("ior: {:?}", findings.ior);
+    for (written, read) in &findings.ior {
+        assert!(
+            (written - read).abs() < 1e-6,
+            "the index of refraction round-trips: {written} came back as {read}"
+        );
+    }
+
+    // The ambient term is *floored*, not clamped: a channel above one survives.
+    println!("ambient: {:?}", findings.ambient);
+    assert_eq!(
+        findings.ambient[0].1,
+        (0.1, 0.2, 0.3),
+        "an ambient inside the range round-trips"
+    );
+    assert_eq!(
+        findings.ambient[1].1,
+        (0.0, 0.5, 2.0),
+        "a negative channel is floored at zero and a bright one is kept"
+    );
+
+    assert_eq!(
+        findings.bound_extras,
+        (false, false),
+        "a fresh effect has neither an area light nor a light probe"
+    );
+    assert_eq!(
+        findings.cleared_extras,
+        (false, false),
+        "and clearing what was never bound is a no-op rather than an error"
+    );
+
+    // --- beginning a frame -------------------------------------------------
+    assert!(
+        findings.begin_before_upload.is_some(),
+        "beginning against a buffer holding no light list is refused"
+    );
+    assert!(
+        findings.begin_after_upload.is_none(),
+        "and allowed once one has been uploaded: {:?}",
+        findings.begin_after_upload
+    );
+
+    // --- the opaque frame --------------------------------------------------
+    assert!(!findings.frame_before, "no frame is bound to start with");
+    assert_eq!(
+        findings.frame_after,
+        Some((40, 24)),
+        "the frame that comes back is the one that went in, at its own size"
+    );
+    assert!(!findings.frame_cleared, "and unbinding leaves none");
+
+    // --- the pure functions ------------------------------------------------
+    // Beer-Lambert: no thickness is no attenuation, and the attenuation colour
+    // is reached at exactly the attenuation distance. Doubling the thickness
+    // squares it; doubling the distance takes its square root.
+    println!("attenuation: {:?}", findings.attenuation);
+    let value = |index: usize| findings.attenuation[index].1;
+    assert_eq!(value(0), (1.0, 1.0, 1.0), "zero thickness attenuates nothing");
+    for channel in [value(1).0, value(1).1, value(1).2] {
+        assert!(
+            (channel - 0.5).abs() < 1e-4,
+            "at the attenuation distance the colour is reached exactly: {channel}"
+        );
+    }
+    assert!(
+        (value(2).0 - 0.25).abs() < 1e-4,
+        "twice the thickness squares the attenuation: {}",
+        value(2).0
+    );
+    assert!(
+        (value(3).0 - 0.5_f32.sqrt()).abs() < 1e-4,
+        "twice the distance takes its square root: {}",
+        value(3).0
+    );
+
+    println!("contributions: {:?}", findings.contributions);
+    let contribution = |name: &str| -> (f32, f32, f32) {
+        findings
+            .contributions
+            .iter()
+            .find(|(label, _)| *label == name)
+            .expect("a recorded contribution")
+            .1
+    };
+    let lit = contribution("a lamp overhead");
+    assert!(
+        lit.0 > 0.0 && lit.1 > 0.0 && lit.2 > 0.0,
+        "a lamp above a surface facing up lights it: {lit:?}"
+    );
+    let brighter = contribution("twice as bright");
+    assert!(
+        (brighter.0 - lit.0 * 2.0).abs() < lit.0 * 1e-3,
+        "and the contribution is linear in intensity: {} against {}",
+        brighter.0,
+        lit.0 * 2.0
+    );
+    assert_eq!(
+        contribution("the same lamp underneath"),
+        (0.0, 0.0, 0.0),
+        "a lamp behind the surface contributes nothing"
+    );
+    assert_eq!(
+        contribution("out of its own range"),
+        (0.0, 0.0, 0.0),
+        "and neither does one further away than it reaches"
     );
 }

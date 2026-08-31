@@ -8571,6 +8571,116 @@ extern "C" {
         argument4: *const i32,
         argument5: u64,
     ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_begin(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: *const CNA_Matrix,
+        argument2: *const CNA_Matrix,
+        argument3: *const CNA_Matrix,
+        argument4: *const CNA_Vector3,
+        argument5: CNA_ClusteredLightBufferHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_clear_area_light(
+        argument0: CNA_ClusteredForwardEffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_clear_light_probe(
+        argument0: CNA_ClusteredForwardEffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_contribution(
+        argument0: *const CNA_ClusteredLightEXT,
+        argument1: *const CNA_Vector3,
+        argument2: *const CNA_Vector3,
+        argument3: *const CNA_Vector3,
+        argument4: *const CNA_Vector3,
+        argument5: f32,
+        argument6: f32,
+        argument7: f32,
+        argument8: f32,
+        argument9: *const CNA_Vector3,
+        argument10: f32,
+        argument11: f32,
+        argument12: f32,
+        argument13: f32,
+        argument14: *const CNA_Vector3,
+        argument15: f32,
+        argument16: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_ClusteredForwardEffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_destroy(
+        argument0: CNA_ClusteredForwardEffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_get_ambient(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_get_base_color(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_get_effect(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: *mut CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_get_ior(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_get_metallic(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_get_opaque_frame(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_get_roughness(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_has_area_light(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_has_light_probe(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_is_supported(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_set_ambient(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: *const CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_set_base_color(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: *const CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_set_ior(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_set_metallic(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_set_opaque_frame(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_set_roughness(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_volume_attenuation(
+        argument0: *const CNA_Vector3,
+        argument1: f32,
+        argument2: f32,
+        argument3: *mut CNA_Vector3,
+    ) -> CNA_Result;
     pub fn cna_clustered_light_assignment_assign(
         argument0: CNA_ClusteredLightAssignmentHandle,
         argument1: CNA_ClusteredLightGridHandle,

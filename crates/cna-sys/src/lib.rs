@@ -807,6 +807,9 @@ pub const CNA_CLUSTERED_COMPUTE_DEFAULT_STRIDE_EXT: i32 = 64;
 pub type CNA_ClusteredShadowPolicyHandle = CNA_Handle;
 pub type CNA_ClusteredLightBufferHandle = CNA_Handle;
 pub type CNA_ClusteredLightComputeHandle = CNA_Handle;
+pub type CNA_ClusteredForwardEffectHandle = CNA_Handle;
+
+pub const CNA_CLUSTERED_FORWARD_MAX_LIGHTS_PER_FRAGMENT_EXT: i32 = 128;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -9815,4 +9818,73 @@ pub type cna_clustered_shadow_policy_set_budget_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_clustered_shadow_policy_set_hysteresis_fn = unsafe extern "C" fn(
     CNA_ClusteredShadowPolicyHandle, f32,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_begin_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, *const CNA_Matrix, *const CNA_Matrix, *const CNA_Matrix, *const CNA_Vector3, CNA_ClusteredLightBufferHandle,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_clear_area_light_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_clear_light_probe_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_contribution_fn = unsafe extern "C" fn(
+    *const CNA_ClusteredLightEXT, *const CNA_Vector3, *const CNA_Vector3, *const CNA_Vector3, *const CNA_Vector3, f32, f32, f32, f32, *const CNA_Vector3, f32, f32, f32, f32, *const CNA_Vector3, f32, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_ClusteredForwardEffectHandle,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_destroy_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_get_ambient_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_get_base_color_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_get_effect_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, *mut CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_get_ior_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_get_metallic_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_get_opaque_frame_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_get_roughness_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_has_area_light_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_has_light_probe_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_is_supported_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_set_ambient_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, *const CNA_Vector3,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_set_base_color_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, *const CNA_Vector3,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_set_ior_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, f32,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_set_metallic_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, f32,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_set_opaque_frame_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, CNA_Handle,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_set_roughness_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, f32,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_volume_attenuation_fn = unsafe extern "C" fn(
+    *const CNA_Vector3, f32, f32, *mut CNA_Vector3,
 ) -> CNA_Result;
