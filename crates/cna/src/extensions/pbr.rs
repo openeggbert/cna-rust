@@ -948,6 +948,10 @@ impl PbrMaterialFull {
 }
 
 impl PbrEffect {
+    pub(crate) const fn native_handle(&self) -> sys::CNA_EffectHandle {
+        self.handle
+    }
+
     /// Applies a complete material, every field of which crosses.
     pub fn apply_full(&self, material: &PbrMaterialFull) -> Result<()> {
         // SAFETY: the material is a live local CNA reads during the call.
@@ -1486,6 +1490,10 @@ impl SkinnedPbrEffect {
     #[must_use]
     pub const fn graphics_device(&self) -> &GraphicsDevice {
         &self.device
+    }
+
+    pub(crate) const fn native_handle(&self) -> sys::CNA_EffectHandle {
+        self.handle
     }
 
     /// How many bone weights each vertex carries.

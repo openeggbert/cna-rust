@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use cna::extensions::pbr::{
     GltfMaterialBridge, GltfMaterialExtensionSource, GltfMaterialExtensionTextures,
     GltfMaterialSource, PbrMaterialExtensions, PbrMaterialFull, SkinnedPbrEffect,
-    ThinFilmIridescence,
+    PbrEffect, ThinFilmIridescence,
 };
 use cna::extensions::engine::{
     supports_shadow_sampling, DirectionalLight, FxaaPass, GpuTimer, Particle,
@@ -29,7 +29,7 @@ use cna::extensions::engine::{
     ClusteredLightBuffer, ClusteredLightCompute, ClusteredLightSet, ClusteredLightType,
     ClusteredForwardEffect, ClusteredShadingMaterial, ClusteredShadowPolicy, CubeLut,
     DebugDraw, DepthEncoding, EnvironmentProcessor, ImageBasedLight, LightProbe,
-    LightProbeBaker, LightProbeVolume, ShaderEffectFactory,
+    EffectLighting, LightProbeBaker, LightProbeVolume, ShaderEffectFactory,
     DepthNormalPrepass, DisplayColorSpace, FrustumCuller, HdrDisplayOutput, LodGroup,
     LodSelectionMode, ShadowCascadeState, SpotLight, SpotShadowMap, SsaoPass,
     SsrPass, StorageBuffer, TonemapPass, TransparentDrawList, VolumetricFogPass,
@@ -8096,5 +8096,305 @@ fn an_area_light_is_a_surface_and_its_table_is_the_lobe_it_shades_with() {
         findings.area_light_on_effect.is_none(),
         "a clustered forward effect accepts an area light and its table: {:?}",
         findings.area_light_on_effect
+    );
+}
+
+/// What the effect-lighting run measured.
+#[derive(Default)]
+struct LightingFindings {
+    engine_layer: i32,
+    shadow_map: Vec<(&'static str, bool, Option<(i32, i32)>)>,
+    shadow_scalars: Vec<(&'static str, f32, i32, bool)>,
+    light_view_projection: Option<(f32, f32, f32)>,
+    cascades: Option<(i32, f32, bool, f32)>,
+    punctual: Vec<(&'static str, PunctualLightKind, f32, bool, bool)>,
+    binding_shadows: Vec<(&'static str, bool, bool)>,
+    image_based: Vec<(&'static str, bool, bool, bool, i32, f32)>,
+    cleared_on_drop: Option<(bool, bool)>,
+}
+
+struct LightingGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<LightingFindings>>,
+}
+
+impl GameStateAccess for LightingGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for LightingGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+        let mut findings = LightingFindings {
+            engine_layer: version,
+            ..LightingFindings::default()
+        };
+        let effect = PbrEffect::new(&device)?;
+
+        {
+            let mut lighting = EffectLighting::of_pbr(&effect)?;
+            findings.shadow_map.push((
+                "before one is bound",
+                lighting.shadow_map()?.is_some(),
+                None,
+            ));
+            let map = Texture2D::new(&device, 24, 12)?;
+            lighting.set_shadow_map(Some(map))?;
+            findings.shadow_map.push((
+                "after one is bound",
+                true,
+                lighting
+                    .shadow_map()?
+                    .map(|view| (view.texture().Width(), view.texture().Height())),
+            ));
+            lighting.set_shadow_map(None)?;
+            findings.shadow_map.push((
+                "after clearing",
+                lighting.shadow_map()?.is_some(),
+                None,
+            ));
+
+            findings.shadow_scalars.push((
+                "as created",
+                lighting.shadow_depth_bias()?,
+                lighting.shadow_filter_radius()?,
+                lighting.shadows_enabled()?,
+            ));
+            lighting.set_shadow_depth_bias(0.004)?;
+            lighting.set_shadow_filter_radius(3)?;
+            lighting.set_shadows_enabled(true)?;
+            findings.shadow_scalars.push((
+                "after setting",
+                lighting.shadow_depth_bias()?,
+                lighting.shadow_filter_radius()?,
+                lighting.shadows_enabled()?,
+            ));
+
+            let matrix = Matrix::CreateTranslation(Vector3::from_x_and_y_and_z(1.0, 2.0, 3.0));
+            lighting.set_light_view_projection(matrix)?;
+            let read = lighting.light_view_projection()?;
+            findings.light_view_projection = Some((read.M41, read.M42, read.M43));
+
+            let mut cascades = ShadowCascadeState::canonical_defaults()?;
+            cascades.count = 3;
+            cascades.blend_band = 0.125;
+            cascades.debug_tint = true;
+            cascades.split_distance[1] = 42.0;
+            lighting.set_shadow_cascades(&cascades)?;
+            let read = lighting.shadow_cascades()?;
+            findings.cascades = Some((
+                read.count,
+                read.blend_band,
+                read.debug_tint,
+                read.split_distance[1],
+            ));
+
+            let mut light = PunctualLight::canonical_defaults()?;
+            findings.punctual.push((
+                "as created",
+                lighting.punctual_light()?.kind,
+                lighting.punctual_light()?.range,
+                lighting.punctual_light()?.has_shadow_cube,
+                lighting.punctual_light()?.has_shadow_map,
+            ));
+            light.kind = PunctualLightKind::Spot;
+            light.range = 17.0;
+            let spot_shadow = Texture2D::new(&device, 8, 8)?;
+            lighting.set_punctual_light(light, None, Some(spot_shadow))?;
+            let read = lighting.punctual_light()?;
+            findings.punctual.push((
+                "a spot with a shadow map",
+                read.kind,
+                read.range,
+                read.has_shadow_cube,
+                read.has_shadow_map,
+            ));
+            findings.binding_shadows.push((
+                "a spot with a shadow map",
+                lighting.has_punctual_shadow_cube(),
+                lighting.has_punctual_shadow_map(),
+            ));
+            let cube_shadow = TextureCube::new(&device, 8, false, SurfaceFormat::Color)?;
+            light.kind = PunctualLightKind::Point;
+            lighting.set_punctual_light(light, Some(cube_shadow), None)?;
+            let read = lighting.punctual_light()?;
+            findings.punctual.push((
+                "a point with a shadow cube",
+                read.kind,
+                read.range,
+                read.has_shadow_cube,
+                read.has_shadow_map,
+            ));
+            findings.binding_shadows.push((
+                "a point with a shadow cube",
+                lighting.has_punctual_shadow_cube(),
+                lighting.has_punctual_shadow_map(),
+            ));
+
+            let borrowed = lighting.image_based_light()?;
+            findings.image_based.push((
+                "before one is set",
+                borrowed.has_irradiance(),
+                borrowed.has_prefiltered_specular(),
+                borrowed.has_brdf_lut(),
+                borrowed.prefiltered_mip_count(),
+                borrowed.intensity(),
+            ));
+            drop(borrowed);
+            let irradiance = TextureCube::new(&device, 4, false, SurfaceFormat::Color)?;
+            let specular = TextureCube::new(&device, 8, true, SurfaceFormat::Color)?;
+            let lut = Texture2D::new(&device, 8, 8)?;
+            lighting.set_image_based_light(
+                Some(irradiance),
+                Some(specular),
+                4,
+                Some(lut),
+                2.5,
+            )?;
+            let borrowed = lighting.image_based_light()?;
+            findings.image_based.push((
+                "after one is set",
+                borrowed.has_irradiance(),
+                borrowed.has_prefiltered_specular(),
+                borrowed.has_brdf_lut(),
+                borrowed.prefiltered_mip_count(),
+                borrowed.intensity(),
+            ));
+            drop(borrowed);
+        }
+
+        // Dropping the binding clears every slot it filled, so the effect never
+        // points at a texture Rust has released.
+        let lighting = EffectLighting::of_pbr(&effect)?;
+        let borrowed = lighting.image_based_light()?;
+        findings.cleared_on_drop = Some((
+            lighting.shadow_map()?.is_some(),
+            borrowed.has_irradiance(),
+        ));
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn an_effects_lighting_slots_are_bindings_with_a_lifetime() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(LightingFindings::default()));
+    let game = LightingGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with an effect's lighting slots");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+
+    println!("shadow map: {:?}", findings.shadow_map);
+    assert!(
+        !findings.shadow_map[0].1,
+        "a fresh effect samples no shadow map"
+    );
+    assert_eq!(
+        findings.shadow_map[1].2,
+        Some((24, 12)),
+        "the map that comes back is the one that went in, at its own size"
+    );
+    assert!(
+        !findings.shadow_map[2].1,
+        "and clearing the slot leaves none"
+    );
+
+    println!("shadow scalars: {:?}", findings.shadow_scalars);
+    let (_, bias, radius, enabled) = findings.shadow_scalars[1];
+    assert!(
+        (bias - 0.004).abs() < 1e-6,
+        "the depth bias round-trips: {bias}"
+    );
+    assert_eq!(radius, 3, "and so does the filter radius");
+    assert!(enabled, "and the shadow switch");
+
+    assert_eq!(
+        findings.light_view_projection,
+        Some((1.0, 2.0, 3.0)),
+        "the light's view-projection round-trips, translation and all"
+    );
+
+    let (count, blend, tint, split) = findings.cascades.expect("a cascade state");
+    println!("cascades: {count} splits, blend {blend}, tint {tint}, second split {split}");
+    assert_eq!(count, 3, "the cascade count round-trips");
+    assert!((blend - 0.125).abs() < 1e-6, "and the blend band");
+    assert!(tint, "and the debug tint");
+    assert!(
+        (split - 42.0).abs() < 1e-4,
+        "and a split distance written into the middle of the array: {split}"
+    );
+
+    println!("punctual: {:?}", findings.punctual);
+    let (_, kind, _, cube, map) = findings.punctual[0];
+    assert_eq!(kind, PunctualLightKind::None, "a fresh effect carries no light");
+    assert!(!cube && !map, "and no shadow of either kind");
+    let (_, kind, range, cube, map) = findings.punctual[1];
+    assert_eq!(kind, PunctualLightKind::Spot, "a spot light round-trips");
+    assert!((range - 17.0).abs() < 1e-6, "with its range");
+    // The shadow slots are *always* empty on a light read back from an effect:
+    // the canonical structure holds raw pointers and the C getter declines to
+    // invent handle names for textures it does not own. A test that read them
+    // as "no shadow is bound" would be reading a constant.
+    assert!(
+        !cube && !map,
+        "the C getter publishes neither shadow handle, whatever was bound"
+    );
+    let (_, kind, _, cube, map) = findings.punctual[2];
+    assert_eq!(kind, PunctualLightKind::Point, "a point light round-trips");
+    assert!(!cube && !map, "and still publishes neither");
+    println!("binding shadows: {:?}", findings.binding_shadows);
+    assert_eq!(
+        findings.binding_shadows,
+        vec![
+            ("a spot with a shadow map", false, true),
+            ("a point with a shadow cube", true, false),
+        ],
+        "the binding knows which shadow it holds, and setting one kind clears the other"
+    );
+
+    println!("image-based: {:?}", findings.image_based);
+    let (_, irradiance, specular, lut, mips, intensity) = findings.image_based[0];
+    assert!(
+        !irradiance && !specular && !lut,
+        "a fresh effect carries no image-based textures"
+    );
+    println!("unset mip count {mips} intensity {intensity}");
+    let (_, irradiance, specular, lut, mips, intensity) = findings.image_based[1];
+    assert!(
+        irradiance && specular && lut,
+        "all three textures come back as present"
+    );
+    assert_eq!(mips, 4, "with the mip count that was given");
+    assert!(
+        (intensity - 2.5).abs() < 1e-6,
+        "and the intensity: {intensity}"
+    );
+
+    // The whole reason the binding has a lifetime: dropping it unbinds what it
+    // bound, so CNA is not left holding pointers into released textures.
+    assert_eq!(
+        findings.cleared_on_drop,
+        Some((false, false)),
+        "dropping the binding cleared both the shadow map and the image-based light"
     );
 }

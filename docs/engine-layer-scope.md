@@ -146,6 +146,7 @@ the criterion above is unchanged, only its precondition has been met.
 | the material extension texture slots, material identity, thin-film iridescence and the skinned PBR effect | `pbr_material_extensions_*_texture`, `pbr_material_ext`, `thin_film_iridescence`, `skinned_pbr_effect` | 31 | `VERIFIED_STATE` |
 | the shader-effect factory, the glTF material bridge, the pipeline's skybox and the routes that were waiting on other families | `shader_effect_factory`, `gltf_material_*`, `render_pipeline_*_skybox`, the last `clustered_forward_effect` and `debug_draw` routes | 21 | `VERIFIED_GPU` |
 | area lights, their BRDF table and the shading maths | `area_light_ext`, `area_light_brdf_table`, `area_light_shading`, `clustered_forward_effect_set_area_light` | 17 | `VERIFIED_GPU` |
+| an effect's shadow, punctual-light and image-based-light slots | `effect_*_ext` | 16 | `VERIFIED_STATE` |
 
 ### What the GPU artifact changed about the evidence
 
@@ -407,4 +408,23 @@ three found something:
   samples per entry took 7.8 ms to integrate on this host, and its own
   `generation_milliseconds` reports it -- which is why it is an object to build
   once and share rather than a call to make per frame.
+- **`cna_effect_get_punctual_light_ext` never publishes the shadow handles.**
+  It fills every other field and leaves `shadow_cube` and `shadow_map` at
+  `CNA_INVALID_HANDLE` whatever was bound, deliberately: "this ABI does not
+  invent a name for a texture it does not own". So `PunctualLight::has_shadow_*`
+  read back from an effect is a *constant false*, and a test that treated it as
+  a round-trip would be asserting nothing. The Rust binding knows the answer
+  because it is what holds those textures, and publishes it as
+  `EffectLighting::has_punctual_shadow_cube` / `has_punctual_shadow_map`; the
+  doc on the getter says why it cannot come from CNA.
+- **The lighting slots are a binding with a lifetime, not a set of free
+  functions.** Every texture in them is a raw pointer CNA never releases, so
+  `EffectLighting` holds the Rust resources and clears every slot it filled when
+  it drops. Without that, an effect drawn after its shadow map was dropped would
+  read freed memory -- and nothing in CNA would notice. The test asserts the
+  clearing directly: after the binding goes out of scope, a fresh one reads back
+  no shadow map and no image-based light.
+- **Setting a punctual light's shadow of one kind clears the other.** The two
+  slots are one structure, so binding a cube leaves the map empty and vice
+  versa; there is no partial update.
 

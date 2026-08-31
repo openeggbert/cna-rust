@@ -768,6 +768,70 @@ extern "C" {
         argument1: *mut CNA_EffectHandle,
     ) -> CNA_Result;
     pub fn cna_effect_destroy(argument0: CNA_EffectHandle) -> CNA_Result;
+    pub fn cna_effect_get_image_based_light_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_ImageBasedLightEXT,
+    ) -> CNA_Result;
+    pub fn cna_effect_get_light_view_projection_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_effect_get_punctual_light_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_PunctualLightEXT,
+    ) -> CNA_Result;
+    pub fn cna_effect_get_shadow_cascades_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_ShadowCascadeStateEXT,
+    ) -> CNA_Result;
+    pub fn cna_effect_get_shadow_depth_bias_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_effect_get_shadow_filter_radius_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_effect_get_shadow_map_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_effect_is_shadows_enabled_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_effect_set_image_based_light_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *const CNA_ImageBasedLightEXT,
+    ) -> CNA_Result;
+    pub fn cna_effect_set_light_view_projection_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *const CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_effect_set_punctual_light_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *const CNA_PunctualLightEXT,
+    ) -> CNA_Result;
+    pub fn cna_effect_set_shadow_cascades_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *const CNA_ShadowCascadeStateEXT,
+    ) -> CNA_Result;
+    pub fn cna_effect_set_shadow_depth_bias_ext(
+        argument0: CNA_EffectHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_effect_set_shadow_filter_radius_ext(
+        argument0: CNA_EffectHandle,
+        argument1: i32,
+    ) -> CNA_Result;
+    pub fn cna_effect_set_shadow_map_ext(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_effect_set_shadows_enabled_ext(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
     pub fn cna_effect_clone(
         argument0: CNA_EffectHandle,
         argument1: *mut CNA_EffectHandle,

@@ -6256,14 +6256,32 @@ impl ShadowCascadeState {
         let mut value = sys::CNA_ShadowCascadeStateEXT::default();
         // SAFETY: the structure is a caller-owned versioned output.
         native.check(unsafe { (native.engine.shadow_cascade_state_ext_init)(&mut value) })?;
-        Ok(Self {
+        Ok(Self::from_native(&value))
+    }
+
+    fn from_native(value: &sys::CNA_ShadowCascadeStateEXT) -> Self {
+        Self {
             count: value.count,
             blend_band: value.blend_band,
             world_to_atlas: value.world_to_atlas.map(from_native_matrix),
             split_distance: value.split_distance,
             camera_view: from_native_matrix(value.camera_view),
             debug_tint: value.debug_tint != 0,
-        })
+        }
+    }
+
+    fn to_native(&self) -> sys::CNA_ShadowCascadeStateEXT {
+        sys::CNA_ShadowCascadeStateEXT {
+            struct_size: core::mem::size_of::<sys::CNA_ShadowCascadeStateEXT>() as u32,
+            struct_version: 1,
+            count: self.count,
+            blend_band: self.blend_band,
+            world_to_atlas: self.world_to_atlas.map(native_matrix),
+            split_distance: self.split_distance,
+            camera_view: native_matrix(self.camera_view),
+            debug_tint: u8::from(self.debug_tint),
+            reserved: Default::default(),
+        }
     }
 }
 
@@ -6543,6 +6561,14 @@ pub enum PunctualLightKind {
 }
 
 impl PunctualLightKind {
+    const fn to_native(self) -> sys::CNA_PunctualLightKindEXT {
+        match self {
+            Self::None => sys::CNA_PUNCTUAL_LIGHT_KIND_EXT_NONE,
+            Self::Point => sys::CNA_PUNCTUAL_LIGHT_KIND_EXT_POINT,
+            Self::Spot => sys::CNA_PUNCTUAL_LIGHT_KIND_EXT_SPOT,
+        }
+    }
+
     const fn from_native(value: sys::CNA_PunctualLightKindEXT) -> Option<Self> {
         Some(match value {
             sys::CNA_PUNCTUAL_LIGHT_KIND_EXT_NONE => Self::None,
@@ -6593,6 +6619,10 @@ impl PunctualLight {
         let mut value = sys::CNA_PunctualLightEXT::default();
         // SAFETY: the structure is a caller-owned versioned output.
         native.check(unsafe { (native.engine.punctual_light_ext_init)(&mut value) })?;
+        Self::from_native(&value)
+    }
+
+    fn from_native(value: &sys::CNA_PunctualLightEXT) -> Result<Self> {
         Ok(Self {
             kind: PunctualLightKind::from_native(value.kind).ok_or(CnaError::InvalidInput(
                 "native punctual light kind is unknown",
@@ -6608,6 +6638,35 @@ impl PunctualLight {
             has_shadow_map: value.shadow_map != sys::CNA_INVALID_HANDLE,
             shadow_view_projection: from_native_matrix(value.shadow_view_projection),
         })
+    }
+
+    /// The C form, with the two shadow slots supplied separately.
+    ///
+    /// This type reports shadow attachment as *presence* rather than carrying
+    /// handles, so the handles have to come from somewhere: whoever sets a
+    /// light supplies them, and whoever reads one back learns only whether
+    /// they were there.
+    fn to_native(
+        self,
+        shadow_cube: sys::CNA_Handle,
+        shadow_map: sys::CNA_Handle,
+    ) -> sys::CNA_PunctualLightEXT {
+        sys::CNA_PunctualLightEXT {
+            struct_size: core::mem::size_of::<sys::CNA_PunctualLightEXT>() as u32,
+            struct_version: 1,
+            kind: self.kind.to_native(),
+            reserved: 0,
+            position: native_vector3(self.position),
+            direction: native_vector3(self.direction),
+            diffuse_color: native_vector3(self.diffuse_color),
+            range: self.range,
+            inner_angle: self.inner_angle,
+            outer_angle: self.outer_angle,
+            shadow_depth_bias: self.shadow_depth_bias,
+            shadow_cube,
+            shadow_map,
+            shadow_view_projection: native_matrix(self.shadow_view_projection),
+        }
     }
 }
 
@@ -12510,5 +12569,459 @@ impl ClusteredForwardEffect {
         self.native.check(unsafe {
             (self.native.engine.clustered_forward_effect_set_area_light)(handle, &light, table)
         })
+    }
+}
+
+/// The engine layer's lighting slots on an effect, and the textures they point
+/// at.
+///
+/// XNA's `Effect` has no shadow map, no punctual light and no image-based
+/// light; CNA adds all three to any effect that implements the receiver
+/// contract. Every texture in them is `RETAINED_DEPENDENCY`: CNA stores a raw
+/// pointer and releases nothing, so **this value is what keeps them alive**.
+///
+/// It is therefore a binding with a lifetime rather than a set of free
+/// functions. Hold it for as long as you draw through the effect; dropping it
+/// clears every slot it filled, so CNA never points at a texture Rust has
+/// dropped. The `'effect` lifetime stops it outliving the effect itself.
+pub struct EffectLighting<'effect> {
+    native: Arc<Native>,
+    handle: sys::CNA_EffectHandle,
+    device: GraphicsDevice,
+    shadow_map: Option<Texture2D>,
+    irradiance: Option<TextureCube>,
+    prefiltered_specular: Option<TextureCube>,
+    brdf_lut: Option<Texture2D>,
+    punctual_shadow_cube: Option<TextureCube>,
+    punctual_shadow_map: Option<Texture2D>,
+    owner: PhantomData<&'effect ()>,
+}
+
+impl<'effect> EffectLighting<'effect> {
+    fn wrap(
+        native: &Arc<Native>,
+        device: &GraphicsDevice,
+        handle: sys::CNA_EffectHandle,
+    ) -> Self {
+        Self {
+            native: Arc::clone(native),
+            handle,
+            device: device.clone(),
+            shadow_map: None,
+            irradiance: None,
+            prefiltered_specular: None,
+            brdf_lut: None,
+            punctual_shadow_cube: None,
+            punctual_shadow_map: None,
+            owner: PhantomData,
+        }
+    }
+
+    /// The lighting slots of an ordinary effect.
+    pub fn of(effect: &'effect Effect, device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        Ok(Self::wrap(native, device, effect.native_handle()?))
+    }
+
+    /// The lighting slots of a [`PbrEffect`](super::pbr::PbrEffect).
+    pub fn of_pbr(effect: &'effect super::pbr::PbrEffect) -> Result<Self> {
+        let device = effect.graphics_device();
+        let native = device.state_native();
+        Ok(Self::wrap(native, device, effect.native_handle()))
+    }
+
+    /// The lighting slots of a
+    /// [`SkinnedPbrEffect`](super::pbr::SkinnedPbrEffect).
+    pub fn of_skinned(effect: &'effect super::pbr::SkinnedPbrEffect) -> Result<Self> {
+        let device = effect.graphics_device();
+        let native = device.state_native();
+        Ok(Self::wrap(native, device, effect.native_handle()))
+    }
+
+    /// Binds a shadow map for the effect to sample, or `None` to bind none.
+    ///
+    /// **Takes** the texture: CNA borrows it and releases nothing, so this
+    /// value holds it until the slot is cleared or this value is dropped.
+    pub fn set_shadow_map(&mut self, map: Option<Texture2D>) -> Result<()> {
+        let handle = match map.as_ref() {
+            Some(texture) => texture.handle()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        // SAFETY: the effect handle is live and the texture handle is live for
+        // the call, kept alive afterwards by the value this stores.
+        self.native
+            .check(unsafe { (self.native.engine.effect_set_shadow_map_ext)(self.handle, handle) })?;
+        self.shadow_map = map;
+        Ok(())
+    }
+
+    /// The shadow map the effect samples, viewed for a borrow.
+    ///
+    /// The handle CNA publishes is a *fresh name for the same texture* -- not
+    /// the one that was set, because the canonical interface stores a raw
+    /// pointer and has no handle to give back -- and it does **not** keep the
+    /// texture alive. This value does.
+    pub fn shadow_map(&self) -> Result<Option<BorrowedRenderTarget<'_>>> {
+        let mut value = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the effect handle is live and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.effect_get_shadow_map_ext)(self.handle, &mut value)
+        })?;
+        if value == sys::CNA_INVALID_HANDLE {
+            return Ok(None);
+        }
+        BorrowedRenderTarget::new(&self.native, &self.device, value).map(Some)
+    }
+
+    /// The matrix the shadow map was rendered with.
+    pub fn light_view_projection(&self) -> Result<Matrix> {
+        let mut value = sys::CNA_Matrix::default();
+        // SAFETY: the effect handle is live and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.effect_get_light_view_projection_ext)(self.handle, &mut value)
+        })?;
+        Ok(from_native_matrix(value))
+    }
+
+    /// Sets it.
+    pub fn set_light_view_projection(&self, value: Matrix) -> Result<()> {
+        let value = native_matrix(value);
+        // SAFETY: the effect handle is live and the matrix is borrowed for the
+        // call.
+        self.native.check(unsafe {
+            (self.native.engine.effect_set_light_view_projection_ext)(self.handle, &value)
+        })
+    }
+
+    /// Whether the effect samples its shadow map at all.
+    pub fn shadows_enabled(&self) -> Result<bool> {
+        let mut value = 0_u8;
+        // SAFETY: the effect handle is live and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.effect_is_shadows_enabled_ext)(self.handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Sets it.
+    pub fn set_shadows_enabled(&self, enabled: bool) -> Result<()> {
+        // SAFETY: the effect handle is live.
+        self.native.check(unsafe {
+            (self.native.engine.effect_set_shadows_enabled_ext)(self.handle, u8::from(enabled))
+        })
+    }
+
+    /// The depth bias the shadow comparison uses.
+    pub fn shadow_depth_bias(&self) -> Result<f32> {
+        let mut value = 0.0_f32;
+        // SAFETY: the effect handle is live and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.effect_get_shadow_depth_bias_ext)(self.handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Sets it.
+    pub fn set_shadow_depth_bias(&self, bias: f32) -> Result<()> {
+        // SAFETY: the effect handle is live.
+        self.native.check(unsafe {
+            (self.native.engine.effect_set_shadow_depth_bias_ext)(self.handle, bias)
+        })
+    }
+
+    /// How many texels wide the shadow filter kernel is.
+    pub fn shadow_filter_radius(&self) -> Result<i32> {
+        let mut value = 0_i32;
+        // SAFETY: the effect handle is live and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.effect_get_shadow_filter_radius_ext)(self.handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Sets it.
+    pub fn set_shadow_filter_radius(&self, radius: i32) -> Result<()> {
+        // SAFETY: the effect handle is live.
+        self.native.check(unsafe {
+            (self.native.engine.effect_set_shadow_filter_radius_ext)(self.handle, radius)
+        })
+    }
+
+    /// The cascade split state the effect shades with.
+    pub fn shadow_cascades(&self) -> Result<ShadowCascadeState> {
+        let mut value = sys::CNA_ShadowCascadeStateEXT {
+            struct_size: core::mem::size_of::<sys::CNA_ShadowCascadeStateEXT>() as u32,
+            struct_version: 1,
+            ..sys::CNA_ShadowCascadeStateEXT::default()
+        };
+        // SAFETY: the effect handle is live and the structure is a
+        // caller-owned versioned output.
+        self.native.check(unsafe {
+            (self.native.engine.effect_get_shadow_cascades_ext)(self.handle, &mut value)
+        })?;
+        Ok(ShadowCascadeState::from_native(&value))
+    }
+
+    /// Sets it.
+    pub fn set_shadow_cascades(&self, state: &ShadowCascadeState) -> Result<()> {
+        let value = state.to_native();
+        // SAFETY: the effect handle is live and the structure is borrowed for
+        // the call.
+        self.native.check(unsafe {
+            (self.native.engine.effect_set_shadow_cascades_ext)(self.handle, &value)
+        })
+    }
+
+    /// Whether this binding gave the light a shadow cube.
+    ///
+    /// Asked of the binding rather than of CNA, because
+    /// [`punctual_light`](Self::punctual_light) cannot answer it: see there.
+    #[must_use]
+    pub const fn has_punctual_shadow_cube(&self) -> bool {
+        self.punctual_shadow_cube.is_some()
+    }
+
+    /// Whether this binding gave the light a shadow map.
+    #[must_use]
+    pub const fn has_punctual_shadow_map(&self) -> bool {
+        self.punctual_shadow_map.is_some()
+    }
+
+    /// The punctual light the effect shades with.
+    ///
+    /// [`PunctualLight::has_shadow_cube`] and
+    /// [`PunctualLight::has_shadow_map`] are **always `false`** on a light read
+    /// back this way, whatever was bound. The canonical structure holds raw
+    /// texture pointers and `cna_effect_get_punctual_light_ext` deliberately
+    /// declines to invent handle names for textures it does not own, so it
+    /// leaves both slots empty. Ask
+    /// [`has_punctual_shadow_cube`](Self::has_punctual_shadow_cube) and
+    /// [`has_punctual_shadow_map`](Self::has_punctual_shadow_map) instead --
+    /// this binding is what holds those textures, so it is what knows.
+    pub fn punctual_light(&self) -> Result<PunctualLight> {
+        let mut value = sys::CNA_PunctualLightEXT {
+            struct_size: core::mem::size_of::<sys::CNA_PunctualLightEXT>() as u32,
+            struct_version: 1,
+            ..sys::CNA_PunctualLightEXT::default()
+        };
+        // SAFETY: the effect handle is live and the structure is a
+        // caller-owned versioned output.
+        self.native.check(unsafe {
+            (self.native.engine.effect_get_punctual_light_ext)(self.handle, &mut value)
+        })?;
+        PunctualLight::from_native(&value)
+    }
+
+    /// Sets it, with the shadow textures it samples.
+    ///
+    /// [`PunctualLight`] reports shadow attachment as presence rather than
+    /// carrying handles, so the textures are given here -- and **taken**, for
+    /// the same reason the shadow map is: CNA borrows them and releases
+    /// nothing. Passing `None` for both is what leaves the light unshadowed.
+    pub fn set_punctual_light(
+        &mut self,
+        light: PunctualLight,
+        shadow_cube: Option<TextureCube>,
+        shadow_map: Option<Texture2D>,
+    ) -> Result<()> {
+        let cube_handle = match shadow_cube.as_ref() {
+            Some(texture) => texture.native_handle()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        let map_handle = match shadow_map.as_ref() {
+            Some(texture) => texture.handle()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        let value = light.to_native(cube_handle, map_handle);
+        // SAFETY: the effect handle is live and the structure is borrowed for
+        // the call, its textures kept alive afterwards by the values this
+        // stores.
+        self.native.check(unsafe {
+            (self.native.engine.effect_set_punctual_light_ext)(self.handle, &value)
+        })?;
+        self.punctual_shadow_cube = shadow_cube;
+        self.punctual_shadow_map = shadow_map;
+        Ok(())
+    }
+
+    /// Gives the effect an image-based light to shade with.
+    ///
+    /// **Takes** its three textures for the same reason the shadow map is
+    /// taken: CNA borrows them and releases nothing.
+    pub fn set_image_based_light(
+        &mut self,
+        irradiance: Option<TextureCube>,
+        prefiltered_specular: Option<TextureCube>,
+        prefiltered_mip_count: i32,
+        brdf_lut: Option<Texture2D>,
+        intensity: f32,
+    ) -> Result<()> {
+        let value = sys::CNA_ImageBasedLightEXT {
+            struct_size: core::mem::size_of::<sys::CNA_ImageBasedLightEXT>() as u32,
+            struct_version: 1,
+            irradiance: match irradiance.as_ref() {
+                Some(texture) => texture.native_handle()?,
+                None => sys::CNA_INVALID_HANDLE,
+            },
+            prefiltered_specular: match prefiltered_specular.as_ref() {
+                Some(texture) => texture.native_handle()?,
+                None => sys::CNA_INVALID_HANDLE,
+            },
+            brdf_lut: match brdf_lut.as_ref() {
+                Some(texture) => texture.handle()?,
+                None => sys::CNA_INVALID_HANDLE,
+            },
+            prefiltered_mip_count,
+            intensity,
+        };
+        // SAFETY: the effect handle is live and the structure is borrowed for
+        // the call, its textures kept alive afterwards by the values this
+        // stores.
+        self.native.check(unsafe {
+            (self.native.engine.effect_set_image_based_light_ext)(self.handle, &value)
+        })?;
+        self.irradiance = irradiance;
+        self.prefiltered_specular = prefiltered_specular;
+        self.brdf_lut = brdf_lut;
+        Ok(())
+    }
+
+    /// The image-based light the effect shades with, viewed for a borrow.
+    ///
+    /// Its three textures come back as **fresh handles onto the effect's own**,
+    /// each of which keeps the effect alive and has to be released; the view
+    /// releases all three on drop.
+    pub fn image_based_light(&self) -> Result<BorrowedImageBasedLight<'_>> {
+        let mut value = sys::CNA_ImageBasedLightEXT {
+            struct_size: core::mem::size_of::<sys::CNA_ImageBasedLightEXT>() as u32,
+            struct_version: 1,
+            ..sys::CNA_ImageBasedLightEXT::default()
+        };
+        // SAFETY: the effect handle is live and the structure is a
+        // caller-owned versioned output.
+        self.native.check(unsafe {
+            (self.native.engine.effect_get_image_based_light_ext)(self.handle, &mut value)
+        })?;
+        Ok(BorrowedImageBasedLight {
+            native: Arc::clone(&self.native),
+            irradiance: value.irradiance,
+            prefiltered_specular: value.prefiltered_specular,
+            brdf_lut: value.brdf_lut,
+            prefiltered_mip_count: value.prefiltered_mip_count,
+            intensity: value.intensity,
+            owner: PhantomData,
+        })
+    }
+}
+
+impl Drop for EffectLighting<'_> {
+    fn drop(&mut self) {
+        // Clearing what this value bound is the whole point of its lifetime:
+        // CNA holds raw pointers into textures that are about to be released,
+        // so leaving them bound would leave the effect pointing at freed
+        // memory the next time it drew.
+        if self.shadow_map.is_some() {
+            // SAFETY: the effect handle is live and the invalid handle clears
+            // the slot.
+            let _ = unsafe {
+                (self.native.engine.effect_set_shadow_map_ext)(
+                    self.handle,
+                    sys::CNA_INVALID_HANDLE,
+                )
+            };
+        }
+        if self.irradiance.is_some() || self.prefiltered_specular.is_some() || self.brdf_lut.is_some()
+        {
+            let empty = sys::CNA_ImageBasedLightEXT {
+                struct_size: core::mem::size_of::<sys::CNA_ImageBasedLightEXT>() as u32,
+                struct_version: 1,
+                irradiance: sys::CNA_INVALID_HANDLE,
+                prefiltered_specular: sys::CNA_INVALID_HANDLE,
+                brdf_lut: sys::CNA_INVALID_HANDLE,
+                prefiltered_mip_count: 1,
+                intensity: 0.0,
+            };
+            // SAFETY: the effect handle is live and the structure is a live
+            // local borrowed for the call.
+            let _ = unsafe {
+                (self.native.engine.effect_set_image_based_light_ext)(self.handle, &empty)
+            };
+        }
+        if self.punctual_shadow_cube.is_some() || self.punctual_shadow_map.is_some() {
+            if let Ok(light) = PunctualLight::canonical_defaults() {
+                let empty = light.to_native(sys::CNA_INVALID_HANDLE, sys::CNA_INVALID_HANDLE);
+                // SAFETY: the effect handle is live and the structure is a live
+                // local borrowed for the call.
+                let _ = unsafe {
+                    (self.native.engine.effect_set_punctual_light_ext)(self.handle, &empty)
+                };
+            }
+        }
+    }
+}
+
+/// An image-based light an effect owns, viewed for a bounded borrow.
+///
+/// Each of its three texture handles keeps the effect alive; all three are
+/// released here on drop.
+pub struct BorrowedImageBasedLight<'owner> {
+    native: Arc<Native>,
+    irradiance: sys::CNA_Handle,
+    prefiltered_specular: sys::CNA_Handle,
+    brdf_lut: sys::CNA_Handle,
+    prefiltered_mip_count: i32,
+    intensity: f32,
+    owner: PhantomData<&'owner ()>,
+}
+
+impl BorrowedImageBasedLight<'_> {
+    /// Whether a diffuse irradiance cube is bound.
+    #[must_use]
+    pub const fn has_irradiance(&self) -> bool {
+        self.irradiance != sys::CNA_INVALID_HANDLE
+    }
+
+    /// Whether a prefiltered specular cube is bound.
+    #[must_use]
+    pub const fn has_prefiltered_specular(&self) -> bool {
+        self.prefiltered_specular != sys::CNA_INVALID_HANDLE
+    }
+
+    /// Whether a BRDF lookup table is bound.
+    #[must_use]
+    pub const fn has_brdf_lut(&self) -> bool {
+        self.brdf_lut != sys::CNA_INVALID_HANDLE
+    }
+
+    /// How many mip levels the prefiltered cube has.
+    #[must_use]
+    pub const fn prefiltered_mip_count(&self) -> i32 {
+        self.prefiltered_mip_count
+    }
+
+    /// How bright the light is.
+    #[must_use]
+    pub const fn intensity(&self) -> f32 {
+        self.intensity
+    }
+}
+
+impl Drop for BorrowedImageBasedLight<'_> {
+    fn drop(&mut self) {
+        for (handle, is_cube) in [
+            (self.irradiance, true),
+            (self.prefiltered_specular, true),
+            (self.brdf_lut, false),
+        ] {
+            if handle == sys::CNA_INVALID_HANDLE {
+                continue;
+            }
+            if is_cube {
+                let _ = self.native.destroy_texture_cube(handle);
+            } else {
+                // SAFETY: the handle is this view's own, released exactly once.
+                let _ = unsafe { (self.native.render_target_destroy)(handle) };
+            }
+        }
     }
 }

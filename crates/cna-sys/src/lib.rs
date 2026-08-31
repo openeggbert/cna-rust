@@ -10399,3 +10399,51 @@ pub type cna_area_light_shading_quad_of_fn = unsafe extern "C" fn(
 pub type cna_clustered_forward_effect_set_area_light_fn = unsafe extern "C" fn(
     CNA_ClusteredForwardEffectHandle, *const CNA_AreaLightEXT, CNA_AreaLightBrdfTableHandle,
 ) -> CNA_Result;
+pub type cna_effect_get_image_based_light_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_ImageBasedLightEXT,
+) -> CNA_Result;
+pub type cna_effect_get_light_view_projection_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_effect_get_punctual_light_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_PunctualLightEXT,
+) -> CNA_Result;
+pub type cna_effect_get_shadow_cascades_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_ShadowCascadeStateEXT,
+) -> CNA_Result;
+pub type cna_effect_get_shadow_depth_bias_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_effect_get_shadow_filter_radius_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_effect_get_shadow_map_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_effect_is_shadows_enabled_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_effect_set_image_based_light_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *const CNA_ImageBasedLightEXT,
+) -> CNA_Result;
+pub type cna_effect_set_light_view_projection_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *const CNA_Matrix,
+) -> CNA_Result;
+pub type cna_effect_set_punctual_light_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *const CNA_PunctualLightEXT,
+) -> CNA_Result;
+pub type cna_effect_set_shadow_cascades_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *const CNA_ShadowCascadeStateEXT,
+) -> CNA_Result;
+pub type cna_effect_set_shadow_depth_bias_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, f32,
+) -> CNA_Result;
+pub type cna_effect_set_shadow_filter_radius_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, i32,
+) -> CNA_Result;
+pub type cna_effect_set_shadow_map_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_Handle,
+) -> CNA_Result;
+pub type cna_effect_set_shadows_enabled_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_Bool,
+) -> CNA_Result;
