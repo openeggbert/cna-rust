@@ -150,6 +150,13 @@ the criterion above is unchanged, only its precondition has been met.
 | the instance stream, the GPU instance culler and the indirect draws | `instanced_renderer_ext` (the 4 static routes), `gpu_instance_culler`, `gpu_cullable_instance`, `indirect_draw_*`, `graphics_device_draw_*_indirect_ext` | 19 | `VERIFIED_GPU` |
 | the native mesh part and the instanced renderer | `model_mesh_part` (8 of `models.h`), `instanced_renderer_ext` (the remaining 14), `lod_group_ext_select` | 22 | `VERIFIED_GPU` |
 
+That is **811 engine-layer routes across twenty-two slices**, on top of the 46
+`RUST-EXT-010a` and `RUST-EXT-010c` had already bound -- 857 of 857 -- plus the
+eight `models.h` routes the native mesh part needed. Ten slices are
+`VERIFIED_GPU`, two `VERIFIED_PIXEL` and ten `VERIFIED_STATE`; nothing is
+`PASS`, because a family whose semantics this host cannot observe is labelled
+for what was actually measured rather than for the fact that the calls returned.
+
 ### What the GPU artifact changed about the evidence
 
 Three things could not have been measured on the headless artifact, and all

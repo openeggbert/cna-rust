@@ -79,7 +79,7 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-EXT-009 | Sensors: accelerometer, compass, gyroscope | `sensors.h`, `input_devices.h` | DONE, real readings `HARDWARE_PENDING` |
 | RUST-EXT-010a | Engine layer: render-pipeline settings, presets, normalization, text | `engine_layer.h` | DONE |
 | RUST-EXT-010c | Engine layer: the `KHR_materials_*` extension set | `engine_layer.h` | DONE |
-| RUST-EXT-010b | The other 808 engine-layer routes across 224 families | `engine_layer.h` | **reopened**: the trigger the scope decision named has arrived. A GPU-backed artifact runs real frames through the Rust binding on the host's AMD Radeon 780M under `OPENGL33` and `VULKAN`, and this session built an `OPENGLES3` artifact with `CNA_CNAEXT=ON` so the engine layer is actually present. See [docs/gpu-evidence.md](gpu-evidence.md). The row is no longer one task: it is decomposed family by family in [docs/engine-layer-scope.md](engine-layer-scope.md) | IN_PROGRESS |
+| RUST-EXT-010b | The other 808 engine-layer routes across 224 families | `engine_layer.h` | **all 857 routes of `engine_layer.h` are bound**, qualified on a GPU-backed `OPENGLES3` artifact with `CNA_CNAEXT=ON` and on the headless one, plain and `--all-features`. The trigger the scope decision named arrived and was taken: see [docs/gpu-evidence.md](gpu-evidence.md) for the host evidence and [docs/engine-layer-scope.md](engine-layer-scope.md) for the family-by-family table and the upstream contracts the tests measured. The last fourteen routes needed a native mesh-part handle the XNA projection cannot produce, so `cna::extensions::engine::NativeMeshPart` builds one | DONE |
 
 ## Platform and packaging
 
