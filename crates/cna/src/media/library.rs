@@ -9,7 +9,7 @@ use crate::native::Native;
 
 use super::runtime::MediaRuntime;
 use super::{
-    native_function, string_view, AlbumCollection, ArtistCollection, GenreCollection,
+    string_view, AlbumCollection, ArtistCollection, GenreCollection,
     MediaSourceType, Picture, PictureAlbum, PictureCollection, PlaylistCollection, ResourceCore,
     SongCollection,
 };
@@ -27,18 +27,10 @@ impl MediaSource {
         let (native, handle) = game.native_game();
         let runtime = Arc::clone(game.media_runtime());
         let generation = game.media_generation();
-        let count_fn: sys::cna_media_source_get_available_count_fn = unsafe {
-            native_function(native.media.media_source_get_available_count)
-        };
-        let type_fn: sys::cna_media_source_get_type_at_fn = unsafe {
-            native_function(native.media.media_source_get_type_at)
-        };
-        let size_fn: sys::cna_media_source_get_name_size_at_fn = unsafe {
-            native_function(native.media.media_source_get_name_size_at)
-        };
-        let copy_fn: sys::cna_media_source_copy_name_at_fn = unsafe {
-            native_function(native.media.media_source_copy_name_at)
-        };
+        let count_fn: sys::cna_media_source_get_available_count_fn = native.media.media_source_get_available_count;
+        let type_fn: sys::cna_media_source_get_type_at_fn = native.media.media_source_get_type_at;
+        let size_fn: sys::cna_media_source_get_name_size_at_fn = native.media.media_source_get_name_size_at;
+        let copy_fn: sys::cna_media_source_copy_name_at_fn = native.media.media_source_copy_name_at;
         let mut count = 0;
         // SAFETY: game and output pointer are valid for this callback.
         native.check(unsafe { count_fn(handle, &mut count) })?;
@@ -134,27 +126,17 @@ impl MediaLibrary {
         let generation = game.media_generation();
         let mut handle = 0;
         if let Some(index) = source_index {
-            let create: sys::cna_media_library_create_from_source_fn = unsafe {
-                native_function(native.media.media_library_create_from_source)
-            };
+            let create: sys::cna_media_library_create_from_source_fn = native.media.media_library_create_from_source;
             // SAFETY: game is live and the output pointer is valid.
             native.check(unsafe { create(game_handle, index, &mut handle) })?;
         } else {
-            let create: sys::cna_media_library_create_fn = unsafe {
-                native_function(native.media.media_library_create)
-            };
+            let create: sys::cna_media_library_create_fn = native.media.media_library_create;
             // SAFETY: game is live and the output pointer is valid.
             native.check(unsafe { create(game_handle, &mut handle) })?;
         }
-        let dispose: sys::cna_media_library_dispose_fn = unsafe {
-            native_function(native.media.media_library_dispose)
-        };
-        let destroy: sys::cna_media_library_destroy_fn = unsafe {
-            native_function(native.media.media_library_destroy)
-        };
-        let is_disposed: sys::cna_media_library_get_is_disposed_fn = unsafe {
-            native_function(native.media.media_library_get_is_disposed)
-        };
+        let dispose: sys::cna_media_library_dispose_fn = native.media.media_library_dispose;
+        let destroy: sys::cna_media_library_destroy_fn = native.media.media_library_destroy;
+        let is_disposed: sys::cna_media_library_get_is_disposed_fn = native.media.media_library_get_is_disposed;
         Ok(Self {
             core: ResourceCore::new(
                 Arc::clone(native),
@@ -207,31 +189,31 @@ impl MediaLibrary {
         Ok(value)
     }
 
-    pub fn Songs(&self) -> Result<Arc<SongCollection>> { let f:sys::cna_media_library_get_songs_fn=unsafe{native_function(self.core.native().media.media_library_get_songs)};self.collection(&self.songs,f,SongCollection::from_handle) }
-    pub fn Albums(&self) -> Result<Arc<AlbumCollection>> { let f:sys::cna_media_library_get_albums_fn=unsafe{native_function(self.core.native().media.media_library_get_albums)};self.collection(&self.albums,f,AlbumCollection::from_handle) }
-    pub fn Artists(&self) -> Result<Arc<ArtistCollection>> { let f:sys::cna_media_library_get_artists_fn=unsafe{native_function(self.core.native().media.media_library_get_artists)};self.collection(&self.artists,f,ArtistCollection::from_handle) }
-    pub fn Genres(&self) -> Result<Arc<GenreCollection>> { let f:sys::cna_media_library_get_genres_fn=unsafe{native_function(self.core.native().media.media_library_get_genres)};self.collection(&self.genres,f,GenreCollection::from_handle) }
-    pub fn Playlists(&self) -> Result<Arc<PlaylistCollection>> { let f:sys::cna_media_library_get_playlists_fn=unsafe{native_function(self.core.native().media.media_library_get_playlists)};self.collection(&self.playlists,f,PlaylistCollection::from_handle) }
-    pub fn Pictures(&self) -> Result<Arc<PictureCollection>> { let f:sys::cna_media_library_get_pictures_fn=unsafe{native_function(self.core.native().media.media_library_get_pictures)};self.collection(&self.pictures,f,PictureCollection::from_handle) }
-    pub fn SavedPictures(&self) -> Result<Arc<PictureCollection>> { let f:sys::cna_media_library_get_saved_pictures_fn=unsafe{native_function(self.core.native().media.media_library_get_saved_pictures)};self.collection(&self.saved_pictures,f,PictureCollection::from_handle) }
+    pub fn Songs(&self) -> Result<Arc<SongCollection>> { let f:sys::cna_media_library_get_songs_fn=self.core.native().media.media_library_get_songs;self.collection(&self.songs,f,SongCollection::from_handle) }
+    pub fn Albums(&self) -> Result<Arc<AlbumCollection>> { let f:sys::cna_media_library_get_albums_fn=self.core.native().media.media_library_get_albums;self.collection(&self.albums,f,AlbumCollection::from_handle) }
+    pub fn Artists(&self) -> Result<Arc<ArtistCollection>> { let f:sys::cna_media_library_get_artists_fn=self.core.native().media.media_library_get_artists;self.collection(&self.artists,f,ArtistCollection::from_handle) }
+    pub fn Genres(&self) -> Result<Arc<GenreCollection>> { let f:sys::cna_media_library_get_genres_fn=self.core.native().media.media_library_get_genres;self.collection(&self.genres,f,GenreCollection::from_handle) }
+    pub fn Playlists(&self) -> Result<Arc<PlaylistCollection>> { let f:sys::cna_media_library_get_playlists_fn=self.core.native().media.media_library_get_playlists;self.collection(&self.playlists,f,PlaylistCollection::from_handle) }
+    pub fn Pictures(&self) -> Result<Arc<PictureCollection>> { let f:sys::cna_media_library_get_pictures_fn=self.core.native().media.media_library_get_pictures;self.collection(&self.pictures,f,PictureCollection::from_handle) }
+    pub fn SavedPictures(&self) -> Result<Arc<PictureCollection>> { let f:sys::cna_media_library_get_saved_pictures_fn=self.core.native().media.media_library_get_saved_pictures;self.collection(&self.saved_pictures,f,PictureCollection::from_handle) }
 
     pub fn RootPictureAlbum(&self) -> Result<Option<Arc<PictureAlbum>>> {
         if let Some(value)=self.root_picture_album.lock().unwrap_or_else(std::sync::PoisonError::into_inner).as_ref(){return Ok(Some(Arc::clone(value)));}
-        let f:sys::cna_media_library_get_root_picture_album_fn=unsafe{native_function(self.core.native().media.media_library_get_root_picture_album)};let mut handle=0;let mut available=0;self.core.native().check(unsafe{f(self.core.handle()?,&mut handle,&mut available)})?;if available==0{return Ok(None);}let value=PictureAlbum::from_handle(Arc::clone(self.core.native()),Arc::clone(self.core.runtime()),self.core.generation(),handle);*self.root_picture_album.lock().unwrap_or_else(std::sync::PoisonError::into_inner)=Some(Arc::clone(&value));Ok(Some(value))
+        let f:sys::cna_media_library_get_root_picture_album_fn=self.core.native().media.media_library_get_root_picture_album;let mut handle=0;let mut available=0;self.core.native().check(unsafe{f(self.core.handle()?,&mut handle,&mut available)})?;if available==0{return Ok(None);}let value=PictureAlbum::from_handle(Arc::clone(self.core.native()),Arc::clone(self.core.runtime()),self.core.generation(),handle);*self.root_picture_album.lock().unwrap_or_else(std::sync::PoisonError::into_inner)=Some(Arc::clone(&value));Ok(Some(value))
     }
 
     pub fn MediaSource(&self) -> Result<Arc<MediaSource>> {
         if let Some(value)=self.source.lock().unwrap_or_else(std::sync::PoisonError::into_inner).as_ref(){return Ok(Arc::clone(value));}
-        let type_fn:sys::cna_media_library_get_media_source_type_fn=unsafe{native_function(self.core.native().media.media_library_get_media_source_type)};let size_fn:sys::cna_media_library_get_media_source_name_size_fn=unsafe{native_function(self.core.native().media.media_library_get_media_source_name_size)};let copy_fn:sys::cna_media_library_copy_media_source_name_fn=unsafe{native_function(self.core.native().media.media_library_copy_media_source_name)};let handle=self.core.handle()?;let mut kind=0;self.core.native().check(unsafe{type_fn(handle,&mut kind)})?;let mut required=0;self.core.native().check(unsafe{size_fn(handle,&mut required)})?;let mut bytes=vec![0_u8;usize::try_from(required).map_err(|_|CnaError::InvalidInput("media source name is too large"))?];let mut copied=0;self.core.native().check(unsafe{copy_fn(handle,bytes.as_mut_ptr().cast(),required,&mut copied)})?;let value=Arc::new(MediaSource{runtime:Arc::clone(self.core.runtime()),generation:self.core.generation(),index:None,source_type:MediaSourceType::from_native(kind)?,name:String::from_utf8(bytes).map_err(|_|CnaError::InvalidInput("media source name is not UTF-8"))?});*self.source.lock().unwrap_or_else(std::sync::PoisonError::into_inner)=Some(Arc::clone(&value));Ok(value)
+        let type_fn:sys::cna_media_library_get_media_source_type_fn=self.core.native().media.media_library_get_media_source_type;let size_fn:sys::cna_media_library_get_media_source_name_size_fn=self.core.native().media.media_library_get_media_source_name_size;let copy_fn:sys::cna_media_library_copy_media_source_name_fn=self.core.native().media.media_library_copy_media_source_name;let handle=self.core.handle()?;let mut kind=0;self.core.native().check(unsafe{type_fn(handle,&mut kind)})?;let mut required=0;self.core.native().check(unsafe{size_fn(handle,&mut required)})?;let mut bytes=vec![0_u8;usize::try_from(required).map_err(|_|CnaError::InvalidInput("media source name is too large"))?];let mut copied=0;self.core.native().check(unsafe{copy_fn(handle,bytes.as_mut_ptr().cast(),required,&mut copied)})?;let value=Arc::new(MediaSource{runtime:Arc::clone(self.core.runtime()),generation:self.core.generation(),index:None,source_type:MediaSourceType::from_native(kind)?,name:String::from_utf8(bytes).map_err(|_|CnaError::InvalidInput("media source name is not UTF-8"))?});*self.source.lock().unwrap_or_else(std::sync::PoisonError::into_inner)=Some(Arc::clone(&value));Ok(value)
     }
 
     pub fn SavePicture(&self, name: &str, imageBuffer: &[u8]) -> Result<Arc<Picture>> {
-        let f:sys::cna_media_library_save_picture_fn=unsafe{native_function(self.core.native().media.media_library_save_picture)};let mut handle=0;self.core.native().check(unsafe{f(self.core.handle()?,string_view(name),imageBuffer.as_ptr(),imageBuffer.len() as u64,&mut handle)})?;Ok(Picture::from_handle(Arc::clone(self.core.native()),Arc::clone(self.core.runtime()),self.core.generation(),handle))
+        let f:sys::cna_media_library_save_picture_fn=self.core.native().media.media_library_save_picture;let mut handle=0;self.core.native().check(unsafe{f(self.core.handle()?,string_view(name),imageBuffer.as_ptr(),imageBuffer.len() as u64,&mut handle)})?;Ok(Picture::from_handle(Arc::clone(self.core.native()),Arc::clone(self.core.runtime()),self.core.generation(),handle))
     }
 
     pub fn SavePictureWithNameAndSource<R: Read>(&self, name:&str, source:&mut R)->Result<Arc<Picture>> { let mut bytes=Vec::new();source.read_to_end(&mut bytes).map_err(|error|CnaError::Io(error.to_string()))?;self.SavePicture(name,&bytes) }
 
-    pub fn GetPictureFromToken(&self, token:&str)->Result<Option<Arc<Picture>>>{let f:sys::cna_media_library_get_picture_from_token_fn=unsafe{native_function(self.core.native().media.media_library_get_picture_from_token)};let mut handle=0;let mut available=0;self.core.native().check(unsafe{f(self.core.handle()?,string_view(token),&mut handle,&mut available)})?;if available==0{Ok(None)}else{Ok(Some(Picture::from_handle(Arc::clone(self.core.native()),Arc::clone(self.core.runtime()),self.core.generation(),handle)))} }
+    pub fn GetPictureFromToken(&self, token:&str)->Result<Option<Arc<Picture>>>{let f:sys::cna_media_library_get_picture_from_token_fn=self.core.native().media.media_library_get_picture_from_token;let mut handle=0;let mut available=0;self.core.native().check(unsafe{f(self.core.handle()?,string_view(token),&mut handle,&mut available)})?;if available==0{Ok(None)}else{Ok(Some(Picture::from_handle(Arc::clone(self.core.native()),Arc::clone(self.core.runtime()),self.core.generation(),handle)))} }
     pub fn IsDisposed(&self)->Result<bool>{self.core.IsDisposed()}
     pub fn Dispose(&self)->Result<()>{self.invalidate_children();self.core.Dispose()}
     pub fn Finalize(&self)->Result<()> { Ok(()) }

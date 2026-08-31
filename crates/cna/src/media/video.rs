@@ -8,7 +8,7 @@ use crate::error::{CnaError, Result};
 use crate::game::{GameContext, TimeSpan};
 use crate::graphics::{BorrowedHandle, GraphicsDevice, Texture2D};
 
-use super::{native_function, MediaRuntime, MediaState, ResourceCore, VideoSoundtrackType};
+use super::{MediaRuntime, MediaState, ResourceCore, VideoSoundtrackType};
 
 pub struct Video {
     core: Arc<ResourceCore>,
@@ -27,9 +27,7 @@ impl Video {
     ) -> Result<Self> {
         let runtime = MediaRuntime::process();
         let (native, _, generation) = runtime.binding()?;
-        let create: sys::cna_video_create_with_metadata_fn = unsafe {
-            native_function(native.media.video_create_with_metadata)
-        };
+        let create: sys::cna_video_create_with_metadata_fn = native.media.video_create_with_metadata;
         let mut handle = 0;
         // SAFETY: the device is callback-live, input text is borrowed for the call, metadata uses
         // fixed-width ABI values, and output pointer is valid.
@@ -45,9 +43,7 @@ impl Video {
                 &mut handle,
             )
         })?;
-        let destroy: sys::cna_video_destroy_fn = unsafe {
-            native_function(native.media.video_destroy)
-        };
+        let destroy: sys::cna_video_destroy_fn = native.media.video_destroy;
         #[cfg(feature = "native-fault-injection")]
         if let Err(error) = crate::native::fault::check("video-create-after-native") {
             // SAFETY: CNA just returned this owned Video handle and no Rust owner exists yet.
@@ -61,12 +57,12 @@ impl Video {
     }
 
     pub fn Duration(&self) -> Result<TimeSpan> {
-        let f:sys::cna_video_get_duration_fn=unsafe{native_function(self.core.native().media.video_get_duration)};let mut value=0;self.core.native().check(unsafe{f(self.core.handle()?,&mut value)})?;Ok(TimeSpan::from_ticks(value))
+        let f:sys::cna_video_get_duration_fn=self.core.native().media.video_get_duration;let mut value=0;self.core.native().check(unsafe{f(self.core.handle()?,&mut value)})?;Ok(TimeSpan::from_ticks(value))
     }
-    pub fn Width(&self)->Result<i32>{let f:sys::cna_video_get_width_fn=unsafe{native_function(self.core.native().media.video_get_width)};let mut value=0;self.core.native().check(unsafe{f(self.core.handle()?,&mut value)})?;Ok(value)}
-    pub fn Height(&self)->Result<i32>{let f:sys::cna_video_get_height_fn=unsafe{native_function(self.core.native().media.video_get_height)};let mut value=0;self.core.native().check(unsafe{f(self.core.handle()?,&mut value)})?;Ok(value)}
-    pub fn FramesPerSecond(&self)->Result<f32>{let f:sys::cna_video_get_frames_per_second_fn=unsafe{native_function(self.core.native().media.video_get_frames_per_second)};let mut value=0.0;self.core.native().check(unsafe{f(self.core.handle()?,&mut value)})?;Ok(value)}
-    pub fn VideoSoundtrackType(&self)->Result<VideoSoundtrackType>{let f:sys::cna_video_get_soundtrack_type_fn=unsafe{native_function(self.core.native().media.video_get_soundtrack_type)};let mut value=0;self.core.native().check(unsafe{f(self.core.handle()?,&mut value)})?;VideoSoundtrackType::from_native(value)}
+    pub fn Width(&self)->Result<i32>{let f:sys::cna_video_get_width_fn=self.core.native().media.video_get_width;let mut value=0;self.core.native().check(unsafe{f(self.core.handle()?,&mut value)})?;Ok(value)}
+    pub fn Height(&self)->Result<i32>{let f:sys::cna_video_get_height_fn=self.core.native().media.video_get_height;let mut value=0;self.core.native().check(unsafe{f(self.core.handle()?,&mut value)})?;Ok(value)}
+    pub fn FramesPerSecond(&self)->Result<f32>{let f:sys::cna_video_get_frames_per_second_fn=self.core.native().media.video_get_frames_per_second;let mut value=0.0;self.core.native().check(unsafe{f(self.core.handle()?,&mut value)})?;Ok(value)}
+    pub fn VideoSoundtrackType(&self)->Result<VideoSoundtrackType>{let f:sys::cna_video_get_soundtrack_type_fn=self.core.native().media.video_get_soundtrack_type;let mut value=0;self.core.native().check(unsafe{f(self.core.handle()?,&mut value)})?;VideoSoundtrackType::from_native(value)}
     pub(crate) fn native_handle(&self)->Result<sys::CNA_Handle>{self.core.handle()}
     pub(crate) fn graphics_device(&self)->&GraphicsDevice{&self._graphics_device}
 }
@@ -112,23 +108,23 @@ pub struct VideoPlayer {
 
 impl VideoPlayer {
     pub fn new(game:&GameContext<'_>)->Result<Self>{
-        let(native,game_handle)=game.native_game();let runtime=Arc::clone(game.media_runtime());let generation=game.media_generation();let create:sys::cna_video_player_create_fn=unsafe{native_function(native.media.video_player_create)};let mut handle=0;native.check(unsafe{create(game_handle,&mut handle)})?;let dispose:sys::cna_video_player_dispose_fn=unsafe{native_function(native.media.video_player_dispose)};let destroy:sys::cna_video_player_destroy_fn=unsafe{native_function(native.media.video_player_destroy)};let is_disposed:sys::cna_video_player_get_is_disposed_fn=unsafe{native_function(native.media.video_player_get_is_disposed)};let core=ResourceCore::new(Arc::clone(native),runtime,generation,handle,Some(dispose),destroy,Some(is_disposed));let loop_fn:sys::cna_video_player_get_is_looped_fn=unsafe{native_function(native.media.video_player_get_is_looped)};let mute_fn:sys::cna_video_player_get_is_muted_fn=unsafe{native_function(native.media.video_player_get_is_muted)};let volume_fn:sys::cna_video_player_get_volume_fn=unsafe{native_function(native.media.video_player_get_volume)};let mut looped=0;let mut muted=0;let mut volume=1.0;native.check(unsafe{loop_fn(handle,&mut looped)})?;native.check(unsafe{mute_fn(handle,&mut muted)})?;native.check(unsafe{volume_fn(handle,&mut volume)})?;Ok(Self{core,video:Mutex::new(None),is_looped:Mutex::new(looped!=0),is_muted:Mutex::new(muted!=0),volume:Mutex::new(volume),frame_epoch:Arc::new(AtomicU64::new(0))})
+        let(native,game_handle)=game.native_game();let runtime=Arc::clone(game.media_runtime());let generation=game.media_generation();let create:sys::cna_video_player_create_fn=native.media.video_player_create;let mut handle=0;native.check(unsafe{create(game_handle,&mut handle)})?;let dispose:sys::cna_video_player_dispose_fn=native.media.video_player_dispose;let destroy:sys::cna_video_player_destroy_fn=native.media.video_player_destroy;let is_disposed:sys::cna_video_player_get_is_disposed_fn=native.media.video_player_get_is_disposed;let core=ResourceCore::new(Arc::clone(native),runtime,generation,handle,Some(dispose),destroy,Some(is_disposed));let loop_fn:sys::cna_video_player_get_is_looped_fn=native.media.video_player_get_is_looped;let mute_fn:sys::cna_video_player_get_is_muted_fn=native.media.video_player_get_is_muted;let volume_fn:sys::cna_video_player_get_volume_fn=native.media.video_player_get_volume;let mut looped=0;let mut muted=0;let mut volume=1.0;native.check(unsafe{loop_fn(handle,&mut looped)})?;native.check(unsafe{mute_fn(handle,&mut muted)})?;native.check(unsafe{volume_fn(handle,&mut volume)})?;Ok(Self{core,video:Mutex::new(None),is_looped:Mutex::new(looped!=0),is_muted:Mutex::new(muted!=0),volume:Mutex::new(volume),frame_epoch:Arc::new(AtomicU64::new(0))})
     }
     pub fn IsDisposed(&self)->Result<bool>{self.core.IsDisposed()}
     pub fn Video(&self)->Result<Option<Arc<Video>>>{Ok(self.video.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone())}
-    pub fn State(&self)->Result<MediaState>{let f:sys::cna_video_player_get_state_fn=unsafe{native_function(self.core.native().media.video_player_get_state)};let mut value=0;self.core.native().check(unsafe{f(self.player_handle()?,&mut value)})?;MediaState::from_native(value)}
-    pub fn PlayPosition(&self)->Result<TimeSpan>{let f:sys::cna_video_player_get_play_position_ticks_fn=unsafe{native_function(self.core.native().media.video_player_get_play_position_ticks)};let mut value=0;self.core.native().check(unsafe{f(self.player_handle()?,&mut value)})?;Ok(TimeSpan::from_ticks(value))}
+    pub fn State(&self)->Result<MediaState>{let f:sys::cna_video_player_get_state_fn=self.core.native().media.video_player_get_state;let mut value=0;self.core.native().check(unsafe{f(self.player_handle()?,&mut value)})?;MediaState::from_native(value)}
+    pub fn PlayPosition(&self)->Result<TimeSpan>{let f:sys::cna_video_player_get_play_position_ticks_fn=self.core.native().media.video_player_get_play_position_ticks;let mut value=0;self.core.native().check(unsafe{f(self.player_handle()?,&mut value)})?;Ok(TimeSpan::from_ticks(value))}
     pub fn IsLooped(&self)->Result<bool>{Ok(*self.is_looped.lock().unwrap_or_else(std::sync::PoisonError::into_inner))}
-    pub fn SetIsLooped(&self,value:bool)->Result<()>{let f:sys::cna_video_player_set_is_looped_fn=unsafe{native_function(self.core.native().media.video_player_set_is_looped)};self.core.native().check(unsafe{f(self.player_handle()?,u8::from(value))})?;*self.is_looped.lock().unwrap_or_else(std::sync::PoisonError::into_inner)=value;Ok(())}
+    pub fn SetIsLooped(&self,value:bool)->Result<()>{let f:sys::cna_video_player_set_is_looped_fn=self.core.native().media.video_player_set_is_looped;self.core.native().check(unsafe{f(self.player_handle()?,u8::from(value))})?;*self.is_looped.lock().unwrap_or_else(std::sync::PoisonError::into_inner)=value;Ok(())}
     pub fn IsMuted(&self)->Result<bool>{Ok(*self.is_muted.lock().unwrap_or_else(std::sync::PoisonError::into_inner))}
-    pub fn SetIsMuted(&self,value:bool)->Result<()>{let f:sys::cna_video_player_set_is_muted_fn=unsafe{native_function(self.core.native().media.video_player_set_is_muted)};self.core.native().check(unsafe{f(self.player_handle()?,u8::from(value))})?;*self.is_muted.lock().unwrap_or_else(std::sync::PoisonError::into_inner)=value;Ok(())}
+    pub fn SetIsMuted(&self,value:bool)->Result<()>{let f:sys::cna_video_player_set_is_muted_fn=self.core.native().media.video_player_set_is_muted;self.core.native().check(unsafe{f(self.player_handle()?,u8::from(value))})?;*self.is_muted.lock().unwrap_or_else(std::sync::PoisonError::into_inner)=value;Ok(())}
     pub fn Volume(&self)->Result<f32>{Ok(*self.volume.lock().unwrap_or_else(std::sync::PoisonError::into_inner))}
-    pub fn SetVolume(&self,value:f32)->Result<()>{if value<0.0||value>1.0{return Err(CnaError::InvalidInput("VideoPlayer Volume must be in [0, 1] or NaN"));}let f:sys::cna_video_player_set_volume_fn=unsafe{native_function(self.core.native().media.video_player_set_volume)};self.core.native().check(unsafe{f(self.player_handle()?,value)})?;*self.volume.lock().unwrap_or_else(std::sync::PoisonError::into_inner)=value;Ok(())}
-    pub fn Play(&self,video:Arc<Video>)->Result<()>{if video.core.generation()!=self.core.generation(){return Err(CnaError::InvalidInput("Video belongs to another Game generation"));}let f:sys::cna_video_player_play_fn=unsafe{native_function(self.core.native().media.video_player_play)};self.core.native().check(unsafe{f(self.player_handle()?,video.native_handle()?)})?;*self.video.lock().unwrap_or_else(std::sync::PoisonError::into_inner)=Some(video);Ok(())}
+    pub fn SetVolume(&self,value:f32)->Result<()>{if value<0.0||value>1.0{return Err(CnaError::InvalidInput("VideoPlayer Volume must be in [0, 1] or NaN"));}let f:sys::cna_video_player_set_volume_fn=self.core.native().media.video_player_set_volume;self.core.native().check(unsafe{f(self.player_handle()?,value)})?;*self.volume.lock().unwrap_or_else(std::sync::PoisonError::into_inner)=value;Ok(())}
+    pub fn Play(&self,video:Arc<Video>)->Result<()>{if video.core.generation()!=self.core.generation(){return Err(CnaError::InvalidInput("Video belongs to another Game generation"));}let f:sys::cna_video_player_play_fn=self.core.native().media.video_player_play;self.core.native().check(unsafe{f(self.player_handle()?,video.native_handle()?)})?;*self.video.lock().unwrap_or_else(std::sync::PoisonError::into_inner)=Some(video);Ok(())}
     pub fn Pause(&self)->Result<()>{self.operation(self.core.native().media.video_player_pause)}
     pub fn Resume(&self)->Result<()>{self.operation(self.core.native().media.video_player_resume)}
     pub fn Stop(&self)->Result<()>{self.operation(self.core.native().media.video_player_stop)}
-    fn operation(&self,slot:usize)->Result<()>{let f:unsafe extern "C" fn(sys::CNA_VideoPlayerHandle)->sys::CNA_Result=unsafe{native_function(slot)};self.core.native().check(unsafe{f(self.player_handle()?)})}
+    fn operation(&self,route:unsafe extern "C" fn(sys::CNA_VideoPlayerHandle)->sys::CNA_Result)->Result<()>{let f=route;self.core.native().check(unsafe{f(self.player_handle()?)})}
     /// Returns the player's handle after invalidating any outstanding frame
     /// borrow, because that is exactly what the impending native call does.
     fn player_handle(&self) -> Result<sys::CNA_Handle> {
@@ -145,7 +141,7 @@ impl VideoPlayer {
             ..sys::CNA_VideoFrameEXT::default()
         };
         let f: sys::cna_video_player_get_frame_ext_fn =
-            unsafe { native_function(self.core.native().media.video_player_get_frame_ext) };
+            self.core.native().media.video_player_get_frame_ext;
         // SAFETY: the handle is live, and the descriptor is a caller-owned
         // versioned output whose prefix this build declares exactly.
         self.core

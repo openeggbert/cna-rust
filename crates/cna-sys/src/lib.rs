@@ -10,6 +10,9 @@
 
 use core::ffi::{c_char, c_void};
 
+#[cfg(feature = "direct-link")]
+pub mod linked;
+
 pub const BINDINGS_AVAILABLE: bool = true;
 
 /// Packs an ABI version the way canonical `CNA_ABI_VERSION_ENCODE` does.

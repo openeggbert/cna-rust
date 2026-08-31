@@ -127,11 +127,6 @@ impl VisualizationData {
     }
 }
 
-pub(crate) unsafe fn native_function<T: Copy>(slot: usize) -> T {
-    // SAFETY: every caller names the cna-sys alias corresponding to this MediaApi field.
-    unsafe { crate::native::media::MediaApi::function(slot) }
-}
-
 type DestroyFn = unsafe extern "C" fn(sys::CNA_Handle) -> sys::CNA_Result;
 type DisposeFn = unsafe extern "C" fn(sys::CNA_Handle) -> sys::CNA_Result;
 type IsDisposedFn =

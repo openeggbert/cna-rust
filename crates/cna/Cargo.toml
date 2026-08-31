@@ -12,7 +12,20 @@ readme = "../../README.md"
 cna-sys = { package = "cna-rust-sys", path = "../cna-sys", version = "0.0.0" }
 
 [features]
-default = []
+default = ["dynamic-loading"]
+# How the audited function tables are filled. Exactly one is expected.
+#
+# `dynamic-loading` resolves every route through the platform loader at run
+# time, which is the historical behaviour and stays the default: it adds no
+# link-time dependency on CNA, so a consumer can build without the library
+# present and point at one later.
+#
+# `direct-link` fills the same tables from typed `extern "C"` declarations
+# instead. CNA must then resolve at link time, which is what a target with no
+# dynamic loader -- WebAssembly being the reason this exists -- requires. The
+# safe API is identical either way.
+dynamic-loading = []
+direct-link = ["cna-sys/direct-link"]
 # Test-only bridge fault points. They remain inert unless the deliberately
 # named CNA_RUST_TEST_FAULT environment variable is also set.
 native-fault-injection = []

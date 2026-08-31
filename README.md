@@ -163,7 +163,7 @@ checkout; see [docs/abi-migration-evidence.md](docs/abi-migration-evidence.md).
 | Linux x86-64, HEADLESS | Experimental runtime verified | 60/600 native frames with the qualification above |
 | Windows | Loader implemented, not compiled here | `LoadLibraryW`/`GetProcAddress`/`FreeLibrary` are in the source. No Windows Rust target is installed on this host, so nothing here compiles or runs a Windows binary. The path encoding is unit-tested on every host, and the loader body type-checks on Linux against stubbed OS pieces. |
 | macOS | Loader shared with Unix, not run | The `#[cfg(unix)]` loader covers macOS in source; no macOS host was available |
-| WebAssembly | Blocked in this binding | CNA's WebAssembly C ABI exists and is current; the Rust side has no wasm target installed here and no static-linkage mode. See [docs/platform-evidence.md](docs/platform-evidence.md) |
+| WebAssembly | Blocked by the toolchain | CNA's WebAssembly C ABI exists and the binding now has a direct-linkage mode, so the architecture no longer blocks it; no wasm standard library is installed here and there is no `rustup` to add one. See [docs/platform-evidence.md](docs/platform-evidence.md) |
 | Android | Unsupported | No native lifecycle/window/input integration verified |
 
 Full platform evidence: [docs/platform-evidence.md](docs/platform-evidence.md).
@@ -180,6 +180,18 @@ Alternatively set `CNA_NATIVE_DIR` to a library directory or `CNA_ROOT` to a
 CNA source/install root. Missing-library errors list the searched paths and the
 expected platform filename. The loader covers Unix and Windows in source; only
 Unix is runtime-qualified here.
+
+That is the default, `dynamic-loading`. A consumer that must resolve CNA at
+link time instead -- a target with no dynamic loader, WebAssembly being the
+reason the mode exists -- selects `direct-link`:
+
+```toml
+cna = { package = "cna-rust", default-features = false, features = ["direct-link"] }
+```
+
+The same environment variables tell the build script where to link from, and
+the safe API is identical. See
+[docs/platform-evidence.md](docs/platform-evidence.md) for what is verified.
 
 The CNA canonical headers are `modules/c-api/include/CNA/C` in the CNA
 repository. The full upstream ABI is much larger than the currently reviewed

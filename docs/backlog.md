@@ -80,8 +80,10 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 |---|---|---|---|
 | RUST-PLATFORM-001 | Windows dynamic loader | source complete; no Windows Rust target on this host, so `COMPILE_NOT_VERIFIED_PLATFORM` | DONE |
 | RUST-PLATFORM-002 | macOS loader | already `#[cfg(unix)]`; needs a runtime run | BLOCKED_PLATFORM |
-| RUST-PLATFORM-003 | WebAssembly | re-measured: CNA's wasm C ABI exists (4,053 names); Rust has no wasm target here and the binding has no static-linkage mode | BLOCKED_PLATFORM |
-| RUST-PLATFORM-004 | Static-linkage mode so `Native` can be filled from `extern "C"` declarations | the prerequisite for any WebAssembly route | READY |
+| RUST-PLATFORM-003 | WebAssembly | re-measured: CNA's wasm C ABI exists and the binding now has direct linkage, so only the toolchain blocks it -- no wasm std is installed and there is no `rustup` to add one | BLOCKED_PLATFORM |
+| RUST-PLATFORM-004 | Direct-linkage mode so the tables fill from typed `extern "C"` declarations | one route inventory, two acquisition mechanisms, one gate over both | DONE |
+| RUST-ABI-011 | Type `MediaApi`'s 203 routes, which were outside the symbol gate entirely | `SYMBOL_TYPE_MISMATCH` covers 1,387 acquisitions, up from 1,184 | DONE |
+| RUST-ABI-012 | Put a floor under the acquisition scan so a blind gate fails loudly | the scan cannot silently match nothing | DONE |
 | RUST-PACKAGE-001 | `cargo package` file list, notices, no native binary | LICENSE and NOTICE.md now ship with each crate; an outside consumer builds from the packaged file set alone | DONE |
 | RUST-PACKAGE-003 | `cargo package -p cna-rust` needs `cna-rust-sys` published first | publish order recorded | BLOCKED_UPSTREAM |
 | RUST-PACKAGE-002 | MSRV 1.74 evidence | `tools/msrv/audit.py` denylist; two real violations found and fixed. Compiling with 1.74 is still `MSRV_RUNTIME_NOT_RUN` | DONE |

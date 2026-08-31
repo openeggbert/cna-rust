@@ -276,10 +276,20 @@ def unaudited_declarations(expected: set[str]) -> list[dict]:
 NATIVE_DIRECTORY = ROOT / "crates/cna/src/native"
 
 SYMBOL_ACQUISITION = re.compile(
-    r"(?P<field>[A-Za-z_][A-Za-z_0-9]*)\s*:\s*symbol!\(\s*\"(?P<name>cna_[a-z0-9_]+)\"\s*,"
+    r"(?P<field>[A-Za-z_][A-Za-z_0-9]*)\s*:\s*symbol!\(\s*(?P<name>cna_[a-z0-9_]+)\s*,"
     r"\s*(?P<alias>sys::[A-Za-z_0-9]+|_)\s*\)",
     re.S,
 )
+
+# A floor under the acquisition scan itself.
+#
+# The regex is the only thing that finds acquisitions, so a change to the call
+# syntax that it stops matching does not fail: it reports zero acquisitions and
+# zero mismatches, which reads exactly like a pass. That happened once already,
+# when every call site moved from a string name to an identifier so direct-link
+# mode could reach the linked declaration. The scan must therefore find at least
+# as many acquisitions as there are declared table fields.
+ACQUISITION_FLOOR = 1300
 FIELD_DECLARATION = re.compile(
     r"pub\((?:crate|super)\)\s+(?P<field>[A-Za-z_][A-Za-z_0-9]*)\s*:\s*sys::(?P<alias>[A-Za-z_0-9]+)\s*,",
     re.S,
@@ -502,6 +512,13 @@ def main() -> int:
     # exactly rather than the manifest merely being a subset.
     findings.extend(unaudited_declarations(set(expected)))
     findings.extend(acquisition_pairings())
+    acquisitions = acquisition_count()
+    if acquisitions < ACQUISITION_FLOOR:
+        findings.append({
+            "code": "ACQUISITION_SCAN_TOO_SMALL",
+            "expected_at_least": ACQUISITION_FLOOR,
+            "actual": acquisitions,
+        })
 
     c_probe, rust_probe = abi_probes(Path(args.cna_root), manifest)
     for key in sorted(c_probe.keys() | rust_probe.keys()):
@@ -548,7 +565,12 @@ def main() -> int:
         "unauditedDeclarations": sum(x["code"] == "UNAUDITED_DECLARATION" for x in findings),
         "symbolAcquisitions": acquisition_count(),
         "symbolTypeMismatches": sum(
-            x["code"] in {"SYMBOL_TYPE_MISMATCH", "UNRESOLVED_ACQUISITION_TYPE"} for x in findings
+            x["code"] in {
+                "SYMBOL_TYPE_MISMATCH",
+                "UNRESOLVED_ACQUISITION_TYPE",
+                "ACQUISITION_SCAN_TOO_SMALL",
+            }
+            for x in findings
         ),
         "missingDeclarations": sum(x["code"] == "MISSING_DECLARATION" for x in findings),
         "arityMismatches": sum(x["code"] == "HEADER_ARITY_MISMATCH" for x in findings),

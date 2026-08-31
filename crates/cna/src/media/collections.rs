@@ -7,7 +7,7 @@ use crate::error::{CnaError, Result};
 use crate::native::Native;
 
 use super::runtime::MediaRuntime;
-use super::{native_function, Album, Artist, Genre, Picture, PictureAlbum, Playlist, ResourceCore, Song};
+use super::{Album, Artist, Genre, Picture, PictureAlbum, Playlist, ResourceCore, Song};
 
 type CountFn = unsafe extern "C" fn(sys::CNA_Handle, *mut i32) -> sys::CNA_Result;
 type ItemFn =
@@ -164,11 +164,11 @@ macro_rules! collection {
                 generation: u64,
                 handle: sys::CNA_Handle,
             ) -> Arc<Self> {
-                let count: $count_alias = unsafe { native_function(native.media.$count_field) };
-                let item: $item_alias = unsafe { native_function(native.media.$item_field) };
-                let is_disposed: $disposed_alias = unsafe { native_function(native.media.$disposed_field) };
-                let dispose: $dispose_alias = unsafe { native_function(native.media.$dispose_field) };
-                let destroy: $destroy_alias = unsafe { native_function(native.media.$destroy_field) };
+                let count: $count_alias = native.media.$count_field;
+                let item: $item_alias = native.media.$item_field;
+                let is_disposed: $disposed_alias = native.media.$disposed_field;
+                let dispose: $dispose_alias = native.media.$dispose_field;
+                let destroy: $destroy_alias = native.media.$destroy_field;
                 Arc::new(Self {
                     core: CollectionCore::new(
                         native, runtime, generation, handle, count, item, is_disposed, dispose, destroy,

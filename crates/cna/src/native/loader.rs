@@ -1,10 +1,93 @@
-//! Platform dynamic-library ownership and symbol resolution.
+//! Where the audited function tables come from.
+//!
+//! There is one route inventory and one safe layer above it, and two ways to
+//! fill the tables underneath: the platform's dynamic loader, or CNA's symbols
+//! resolved at link time. Which one a build uses is a Cargo feature; nothing
+//! above this module can tell the difference, and neither can the ABI gate,
+//! which checks both.
 
+#[cfg(feature = "dynamic-loading")]
 use core::ffi::{c_char, c_int, c_void};
+#[cfg(feature = "dynamic-loading")]
 use std::ffi::{CStr, CString};
+#[cfg(feature = "dynamic-loading")]
 use std::path::{Path, PathBuf};
 
 use crate::error::{CnaError, Result};
+
+/// Where one build's function pointers come from.
+///
+/// Dynamic mode owns a `Library` whose lifetime keeps every resolved pointer
+/// valid. Direct mode owns nothing: the symbols are part of the executable, so
+/// there is no handle to hold and nothing to unload. Representing that as a
+/// variant rather than as an `Option<Library>` keeps the difference stated
+/// instead of encoded in a null.
+#[derive(Debug)]
+pub(crate) enum NativeSource {
+    /// Resolved through the platform loader; the library must outlive the table.
+    #[cfg(all(feature = "dynamic-loading", any(unix, windows)))]
+    Dynamic(Library),
+    /// Resolved at link time. There is no library object, and inventing one
+    /// would be a lie about what can be unloaded.
+    #[cfg(feature = "direct-link")]
+    Linked,
+}
+
+/// Fills one table field from whichever source this build uses.
+///
+/// The name is an identifier, not a string, so that direct mode can reach the
+/// declaration of that exact route: `sys::linked::$name` carries the route's
+/// real parameter and return types, and assigning it to the field's `_fn`
+/// alias is a coercion the compiler checks. A signature that drifts from the
+/// canonical header therefore fails to compile rather than being transmuted
+/// into place. Dynamic mode resolves the same name as a string, and
+/// `tools/native-abi/verify.py` proves the field, the name and the alias agree
+/// in both modes.
+macro_rules! acquire {
+    ($source:expr, $name:ident, $ty:ty) => {{
+        #[cfg(feature = "direct-link")]
+        {
+            let _ = &$source;
+            let route: $ty = cna_sys::linked::$name;
+            route
+        }
+        #[cfg(not(feature = "direct-link"))]
+        {
+            // SAFETY: the requested type is this route's own canonical
+            // function-pointer alias, which the ABI gate re-checks against the
+            // header Clang parses.
+            unsafe { $source.symbol::<$ty>(stringify!($name))? }
+        }
+    }};
+}
+
+pub(crate) use acquire;
+
+impl NativeSource {
+    /// Resolves one symbol through the platform loader.
+    ///
+    /// Only dynamic mode has anything to resolve. Direct mode never calls
+    /// this: `acquire!` takes the linked declaration instead, so a build with
+    /// no dynamic loader does not need one to exist.
+    ///
+    /// # Safety
+    /// `T` must be the canonical function-pointer type declared for `name`.
+    #[cfg_attr(feature = "direct-link", allow(dead_code))]
+    pub(super) unsafe fn symbol<T: Copy>(&self, name: &'static str) -> Result<T> {
+        match self {
+            #[cfg(all(feature = "dynamic-loading", any(unix, windows)))]
+            // SAFETY: the caller's obligation is carried straight through.
+            Self::Dynamic(library) => unsafe { library.symbol::<T>(name) },
+            #[cfg(feature = "direct-link")]
+            Self::Linked => {
+                let _ = name;
+                Err(CnaError::UnsupportedRuntime(
+                    "a directly linked build resolves no symbols at run time",
+                ))
+            }
+        }
+    }
+}
 
 /// NUL-terminates a wide path for a Win32 `W` entry point.
 ///
@@ -23,10 +106,16 @@ fn terminated_wide(units: impl IntoIterator<Item = u16>) -> core::result::Result
     Ok(wide)
 }
 
-#[cfg(unix)]
+// The dynamic loader below is compiled only when a build can use it. A
+// directly linked build has no loader to call, and leaving the `dl*`
+// declarations compiled would make the crate import symbols it never uses --
+// which on a target with no dynamic loader at all is not merely untidy but
+// unlinkable.
+
+#[cfg(all(unix, feature = "dynamic-loading"))]
 const RTLD_NOW: c_int = 2;
 
-#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(all(unix, not(target_os = "macos"), feature = "dynamic-loading"))]
 #[link(name = "dl")]
 extern "C" {
     fn dlopen(filename: *const c_char, flags: c_int) -> *mut c_void;
@@ -35,7 +124,7 @@ extern "C" {
     fn dlerror() -> *const c_char;
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", feature = "dynamic-loading"))]
 extern "C" {
     fn dlopen(filename: *const c_char, flags: c_int) -> *mut c_void;
     fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
@@ -43,11 +132,11 @@ extern "C" {
     fn dlerror() -> *const c_char;
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "dynamic-loading"))]
 #[derive(Debug)]
 pub(super) struct Library(*mut c_void);
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "dynamic-loading"))]
 impl Drop for Library {
     fn drop(&mut self) {
         // SAFETY: `self.0` is a successful `dlopen` result and Arc ownership
@@ -56,12 +145,12 @@ impl Drop for Library {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "dynamic-loading"))]
 unsafe impl Send for Library {}
-#[cfg(unix)]
+#[cfg(all(unix, feature = "dynamic-loading"))]
 unsafe impl Sync for Library {}
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "dynamic-loading"))]
 impl Library {
     pub(super) fn open(path: &Path) -> core::result::Result<Self, String> {
         let text = path.as_os_str().to_string_lossy();
@@ -90,7 +179,7 @@ impl Library {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "dynamic-loading"))]
 fn loader_error() -> String {
     // SAFETY: `dlerror` returns either null or a library-owned NUL-terminated
     // string that remains valid until the next dynamic-loader call on this thread.
@@ -105,7 +194,7 @@ fn loader_error() -> String {
     }
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, feature = "dynamic-loading"))]
 mod windows {
     use core::ffi::c_void;
     use std::ffi::CString;
@@ -178,9 +267,10 @@ mod windows {
     }
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, feature = "dynamic-loading"))]
 pub(super) use windows::Library;
 
+#[cfg(feature = "dynamic-loading")]
 pub(super) fn library_candidates() -> Vec<PathBuf> {
     let filename = platform_library_name();
     if let Some(path) = std::env::var_os("CNA_NATIVE_LIBRARY") {
@@ -205,22 +295,25 @@ pub(super) fn library_candidates() -> Vec<PathBuf> {
     candidates
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", feature = "dynamic-loading"))]
 const fn platform_library_name() -> &'static str {
     "libcna_c_api.so"
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", feature = "dynamic-loading"))]
 const fn platform_library_name() -> &'static str {
     "libcna_c_api.dylib"
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(all(target_os = "windows", feature = "dynamic-loading"))]
 const fn platform_library_name() -> &'static str {
     "cna_c_api.dll"
 }
 
-#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+#[cfg(all(
+    feature = "dynamic-loading",
+    not(any(target_os = "linux", target_os = "macos", target_os = "windows"))
+))]
 const fn platform_library_name() -> &'static str {
     "cna_c_api"
 }

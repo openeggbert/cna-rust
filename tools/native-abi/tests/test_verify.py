@@ -223,11 +223,11 @@ class SymbolAcquisitionTests(unittest.TestCase):
 
     EXPLICIT = (
         'pub(crate) alpha: sys::cna_alpha_fn,\n'
-        'alpha: symbol!("cna_alpha", sys::cna_alpha_fn),\n'
+        'alpha: symbol!(cna_alpha, sys::cna_alpha_fn),\n'
     )
     INFERRED = (
         'pub(crate) beta: sys::cna_beta_fn,\n'
-        'beta: symbol!("cna_beta", _),\n'
+        'beta: symbol!(cna_beta, _),\n'
     )
 
     def test_the_checked_in_native_tables_pair_correctly(self):
@@ -245,7 +245,7 @@ class SymbolAcquisitionTests(unittest.TestCase):
     def test_a_field_paired_with_another_routes_signature_is_reported(self):
         findings = self.probe(
             'pub(crate) alpha: sys::cna_alpha_fn,\n'
-            'alpha: symbol!("cna_alpha", sys::cna_gamma_fn),\n'
+            'alpha: symbol!(cna_alpha, sys::cna_gamma_fn),\n'
         )
         self.assertEqual(
             findings,
@@ -262,10 +262,40 @@ class SymbolAcquisitionTests(unittest.TestCase):
     def test_an_inferred_type_over_a_wrong_field_declaration_is_reported(self):
         findings = self.probe(
             'pub(crate) beta: sys::cna_delta_fn,\n'
-            'beta: symbol!("cna_beta", _),\n'
+            'beta: symbol!(cna_beta, _),\n'
         )
         self.assertEqual([value["code"] for value in findings], ["SYMBOL_TYPE_MISMATCH"])
 
     def test_an_inferred_type_with_no_field_declaration_is_reported(self):
-        findings = self.probe('beta: symbol!("cna_beta", _),\n')
+        findings = self.probe('beta: symbol!(cna_beta, _),\n')
         self.assertEqual([value["code"] for value in findings], ["UNRESOLVED_ACQUISITION_TYPE"])
+
+    def test_the_scan_finds_every_table_field(self):
+        """A gate that stops matching reports zero mismatches, which looks like a pass.
+
+        That is not hypothetical: moving every call site from a string name to
+        an identifier, so direct-link mode could name the linked declaration,
+        silently took the acquisition count from 1,184 to 0 while the report
+        still said zero mismatches. The floor is what makes that failure loud.
+        """
+        self.assertGreaterEqual(VERIFY.acquisition_count(), VERIFY.ACQUISITION_FLOOR)
+
+    def test_a_call_syntax_the_scan_cannot_read_is_reported(self):
+        # The old string form is exactly what a future edit might reintroduce.
+        findings = self.probe(
+            'pub(crate) alpha: sys::cna_alpha_fn,\n'
+            'alpha: symbol!("cna_alpha", sys::cna_alpha_fn),\n'
+        )
+        self.assertEqual(findings, [], "an unreadable call form yields no findings at all")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "probe.rs"
+            path.write_text(
+                'pub(crate) alpha: sys::cna_alpha_fn,\n'
+                'alpha: symbol!("cna_alpha", sys::cna_alpha_fn),\n',
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                VERIFY.acquisition_count(Path(directory)),
+                0,
+                "which is why the count, not the finding list, is what the floor guards",
+            )

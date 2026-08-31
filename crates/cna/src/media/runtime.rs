@@ -103,15 +103,9 @@ impl MediaRuntime {
             return Ok(());
         }
         let context = Arc::as_ptr(self).cast_mut().cast::<c_void>();
-        let active_fn: sys::cna_media_player_subscribe_active_song_changed_ext_fn = unsafe {
-            super::native_function(native.media.media_player_subscribe_active_song_changed_ext)
-        };
-        let state_fn: sys::cna_media_player_subscribe_media_state_changed_ext_fn = unsafe {
-            super::native_function(native.media.media_player_subscribe_media_state_changed_ext)
-        };
-        let unsubscribe: sys::cna_media_player_unsubscribe_ext_fn = unsafe {
-            super::native_function(native.media.media_player_unsubscribe_ext)
-        };
+        let active_fn: sys::cna_media_player_subscribe_active_song_changed_ext_fn = native.media.media_player_subscribe_active_song_changed_ext;
+        let state_fn: sys::cna_media_player_subscribe_media_state_changed_ext_fn = native.media.media_player_subscribe_media_state_changed_ext;
+        let unsubscribe: sys::cna_media_player_unsubscribe_ext_fn = native.media.media_player_unsubscribe_ext;
         let mut active_song = 0;
         // SAFETY: the process runtime address is stable in a process-lifetime Arc and the
         // callback catches panics before returning through C.
@@ -230,9 +224,7 @@ impl MediaRuntime {
         let Some(binding) = binding else {
             return;
         };
-        let program_exit: sys::cna_media_player_program_exit_ext_fn = unsafe {
-            super::native_function(binding.native.media.media_player_program_exit_ext)
-        };
+        let program_exit: sys::cna_media_player_program_exit_ext_fn = binding.native.media.media_player_program_exit_ext;
         // SAFETY: the game is still live while GameState performs media cleanup.
         let _ = binding.native.check(unsafe { program_exit(binding.game) });
         let resources = self
@@ -363,9 +355,7 @@ impl MediaRuntime {
 impl Drop for MediaRuntime {
     fn drop(&mut self) {
         if let Some(registrations) = self.registrations.get() {
-            let unsubscribe: sys::cna_media_player_unsubscribe_ext_fn = unsafe {
-                super::native_function(registrations.native.media.media_player_unsubscribe_ext)
-            };
+            let unsubscribe: sys::cna_media_player_unsubscribe_ext_fn = registrations.native.media.media_player_unsubscribe_ext;
             // SAFETY: both handles are owned by this runtime.
             let _ = registrations.native.check(unsafe { unsubscribe(registrations.active_song) });
             let _ = registrations.native.check(unsafe { unsubscribe(registrations.media_state) });
