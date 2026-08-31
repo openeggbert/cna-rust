@@ -16,6 +16,7 @@ pub mod input;
 pub mod input_devices;
 pub mod logging;
 pub mod media;
+pub mod models;
 pub mod net;
 pub mod pbr;
 pub mod runtime;

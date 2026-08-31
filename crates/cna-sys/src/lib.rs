@@ -816,6 +816,56 @@ pub type CNA_ShaderEffectFactoryHandle = CNA_Handle;
 pub type CNA_AreaLightBrdfTableHandle = CNA_Handle;
 pub type CNA_GpuInstanceCullerHandle = CNA_Handle;
 pub type CNA_InstancedRendererEXTHandle = CNA_Handle;
+pub type CNA_SkinnedModelEXTHandle = CNA_Handle;
+pub type CNA_ClipTargetSpaceEXT = u32;
+
+pub const CNA_CLIP_TARGET_SPACE_JOINT_PALETTE_EXT: CNA_ClipTargetSpaceEXT = 0;
+pub const CNA_CLIP_TARGET_SPACE_SCENE_NODE_EXT: CNA_ClipTargetSpaceEXT = 1;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_KeyframeEXT {
+    pub time_seconds: f64,
+    pub translation: CNA_Vector3,
+    pub rotation: CNA_Quaternion,
+    pub scale: CNA_Vector3,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_BoneTrackEXTDescriptor {
+    pub bone_index: i32,
+    pub reserved: u32,
+    pub keyframes: *const CNA_KeyframeEXT,
+    pub keyframe_count: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_AnimationClipEXTDescriptor {
+    pub duration_seconds: f64,
+    pub tracks: *const CNA_BoneTrackEXTDescriptor,
+    pub track_count: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_NamedAnimationClipEXTDescriptor {
+    pub name: CNA_StringView,
+    pub clip: CNA_AnimationClipEXTDescriptor,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_SkinnedModelEXTDescriptor {
+    pub bone_count: i32,
+    pub reserved: u32,
+    pub parent_bone_indices: *const i32,
+    pub bind_pose_local: *const CNA_Matrix,
+    pub inverse_bind_pose_global: *const CNA_Matrix,
+    pub clips: *const CNA_NamedAnimationClipEXTDescriptor,
+    pub clip_count: u64,
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -10599,4 +10649,82 @@ pub type cna_model_mesh_part_get_vertex_offset_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_model_mesh_part_set_primitive_type_ext_fn = unsafe extern "C" fn(
     CNA_ModelMeshPartHandle, CNA_PrimitiveType,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_add_part_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, CNA_StringView, CNA_VertexBufferHandle, CNA_IndexBufferHandle, CNA_ModelMeshPartHandle, CNA_Handle,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_attach_parts_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, CNA_SkinnedModelEXTHandle,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_compute_bone_transforms_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, CNA_StringView, f64, CNA_Bool, *mut CNA_Matrix, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_copy_bind_pose_local_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, *mut CNA_Matrix, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_copy_clip_name_at_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_copy_clip_track_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, CNA_StringView, u64, *mut i32, *mut CNA_KeyframeEXT, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_copy_inverse_bind_pose_global_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, *mut CNA_Matrix, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_copy_parent_bone_indices_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, *mut i32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_copy_part_name_at_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_create_fn = unsafe extern "C" fn(
+    *const CNA_SkinnedModelEXTDescriptor, *mut CNA_SkinnedModelEXTHandle,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_create_default_fn = unsafe extern "C" fn(
+    *mut CNA_SkinnedModelEXTHandle,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_create_move_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, *mut CNA_SkinnedModelEXTHandle,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_destroy_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_get_bone_count_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_get_clip_count_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_get_clip_info_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, CNA_StringView, *mut CNA_Bool, *mut f64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_get_clip_name_byte_count_at_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_get_owned_resource_counts_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, *mut u64, *mut u64, *mut u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_get_part_at_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, u64, *mut CNA_ModelMeshPartHandle, *mut CNA_Bool, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_get_part_count_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_get_part_name_byte_count_at_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_move_assign_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, CNA_SkinnedModelEXTHandle,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_remove_clip_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, CNA_StringView,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_remove_part_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, CNA_StringView,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_set_clip_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, CNA_StringView, *const CNA_AnimationClipEXTDescriptor,
+) -> CNA_Result;
+pub type cna_skinned_model_ext_set_skeleton_fn = unsafe extern "C" fn(
+    CNA_SkinnedModelEXTHandle, i32, *const i32, *const CNA_Matrix, *const CNA_Matrix,
 ) -> CNA_Result;

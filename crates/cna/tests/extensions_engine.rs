@@ -11,6 +11,7 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
+use cna::extensions::models::{AnimationClip, BoneTrack, Keyframe, SkinnedModel};
 use cna::extensions::pbr::{
     GltfMaterialBridge, GltfMaterialExtensionSource, GltfMaterialExtensionTextures,
     GltfMaterialSource, PbrMaterialExtensions, PbrMaterialFull, SkinnedPbrEffect,
@@ -54,7 +55,7 @@ use cna::Microsoft::Xna::Framework::Graphics::{
 };
 use cna::Microsoft::Xna::Framework::{
     BoundingBox, BoundingFrustum, BoundingSphere, Color, Game, GameContext, GameTime, Matrix,
-    Vector2, Vector3,
+    Quaternion, Vector2, Vector3,
 };
 use cna::{run_for_frames, CnaError, ErrorCategory, GameState, GameStateAccess, Result};
 
@@ -9562,4 +9563,379 @@ fn a_rust_loader_runs_on_the_device_the_renderer_actually_made() {
              containing a panic rather than letting it unwind into C"
         );
     }
+}
+
+/// What the skinned-model run measured.
+#[derive(Default)]
+struct SkinnedFindings {
+    empty: (u64, u64, u64),
+    skeleton: (u64, Vec<i32>, bool, bool),
+    clips: Vec<(String, Option<(f64, u64)>)>,
+    track: Option<(i32, usize, f64, (f32, f32, f32))>,
+    poses: Vec<(&'static str, f64, (f32, f32, f32))>,
+    looped: Vec<(&'static str, (f32, f32, f32))>,
+    missing_clip: bool,
+    removed_clip: (u64, bool),
+    parts: Vec<(&'static str, u64, String, bool)>,
+    owned: Option<(u64, u64, u64, u64)>,
+    attached: (u64, u64),
+    moved: Vec<(&'static str, u64, u64)>,
+    returned_on_refusal: Option<(String, bool)>,
+}
+
+struct SkinnedGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<SkinnedFindings>>,
+}
+
+impl GameStateAccess for SkinnedGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+/// A two-bone skeleton: a root and a child hanging off it.
+fn two_bone_skeleton() -> (Vec<i32>, Vec<Matrix>, Vec<Matrix>) {
+    (
+        vec![-1, 0],
+        vec![
+            Matrix::Identity,
+            Matrix::CreateTranslation(Vector3::from_x_and_y_and_z(0.0, 1.0, 0.0)),
+        ],
+        vec![
+            Matrix::Identity,
+            Matrix::CreateTranslation(Vector3::from_x_and_y_and_z(0.0, -1.0, 0.0)),
+        ],
+    )
+}
+
+/// A clip that slides bone one from the origin to x = 4 over two seconds.
+fn slide_clip() -> AnimationClip {
+    let frame = |time: f64, x: f32| Keyframe {
+        time_seconds: time,
+        translation: Vector3::from_x_and_y_and_z(x, 0.0, 0.0),
+        rotation: Quaternion {
+            X: 0.0,
+            Y: 0.0,
+            Z: 0.0,
+            W: 1.0,
+        },
+        scale: Vector3::from_x_and_y_and_z(1.0, 1.0, 1.0),
+    };
+    AnimationClip {
+        duration_seconds: 2.0,
+        tracks: vec![BoneTrack {
+            bone_index: 1,
+            keyframes: vec![frame(0.0, 0.0), frame(2.0, 4.0)],
+        }],
+    }
+}
+
+impl Game for SkinnedGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let device = game.GraphicsDevice()?;
+        let mut findings = SkinnedFindings::default();
+
+        let empty = SkinnedModel::new()?;
+        findings.empty = (empty.bone_count()?, empty.clip_count()?, empty.part_count()?);
+
+        let (parents, bind, inverse) = two_bone_skeleton();
+        let model = SkinnedModel::with_skeleton(
+            &parents,
+            &bind,
+            &inverse,
+            &[("slide".to_owned(), slide_clip())],
+        )?;
+        let read_bind = model.bind_pose_local()?;
+        let read_inverse = model.inverse_bind_pose_global()?;
+        findings.skeleton = (
+            model.bone_count()?,
+            model.parent_bone_indices()?,
+            read_bind == bind,
+            read_inverse == inverse,
+        );
+
+        findings.clips.push((
+            model.clip_name_at(0)?,
+            model
+                .clip_info("slide")?
+                .map(|info| (info.duration_seconds, info.track_count)),
+        ));
+        findings.missing_clip = model.clip_info("nothing-of-that-name")?.is_none();
+
+        let track = model.clip_track("slide", 0)?;
+        findings.track = Some((
+            track.bone_index,
+            track.keyframes.len(),
+            track.keyframes[1].time_seconds,
+            triple(track.keyframes[1].translation),
+        ));
+
+        // The pose at three positions along the clip. The child bone slides
+        // from zero to four over two seconds, so the middle is two.
+        for (name, position) in [("start", 0.0_f64), ("middle", 1.0), ("end", 2.0)] {
+            let pose = model.compute_bone_transforms("slide", position, false)?;
+            findings.poses.push((
+                name,
+                position,
+                (pose[1].M41, pose[1].M42, pose[1].M43),
+            ));
+        }
+        // Past the end, clamping and looping disagree: clamped stays at the
+        // last pose, looped wraps back towards the first.
+        for (name, loop_clip) in [("clamped past the end", false), ("looped past the end", true)] {
+            let pose = model.compute_bone_transforms("slide", 3.0, loop_clip)?;
+            findings
+                .looped
+                .push((name, (pose[1].M41, pose[1].M42, pose[1].M43)));
+        }
+
+        model.remove_clip("slide")?;
+        findings.removed_clip = (model.clip_count()?, model.clip_info("slide")?.is_none());
+        model.set_clip("slide", &slide_clip())?;
+
+        // A renderable part, which the model retains for itself.
+        let declaration = VertexPositionColor::VertexDeclaration();
+        let vertices = VertexBuffer::new(&device, declaration, 3, BufferUsage::None)?;
+        let indices =
+            IndexBuffer::new(&device, IndexElementSize::SixteenBits, 3, BufferUsage::None)?;
+        let part = NativeMeshPart::new(None, None, 3, 1, 0, 0)?;
+        let texture = Texture2D::new(&device, 4, 4)?;
+        findings
+            .parts
+            .push(("before", model.part_count()?, String::new(), false));
+        model
+            .add_part("body", &vertices, &indices, part, Some(texture))
+            .map_err(|refused| refused.error)?;
+        findings.parts.push((
+            "with a textured part",
+            model.part_count()?,
+            model.part_name_at(0)?,
+            model.part_has_texture_at(0)?,
+        ));
+        let counts = model.owned_resource_counts()?;
+        findings.owned = Some((
+            counts.vertex_buffers,
+            counts.index_buffers,
+            counts.parts,
+            counts.textures,
+        ));
+
+        // A second model of the same skeleton hands its parts over.
+        // Its own part, not this model's: CNA refuses a `ModelMeshPart` that
+        // already belongs to a live model, which is the rule that stops two
+        // models sharing one part's lifetime.
+        let other = SkinnedModel::with_skeleton(&parents, &bind, &inverse, &[])?;
+        // A refused `add_part` hands the part and its texture back, unconsumed.
+        // A released model is the refusal that needs no invalid state anywhere
+        // else: the part never reaches CNA, so if the caller does not get it
+        // back it has simply been dropped.
+        let closed = SkinnedModel::new()?;
+        closed.release()?;
+        let offered = NativeMeshPart::new(None, None, 3, 1, 0, 0)?;
+        let offered_texture = Texture2D::new(&device, 2, 2)?;
+        findings.returned_on_refusal =
+            match closed.add_part("nowhere", &vertices, &indices, offered, Some(offered_texture)) {
+                Ok(()) => None,
+                Err(refused) => Some((
+                    refused.error.to_string(),
+                    // Both came back, and both are still usable -- which a
+                    // consumed value would not be.
+                    refused.part.primitive_count().is_ok()
+                        && refused.texture.is_some_and(|texture| texture.Width() == 2),
+                )),
+            };
+        let other_part = NativeMeshPart::new(None, None, 3, 1, 0, 0)?;
+        other
+            .add_part("arm", &vertices, &indices, other_part, None)
+            .map_err(|refused| refused.error)?;
+        model.attach_parts(&other)?;
+        findings.attached = (model.part_count()?, other.part_count()?);
+
+        // Move construction leaves the source valid but empty.
+        findings
+            .moved
+            .push(("before the move", model.bone_count()?, model.part_count()?));
+        let moved = model.move_out()?;
+        findings
+            .moved
+            .push(("the source after it", model.bone_count()?, model.part_count()?));
+        findings
+            .moved
+            .push(("the destination", moved.bone_count()?, moved.part_count()?));
+        // And move-assignment does the same into an existing model.
+        model.move_assign_from(&moved)?;
+        findings
+            .moved
+            .push(("assigned back", model.bone_count()?, model.part_count()?));
+        findings
+            .moved
+            .push(("its source now", moved.bone_count()?, moved.part_count()?));
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn a_skinned_model_evaluates_the_pose_the_skinned_effect_needs() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(SkinnedFindings::default()));
+    let game = SkinnedGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with a skinned model");
+
+    let findings = findings.lock().expect("findings");
+    assert_eq!(
+        findings.empty,
+        (0, 0, 0),
+        "a default model has no bones, no clips and no parts"
+    );
+
+    let (bones, parents, bind_kept, inverse_kept) = findings.skeleton.clone();
+    assert_eq!(bones, 2, "the skeleton has the bones it was given");
+    assert_eq!(parents, vec![-1, 0], "with the parent indices it was given");
+    assert!(bind_kept, "and the local bind pose comes back unchanged");
+    assert!(
+        inverse_kept,
+        "and the inverse global bind pose, which is a different array"
+    );
+
+    println!("clips: {:?}", findings.clips);
+    let (name, info) = findings.clips[0].clone();
+    assert_eq!(name, "slide", "the clip is stored under the name it was given");
+    let (duration, tracks) = info.expect("the clip is found by name");
+    assert!(
+        (duration - 2.0).abs() < 1e-9,
+        "with its duration: {duration}"
+    );
+    assert_eq!(tracks, 1, "and its track count");
+    assert!(
+        findings.missing_clip,
+        "and a name no clip has answers None rather than failing"
+    );
+
+    let (bone, frames, last_time, last_translation) = findings.track.expect("a track");
+    assert_eq!(bone, 1, "the track drives the bone it names");
+    assert_eq!(frames, 2, "and carries both keyframes");
+    assert!((last_time - 2.0).abs() < 1e-9, "at the times they were given");
+    assert_eq!(
+        last_translation,
+        (4.0, 0.0, 0.0),
+        "and the translations they were given"
+    );
+
+    // The pose really is evaluated: the child bone slides from zero to four
+    // over two seconds, so the middle is two. A model that returned the bind
+    // pose, or the same matrix at every position, fails here.
+    println!("poses: {:?}", findings.poses);
+    let x = |name: &str| -> f32 {
+        findings
+            .poses
+            .iter()
+            .find(|(label, _, _)| *label == name)
+            .expect("a recorded pose")
+            .2
+             .0
+    };
+    assert!(
+        (x("start") - 0.0).abs() < 1e-4,
+        "at the start the bone is where the first keyframe puts it: {}",
+        x("start")
+    );
+    assert!(
+        (x("middle") - 2.0).abs() < 1e-3,
+        "halfway through it is halfway between them: {}",
+        x("middle")
+    );
+    assert!(
+        (x("end") - 4.0).abs() < 1e-4,
+        "and at the end it is where the last one puts it: {}",
+        x("end")
+    );
+
+    println!("past the end: {:?}", findings.looped);
+    let clamped = findings.looped[0].1;
+    let looped = findings.looped[1].1;
+    assert!(
+        (clamped.0 - 4.0).abs() < 1e-4,
+        "clamping past the end holds the last pose: {clamped:?}"
+    );
+    assert!(
+        looped != clamped,
+        "and looping wraps instead, which is the whole difference: {looped:?}"
+    );
+
+    assert_eq!(
+        findings.removed_clip,
+        (0, true),
+        "removing a clip removes it, and it is no longer found by name"
+    );
+
+    println!("parts: {:?}", findings.parts);
+    assert_eq!(findings.parts[0].1, 0, "a model starts with no parts");
+    assert_eq!(findings.parts[1].1, 1, "adding one adds one");
+    assert_eq!(
+        findings.parts[1].2, "body",
+        "stored under the name it was given"
+    );
+    assert!(findings.parts[1].3, "and it carries the texture it was given");
+
+    // The model retains what it was given: one of each, and the texture too.
+    assert_eq!(
+        findings.owned,
+        Some((1, 1, 1, 1)),
+        "the model owns one vertex buffer, one index buffer, one part and one texture"
+    );
+
+    // A mesh part belongs to one live model, and a refusal hands it back.
+    println!("returned on refusal: {:?}", findings.returned_on_refusal);
+    let (message, usable) = findings
+        .returned_on_refusal
+        .clone()
+        .expect("adding a part to a released model is refused");
+    assert!(
+        message.contains("released"),
+        "and refused for the model being released: {message}"
+    );
+    assert!(
+        usable,
+        "and the part and its texture both come back usable rather than consumed"
+    );
+    assert_eq!(
+        findings.attached,
+        (2, 0),
+        "attaching moves the other model's parts across and leaves it with none"
+    );
+
+    // A move leaves the source valid but empty -- not invalid, which is the
+    // distinction that makes this a content transfer rather than a handle one.
+    println!("moves: {:?}", findings.moved);
+    assert_eq!(findings.moved[0], ("before the move", 2, 2));
+    assert_eq!(
+        findings.moved[1],
+        ("the source after it", 0, 0),
+        "the source is left valid but empty"
+    );
+    assert_eq!(
+        findings.moved[2],
+        ("the destination", 2, 2),
+        "and the destination has everything"
+    );
+    assert_eq!(
+        findings.moved[3],
+        ("assigned back", 2, 2),
+        "move-assignment does the same into an existing model"
+    );
+    assert_eq!(
+        findings.moved[4],
+        ("its source now", 0, 0),
+        "and empties its source too"
+    );
 }

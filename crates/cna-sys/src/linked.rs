@@ -3509,6 +3509,147 @@ extern "C" {
         argument0: CNA_PbrMaterialExtensionsHandle,
         argument1: CNA_Handle,
     ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_add_part(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: CNA_StringView,
+        argument2: CNA_VertexBufferHandle,
+        argument3: CNA_IndexBufferHandle,
+        argument4: CNA_ModelMeshPartHandle,
+        argument5: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_attach_parts(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: CNA_SkinnedModelEXTHandle,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_compute_bone_transforms(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: CNA_StringView,
+        argument2: f64,
+        argument3: CNA_Bool,
+        argument4: *mut CNA_Matrix,
+        argument5: u64,
+        argument6: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_copy_bind_pose_local(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: *mut CNA_Matrix,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_copy_clip_name_at(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_copy_clip_track(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: CNA_StringView,
+        argument2: u64,
+        argument3: *mut i32,
+        argument4: *mut CNA_KeyframeEXT,
+        argument5: u64,
+        argument6: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_copy_inverse_bind_pose_global(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: *mut CNA_Matrix,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_copy_parent_bone_indices(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: *mut i32,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_copy_part_name_at(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_create(
+        argument0: *const CNA_SkinnedModelEXTDescriptor,
+        argument1: *mut CNA_SkinnedModelEXTHandle,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_create_default(
+        argument0: *mut CNA_SkinnedModelEXTHandle,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_create_move(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: *mut CNA_SkinnedModelEXTHandle,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_destroy(argument0: CNA_SkinnedModelEXTHandle) -> CNA_Result;
+    pub fn cna_skinned_model_ext_get_bone_count(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_get_clip_count(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_get_clip_info(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_Bool,
+        argument3: *mut f64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_get_clip_name_byte_count_at(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_get_owned_resource_counts(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: *mut u64,
+        argument2: *mut u64,
+        argument3: *mut u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_get_part_at(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: u64,
+        argument2: *mut CNA_ModelMeshPartHandle,
+        argument3: *mut CNA_Bool,
+        argument4: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_get_part_count(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_get_part_name_byte_count_at(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_move_assign(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: CNA_SkinnedModelEXTHandle,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_remove_clip(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_remove_part(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_set_clip(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: CNA_StringView,
+        argument2: *const CNA_AnimationClipEXTDescriptor,
+    ) -> CNA_Result;
+    pub fn cna_skinned_model_ext_set_skeleton(
+        argument0: CNA_SkinnedModelEXTHandle,
+        argument1: i32,
+        argument2: *const i32,
+        argument3: *const CNA_Matrix,
+        argument4: *const CNA_Matrix,
+    ) -> CNA_Result;
     pub fn cna_skinned_pbr_effect_apply_material(
         argument0: CNA_EffectHandle,
         argument1: *const CNA_PbrMaterialEXT,

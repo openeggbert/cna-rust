@@ -13656,6 +13656,10 @@ impl NativeMeshPart {
     pub fn release(&self) -> Result<()> {
         self.core.release()
     }
+
+    pub(crate) fn native_handle(&self) -> Result<sys::CNA_ModelMeshPartHandle> {
+        self.core.get()
+    }
 }
 
 impl Drop for NativeMeshPart {
