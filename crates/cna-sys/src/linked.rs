@@ -8563,6 +8563,201 @@ extern "C" {
         argument1: f32,
         argument2: *mut i32,
     ) -> CNA_Result;
+    pub fn cna_clustered_light_assignment_adopt(
+        argument0: CNA_ClusteredLightAssignmentHandle,
+        argument1: i32,
+        argument2: *const i32,
+        argument3: u64,
+        argument4: *const i32,
+        argument5: u64,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_assignment_assign(
+        argument0: CNA_ClusteredLightAssignmentHandle,
+        argument1: CNA_ClusteredLightGridHandle,
+        argument2: *const CNA_Matrix,
+        argument3: *const CNA_BoundingSphere,
+        argument4: u64,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_assignment_clear(
+        argument0: CNA_ClusteredLightAssignmentHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_assignment_copy_indices(
+        argument0: CNA_ClusteredLightAssignmentHandle,
+        argument1: *mut i32,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_assignment_copy_lights_in_cluster(
+        argument0: CNA_ClusteredLightAssignmentHandle,
+        argument1: i32,
+        argument2: *mut i32,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_assignment_copy_offsets(
+        argument0: CNA_ClusteredLightAssignmentHandle,
+        argument1: *mut i32,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_assignment_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_ClusteredLightAssignmentHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_assignment_destroy(
+        argument0: CNA_ClusteredLightAssignmentHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_assignment_get_cluster_count(
+        argument0: CNA_ClusteredLightAssignmentHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_assignment_get_light_count(
+        argument0: CNA_ClusteredLightAssignmentHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_assignment_get_max_lights_per_cluster(
+        argument0: CNA_ClusteredLightAssignmentHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_assignment_get_total_reference_count(
+        argument0: CNA_ClusteredLightAssignmentHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_ext_init(argument0: *mut CNA_ClusteredLightEXT) -> CNA_Result;
+    pub fn cna_clustered_light_grid_cluster_bounds(
+        argument0: CNA_ClusteredLightGridHandle,
+        argument1: i32,
+        argument2: i32,
+        argument3: i32,
+        argument4: *mut CNA_BoundingBox,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_grid_cluster_index(
+        argument0: CNA_ClusteredLightGridHandle,
+        argument1: i32,
+        argument2: i32,
+        argument3: i32,
+        argument4: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_grid_create(
+        argument0: CNA_Handle,
+        argument1: i32,
+        argument2: i32,
+        argument3: i32,
+        argument4: *mut CNA_ClusteredLightGridHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_grid_destroy(argument0: CNA_ClusteredLightGridHandle) -> CNA_Result;
+    pub fn cna_clustered_light_grid_get_cluster_count(
+        argument0: CNA_ClusteredLightGridHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_grid_get_far_plane(
+        argument0: CNA_ClusteredLightGridHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_grid_get_inverse_projection(
+        argument0: CNA_ClusteredLightGridHandle,
+        argument1: *mut CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_grid_get_near_plane(
+        argument0: CNA_ClusteredLightGridHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_grid_get_slice_count(
+        argument0: CNA_ClusteredLightGridHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_grid_get_tiles_x(
+        argument0: CNA_ClusteredLightGridHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_grid_get_tiles_y(
+        argument0: CNA_ClusteredLightGridHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_grid_has_projection(
+        argument0: CNA_ClusteredLightGridHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_grid_set_projection(
+        argument0: CNA_ClusteredLightGridHandle,
+        argument1: *const CNA_Matrix,
+        argument2: f32,
+        argument3: f32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_grid_slice_distance(
+        argument0: CNA_ClusteredLightGridHandle,
+        argument1: i32,
+        argument2: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_grid_slice_for_view_distance(
+        argument0: CNA_ClusteredLightGridHandle,
+        argument1: f32,
+        argument2: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_set_add(
+        argument0: CNA_ClusteredLightSetHandle,
+        argument1: *const CNA_ClusteredLightEXT,
+        argument2: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_set_add_point(
+        argument0: CNA_ClusteredLightSetHandle,
+        argument1: *const CNA_PointLightEXT,
+        argument2: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_set_add_spot(
+        argument0: CNA_ClusteredLightSetHandle,
+        argument1: *const CNA_SpotLightEXT,
+        argument2: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_set_clear(argument0: CNA_ClusteredLightSetHandle) -> CNA_Result;
+    pub fn cna_clustered_light_set_copy_bounds(
+        argument0: CNA_ClusteredLightSetHandle,
+        argument1: *mut CNA_BoundingSphere,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_set_copy_lights(
+        argument0: CNA_ClusteredLightSetHandle,
+        argument1: *mut CNA_ClusteredLightEXT,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_set_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_ClusteredLightSetHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_set_destroy(argument0: CNA_ClusteredLightSetHandle) -> CNA_Result;
+    pub fn cna_clustered_light_set_get_at(
+        argument0: CNA_ClusteredLightSetHandle,
+        argument1: i32,
+        argument2: *mut CNA_ClusteredLightEXT,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_set_get_bounds_at(
+        argument0: CNA_ClusteredLightSetHandle,
+        argument1: i32,
+        argument2: *mut CNA_BoundingSphere,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_set_get_count(
+        argument0: CNA_ClusteredLightSetHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_set_is_empty(
+        argument0: CNA_ClusteredLightSetHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_set_is_usable(
+        argument0: *const CNA_ClusteredLightEXT,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_set_remove_at(
+        argument0: CNA_ClusteredLightSetHandle,
+        argument1: i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_set_replace_at(
+        argument0: CNA_ClusteredLightSetHandle,
+        argument1: i32,
+        argument2: *const CNA_ClusteredLightEXT,
+    ) -> CNA_Result;
     pub fn cna_lod_group_ext_set_hysteresis(
         argument0: CNA_LodGroupEXTHandle,
         argument1: f32,

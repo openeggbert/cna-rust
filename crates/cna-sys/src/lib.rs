@@ -785,6 +785,38 @@ pub type CNA_LodSelectionMode = u32;
 
 pub const CNA_LOD_SELECTION_MODE_DISTANCE: CNA_LodSelectionMode = 0;
 pub const CNA_LOD_SELECTION_MODE_SCREEN_SPACE_ERROR: CNA_LodSelectionMode = 1;
+pub type CNA_ClusteredLightSetHandle = CNA_Handle;
+pub type CNA_ClusteredLightGridHandle = CNA_Handle;
+pub type CNA_ClusteredLightAssignmentHandle = CNA_Handle;
+pub type CNA_ClusteredLightType = u32;
+
+pub const CNA_CLUSTERED_LIGHT_TYPE_POINT: CNA_ClusteredLightType = 0;
+pub const CNA_CLUSTERED_LIGHT_TYPE_SPOT: CNA_ClusteredLightType = 1;
+
+pub const CNA_CLUSTERED_LIGHT_SET_MAX_EXT: i32 = 256;
+pub const CNA_CLUSTER_GRID_MAX_TILES_PER_AXIS_EXT: i32 = 128;
+pub const CNA_CLUSTER_GRID_MAX_SLICE_COUNT_EXT: i32 = 256;
+pub const CNA_CLUSTER_GRID_DEFAULT_TILES_X_EXT: i32 = 16;
+pub const CNA_CLUSTER_GRID_DEFAULT_TILES_Y_EXT: i32 = 8;
+pub const CNA_CLUSTER_GRID_DEFAULT_SLICE_COUNT_EXT: i32 = 24;
+pub const CNA_CLUSTERED_ASSIGNMENT_MAX_LIGHTS_EXT: i32 = 1024;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_ClusteredLightEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub r#type: CNA_ClusteredLightType,
+    pub casts_shadows: CNA_Bool,
+    pub reserved: [u8; 3],
+    pub position: CNA_Vector3,
+    pub direction: CNA_Vector3,
+    pub color: CNA_Vector3,
+    pub intensity: f32,
+    pub range: f32,
+    pub inner_angle: f32,
+    pub outer_angle: f32,
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -9557,4 +9589,133 @@ pub type cna_lod_group_ext_set_screen_space_parameters_fn = unsafe extern "C" fn
 ) -> CNA_Result;
 pub type cna_lod_group_ext_set_selection_mode_fn = unsafe extern "C" fn(
     CNA_LodGroupEXTHandle, CNA_LodSelectionMode,
+) -> CNA_Result;
+pub type cna_clustered_light_assignment_adopt_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightAssignmentHandle, i32, *const i32, u64, *const i32, u64,
+) -> CNA_Result;
+pub type cna_clustered_light_assignment_assign_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightAssignmentHandle, CNA_ClusteredLightGridHandle, *const CNA_Matrix, *const CNA_BoundingSphere, u64,
+) -> CNA_Result;
+pub type cna_clustered_light_assignment_clear_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightAssignmentHandle,
+) -> CNA_Result;
+pub type cna_clustered_light_assignment_copy_indices_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightAssignmentHandle, *mut i32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_clustered_light_assignment_copy_lights_in_cluster_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightAssignmentHandle, i32, *mut i32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_clustered_light_assignment_copy_offsets_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightAssignmentHandle, *mut i32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_clustered_light_assignment_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_ClusteredLightAssignmentHandle,
+) -> CNA_Result;
+pub type cna_clustered_light_assignment_destroy_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightAssignmentHandle,
+) -> CNA_Result;
+pub type cna_clustered_light_assignment_get_cluster_count_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightAssignmentHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_light_assignment_get_light_count_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightAssignmentHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_light_assignment_get_max_lights_per_cluster_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightAssignmentHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_light_assignment_get_total_reference_count_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightAssignmentHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_light_ext_init_fn = unsafe extern "C" fn(
+    *mut CNA_ClusteredLightEXT,
+) -> CNA_Result;
+pub type cna_clustered_light_grid_cluster_bounds_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightGridHandle, i32, i32, i32, *mut CNA_BoundingBox,
+) -> CNA_Result;
+pub type cna_clustered_light_grid_cluster_index_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightGridHandle, i32, i32, i32, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_light_grid_create_fn = unsafe extern "C" fn(
+    CNA_Handle, i32, i32, i32, *mut CNA_ClusteredLightGridHandle,
+) -> CNA_Result;
+pub type cna_clustered_light_grid_destroy_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightGridHandle,
+) -> CNA_Result;
+pub type cna_clustered_light_grid_get_cluster_count_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightGridHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_light_grid_get_far_plane_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightGridHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_clustered_light_grid_get_inverse_projection_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightGridHandle, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_clustered_light_grid_get_near_plane_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightGridHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_clustered_light_grid_get_slice_count_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightGridHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_light_grid_get_tiles_x_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightGridHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_light_grid_get_tiles_y_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightGridHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_light_grid_has_projection_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightGridHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_clustered_light_grid_set_projection_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightGridHandle, *const CNA_Matrix, f32, f32,
+) -> CNA_Result;
+pub type cna_clustered_light_grid_slice_distance_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightGridHandle, i32, *mut f32,
+) -> CNA_Result;
+pub type cna_clustered_light_grid_slice_for_view_distance_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightGridHandle, f32, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_light_set_add_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightSetHandle, *const CNA_ClusteredLightEXT, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_light_set_add_point_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightSetHandle, *const CNA_PointLightEXT, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_light_set_add_spot_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightSetHandle, *const CNA_SpotLightEXT, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_light_set_clear_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightSetHandle,
+) -> CNA_Result;
+pub type cna_clustered_light_set_copy_bounds_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightSetHandle, *mut CNA_BoundingSphere, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_clustered_light_set_copy_lights_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightSetHandle, *mut CNA_ClusteredLightEXT, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_clustered_light_set_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_ClusteredLightSetHandle,
+) -> CNA_Result;
+pub type cna_clustered_light_set_destroy_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightSetHandle,
+) -> CNA_Result;
+pub type cna_clustered_light_set_get_at_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightSetHandle, i32, *mut CNA_ClusteredLightEXT,
+) -> CNA_Result;
+pub type cna_clustered_light_set_get_bounds_at_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightSetHandle, i32, *mut CNA_BoundingSphere,
+) -> CNA_Result;
+pub type cna_clustered_light_set_get_count_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightSetHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_light_set_is_empty_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightSetHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_clustered_light_set_is_usable_fn = unsafe extern "C" fn(
+    *const CNA_ClusteredLightEXT, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_clustered_light_set_remove_at_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightSetHandle, i32,
+) -> CNA_Result;
+pub type cna_clustered_light_set_replace_at_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightSetHandle, i32, *const CNA_ClusteredLightEXT,
 ) -> CNA_Result;

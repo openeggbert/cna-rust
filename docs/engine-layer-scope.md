@@ -138,6 +138,7 @@ the criterion above is unchanged, only its precondition has been met.
 | the depth/normal prepass and both transparency paths | `depth_normal_prepass`, `weighted_blended_transparency`, `transparent_draw_list` | 49 | `VERIFIED_STATE` |
 | HDR display output, auto exposure and `.cube` lookup tables | `hdr_display_output`, `auto_exposure_ext`, `cube_lut` | 39 | `VERIFIED_STATE` |
 | debug drawing, frustum culling and levels of detail | `debug_draw`, `frustum_culler_ext`, `lod_group_ext` | 41 | `VERIFIED_STATE` |
+| the clustered light set, the cluster grid and the light-to-cluster assignment | `clustered_light_ext`, `clustered_light_set`, `clustered_light_grid`, `clustered_light_assignment` | 43 | `VERIFIED_STATE` |
 
 ### What the GPU artifact changed about the evidence
 
@@ -215,4 +216,23 @@ three found something:
   remembered level instead of the one the distance falls in. Two identical calls
   with the same argument legitimately return different answers; the Rust doc
   says so and the test pins both sides of it around a three-unit margin.
+- **Three clustered-lighting constructors take a graphics device, not a game.**
+  `cna_clustered_light_set_create`, `cna_clustered_light_grid_create` and
+  `cna_clustered_light_assignment_create` all name the parameter `game` and
+  document it as "the owning game", and all three resolve it with
+  `GetBorrowedGraphicsDevice`, taking the game from the device afterwards.
+  Passing the game handle answers "the graphics-device handle is invalid for
+  this call" -- a `Handle` error naming a parameter the header does not mention.
+  The Rust constructors take `&GraphicsDevice` and say why.
+- **A cluster grid's depth slices are logarithmic, and there is one more
+  boundary than slice.** With a near plane of 1 and a far plane of 100 over
+  eight slices the boundaries are `1, 1.778, 3.162, 5.623, 10, 17.78, 31.62,
+  56.23, 100` -- exactly `near * (far/near)^(i/N)`. A linear split passes every
+  monotonicity check and fails this one. Placing a distance is *clamped* at both
+  ends rather than refused, so a light straddling the frustum edge still lands
+  in a slice.
+- **A cleared assignment keeps its shape invariant.** `clear` leaves zero
+  clusters and zero references but still one offset -- the single zero that
+  empties them -- because the offset array is always one longer than the cluster
+  count. A test asserting "everything is zero after clear" reads that as a bug.
 

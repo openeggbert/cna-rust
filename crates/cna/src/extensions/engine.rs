@@ -1373,6 +1373,13 @@ fn native_bounds(value: BoundingBox) -> sys::CNA_BoundingBox {
     }
 }
 
+fn from_native_bounds(value: sys::CNA_BoundingBox) -> BoundingBox {
+    BoundingBox::new(
+        from_native_vector3(value.min),
+        from_native_vector3(value.max),
+    )
+}
+
 /// One frame's inputs to a post-process pass or chain.
 ///
 /// A typed Rust value rather than the C structure. The ABI's version-2 form
@@ -8652,6 +8659,856 @@ impl LodGroup {
 }
 
 impl Drop for LodGroup {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// Which kind of light a [`ClusteredLight`] is.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum ClusteredLightType {
+    /// A point light: a sphere of colour around a position.
+    Point,
+    /// A spot light: a cone of colour from a position along a direction.
+    Spot,
+}
+
+impl ClusteredLightType {
+    const fn to_native(self) -> sys::CNA_ClusteredLightType {
+        match self {
+            Self::Point => sys::CNA_CLUSTERED_LIGHT_TYPE_POINT,
+            Self::Spot => sys::CNA_CLUSTERED_LIGHT_TYPE_SPOT,
+        }
+    }
+
+    const fn from_native(value: sys::CNA_ClusteredLightType) -> Option<Self> {
+        match value {
+            sys::CNA_CLUSTERED_LIGHT_TYPE_POINT => Some(Self::Point),
+            sys::CNA_CLUSTERED_LIGHT_TYPE_SPOT => Some(Self::Spot),
+            _ => None,
+        }
+    }
+}
+
+/// One light in a [`ClusteredLightSet`].
+///
+/// A value, not a resource: a set holds copies, so a light read back out stays
+/// correct after the set changes and nothing has to be released.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct ClusteredLight {
+    /// Which kind of light this is.
+    pub kind: ClusteredLightType,
+    /// Whether this light should be given a shadow.
+    pub casts_shadows: bool,
+    /// World-space position.
+    pub position: Vector3,
+    /// The direction a spot light points; ignored for a point light.
+    pub direction: Vector3,
+    /// Linear RGB colour.
+    pub color: Vector3,
+    /// Scalar multiplier on [`ClusteredLight::color`]; must not be negative.
+    pub intensity: f32,
+    /// Distance at which the light stops contributing; must be positive.
+    pub range: f32,
+    /// The half angle a spot light is at full strength within, in radians.
+    pub inner_angle: f32,
+    /// The half angle a spot light has fallen to nothing at, in radians.
+    pub outer_angle: f32,
+}
+
+impl ClusteredLight {
+    /// The greatest number of lights one [`ClusteredLightSet`] holds.
+    pub const SET_MAX: i32 = sys::CNA_CLUSTERED_LIGHT_SET_MAX_EXT;
+
+    /// CNA's own defaults, asked of the library rather than restated here.
+    pub fn canonical_defaults() -> Result<Self> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_ClusteredLightEXT::default();
+        // SAFETY: the structure is a caller-owned versioned output.
+        native.check(unsafe { (native.engine.clustered_light_ext_init)(&mut value) })?;
+        Self::from_native(value)
+    }
+
+    /// Whether a set would accept this light.
+    ///
+    /// The same test [`ClusteredLightSet::add`] applies, exposed so a caller
+    /// can ask before being refused: a positive range, a non-negative finite
+    /// intensity, finite vectors, and for a spot light a non-degenerate
+    /// direction whose inner angle is no wider than its outer.
+    pub fn is_usable(&self) -> Result<bool> {
+        let native = Native::process()?;
+        let value = self.to_native();
+        let mut usable = 0_u8;
+        // SAFETY: the light is borrowed for the call and the output is a live
+        // local.
+        native
+            .check(unsafe { (native.engine.clustered_light_set_is_usable)(&value, &mut usable) })?;
+        Ok(usable != 0)
+    }
+
+    fn to_native(self) -> sys::CNA_ClusteredLightEXT {
+        sys::CNA_ClusteredLightEXT {
+            struct_size: core::mem::size_of::<sys::CNA_ClusteredLightEXT>() as u32,
+            struct_version: 1,
+            r#type: self.kind.to_native(),
+            casts_shadows: u8::from(self.casts_shadows),
+            reserved: [0; 3],
+            position: native_vector3(self.position),
+            direction: native_vector3(self.direction),
+            color: native_vector3(self.color),
+            intensity: self.intensity,
+            range: self.range,
+            inner_angle: self.inner_angle,
+            outer_angle: self.outer_angle,
+        }
+    }
+
+    fn from_native(value: sys::CNA_ClusteredLightEXT) -> Result<Self> {
+        Ok(Self {
+            kind: ClusteredLightType::from_native(value.r#type)
+                .ok_or(CnaError::InvalidInput("native clustered light type is unknown"))?,
+            casts_shadows: value.casts_shadows != 0,
+            position: from_native_vector3(value.position),
+            direction: from_native_vector3(value.direction),
+            color: from_native_vector3(value.color),
+            intensity: value.intensity,
+            range: value.range,
+            inner_angle: value.inner_angle,
+            outer_angle: value.outer_angle,
+        })
+    }
+}
+
+/// The lights a clustered renderer sorts into its grid.
+///
+/// `OWNED`. The set holds values, so nothing it returns keeps it alive and
+/// nothing it lends has to be released; it needs no device, but CNA parents it
+/// to the game so its lifetime is accounted for like any other owned resource,
+/// which is why it registers with the device the way every other engine object
+/// here does.
+pub struct ClusteredLightSet {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl ClusteredLightSet {
+    /// Creates an empty set.
+    ///
+    /// The argument is the **graphics device**, not the game, despite CNA's own
+    /// header naming the parameter `game` and describing it as "the owning
+    /// game": the implementation resolves it with `GetBorrowedGraphicsDevice`
+    /// and takes the game from the device. Passing the game handle answers
+    /// "the graphics-device handle is invalid for this call". The same is true
+    /// of [`ClusteredLightGrid`] and [`ClusteredLightAssignment`].
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut set = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live for the call and the output is a
+        // live local.
+        native
+            .check(unsafe { (native.engine.clustered_light_set_create)(device.handle()?, &mut set) })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(set),
+            destroy: native.engine.clustered_light_set_destroy,
+            released: "the clustered light set has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+        })
+    }
+
+    /// Adds a light, answering the index it landed at.
+    pub fn add(&self, light: ClusteredLight) -> Result<i32> {
+        let handle = self.core.get()?;
+        let value = light.to_native();
+        let mut index = 0_i32;
+        // SAFETY: the handle is owned, the light is borrowed for the call, and
+        // the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_set_add)(handle, &value, &mut index)
+        })?;
+        Ok(index)
+    }
+
+    /// Adds a [`PointLight`], converted to a clustered light.
+    pub fn add_point(&self, light: PointLight) -> Result<i32> {
+        let handle = self.core.get()?;
+        let value = light.to_native();
+        let mut index = 0_i32;
+        // SAFETY: the handle is owned, the light is borrowed for the call, and
+        // the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_set_add_point)(handle, &value, &mut index)
+        })?;
+        Ok(index)
+    }
+
+    /// Adds a [`SpotLight`], converted to a clustered light.
+    pub fn add_spot(&self, light: SpotLight) -> Result<i32> {
+        let handle = self.core.get()?;
+        let value = light.to_native();
+        let mut index = 0_i32;
+        // SAFETY: the handle is owned, the light is borrowed for the call, and
+        // the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_set_add_spot)(handle, &value, &mut index)
+        })?;
+        Ok(index)
+    }
+
+    /// Replaces the light at an index.
+    pub fn replace_at(&self, index: i32, light: ClusteredLight) -> Result<()> {
+        let handle = self.core.get()?;
+        let value = light.to_native();
+        // SAFETY: the handle is owned and the light is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_set_replace_at)(handle, index, &value)
+        })
+    }
+
+    /// Removes the light at an index, shifting the ones after it down.
+    pub fn remove_at(&self, index: i32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.clustered_light_set_remove_at)(handle, index) })
+    }
+
+    /// Removes every light.
+    pub fn clear(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.clustered_light_set_clear)(handle) })
+    }
+
+    /// How many lights the set holds.
+    pub fn count(&self) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_set_get_count)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Whether the set holds no lights.
+    pub fn is_empty(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_set_is_empty)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// A copy of the light at an index.
+    pub fn get(&self, index: i32) -> Result<ClusteredLight> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_ClusteredLightEXT::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_set_get_at)(handle, index, &mut value)
+        })?;
+        ClusteredLight::from_native(value)
+    }
+
+    /// A copy of every light the set holds.
+    pub fn lights(&self) -> Result<Vec<ClusteredLight>> {
+        let handle = self.core.get()?;
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the count.
+        let probe = unsafe {
+            (self.native.engine.clustered_light_set_copy_lights)(
+                handle,
+                core::ptr::null_mut(),
+                0,
+                &mut required,
+            )
+        };
+        if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+            self.native.check(probe)?;
+        }
+        let capacity = usize::try_from(required)
+            .map_err(|_| CnaError::InvalidInput("the light count does not fit in memory"))?;
+        if capacity == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![sys::CNA_ClusteredLightEXT::default(); capacity];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `capacity`
+        // writable lights, which is the count passed alongside it.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_set_copy_lights)(
+                handle,
+                buffer.as_mut_ptr(),
+                required,
+                &mut count,
+            )
+        })?;
+        let count = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("CNA reported more lights than fit in memory"))?;
+        buffer
+            .into_iter()
+            .take(count.min(capacity))
+            .map(ClusteredLight::from_native)
+            .collect()
+    }
+
+    /// The bounding sphere of the light at an index.
+    pub fn bounds_at(&self, index: i32) -> Result<BoundingSphere> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_BoundingSphere::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_set_get_bounds_at)(handle, index, &mut value)
+        })?;
+        Ok(BoundingSphere {
+            Center: from_native_vector3(value.center),
+            Radius: value.radius,
+        })
+    }
+
+    /// The bounding sphere of every light, in light-index order.
+    ///
+    /// This is what [`ClusteredLightAssignment::assign`] sorts, so a caller
+    /// sorts the set it already built rather than describing the lights twice.
+    pub fn bounds(&self) -> Result<Vec<BoundingSphere>> {
+        let handle = self.core.get()?;
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the count.
+        let probe = unsafe {
+            (self.native.engine.clustered_light_set_copy_bounds)(
+                handle,
+                core::ptr::null_mut(),
+                0,
+                &mut required,
+            )
+        };
+        if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+            self.native.check(probe)?;
+        }
+        let capacity = usize::try_from(required)
+            .map_err(|_| CnaError::InvalidInput("the sphere count does not fit in memory"))?;
+        if capacity == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![sys::CNA_BoundingSphere::default(); capacity];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `capacity`
+        // writable spheres, which is the count passed alongside it.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_set_copy_bounds)(
+                handle,
+                buffer.as_mut_ptr(),
+                required,
+                &mut count,
+            )
+        })?;
+        let count = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("CNA reported more spheres than fit in memory"))?;
+        Ok(buffer
+            .into_iter()
+            .take(count.min(capacity))
+            .map(|sphere| BoundingSphere {
+                Center: from_native_vector3(sphere.center),
+                Radius: sphere.radius,
+            })
+            .collect())
+    }
+
+    /// Releases the set now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for ClusteredLightSet {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// The view frustum cut into clusters a light list is sorted into.
+///
+/// `OWNED`, and a pure CPU object: it is parented to the game only so its
+/// lifetime is accounted for. Until [`set_projection`](Self::set_projection) it
+/// has no shape, and [`cluster_bounds`](Self::cluster_bounds) refuses.
+pub struct ClusteredLightGrid {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl ClusteredLightGrid {
+    /// The most tiles a grid takes along either screen axis.
+    pub const MAX_TILES_PER_AXIS: i32 = sys::CNA_CLUSTER_GRID_MAX_TILES_PER_AXIS_EXT;
+    /// The most depth slices a grid takes.
+    pub const MAX_SLICE_COUNT: i32 = sys::CNA_CLUSTER_GRID_MAX_SLICE_COUNT_EXT;
+    /// The default tile count along X.
+    pub const DEFAULT_TILES_X: i32 = sys::CNA_CLUSTER_GRID_DEFAULT_TILES_X_EXT;
+    /// The default tile count along Y.
+    pub const DEFAULT_TILES_Y: i32 = sys::CNA_CLUSTER_GRID_DEFAULT_TILES_Y_EXT;
+    /// The default depth-slice count.
+    pub const DEFAULT_SLICE_COUNT: i32 = sys::CNA_CLUSTER_GRID_DEFAULT_SLICE_COUNT_EXT;
+
+    /// Creates a grid of the given shape.
+    ///
+    /// A dimension outside its range is refused rather than clamped: the
+    /// cluster count is what the light-index list is sized from.
+    pub fn new(
+        device: &GraphicsDevice,
+        tiles_x: i32,
+        tiles_y: i32,
+        slice_count: i32,
+    ) -> Result<Self> {
+        let native = device.state_native();
+        let mut grid = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.clustered_light_grid_create)(
+                device.handle()?,
+                tiles_x,
+                tiles_y,
+                slice_count,
+                &mut grid,
+            )
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(grid),
+            destroy: native.engine.clustered_light_grid_destroy,
+            released: "the cluster grid has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+        })
+    }
+
+    /// Creates a grid of CNA's default shape.
+    pub fn with_canonical_shape(device: &GraphicsDevice) -> Result<Self> {
+        Self::new(
+            device,
+            Self::DEFAULT_TILES_X,
+            Self::DEFAULT_TILES_Y,
+            Self::DEFAULT_SLICE_COUNT,
+        )
+    }
+
+    fn count(&self, route: unsafe extern "C" fn(sys::CNA_Handle, *mut i32) -> sys::CNA_Result) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    /// Tiles along X.
+    pub fn tiles_x(&self) -> Result<i32> {
+        self.count(self.native.engine.clustered_light_grid_get_tiles_x)
+    }
+
+    /// Tiles along Y.
+    pub fn tiles_y(&self) -> Result<i32> {
+        self.count(self.native.engine.clustered_light_grid_get_tiles_y)
+    }
+
+    /// Depth slices.
+    pub fn slice_count(&self) -> Result<i32> {
+        self.count(self.native.engine.clustered_light_grid_get_slice_count)
+    }
+
+    /// How many clusters the grid holds.
+    pub fn cluster_count(&self) -> Result<i32> {
+        self.count(self.native.engine.clustered_light_grid_get_cluster_count)
+    }
+
+    /// The flat index of a cluster coordinate.
+    pub fn cluster_index(&self, x: i32, y: i32, slice: i32) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_grid_cluster_index)(handle, x, y, slice, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Gives the grid its shape from a camera projection.
+    ///
+    /// The slice spacing is logarithmic in the ratio of the two planes, so a
+    /// zero near plane has no logarithm and an inverted pair has no grid: both
+    /// are refused rather than clamped.
+    pub fn set_projection(&self, projection: Matrix, near_plane: f32, far_plane: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        let projection = native_matrix(projection);
+        // SAFETY: the handle is owned and the matrix is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_grid_set_projection)(
+                handle,
+                &projection,
+                near_plane,
+                far_plane,
+            )
+        })
+    }
+
+    /// Whether a projection has been set.
+    pub fn has_projection(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_grid_has_projection)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// The near distance the grid was given.
+    pub fn near_plane(&self) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_grid_get_near_plane)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// The far distance the grid was given.
+    pub fn far_plane(&self) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_grid_get_far_plane)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// The inverse of the projection the grid was given.
+    pub fn inverse_projection(&self) -> Result<Matrix> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_Matrix::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_grid_get_inverse_projection)(handle, &mut value)
+        })?;
+        Ok(from_native_matrix(value))
+    }
+
+    /// The view distance a depth-slice boundary sits at.
+    ///
+    /// The slice count itself is a valid argument and names the far edge of the
+    /// last slice: there is **one more boundary than slice**. The answer is
+    /// zero until a projection has been set.
+    pub fn slice_distance(&self, slice: i32) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_grid_slice_distance)(handle, slice, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Which slice covers a view distance.
+    ///
+    /// **Clamped, not refused**: a point in front of the near plane belongs to
+    /// the first slice and one beyond the far plane to the last, which is what
+    /// a renderer wants when a light straddles the frustum edge.
+    pub fn slice_for_view_distance(&self, view_distance: f32) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_grid_slice_for_view_distance)(
+                handle,
+                view_distance,
+                &mut value,
+            )
+        })?;
+        Ok(value)
+    }
+
+    /// The view-space bounds of one cluster.
+    pub fn cluster_bounds(&self, x: i32, y: i32, slice: i32) -> Result<BoundingBox> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_BoundingBox::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_grid_cluster_bounds)(
+                handle,
+                x,
+                y,
+                slice,
+                &mut value,
+            )
+        })?;
+        Ok(from_native_bounds(value))
+    }
+
+    /// Releases the grid now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for ClusteredLightGrid {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// Which lights reach which clusters.
+///
+/// `OWNED`, and a pure CPU object. Its index and offset arrays are read by
+/// copy, so nothing it returns keeps it alive.
+pub struct ClusteredLightAssignment {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl ClusteredLightAssignment {
+    /// The most lights one assignment sorts.
+    pub const MAX_LIGHTS: i32 = sys::CNA_CLUSTERED_ASSIGNMENT_MAX_LIGHTS_EXT;
+
+    /// Creates an empty assignment.
+    ///
+    /// Takes the graphics device, for the reason
+    /// [`ClusteredLightSet::new`] gives.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut assignment = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.clustered_light_assignment_create)(device.handle()?, &mut assignment)
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(assignment),
+            destroy: native.engine.clustered_light_assignment_destroy,
+            released: "the clustered light assignment has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+        })
+    }
+
+    /// Sorts light bounds into a grid's clusters.
+    ///
+    /// The bounds are what [`ClusteredLightSet::bounds`] produces, in
+    /// light-index order. The grid must already have a projection.
+    pub fn assign(
+        &self,
+        grid: &ClusteredLightGrid,
+        view: Matrix,
+        bounds: &[BoundingSphere],
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let grid_handle = grid.core.get()?;
+        let view = native_matrix(view);
+        let native_bounds: Vec<sys::CNA_BoundingSphere> = bounds
+            .iter()
+            .map(|sphere| sys::CNA_BoundingSphere {
+                center: native_vector3(sphere.Center),
+                radius: sphere.Radius,
+            })
+            .collect();
+        // SAFETY: both handles are owned, and the matrix and the sphere array
+        // are borrowed for the call with the array's own length.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_assignment_assign)(
+                handle,
+                grid_handle,
+                &view,
+                native_bounds.as_ptr(),
+                native_bounds.len() as u64,
+            )
+        })
+    }
+
+    /// Forgets every assignment.
+    pub fn clear(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.clustered_light_assignment_clear)(handle) })
+    }
+
+    /// Takes an assignment computed elsewhere -- on the GPU, or by a caller's
+    /// own sorter.
+    ///
+    /// `offsets` says where each cluster's run of indices begins, so there is
+    /// **one more offset than cluster**: it must start at zero, never go
+    /// backwards, and end at `indices.len()`. Every index must name a light
+    /// below `light_count`.
+    pub fn adopt(&self, light_count: i32, offsets: &[i32], indices: &[i32]) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and both arrays are borrowed for the call
+        // with their own lengths.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_assignment_adopt)(
+                handle,
+                light_count,
+                offsets.as_ptr(),
+                offsets.len() as u64,
+                indices.as_ptr(),
+                indices.len() as u64,
+            )
+        })
+    }
+
+    fn count(&self, route: unsafe extern "C" fn(sys::CNA_Handle, *mut i32) -> sys::CNA_Result) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    /// How many lights the assignment describes.
+    pub fn light_count(&self) -> Result<i32> {
+        self.count(self.native.engine.clustered_light_assignment_get_light_count)
+    }
+
+    /// How many clusters the assignment describes.
+    pub fn cluster_count(&self) -> Result<i32> {
+        self.count(self.native.engine.clustered_light_assignment_get_cluster_count)
+    }
+
+    /// How many light references the assignment holds in total.
+    pub fn total_reference_count(&self) -> Result<i32> {
+        self.count(
+            self.native
+                .engine
+                .clustered_light_assignment_get_total_reference_count,
+        )
+    }
+
+    /// The largest number of lights any one cluster holds.
+    ///
+    /// The number worth watching: it sizes the shader's per-cluster loop.
+    pub fn max_lights_per_cluster(&self) -> Result<i32> {
+        self.count(
+            self.native
+                .engine
+                .clustered_light_assignment_get_max_lights_per_cluster,
+        )
+    }
+
+    fn copy_i32(
+        &self,
+        route: unsafe extern "C" fn(sys::CNA_Handle, *mut i32, u64, *mut u64) -> sys::CNA_Result,
+        what: &'static str,
+    ) -> Result<Vec<i32>> {
+        let handle = self.core.get()?;
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the count.
+        let probe = unsafe { route(handle, core::ptr::null_mut(), 0, &mut required) };
+        if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+            self.native.check(probe)?;
+        }
+        let capacity = usize::try_from(required).map_err(|_| CnaError::InvalidInput(what))?;
+        if capacity == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![0_i32; capacity];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `capacity`
+        // writable values, which is the count passed alongside it.
+        self.native
+            .check(unsafe { route(handle, buffer.as_mut_ptr(), required, &mut count) })?;
+        let count = usize::try_from(count).map_err(|_| CnaError::InvalidInput(what))?;
+        buffer.truncate(count.min(capacity));
+        Ok(buffer)
+    }
+
+    /// The light indices assigned to one cluster.
+    pub fn lights_in_cluster(&self, cluster_index: i32) -> Result<Vec<i32>> {
+        let handle = self.core.get()?;
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the count.
+        let probe = unsafe {
+            (self
+                .native
+                .engine
+                .clustered_light_assignment_copy_lights_in_cluster)(
+                handle,
+                cluster_index,
+                core::ptr::null_mut(),
+                0,
+                &mut required,
+            )
+        };
+        if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+            self.native.check(probe)?;
+        }
+        let capacity = usize::try_from(required)
+            .map_err(|_| CnaError::InvalidInput("the cluster's light count does not fit in memory"))?;
+        if capacity == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![0_i32; capacity];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `capacity`
+        // writable indices, which is the count passed alongside it.
+        self.native.check(unsafe {
+            (self
+                .native
+                .engine
+                .clustered_light_assignment_copy_lights_in_cluster)(
+                handle,
+                cluster_index,
+                buffer.as_mut_ptr(),
+                required,
+                &mut count,
+            )
+        })?;
+        let count = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("CNA reported more indices than fit in memory"))?;
+        buffer.truncate(count.min(capacity));
+        Ok(buffer)
+    }
+
+    /// The whole index array, cluster runs back to back.
+    pub fn indices(&self) -> Result<Vec<i32>> {
+        self.copy_i32(
+            self.native.engine.clustered_light_assignment_copy_indices,
+            "the index count does not fit in memory",
+        )
+    }
+
+    /// The whole offset array: one more entry than the cluster count.
+    pub fn offsets(&self) -> Result<Vec<i32>> {
+        self.copy_i32(
+            self.native.engine.clustered_light_assignment_copy_offsets,
+            "the offset count does not fit in memory",
+        )
+    }
+
+    /// Releases the assignment now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for ClusteredLightAssignment {
     fn drop(&mut self) {
         let _ = self.core.release();
     }

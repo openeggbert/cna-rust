@@ -19,8 +19,10 @@ use cna::extensions::engine::{
     FullscreenPass, HeightFogPass, LensFlarePass, LightShaftPass, LutInterpolation, MemoryBarrier,
     MotionBlurPass, RenderPipeline, ScopedRenderTarget, ShadowMap, Skybox, SpatialUpscalePass,
     CascadedShadowMap, CubeShadowMap, PointLight, PunctualLight, PunctualLightKind,
-    AutoExposure, CubeLut, DebugDraw, DepthEncoding, DepthNormalPrepass, DisplayColorSpace,
-    FrustumCuller, HdrDisplayOutput, LodGroup, LodSelectionMode, ShadowCascadeState, SpotLight, SpotShadowMap, SsaoPass,
+    AutoExposure, ClusteredLight, ClusteredLightAssignment, ClusteredLightGrid,
+    ClusteredLightSet, ClusteredLightType, CubeLut, DebugDraw, DepthEncoding,
+    DepthNormalPrepass, DisplayColorSpace, FrustumCuller, HdrDisplayOutput, LodGroup,
+    LodSelectionMode, ShadowCascadeState, SpotLight, SpotShadowMap, SsaoPass,
     SsrPass, StorageBuffer, TonemapPass, TransparentDrawList, VolumetricFogPass,
     WeightedBlendedTransparency,
 };
@@ -4281,4 +4283,632 @@ fn culling_lod_and_debug_drawing_count_exactly_what_they_produce() {
         findings.lod_levels,
         counts["plus every gizmo"],
     );
+}
+
+/// What the clustered-lighting run measured.
+#[derive(Default)]
+struct ClusteredFindings {
+    engine_layer: i32,
+    defaults: Option<ClusteredLight>,
+    usable: Vec<(&'static str, bool, bool)>,
+    set_counts: Vec<(&'static str, i32, bool)>,
+    round_trip: Option<(ClusteredLight, ClusteredLight)>,
+    lights_match_gets: bool,
+    after_remove: Vec<f32>,
+    bounds: Vec<((f32, f32, f32), f32, (f32, f32, f32), f32)>,
+    bounds_match_per_index: bool,
+    converted: Vec<(&'static str, ClusteredLightType, f32, f32)>,
+    set_overflow: Option<String>,
+    grid_shape: (i32, i32, i32, i32),
+    cluster_indices: Vec<i32>,
+    bad_coordinate: Option<String>,
+    bad_grid_shape: Vec<(&'static str, bool)>,
+    before_projection: Option<(bool, f32, Result<()>)>,
+    bad_projection: Vec<(&'static str, bool)>,
+    planes: (f32, f32),
+    slice_distances: Vec<f32>,
+    slice_lookup: Vec<(f32, i32)>,
+    cluster_depth: Vec<(f32, f32)>,
+    inverse_round_trip: f32,
+    assignment_before: (i32, i32),
+    assign_without_projection: Option<String>,
+    assignment_after: (i32, i32, i32, i32),
+    offsets: Vec<i32>,
+    indices: Vec<i32>,
+    runs_match_offsets: bool,
+    clustered_light_reach: Vec<(&'static str, usize)>,
+    after_clear: (i32, i32, Vec<i32>),
+    adopted: Option<(i32, i32, Vec<i32>, Vec<i32>)>,
+    bad_adoptions: Vec<(&'static str, bool)>,
+}
+
+struct ClusteredGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<ClusteredFindings>>,
+}
+
+impl GameStateAccess for ClusteredGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+fn clustered_light_at(x: f32, y: f32, z: f32, range: f32) -> Result<ClusteredLight> {
+    let mut light = ClusteredLight::canonical_defaults()?;
+    light.position = Vector3::from_x_and_y_and_z(x, y, z);
+    light.range = range;
+    Ok(light)
+}
+
+impl Game for ClusteredGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+        let mut findings = ClusteredFindings {
+            engine_layer: version,
+            ..ClusteredFindings::default()
+        };
+
+        // --- the light value ------------------------------------------------
+        let defaults = ClusteredLight::canonical_defaults()?;
+        findings.defaults = Some(defaults);
+
+        // `is_usable` is documented as exactly the test `add` applies, so both
+        // are recorded for every probe and compared against each other.
+        let set = ClusteredLightSet::new(&device)?;
+        let mut probe = |name: &'static str, light: ClusteredLight| -> Result<()> {
+            let usable = light.is_usable()?;
+            let accepted = set.add(light).is_ok();
+            findings.usable.push((name, usable, accepted));
+            set.clear()?;
+            Ok(())
+        };
+        probe("the defaults", defaults)?;
+        let mut negative_range = defaults;
+        negative_range.range = -1.0;
+        probe("a negative range", negative_range)?;
+        let mut zero_range = defaults;
+        zero_range.range = 0.0;
+        probe("a zero range", zero_range)?;
+        let mut negative_intensity = defaults;
+        negative_intensity.intensity = -0.5;
+        probe("a negative intensity", negative_intensity)?;
+        let mut infinite_position = defaults;
+        infinite_position.position = Vector3::from_x_and_y_and_z(f32::INFINITY, 0.0, 0.0);
+        probe("an infinite position", infinite_position)?;
+        let mut inverted_cone = defaults;
+        inverted_cone.kind = ClusteredLightType::Spot;
+        inverted_cone.inner_angle = 1.0;
+        inverted_cone.outer_angle = 0.5;
+        probe("a cone whose inner angle is wider", inverted_cone)?;
+        let mut degenerate_spot = defaults;
+        degenerate_spot.kind = ClusteredLightType::Spot;
+        degenerate_spot.direction = Vector3::Zero;
+        probe("a spot with no direction", degenerate_spot)?;
+        drop(probe);
+
+        // --- the set --------------------------------------------------------
+        findings
+            .set_counts
+            .push(("fresh", set.count()?, set.is_empty()?));
+        let first = clustered_light_at(1.0, 0.0, 0.0, 3.0)?;
+        let second = clustered_light_at(2.0, 0.0, 0.0, 5.0)?;
+        let third = clustered_light_at(3.0, 0.0, 0.0, 7.0)?;
+        assert_eq!(set.add(first)?, 0);
+        assert_eq!(set.add(second)?, 1);
+        assert_eq!(set.add(third)?, 2);
+        findings
+            .set_counts
+            .push(("three added", set.count()?, set.is_empty()?));
+        findings.round_trip = Some((second, set.get(1)?));
+        let listed = set.lights()?;
+        findings.lights_match_gets = listed.len() == 3
+            && (0..3).all(|index| set.get(index).ok().as_ref() == listed.get(index as usize));
+
+        // The bounds are what an assignment sorts, so their rule matters: each
+        // is the light's own position and range, not a default sphere.
+        for index in 0..3 {
+            let light = set.get(index)?;
+            let sphere = set.bounds_at(index)?;
+            findings.bounds.push((
+                (light.position.X, light.position.Y, light.position.Z),
+                light.range,
+                (sphere.Center.X, sphere.Center.Y, sphere.Center.Z),
+                sphere.Radius,
+            ));
+        }
+        let all_bounds = set.bounds()?;
+        findings.bounds_match_per_index = all_bounds.len() == 3
+            && (0..3).all(|index| {
+                set.bounds_at(index).ok().as_ref() == all_bounds.get(index as usize)
+            });
+
+        set.remove_at(0)?;
+        findings.after_remove = set.lights()?.into_iter().map(|light| light.range).collect();
+        set.replace_at(0, clustered_light_at(9.0, 0.0, 0.0, 11.0)?)?;
+        findings
+            .set_counts
+            .push(("after replace", set.count()?, set.is_empty()?));
+        findings.after_remove.push(set.get(0)?.range);
+        set.clear()?;
+        findings
+            .set_counts
+            .push(("cleared", set.count()?, set.is_empty()?));
+
+        // A point light and a spot light converted into the set keep their kind.
+        let mut point = PointLight::canonical_defaults()?;
+        point.range = 13.0;
+        set.add_point(point)?;
+        let converted = set.get(0)?;
+        findings.converted.push((
+            "a point light",
+            converted.kind,
+            converted.range,
+            converted.outer_angle,
+        ));
+        let mut spot = SpotLight::canonical_defaults()?;
+        spot.range = 17.0;
+        spot.outer_angle = 0.75;
+        set.add_spot(spot)?;
+        let converted = set.get(1)?;
+        findings.converted.push((
+            "a spot light",
+            converted.kind,
+            converted.range,
+            converted.outer_angle,
+        ));
+        set.clear()?;
+
+        // The documented ceiling is a refusal, not a silent drop.
+        for _ in 0..ClusteredLight::SET_MAX {
+            set.add(defaults)?;
+        }
+        findings.set_overflow = set.add(defaults).err().map(|error| error.to_string());
+        set.clear()?;
+
+        // --- the grid -------------------------------------------------------
+        let grid = ClusteredLightGrid::new(&device, 4, 3, 8)?;
+        findings.grid_shape = (
+            grid.tiles_x()?,
+            grid.tiles_y()?,
+            grid.slice_count()?,
+            grid.cluster_count()?,
+        );
+        for slice in 0..8 {
+            for y in 0..3 {
+                for x in 0..4 {
+                    findings.cluster_indices.push(grid.cluster_index(x, y, slice)?);
+                }
+            }
+        }
+        findings.bad_coordinate = grid.cluster_index(4, 0, 0).err().map(|e| e.to_string());
+        for (name, tiles_x, tiles_y, slices) in [
+            ("zero tiles", 0, 4, 4),
+            ("too many tiles", ClusteredLightGrid::MAX_TILES_PER_AXIS + 1, 4, 4),
+            ("too many slices", 4, 4, ClusteredLightGrid::MAX_SLICE_COUNT + 1),
+        ] {
+            findings.bad_grid_shape.push((
+                name,
+                ClusteredLightGrid::new(&device, tiles_x, tiles_y, slices).is_err(),
+            ));
+        }
+
+        findings.before_projection = Some((
+            grid.has_projection()?,
+            grid.slice_distance(0)?,
+            grid.cluster_bounds(0, 0, 0).map(|_| ()),
+        ));
+
+        let projection =
+            Matrix::CreatePerspectiveFieldOfView(std::f32::consts::FRAC_PI_2, 1.0, 1.0, 100.0);
+        for (name, near, far) in [
+            ("a zero near plane", 0.0_f32, 100.0_f32),
+            ("a negative near plane", -1.0, 100.0),
+            ("an inverted pair", 100.0, 1.0),
+        ] {
+            findings
+                .bad_projection
+                .push((name, grid.set_projection(projection, near, far).is_err()));
+        }
+        grid.set_projection(projection, 1.0, 100.0)?;
+        findings.planes = (grid.near_plane()?, grid.far_plane()?);
+        for slice in 0..=8 {
+            findings.slice_distances.push(grid.slice_distance(slice)?);
+        }
+        for distance in [-5.0_f32, 0.5, 1.0, 10.0, 99.0, 100.0, 1.0e6] {
+            findings
+                .slice_lookup
+                .push((distance, grid.slice_for_view_distance(distance)?));
+        }
+        for slice in 0..8 {
+            let bounds = grid.cluster_bounds(0, 0, slice)?;
+            findings
+                .cluster_depth
+                .push((bounds.Min.Z.abs().min(bounds.Max.Z.abs()), bounds.Min.Z.abs().max(bounds.Max.Z.abs())));
+        }
+        let identity = projection * grid.inverse_projection()?;
+        findings.inverse_round_trip = [
+            identity.M11 - 1.0,
+            identity.M12,
+            identity.M21,
+            identity.M22 - 1.0,
+            identity.M33 - 1.0,
+            identity.M44 - 1.0,
+        ]
+        .into_iter()
+        .fold(0.0_f32, |worst, value| worst.max(value.abs()));
+
+        // --- the assignment --------------------------------------------------
+        let assignment = ClusteredLightAssignment::new(&device)?;
+        findings.assignment_before = (assignment.light_count()?, assignment.cluster_count()?);
+
+        let bare_grid = ClusteredLightGrid::new(&device, 2, 2, 2)?;
+        findings.assign_without_projection = assignment
+            .assign(&bare_grid, Matrix::Identity, &[])
+            .err()
+            .map(|error| error.to_string());
+        bare_grid.release()?;
+
+        // One light dead ahead inside the frustum, one behind the camera and
+        // far outside it. The camera looks down -Z from the origin.
+        set.clear()?;
+        set.add(clustered_light_at(0.0, 0.0, -20.0, 6.0)?)?;
+        set.add(clustered_light_at(0.0, 0.0, 5000.0, 1.0)?)?;
+        let view = Matrix::CreateLookAt(
+            Vector3::Zero,
+            Vector3::from_x_and_y_and_z(0.0, 0.0, -1.0),
+            Vector3::Up,
+        );
+        assignment.assign(&grid, view, &set.bounds()?)?;
+        findings.assignment_after = (
+            assignment.light_count()?,
+            assignment.cluster_count()?,
+            assignment.total_reference_count()?,
+            assignment.max_lights_per_cluster()?,
+        );
+        findings.offsets = assignment.offsets()?;
+        findings.indices = assignment.indices()?;
+        let cluster_count = assignment.cluster_count()?;
+        let mut runs_match = findings.offsets.len() == cluster_count as usize + 1;
+        let mut reach = [0_usize; 2];
+        for cluster in 0..cluster_count {
+            let run = assignment.lights_in_cluster(cluster)?;
+            let start = findings.offsets[cluster as usize] as usize;
+            let end = findings.offsets[cluster as usize + 1] as usize;
+            if findings.indices.get(start..end) != Some(run.as_slice()) {
+                runs_match = false;
+            }
+            for light in run {
+                if let Some(slot) = reach.get_mut(light as usize) {
+                    *slot += 1;
+                }
+            }
+        }
+        findings.runs_match_offsets = runs_match;
+        findings
+            .clustered_light_reach
+            .push(("the light inside the frustum", reach[0]));
+        findings
+            .clustered_light_reach
+            .push(("the light behind the camera", reach[1]));
+
+        assignment.clear()?;
+        findings.after_clear = (
+            assignment.total_reference_count()?,
+            assignment.cluster_count()?,
+            assignment.offsets()?,
+        );
+
+        // --- adoption --------------------------------------------------------
+        let offsets = vec![0, 2, 2, 3];
+        let indices = vec![1, 0, 2];
+        assignment.adopt(3, &offsets, &indices)?;
+        findings.adopted = Some((
+            assignment.light_count()?,
+            assignment.cluster_count()?,
+            assignment.offsets()?,
+            assignment.indices()?,
+        ));
+        for (name, light_count, offsets, indices) in [
+            ("offsets that do not begin at zero", 3, vec![1, 2, 3], vec![1, 0, 2]),
+            ("offsets that go backwards", 3, vec![0, 2, 1, 3], vec![1, 0, 2]),
+            ("offsets that end short", 3, vec![0, 1, 2], vec![1, 0, 2]),
+            ("an index past the light count", 2, vec![0, 2, 2, 3], vec![1, 0, 2]),
+        ] {
+            findings.bad_adoptions.push((
+                name,
+                assignment.adopt(light_count, &offsets, &indices).is_err(),
+            ));
+        }
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn clustered_lighting_sorts_the_lights_it_is_given_into_the_grid_it_is_given() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(ClusteredFindings::default()));
+    let game = ClusteredGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with a clustered light set, grid and assignment");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+
+    // --- the light value ---------------------------------------------------
+    let defaults = findings.defaults.expect("CNA's own defaults");
+    println!("clustered light defaults: {defaults:?}");
+    assert_eq!(defaults.kind, ClusteredLightType::Point);
+    assert!(!defaults.casts_shadows);
+    assert_eq!(defaults.position, Vector3::Zero);
+    assert_eq!(
+        defaults.direction,
+        Vector3::from_x_and_y_and_z(0.0, -1.0, 0.0),
+        "the default spot direction points straight down"
+    );
+    assert_eq!(defaults.color, Vector3::from_x_and_y_and_z(1.0, 1.0, 1.0));
+    assert!((defaults.intensity - 1.0).abs() < 1e-6);
+    assert!((defaults.range - 20.0).abs() < 1e-6);
+    assert!((defaults.inner_angle - 0.35).abs() < 1e-6);
+    assert!((defaults.outer_angle - 0.5).abs() < 1e-6);
+
+    println!("usability: {:?}", findings.usable);
+    for (name, usable, accepted) in &findings.usable {
+        assert_eq!(
+            usable, accepted,
+            "{name}: `is_usable` must answer exactly what `add` does"
+        );
+    }
+    assert_eq!(
+        findings.usable.iter().map(|(_, u, _)| *u).collect::<Vec<bool>>(),
+        vec![true, false, false, false, false, false, false],
+        "only the defaults are usable: {:?}",
+        findings.usable
+    );
+
+    // --- the set -----------------------------------------------------------
+    println!("set counts: {:?}", findings.set_counts);
+    assert_eq!(findings.set_counts[0], ("fresh", 0, true));
+    assert_eq!(findings.set_counts[1], ("three added", 3, false));
+    assert_eq!(findings.set_counts[2], ("after replace", 2, false));
+    assert_eq!(findings.set_counts[3], ("cleared", 0, true));
+
+    let (written, read) = findings.round_trip.expect("a light read back");
+    assert_eq!(written, read, "a light comes back as it went in");
+    assert!(
+        findings.lights_match_gets,
+        "copying every light agrees with reading them one at a time"
+    );
+
+    // The bounds are the light's own sphere, which is what makes the
+    // assignment's answer depend on where the lights actually are.
+    println!("bounds: {:?}", findings.bounds);
+    for (position, range, center, radius) in &findings.bounds {
+        assert_eq!(center, position, "a light's bounds are centred on it");
+        assert!(
+            (radius - range).abs() < 1e-6,
+            "and reach as far as its range: {radius} against {range}"
+        );
+    }
+    assert!(
+        findings.bounds_match_per_index,
+        "copying every sphere agrees with reading them one at a time"
+    );
+
+    // Removing index 0 shifts the rest down rather than leaving a hole.
+    assert_eq!(
+        findings.after_remove,
+        vec![5.0, 7.0, 11.0],
+        "removal shifts the tail down, and the replacement lands where it was asked to"
+    );
+
+    println!("converted: {:?}", findings.converted);
+    let (_, kind, range, _) = findings.converted[0];
+    assert_eq!(kind, ClusteredLightType::Point, "a point light stays a point");
+    assert!((range - 13.0).abs() < 1e-6, "and keeps its range");
+    let (_, kind, range, outer) = findings.converted[1];
+    assert_eq!(kind, ClusteredLightType::Spot, "a spot light stays a spot");
+    assert!((range - 17.0).abs() < 1e-6, "and keeps its range");
+    assert!((outer - 0.75).abs() < 1e-6, "and its cone");
+
+    let overflow = findings
+        .set_overflow
+        .as_deref()
+        .expect("the set refuses light 257");
+    println!("set overflow: {overflow}");
+
+    // --- the grid ----------------------------------------------------------
+    assert_eq!(
+        findings.grid_shape,
+        (4, 3, 8, 96),
+        "the cluster count is the product of the three dimensions"
+    );
+    // Every coordinate maps to its own index, and together they cover the
+    // range exactly: an index function that collided or left gaps would size
+    // the shader's light list wrongly.
+    let mut sorted = findings.cluster_indices.clone();
+    sorted.sort_unstable();
+    assert_eq!(
+        sorted,
+        (0..96).collect::<Vec<i32>>(),
+        "the cluster index is a bijection onto the cluster range"
+    );
+    assert!(
+        findings.bad_coordinate.is_some(),
+        "a coordinate outside the grid is refused"
+    );
+    for (name, refused) in &findings.bad_grid_shape {
+        assert!(refused, "{name} is refused rather than clamped");
+    }
+
+    let (has_projection, distance, bounds) = findings
+        .before_projection
+        .as_ref()
+        .expect("the grid was asked before it had a shape");
+    assert!(!has_projection, "a fresh grid has no projection");
+    assert_eq!(*distance, 0.0, "and no slice distances");
+    assert!(bounds.is_err(), "and refuses to bound a cluster");
+
+    for (name, refused) in &findings.bad_projection {
+        assert!(refused, "{name} is refused");
+    }
+    assert_eq!(findings.planes, (1.0, 100.0), "the planes round-trip");
+
+    // The slice boundaries are logarithmic in the plane ratio: there is one
+    // more boundary than slice, the first is the near plane and the last the
+    // far plane. A linear split would pass a monotonicity check and fail this.
+    println!("slice distances: {:?}", findings.slice_distances);
+    assert_eq!(findings.slice_distances.len(), 9, "one more boundary than slice");
+    for (slice, distance) in findings.slice_distances.iter().enumerate() {
+        let expected = 1.0_f32 * (100.0_f32 / 1.0).powf(slice as f32 / 8.0);
+        assert!(
+            (distance - expected).abs() < expected * 1e-3,
+            "boundary {slice} is at {distance}, not {expected}"
+        );
+    }
+
+    // Placing a distance is clamped into the grid at both ends.
+    println!("slice lookup: {:?}", findings.slice_lookup);
+    for (distance, slice) in &findings.slice_lookup {
+        assert!(
+            (0..8).contains(slice),
+            "{distance} was placed outside the grid, at slice {slice}"
+        );
+        let expected = findings
+            .slice_distances
+            .windows(2)
+            .position(|pair| *distance >= pair[0] && *distance < pair[1])
+            .map_or_else(
+                || if *distance < 1.0 { 0 } else { 7 },
+                |position| position,
+            );
+        assert_eq!(
+            *slice as usize, expected,
+            "{distance} belongs to slice {expected}, not {slice}"
+        );
+    }
+
+    // A cluster's depth extent is the pair of slice boundaries around it.
+    println!("cluster depth: {:?}", findings.cluster_depth);
+    for (slice, (near, far)) in findings.cluster_depth.iter().enumerate() {
+        assert!(
+            (near - findings.slice_distances[slice]).abs() < findings.slice_distances[slice] * 1e-3,
+            "cluster {slice} starts at {near}, not {}",
+            findings.slice_distances[slice]
+        );
+        assert!(
+            (far - findings.slice_distances[slice + 1]).abs()
+                < findings.slice_distances[slice + 1] * 1e-3,
+            "cluster {slice} ends at {far}, not {}",
+            findings.slice_distances[slice + 1]
+        );
+    }
+
+    assert!(
+        findings.inverse_round_trip < 1e-4,
+        "the stored inverse really inverts the projection: worst term {}",
+        findings.inverse_round_trip
+    );
+
+    // --- the assignment ----------------------------------------------------
+    assert_eq!(
+        findings.assignment_before,
+        (0, 0),
+        "a fresh assignment describes nothing"
+    );
+    assert!(
+        findings.assign_without_projection.is_some(),
+        "a grid with no shape cannot be sorted into"
+    );
+
+    let (lights, clusters, references, max_per_cluster) = findings.assignment_after;
+    println!(
+        "assignment: {lights} lights, {clusters} clusters, {references} references, at most {max_per_cluster} per cluster"
+    );
+    assert_eq!(lights, 2, "the assignment describes the two lights it sorted");
+    assert_eq!(clusters, 96, "over the grid's own clusters");
+    assert_eq!(
+        findings.offsets.len(),
+        clusters as usize + 1,
+        "one more offset than cluster"
+    );
+    assert_eq!(findings.offsets[0], 0, "the offsets begin at zero");
+    assert!(
+        findings.offsets.windows(2).all(|pair| pair[0] <= pair[1]),
+        "and never go backwards: {:?}",
+        findings.offsets
+    );
+    assert_eq!(
+        *findings.offsets.last().expect("a last offset") as usize,
+        findings.indices.len(),
+        "and end at the index count"
+    );
+    assert_eq!(
+        references as usize,
+        findings.indices.len(),
+        "the total reference count is the length of the index array"
+    );
+    assert!(
+        findings.runs_match_offsets,
+        "each cluster's run is exactly the slice its offsets name"
+    );
+    let longest_run = findings
+        .offsets
+        .windows(2)
+        .map(|pair| (pair[1] - pair[0]) as i32)
+        .max()
+        .unwrap_or(0);
+    assert_eq!(
+        max_per_cluster, longest_run,
+        "the reported maximum is the longest run there actually is"
+    );
+
+    // The whole point: a light inside the frustum reaches clusters and one
+    // behind the camera reaches none.
+    println!("light reach: {:?}", findings.clustered_light_reach);
+    assert!(
+        findings.clustered_light_reach[0].1 > 0,
+        "a light twenty units ahead of the camera lands in at least one cluster"
+    );
+    assert_eq!(
+        findings.clustered_light_reach[1].1, 0,
+        "and one five thousand units behind it lands in none"
+    );
+
+    // Clearing forgets the clusters as well as the references, and keeps the
+    // "one more offset than cluster" invariant while doing it: a cleared
+    // assignment is an empty grid, not a broken one.
+    println!("after clear: {:?}", findings.after_clear);
+    assert_eq!(
+        findings.after_clear,
+        (0, 0, vec![0]),
+        "clearing leaves no references, no clusters, and the single zero offset that empties them"
+    );
+
+    // --- adoption ----------------------------------------------------------
+    let (lights, clusters, offsets, indices) = findings.adopted.clone().expect("an adopted assignment");
+    assert_eq!(lights, 3, "adoption takes the light count it is given");
+    assert_eq!(clusters, 3, "and one fewer clusters than offsets");
+    assert_eq!(offsets, vec![0, 2, 2, 3], "the offsets come back unchanged");
+    assert_eq!(indices, vec![1, 0, 2], "and so do the indices, in order");
+
+    println!("bad adoptions: {:?}", findings.bad_adoptions);
+    for (name, refused) in &findings.bad_adoptions {
+        assert!(refused, "{name} is refused");
+    }
 }
