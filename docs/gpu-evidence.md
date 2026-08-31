@@ -146,3 +146,24 @@ headless device renders nothing, so an engine family's semantics could not be
 asserted beyond "it returned success". That ground is gone. The trigger the
 scope decision named has arrived, and the engine layer is bound one slice at a
 time from here, on the criterion that decision already set.
+
+## What the GPU artifact re-qualified
+
+Four measurements had never run on a renderer that draws. They are guarded by
+`independent_device_or_skip`, which needs a windowless `GraphicsDevice`, and
+every GL-family renderer refuses one -- so on the artifact that can actually
+shade, they skipped. Inside a `Game` the device is real, so each now has a
+device-backed twin in `crates/cna/tests/extensions_engine.rs`:
+
+| What | Was | Now |
+| --- | --- | --- |
+| `PbrEffect`'s thirteen scalars, colours, flags and alpha modes | skipped on every GL renderer | round-trips on the OPENGLES3 device |
+| `PbrMaterialFull` with a per-slot transform and coordinate set on all seven slots | skipped | round-trips, and an out-of-range coordinate set is refused by message |
+| A registered Rust `.cnb` loader decoding a game's own asset type | skipped | runs once, builds its Rust value, and withdraws on drop |
+| A failing loader and a panicking one | skipped | both contained, both leave the process usable |
+
+The independent-device constructor itself is unchanged and correct: it succeeds
+on `HEADLESS` and is refused on GL with `EasyGLRenderer::CreateContext failed:
+surface has no platform window id`. That is a renderer capability, so the guard
+stays -- but it no longer means the feature is unqualified anywhere, because the
+device-backed twins cover the same contracts where the guard cannot reach.

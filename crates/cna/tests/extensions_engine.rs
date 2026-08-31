@@ -14,7 +14,11 @@ use std::sync::{Arc, Mutex};
 use cna::extensions::pbr::{
     GltfMaterialBridge, GltfMaterialExtensionSource, GltfMaterialExtensionTextures,
     GltfMaterialSource, PbrMaterialExtensions, PbrMaterialFull, SkinnedPbrEffect,
-    PbrEffect, ThinFilmIridescence,
+    AlphaMode, PbrEffect, PbrMaterial, TextureSlot, TextureTransform, ThinFilmIridescence,
+};
+use cna::extensions::content::{
+    AssetTypeId, CnbDocument, CnbLoader, CnbLoaderRegistry, CnbWriter, NativeContentManager,
+    ReadLimits,
 };
 use cna::extensions::engine::{
     supports_shadow_sampling, DirectionalLight, FxaaPass, GpuTimer, Particle,
@@ -9066,4 +9070,496 @@ fn a_native_mesh_part_makes_the_instanced_renderer_reachable() {
         "the near level draws the part, the far level draws nothing, \
          and past the last boundary there is no level at all"
     );
+}
+
+/// What the device-backed PBR run measured.
+///
+/// The independent-device suite skips these two on every GL renderer, because
+/// a windowless device is impossible there. Inside a `Game` the device is real,
+/// so this is where they are actually qualified on a GPU artifact.
+#[derive(Default)]
+struct DeviceBackedPbrFindings {
+    engine_layer: i32,
+    scalars: Vec<(&'static str, f32, f32)>,
+    colors: Vec<(&'static str, (f32, f32, f32), (f32, f32, f32))>,
+    flags: Vec<(&'static str, bool)>,
+    alpha_modes: Vec<(String, String)>,
+    applied_material: Option<(f32, f32, String)>,
+    full_scalars: Vec<(&'static str, f32, f32)>,
+    full_flags: Vec<(&'static str, bool)>,
+    full_emissive: (f32, f32, f32),
+    slots: Vec<(String, i32, i32, TextureTransform, TextureTransform)>,
+    bad_coordinate_set: Option<String>,
+    apply_state: Option<String>,
+    device_reachable: bool,
+}
+
+struct DeviceBackedPbrGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<DeviceBackedPbrFindings>>,
+}
+
+impl GameStateAccess for DeviceBackedPbrGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for DeviceBackedPbrGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        let device = game.GraphicsDevice()?;
+        let mut findings = DeviceBackedPbrFindings {
+            engine_layer: version,
+            ..DeviceBackedPbrFindings::default()
+        };
+
+        // `PbrEffect` is upstream's *effects* module, not its engine layer:
+        // `cna_pbr_effect_create` carries no `CNA_CNAEXT` guard, so it works on
+        // a build whose engine-layer version is zero.
+        let effect = PbrEffect::new(&device)?;
+
+        // Distinguishable values, so a property read back from a neighbouring
+        // slot is visible rather than plausible.
+        effect.set_metallic_factor(0.125)?;
+        effect.set_roughness_factor(0.375)?;
+        effect.set_alpha(0.625)?;
+        effect.set_alpha_cutoff(0.875)?;
+        effect.set_normal_scale(2.5)?;
+        effect.set_occlusion_strength(0.25)?;
+        effect.set_ior(1.45)?;
+        effect.set_specular_factor(0.75)?;
+        for (name, written, read) in [
+            ("metallic", 0.125_f32, effect.metallic_factor()?),
+            ("roughness", 0.375, effect.roughness_factor()?),
+            ("alpha", 0.625, effect.alpha()?),
+            ("alpha cutoff", 0.875, effect.alpha_cutoff()?),
+            ("normal scale", 2.5, effect.normal_scale()?),
+            ("occlusion", 0.25, effect.occlusion_strength()?),
+            ("index of refraction", 1.45, effect.ior()?),
+            ("specular", 0.75, effect.specular_factor()?),
+        ] {
+            findings.scalars.push((name, written, read));
+        }
+
+        effect.set_diffuse_color(Vector3::from_x_and_y_and_z(0.1, 0.2, 0.3))?;
+        effect.set_emissive_factor(Vector3::from_x_and_y_and_z(0.4, 0.5, 0.6))?;
+        findings.colors.push((
+            "albedo",
+            (0.1, 0.2, 0.3),
+            triple(effect.diffuse_color()?),
+        ));
+        findings.colors.push((
+            "emissive",
+            (0.4, 0.5, 0.6),
+            triple(effect.emissive_factor()?),
+        ));
+
+        effect.set_double_sided(true)?;
+        effect.set_vertex_color_enabled(true)?;
+        findings
+            .flags
+            .push(("double sided", effect.double_sided()?));
+        findings
+            .flags
+            .push(("vertex colour", effect.vertex_color_enabled()?));
+
+        for mode in [AlphaMode::Opaque, AlphaMode::Mask, AlphaMode::Blend] {
+            effect.set_alpha_mode(mode)?;
+            findings
+                .alpha_modes
+                .push((format!("{mode:?}"), format!("{:?}", effect.alpha_mode()?)));
+        }
+
+        let mut material = PbrMaterial::canonical_defaults()?;
+        material.metallic_factor = 0.0;
+        material.roughness_factor = 0.5;
+        material.alpha_blend_enabled = true;
+        effect.apply(material)?;
+        findings.applied_material = Some((
+            effect.metallic_factor()?,
+            effect.roughness_factor()?,
+            format!("{:?}", effect.alpha_mode()?),
+        ));
+        findings.device_reachable = effect.graphics_device().PresentationParameters().is_ok();
+
+        if version != 0 {
+            let mut full = PbrMaterialFull::canonical_defaults()?;
+            full.set_metallic_factor(0.1)
+                .set_roughness_factor(0.2)
+                .set_normal_scale(0.3)
+                .set_occlusion_strength(0.4)
+                .set_ior(1.6)
+                .set_specular_factor(0.7)
+                .set_alpha_cutoff(0.8)
+                .set_double_sided(true)
+                .set_output_encoded_to_srgb(true)
+                .set_alpha_mode(AlphaMode::Mask)
+                .set_emissive_factor(Vector3::from_x_and_y_and_z(0.11, 0.22, 0.33));
+
+            // Every slot gets a different transform and coordinate set, so a
+            // slot read back from a neighbour is visible rather than plausible.
+            for (ordinal, slot) in TextureSlot::ALL.into_iter().enumerate() {
+                let ordinal = ordinal as f32;
+                full.set_texture_coordinate_set(slot, (ordinal as i32) % 2)
+                    .set_texture_transform(
+                        slot,
+                        TextureTransform {
+                            offset: (ordinal, ordinal + 0.5),
+                            scale: (1.0 + ordinal, 2.0 + ordinal),
+                            rotation: 0.25 * ordinal,
+                        },
+                    );
+            }
+
+            effect.apply_full(&full)?;
+            let read = effect.extract_full()?;
+            for (name, written, back) in [
+                ("metallic", 0.1_f32, read.metallic_factor()),
+                ("roughness", 0.2, read.roughness_factor()),
+                ("normal scale", 0.3, read.normal_scale()),
+                ("occlusion", 0.4, read.occlusion_strength()),
+                ("index of refraction", 1.6, read.ior()),
+                ("specular", 0.7, read.specular_factor()),
+                ("alpha cutoff", 0.8, read.alpha_cutoff()),
+            ] {
+                findings.full_scalars.push((name, written, back));
+            }
+            findings
+                .full_flags
+                .push(("double sided", read.double_sided()));
+            findings
+                .full_flags
+                .push(("sRGB output", read.output_encoded_to_srgb()));
+            findings
+                .full_flags
+                .push(("alpha mode is mask", read.alpha_mode()? == AlphaMode::Mask));
+            findings.full_emissive = triple(read.emissive_factor());
+
+            for (ordinal, slot) in TextureSlot::ALL.into_iter().enumerate() {
+                let ordinal = ordinal as f32;
+                findings.slots.push((
+                    format!("{slot:?}"),
+                    (ordinal as i32) % 2,
+                    read.texture_coordinate_set(slot),
+                    TextureTransform {
+                        offset: (ordinal, ordinal + 0.5),
+                        scale: (1.0 + ordinal, 2.0 + ordinal),
+                        rotation: 0.25 * ordinal,
+                    },
+                    read.texture_transform(slot),
+                ));
+            }
+
+            let mut invalid = PbrMaterialFull::canonical_defaults()?;
+            invalid.set_texture_coordinate_set(TextureSlot::BaseColor, 5);
+            findings.bad_coordinate_set = effect
+                .apply_full(&invalid)
+                .err()
+                .map(|error| error.to_string());
+
+            // Applying the device state a material implies is a separate
+            // operation, because it changes the device and not the effect.
+            findings.apply_state = full.apply_state(&device).err().map(|e| e.to_string());
+        }
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn the_pbr_effect_round_trips_on_a_device_the_renderer_actually_made() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(DeviceBackedPbrFindings::default()));
+    let game = DeviceBackedPbrGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with a PbrEffect on the game's own device");
+
+    let findings = findings.lock().expect("findings");
+
+    println!("scalars: {:?}", findings.scalars);
+    assert_eq!(
+        findings.scalars.len(),
+        8,
+        "every scalar the effect carries was written and read"
+    );
+    for (name, written, read) in &findings.scalars {
+        assert_eq!(
+            written, read,
+            "{name} came back as {read} rather than {written}"
+        );
+    }
+    println!("colours: {:?}", findings.colors);
+    for (name, written, read) in &findings.colors {
+        assert_eq!(written, read, "{name} came back as {read:?}");
+    }
+    assert_eq!(
+        findings.flags,
+        vec![("double sided", true), ("vertex colour", true)],
+        "both flags round-trip"
+    );
+    println!("alpha modes: {:?}", findings.alpha_modes);
+    for (written, read) in &findings.alpha_modes {
+        assert_eq!(written, read, "every alpha mode survives its own round trip");
+    }
+
+    let (metallic, roughness, mode) = findings
+        .applied_material
+        .clone()
+        .expect("a material applied to the effect");
+    assert_eq!(metallic, 0.0, "applying a material sets the metallic factor");
+    assert_eq!(roughness, 0.5, "and the roughness");
+    assert_eq!(
+        mode, "Blend",
+        "and a blending material selects the blend alpha mode"
+    );
+    assert!(
+        findings.device_reachable,
+        "the effect knows its device, and it is the one that made it"
+    );
+
+    if findings.engine_layer == 0 {
+        println!("engine layer absent; the complete-material half is not qualified here");
+        return;
+    }
+
+    println!("complete material: {:?}", findings.full_scalars);
+    for (name, written, read) in &findings.full_scalars {
+        assert_eq!(
+            written, read,
+            "{name} came back as {read} rather than {written}"
+        );
+    }
+    assert_eq!(
+        findings.full_flags,
+        vec![
+            ("double sided", true),
+            ("sRGB output", true),
+            ("alpha mode is mask", true),
+        ],
+        "the complete material's flags round-trip"
+    );
+    assert_eq!(
+        findings.full_emissive,
+        (0.11, 0.22, 0.33),
+        "and its emissive factor"
+    );
+
+    // Seven slots, each with its own coordinate set and transform: a slot read
+    // back from a neighbour is visible rather than plausible.
+    println!("slots: {} measured", findings.slots.len());
+    assert_eq!(findings.slots.len(), 7, "there are seven per-slot entries");
+    for (slot, written_set, read_set, written_transform, read_transform) in &findings.slots {
+        assert_eq!(
+            written_set, read_set,
+            "slot {slot} kept its own coordinate set"
+        );
+        assert_eq!(
+            written_transform, read_transform,
+            "slot {slot} kept its own transform"
+        );
+    }
+
+    // A coordinate set outside glTF's two is refused when the material is
+    // applied, rather than silently clamped into one of them -- which would
+    // sample the wrong UVs and look almost right.
+    let refused = findings
+        .bad_coordinate_set
+        .as_deref()
+        .expect("an out-of-range coordinate set is refused");
+    assert!(
+        refused.contains("texture-coordinate set must be 0 or 1"),
+        "and refused for being out of range: {refused}"
+    );
+    assert!(
+        findings.apply_state.is_none(),
+        "a material's device state applies to the renderer's own device: {:?}",
+        findings.apply_state
+    );
+}
+
+/// A Rust asset a registered loader builds, so the test can prove the loader
+/// really ran and read the document it was given.
+#[derive(Debug, PartialEq)]
+struct LoadedProbeAsset {
+    origin: String,
+    asset_name: String,
+    container: (u16, u16),
+}
+
+/// Counts its calls, and can be told to fail or to panic.
+struct CountingLoader {
+    calls: Arc<std::sync::atomic::AtomicUsize>,
+    fail: bool,
+    panic: bool,
+}
+
+impl CnbLoader for CountingLoader {
+    fn load(
+        &self,
+        document: &CnbDocument,
+        asset_name: &str,
+    ) -> Result<Arc<dyn std::any::Any + Send + Sync>> {
+        self.calls
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if self.panic {
+            panic!("a loader panic must not unwind into C");
+        }
+        if self.fail {
+            return Err(cna::CnaError::InvalidInput(
+                "this loader refuses every document",
+            ));
+        }
+        Ok(Arc::new(LoadedProbeAsset {
+            origin: document.origin()?,
+            asset_name: asset_name.to_owned(),
+            container: document.container_version()?,
+        }))
+    }
+}
+
+fn custom_cnb_document(type_name: &str, content_name: &str) -> Result<Vec<u8>> {
+    let asset_type = AssetTypeId::custom(type_name)?;
+    let writer = CnbWriter::new(asset_type, 1)?;
+    writer.set_metadata(type_name, content_name)?;
+    writer.build()
+}
+
+/// What the device-backed loader run measured.
+#[derive(Default)]
+struct LoaderFindings {
+    round_trip: Option<(String, String, bool)>,
+    calls: usize,
+    withdrawn: Option<(bool, bool)>,
+    contained: Vec<(&'static str, bool, usize, bool)>,
+}
+
+struct LoaderGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<LoaderFindings>>,
+}
+
+impl GameStateAccess for LoaderGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for LoaderGame {
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let device = game.GraphicsDevice()?;
+        let manager = NativeContentManager::new(&device, "")?;
+        let mut findings = LoaderFindings::default();
+
+        let type_name = "CnaRust.Engine.RoundTripAsset";
+        let asset_type = AssetTypeId::custom(type_name)?;
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let registration = CnbLoaderRegistry::register(
+            type_name,
+            Arc::new(CountingLoader {
+                calls: Arc::clone(&calls),
+                fail: false,
+                panic: false,
+            }),
+        )?;
+
+        let bytes = custom_cnb_document(type_name, "round-trip")?;
+        let document = CnbDocument::parse(&bytes, "round-trip.cnb", ReadLimits::default())?;
+        let loader = CnbLoaderRegistry::resolve_for_document(&document)?;
+        let object = loader.invoke(&document, &manager, "round-trip")?;
+        findings.calls = calls.load(std::sync::atomic::Ordering::SeqCst);
+        let asset = object
+            .downcast_ref::<LoadedProbeAsset>()
+            .ok_or(cna::CnaError::InvalidInput("the loader built another type"))?;
+        findings.round_trip = Some((
+            asset.origin.clone(),
+            asset.asset_name.clone(),
+            asset.container == document.container_version()?,
+        ));
+
+        drop(registration);
+        findings.withdrawn = Some((
+            CnbLoaderRegistry::is_registered(asset_type)?,
+            CnbLoaderRegistry::resolve_for_document(&document).is_err(),
+        ));
+
+        // A failing loader and a panicking one are both contained: neither
+        // unwinds into C, and the process is still usable afterwards.
+        for (label, fail, panic) in [("failing", true, false), ("panicking", false, true)] {
+            let type_name = format!("CnaRust.Engine.{label}Asset");
+            let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let registration = CnbLoaderRegistry::register(
+                &type_name,
+                Arc::new(CountingLoader {
+                    calls: Arc::clone(&calls),
+                    fail,
+                    panic,
+                }),
+            )?;
+            let bytes = custom_cnb_document(&type_name, label)?;
+            let document = CnbDocument::parse(&bytes, "contained.cnb", ReadLimits::default())?;
+            let loader = CnbLoaderRegistry::resolve_for_document(&document)?;
+            let refused = loader.invoke(&document, &manager, label).is_err();
+            findings.contained.push((
+                label,
+                refused,
+                calls.load(std::sync::atomic::Ordering::SeqCst),
+                CnbLoaderRegistry::is_registered(registration.asset_type())?,
+            ));
+            drop(registration);
+        }
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+fn a_rust_loader_runs_on_the_device_the_renderer_actually_made() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(LoaderFindings::default()));
+    let game = LoaderGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with a registered Rust loader");
+
+    let findings = findings.lock().expect("findings");
+    let (origin, name, container) = findings
+        .round_trip
+        .clone()
+        .expect("the loader produced its Rust value");
+    assert_eq!(findings.calls, 1, "the loader really ran, exactly once");
+    assert_eq!(origin, "round-trip.cnb", "and read the document's origin");
+    assert_eq!(name, "round-trip", "and the asset name it was invoked with");
+    assert!(
+        container,
+        "and the container version out of the borrowed document rather than a default"
+    );
+    assert_eq!(
+        findings.withdrawn,
+        Some((false, true)),
+        "dropping the registration withdraws it, and a withdrawn loader no longer resolves"
+    );
+
+    println!("contained: {:?}", findings.contained);
+    for (label, refused, calls, still_registered) in &findings.contained {
+        assert!(refused, "a {label} loader fails the load");
+        assert_eq!(*calls, 1, "and the {label} loader ran");
+        assert!(
+            still_registered,
+            "and the process is still usable afterwards, which is the point of \
+             containing a panic rather than letting it unwind into C"
+        );
+    }
 }
