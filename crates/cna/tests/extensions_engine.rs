@@ -11,6 +11,9 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
+use cna::extensions::pbr::{
+    PbrMaterialExtensions, PbrMaterialFull, SkinnedPbrEffect, ThinFilmIridescence,
+};
 use cna::extensions::engine::{
     supports_shadow_sampling, DirectionalLight, FxaaPass, GpuTimer, Particle,
     ParticleEmitterSettings, ParticleSystem, PostProcessChain, PostProcessContext, PostProcessPass,
@@ -6794,4 +6797,432 @@ fn a_probe_volume_interpolates_its_grid_and_a_baker_draws_six_faces_per_probe() 
             .expect("a baker that cannot capture refuses to");
         println!("baking is unavailable on this renderer: {message}");
     }
+}
+
+/// What the PBR texture-slot, material-identity and thin-film run measured.
+#[derive(Default)]
+struct MaterialFindings {
+    engine_layer: i32,
+    fresh_slots: Vec<(&'static str, bool, bool)>,
+    slot_widths: Vec<(&'static str, i32)>,
+    after_clearing_one: Vec<(&'static str, bool)>,
+    extensions_text: String,
+    material_identity: Vec<(&'static str, bool, bool)>,
+    material_text: String,
+    thin_film: Vec<(&'static str, (f32, f32, f32))>,
+    thin_film_glsl: usize,
+    weights: Vec<(i32, i32)>,
+    bones: Vec<(f32, f32, f32)>,
+    skinned_material: Option<(f32, bool)>,
+}
+
+struct MaterialGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<MaterialFindings>>,
+}
+
+impl GameStateAccess for MaterialGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+/// The nine texture slots, each with the width its probe texture is given.
+const TEXTURE_SLOTS: [(&str, i32); 9] = [
+    ("clearcoat", 2),
+    ("clearcoat roughness", 3),
+    ("clearcoat normal", 4),
+    ("sheen colour", 5),
+    ("sheen roughness", 6),
+    ("transmission", 7),
+    ("thickness", 8),
+    ("iridescence", 9),
+    ("iridescence thickness", 10),
+];
+
+impl Game for MaterialGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+        let mut findings = MaterialFindings {
+            engine_layer: version,
+            ..MaterialFindings::default()
+        };
+
+        // --- the nine texture slots -------------------------------------------
+        let mut extensions = PbrMaterialExtensions::new()?;
+        macro_rules! slot_state {
+            ($label:literal, $has:ident, $get:ident) => {
+                findings.fresh_slots.push((
+                    $label,
+                    extensions.$has(),
+                    extensions.$get()?.is_some(),
+                ));
+            };
+        }
+        slot_state!("clearcoat", has_clearcoat_texture, clearcoat_texture);
+        slot_state!(
+            "clearcoat roughness",
+            has_clearcoat_roughness_texture,
+            clearcoat_roughness_texture
+        );
+        slot_state!(
+            "clearcoat normal",
+            has_clearcoat_normal_texture,
+            clearcoat_normal_texture
+        );
+        slot_state!("sheen colour", has_sheen_color_texture, sheen_color_texture);
+        slot_state!(
+            "sheen roughness",
+            has_sheen_roughness_texture,
+            sheen_roughness_texture
+        );
+        slot_state!(
+            "transmission",
+            has_transmission_texture,
+            transmission_texture
+        );
+        slot_state!("thickness", has_thickness_texture, thickness_texture);
+        slot_state!("iridescence", has_iridescence_texture, iridescence_texture);
+        slot_state!(
+            "iridescence thickness",
+            has_iridescence_thickness_texture,
+            iridescence_thickness_texture
+        );
+
+        // Every slot gets a texture of its own distinct width, so a getter
+        // wired to the wrong native route reads the wrong number rather than
+        // merely "a texture".
+        let width = |label: &str| -> i32 {
+            TEXTURE_SLOTS
+                .iter()
+                .find(|(name, _)| *name == label)
+                .map_or(1, |(_, width)| *width)
+        };
+        extensions.set_clearcoat_texture(Some(Texture2D::new(&device, width("clearcoat"), 1)?))?;
+        extensions.set_clearcoat_roughness_texture(Some(Texture2D::new(
+            &device,
+            width("clearcoat roughness"),
+            1,
+        )?))?;
+        extensions.set_clearcoat_normal_texture(Some(Texture2D::new(
+            &device,
+            width("clearcoat normal"),
+            1,
+        )?))?;
+        extensions.set_sheen_color_texture(Some(Texture2D::new(
+            &device,
+            width("sheen colour"),
+            1,
+        )?))?;
+        extensions.set_sheen_roughness_texture(Some(Texture2D::new(
+            &device,
+            width("sheen roughness"),
+            1,
+        )?))?;
+        extensions.set_transmission_texture(Some(Texture2D::new(
+            &device,
+            width("transmission"),
+            1,
+        )?))?;
+        extensions.set_thickness_texture(Some(Texture2D::new(&device, width("thickness"), 1)?))?;
+        extensions.set_iridescence_texture(Some(Texture2D::new(
+            &device,
+            width("iridescence"),
+            1,
+        )?))?;
+        extensions.set_iridescence_thickness_texture(Some(Texture2D::new(
+            &device,
+            width("iridescence thickness"),
+            1,
+        )?))?;
+
+        macro_rules! slot_width {
+            ($label:literal, $get:ident) => {
+                findings.slot_widths.push((
+                    $label,
+                    extensions
+                        .$get()?
+                        .map_or(0, |view| view.texture().Width()),
+                ));
+            };
+        }
+        slot_width!("clearcoat", clearcoat_texture);
+        slot_width!("clearcoat roughness", clearcoat_roughness_texture);
+        slot_width!("clearcoat normal", clearcoat_normal_texture);
+        slot_width!("sheen colour", sheen_color_texture);
+        slot_width!("sheen roughness", sheen_roughness_texture);
+        slot_width!("transmission", transmission_texture);
+        slot_width!("thickness", thickness_texture);
+        slot_width!("iridescence", iridescence_texture);
+        slot_width!("iridescence thickness", iridescence_thickness_texture);
+
+        extensions.set_transmission_texture(None)?;
+        macro_rules! slot_has {
+            ($label:literal, $has:ident) => {
+                findings
+                    .after_clearing_one
+                    .push(($label, extensions.$has()));
+            };
+        }
+        slot_has!("clearcoat", has_clearcoat_texture);
+        slot_has!("transmission", has_transmission_texture);
+        slot_has!("thickness", has_thickness_texture);
+        findings.extensions_text = extensions.to_native_string()?;
+
+        // --- material identity --------------------------------------------------
+        let first = PbrMaterialFull::canonical_defaults()?;
+        let same = PbrMaterialFull::canonical_defaults()?;
+        findings.material_identity.push((
+            "two sets of defaults",
+            first.same_material(&same)?,
+            first.hash_code()? == same.hash_code()?,
+        ));
+        let mut different = PbrMaterialFull::canonical_defaults()?;
+        different.set_emissive_factor(Vector3::from_x_and_y_and_z(0.75, 0.25, 0.5));
+        findings.material_identity.push((
+            "one field changed",
+            first.same_material(&different)?,
+            first.hash_code()? == different.hash_code()?,
+        ));
+        findings.material_text = first.to_native_string()?;
+
+        // --- thin-film iridescence ----------------------------------------------
+        let base = Vector3::from_x_and_y_and_z(0.04, 0.05, 0.06);
+        for (name, outside, film, cos_theta, thickness) in [
+            ("no film at all", 1.0_f32, 1.3_f32, 1.0_f32, 0.0_f32),
+            ("no film, seen edge-on", 1.0, 1.3, 0.2, 0.0),
+            ("a film matching the air", 1.0, 1.0, 1.0, 400.0),
+            ("total internal reflection", 1.5, 1.0, 0.1, 400.0),
+            ("four hundred nanometres", 1.0, 1.3, 1.0, 400.0),
+            ("eight hundred nanometres", 1.0, 1.3, 1.0, 800.0),
+            ("at a grazing angle", 1.0, 1.3, 0.2, 400.0),
+        ] {
+            findings.thin_film.push((
+                name,
+                triple(ThinFilmIridescence::evaluate(
+                    outside, film, cos_theta, thickness, base,
+                )?),
+            ));
+        }
+        findings.thin_film_glsl = ThinFilmIridescence::glsl()?.len();
+
+        // --- the skinned PBR effect ---------------------------------------------
+        let skinned = SkinnedPbrEffect::new(&device)?;
+        for asked in [1_i32, 2, 4] {
+            skinned.set_weights_per_vertex(asked)?;
+            findings.weights.push((asked, skinned.weights_per_vertex()?));
+        }
+        let palette = vec![
+            Matrix::CreateTranslation(Vector3::from_x_and_y_and_z(1.0, 0.0, 0.0)),
+            Matrix::CreateTranslation(Vector3::from_x_and_y_and_z(0.0, 2.0, 0.0)),
+            Matrix::CreateTranslation(Vector3::from_x_and_y_and_z(0.0, 0.0, 3.0)),
+        ];
+        skinned.set_bone_transforms(&palette)?;
+        findings.bones = skinned
+            .bone_transforms(palette.len())?
+            .into_iter()
+            .map(|bone| (bone.M41, bone.M42, bone.M43))
+            .collect();
+
+        let mut material = PbrMaterialFull::canonical_defaults()?;
+        material.set_emissive_factor(Vector3::from_x_and_y_and_z(0.125, 0.25, 0.5));
+        skinned.apply_full(&material)?;
+        let extracted = skinned.extract_full()?;
+        findings.skinned_material = Some((
+            extracted.emissive_factor().X,
+            extracted.same_material(&material)?,
+        ));
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn the_material_extension_texture_slots_are_nine_independent_retained_dependencies() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(MaterialFindings::default()));
+    let game = MaterialGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with material extensions and a skinned PBR effect");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+
+    // --- the nine texture slots ---------------------------------------------
+    println!("fresh slots: {:?}", findings.fresh_slots);
+    assert_eq!(findings.fresh_slots.len(), 9, "there are nine slots");
+    for (name, has, published) in &findings.fresh_slots {
+        assert!(!has, "the {name} slot starts empty");
+        assert!(!published, "and publishes no view while it is");
+    }
+
+    // Each slot reports the width of the texture that slot was given, so a
+    // getter wired to a neighbouring route reads the wrong number.
+    println!("slot widths: {:?}", findings.slot_widths);
+    let expected: Vec<(&str, i32)> = TEXTURE_SLOTS.to_vec();
+    assert_eq!(
+        findings.slot_widths, expected,
+        "every slot reports its own texture, not a neighbour's"
+    );
+
+    assert_eq!(
+        findings.after_clearing_one,
+        vec![
+            ("clearcoat", true),
+            ("transmission", false),
+            ("thickness", true),
+        ],
+        "clearing one slot leaves the others alone"
+    );
+    assert!(
+        !findings.extensions_text.is_empty(),
+        "the extension set renders itself as text"
+    );
+
+    // --- material identity ---------------------------------------------------
+    println!("material identity: {:?}", findings.material_identity);
+    assert_eq!(
+        findings.material_identity[0],
+        ("two sets of defaults", true, true),
+        "two identical materials compare equal and hash equally"
+    );
+    let (_, same, same_hash) = findings.material_identity[1];
+    assert!(!same, "changing a field makes them different materials");
+    assert!(
+        !same_hash,
+        "and the hash follows the field rather than ignoring it"
+    );
+    assert!(
+        !findings.material_text.is_empty(),
+        "and a material renders itself as text"
+    );
+
+    // --- thin-film iridescence ------------------------------------------------
+    println!("thin film: {:?}", findings.thin_film);
+    let film = |name: &str| -> (f32, f32, f32) {
+        findings
+            .thin_film
+            .iter()
+            .find(|(label, _)| *label == name)
+            .expect("a recorded film value")
+            .1
+    };
+    // A film of no thickness is *exactly* the base Schlick reflectance -- a
+    // deliberate departure from the glTF reference, whose 1e-5 floor leaves a
+    // coloured residue of about 0.007 with the film switched off. Head-on the
+    // Schlick term vanishes and the answer is the base itself; edge-on it is
+    // the base plus `(1 - base) * (1 - cos)^5`, which is a number rather than a
+    // direction.
+    let base = (0.04_f32, 0.05_f32, 0.06_f32);
+    let head_on = film("no film at all");
+    assert!(
+        (head_on.0 - base.0).abs() < 1e-6
+            && (head_on.1 - base.1).abs() < 1e-6
+            && (head_on.2 - base.2).abs() < 1e-6,
+        "a film of no thickness is the base reflectance exactly, and gave {head_on:?}"
+    );
+    let edge_on = film("no film, seen edge-on");
+    let schlick = (1.0_f32 - 0.2).powi(5);
+    for (channel, base_channel) in [
+        (edge_on.0, base.0),
+        (edge_on.1, base.1),
+        (edge_on.2, base.2),
+    ] {
+        let expected = base_channel + (1.0 - base_channel) * schlick;
+        assert!(
+            (channel - expected).abs() < 1e-4,
+            "edge-on with no film is Schlick's own curve: {channel} against {expected}"
+        );
+    }
+    // A film whose index matches the medium around it is *not* short-circuited:
+    // the Airy summation still runs and shifts the colour slightly. Close to
+    // the base, but not the base -- which is worth knowing before treating
+    // "same index" as "no film".
+    let matched = film("a film matching the air");
+    assert!(
+        matched != base,
+        "a matching index is not a special case upstream: {matched:?}"
+    );
+    for (channel, base_channel) in [
+        (matched.0, base.0),
+        (matched.1, base.1),
+        (matched.2, base.2),
+    ] {
+        assert!(
+            (channel - base_channel).abs() < 0.02,
+            "but it stays near the base: {channel} against {base_channel}"
+        );
+    }
+    // Light that cannot enter the film all comes back.
+    assert_eq!(
+        film("total internal reflection"),
+        (1.0, 1.0, 1.0),
+        "total internal reflection returns everything"
+    );
+    // A real film interferes, and differently at different thicknesses and
+    // angles: three values that were all equal would mean the film was ignored.
+    let four_hundred = film("four hundred nanometres");
+    let eight_hundred = film("eight hundred nanometres");
+    let grazing = film("at a grazing angle");
+    assert!(
+        four_hundred != base,
+        "a four-hundred-nanometre film changes the reflectance: {four_hundred:?}"
+    );
+    assert!(
+        four_hundred != eight_hundred,
+        "and doubling its thickness changes it again: {four_hundred:?} against {eight_hundred:?}"
+    );
+    assert!(
+        four_hundred != grazing,
+        "and so does looking along it: {four_hundred:?} against {grazing:?}"
+    );
+    for (name, value) in &findings.thin_film {
+        for channel in [value.0, value.1, value.2] {
+            assert!(
+                (0.0..=1.0).contains(&channel),
+                "{name} produced a reflectance outside zero-to-one: {value:?}"
+            );
+        }
+    }
+    assert!(
+        findings.thin_film_glsl > 0,
+        "the shader-side evaluation is published rather than left to be reimplemented"
+    );
+
+    // --- the skinned PBR effect ------------------------------------------------
+    println!("weights per vertex: {:?}", findings.weights);
+    for (asked, got) in &findings.weights {
+        assert_eq!(asked, got, "the bone-weight count round-trips");
+    }
+    assert_eq!(
+        findings.bones,
+        vec![(1.0, 0.0, 0.0), (0.0, 2.0, 0.0), (0.0, 0.0, 3.0)],
+        "the bone palette comes back in the order it went in"
+    );
+    let (emissive, same) = findings
+        .skinned_material
+        .expect("a material through the skinned effect");
+    assert!(
+        (emissive - 0.125).abs() < 1e-4,
+        "a material applied to a skinned effect reads back as itself: {emissive}"
+    );
+    assert!(
+        same,
+        "and CNA agrees it is the same material that went in"
+    );
 }

@@ -3352,6 +3352,144 @@ extern "C" {
     pub fn cna_pbr_material_extensions_create(
         argument0: *mut CNA_PbrMaterialExtensionsHandle,
     ) -> CNA_Result;
+    pub fn cna_pbr_material_ext_copy_to_string(
+        argument0: *const CNA_PbrMaterialEXT,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_ext_equals(
+        argument0: *const CNA_PbrMaterialEXT,
+        argument1: *const CNA_PbrMaterialEXT,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_ext_get_hash_code(
+        argument0: *const CNA_PbrMaterialEXT,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_copy_to_string(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_clearcoat_normal_texture(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_clearcoat_roughness_texture(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_clearcoat_texture(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_iridescence_texture(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_iridescence_thickness_texture(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_sheen_color_texture(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_sheen_roughness_texture(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_thickness_texture(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_transmission_texture(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_clearcoat_normal_texture(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_clearcoat_roughness_texture(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_clearcoat_texture(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_iridescence_texture(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_iridescence_thickness_texture(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_sheen_color_texture(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_sheen_roughness_texture(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_thickness_texture(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_transmission_texture(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_skinned_pbr_effect_apply_material(
+        argument0: CNA_EffectHandle,
+        argument1: *const CNA_PbrMaterialEXT,
+    ) -> CNA_Result;
+    pub fn cna_skinned_pbr_effect_copy_bone_transforms(
+        argument0: CNA_EffectHandle,
+        argument1: u64,
+        argument2: *mut CNA_Matrix,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_skinned_pbr_effect_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_skinned_pbr_effect_extract_material(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_PbrMaterialEXT,
+    ) -> CNA_Result;
+    pub fn cna_skinned_pbr_effect_get_weights_per_vertex(
+        argument0: CNA_EffectHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_skinned_pbr_effect_set_bone_transforms(
+        argument0: CNA_EffectHandle,
+        argument1: *const CNA_Matrix,
+        argument2: u64,
+    ) -> CNA_Result;
+    pub fn cna_skinned_pbr_effect_set_weights_per_vertex(
+        argument0: CNA_EffectHandle,
+        argument1: i32,
+    ) -> CNA_Result;
+    pub fn cna_thin_film_iridescence_copy_glsl(
+        argument0: *mut c_char,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_thin_film_iridescence_evaluate(
+        argument0: f32,
+        argument1: f32,
+        argument2: f32,
+        argument3: f32,
+        argument4: *const CNA_Vector3,
+        argument5: *mut CNA_Vector3,
+    ) -> CNA_Result;
     pub fn cna_pbr_material_extensions_destroy(
         argument0: CNA_PbrMaterialExtensionsHandle,
     ) -> CNA_Result;

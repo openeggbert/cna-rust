@@ -143,6 +143,7 @@ the criterion above is unchanged, only its precondition has been met.
 | the clustered forward effect | `clustered_forward_effect` (23 of 29; the other six wait on the PBR material extensions, the light probes and the area lights) | 23 | `VERIFIED_STATE` |
 | light probes, image-based lights and the environment processor | `light_probe_ext`, `image_based_light_ext`, `environment_processor` | 34 | `VERIFIED_GPU` |
 | probe volumes and the probe baker | `light_probe_volume_ext`, `light_probe_baker` | 27 | `VERIFIED_GPU` |
+| the material extension texture slots, material identity, thin-film iridescence and the skinned PBR effect | `pbr_material_extensions_*_texture`, `pbr_material_ext`, `thin_film_iridescence`, `skinned_pbr_effect` | 31 | `VERIFIED_STATE` |
 
 ### What the GPU artifact changed about the evidence
 
@@ -328,4 +329,28 @@ three found something:
   plane below the near one -- left both distances at the values the last
   accepted call set. An implementation that wrote the near plane before
   validating the far one would fail exactly here and nowhere else.
+- **The nine material-extension texture slots are bindable after all.** An
+  earlier note in this crate said they were "deliberately not exposed" because
+  a safe Rust value holding one would be a raw-handle leak. That was true of a
+  design that stored the handle; it is not true of the one this module has
+  since settled on. `cna_pbr_material_extensions_get_*_texture` publishes a
+  fresh handle through the same `CreateBorrowedRenderTarget2D` path the
+  clustered forward effect's opaque frame uses, so the getter is a
+  lifetime-bound `BorrowedRenderTarget`, and the setter *takes* the texture the
+  way every other `RETAINED_DEPENDENCY` in this module does. The doc comment
+  has been replaced rather than left standing.
+- **`SkinnedPbrEffect` had no `Drop` and aborted the game at shutdown.** The
+  type was written without one, and CNA counts an effect against the parent
+  game's owned children: the first test to construct one failed with "All owned
+  C child resources must be destroyed before the game" -- at teardown, naming
+  nothing. Found the same way the earlier leaks were, and fixed the same way.
+- **A thin film of zero thickness is the base reflectance *exactly*, which the
+  glTF reference implementation is not.** Upstream departs from it on purpose:
+  the reference clamps `R12 * R23` to a floor of 1e-5 rather than to zero, so at
+  zero thickness the first interference order survives as a coloured residue of
+  about 0.007 -- and a material carrying the extension with the film switched
+  off would not be the material without it. A film whose index *matches* the
+  medium around it is not short-circuited, though: the Airy summation still
+  runs and shifts the colour by about 0.001, so "same index" is not "no film".
+  Total internal reflection returns white.
 

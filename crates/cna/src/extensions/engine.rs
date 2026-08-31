@@ -178,7 +178,11 @@ pub struct BorrowedRenderTarget<'owner> {
 }
 
 impl BorrowedRenderTarget<'_> {
-    fn new(native: &Arc<Native>, device: &GraphicsDevice, handle: sys::CNA_Handle) -> Result<Self> {
+    pub(crate) fn new(
+        native: &Arc<Native>,
+        device: &GraphicsDevice,
+        handle: sys::CNA_Handle,
+    ) -> Result<Self> {
         let texture =
             Texture2D::from_borrowed_handle(device, handle, Arc::new(ParentOwnedBorrow))?;
         Ok(Self {
@@ -1337,6 +1341,14 @@ impl Drop for ShadowMap {
         // can still be outstanding here.
         let _ = self.core.release();
     }
+}
+
+pub(crate) fn matrix_to_native(value: Matrix) -> sys::CNA_Matrix {
+    native_matrix(value)
+}
+
+pub(crate) fn matrix_from_native(value: sys::CNA_Matrix) -> Matrix {
+    from_native_matrix(value)
 }
 
 fn native_matrix(value: Matrix) -> sys::CNA_Matrix {

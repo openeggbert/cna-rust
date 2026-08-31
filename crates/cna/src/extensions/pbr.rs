@@ -19,9 +19,10 @@ use std::sync::Arc;
 use cna_sys as sys;
 
 use crate::error::{CnaError, Result};
-use crate::graphics::GraphicsDevice;
+use crate::extensions::engine::BorrowedRenderTarget;
+use crate::graphics::{GraphicsDevice, GraphicsResource, Texture2D};
 use crate::native::Native;
-use crate::value::{Color, Vector3};
+use crate::value::{Color, Matrix, Vector3};
 
 /// The engine-layer revision the linked library was built with.
 ///
@@ -981,14 +982,32 @@ impl PbrEffect {
 /// the largest single engine-layer family and upstream keeps it behind a
 /// handle so it can grow without moving anything.
 ///
-/// The texture slots are deliberately not exposed. They are non-owning handles
-/// in the canonical API, and a safe Rust value holding one would be a
-/// raw-handle leak; the same rule that keeps textures off [`PbrMaterialFull`]
-/// keeps them off this.
-#[derive(Debug)]
+/// The nine texture slots are `RETAINED_DEPENDENCY`. CNA keeps a raw
+/// `Texture2D*` in each and retains nothing, so the setters *take* the texture
+/// and this value holds it for exactly as long as CNA points at it. The
+/// getters hand back a lifetime-bound [`BorrowedRenderTarget`], because the
+/// handle CNA publishes there is a fresh one that has to be released.
 pub struct PbrMaterialExtensions {
     native: Arc<Native>,
     handle: sys::CNA_PbrMaterialExtensionsHandle,
+    textures: ExtensionTextures,
+}
+
+/// The nine texture slots, held as Rust resources.
+///
+/// CNA stores a raw `Texture2D*` in each slot and retains nothing, so these are
+/// what keep the textures alive for exactly as long as CNA points at them.
+#[derive(Default)]
+struct ExtensionTextures {
+    clearcoat: Option<Texture2D>,
+    clearcoat_roughness: Option<Texture2D>,
+    clearcoat_normal: Option<Texture2D>,
+    sheen_color: Option<Texture2D>,
+    sheen_roughness: Option<Texture2D>,
+    transmission: Option<Texture2D>,
+    thickness: Option<Texture2D>,
+    iridescence: Option<Texture2D>,
+    iridescence_thickness: Option<Texture2D>,
 }
 
 macro_rules! extension_scalar {
@@ -1060,7 +1079,11 @@ impl PbrMaterialExtensions {
         let mut handle = sys::CNA_INVALID_HANDLE;
         // SAFETY: the output is a live local receiving a newly owned handle.
         native.check(unsafe { (native.runtime.pbr_ext_create)(&mut handle) })?;
-        Ok(Self { native, handle })
+        Ok(Self {
+            native,
+            handle,
+            textures: ExtensionTextures::default(),
+        })
     }
 
     /// Copies every value from `source` into this set.
@@ -1120,5 +1143,442 @@ impl Drop for PbrMaterialExtensions {
     fn drop(&mut self) {
         // SAFETY: the handle is owned by this value and released exactly once.
         let _ = unsafe { (self.native.runtime.pbr_ext_destroy)(self.handle) };
+    }
+}
+
+impl core::fmt::Debug for PbrMaterialExtensions {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("PbrMaterialExtensions")
+            .field("handle", &self.handle)
+            .finish_non_exhaustive()
+    }
+}
+
+/// CNA's size-then-copy text protocol.
+fn copy_native_text(
+    native: &Arc<Native>,
+    mut route: impl FnMut(*mut core::ffi::c_char, u64, *mut u64) -> sys::CNA_Result,
+) -> Result<String> {
+    let mut required = 0_u64;
+    let probe = route(core::ptr::null_mut(), 0, &mut required);
+    if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+        native.check(probe)?;
+    }
+    let capacity =
+        usize::try_from(required).map_err(|_| CnaError::InvalidInput("CNA text is too large"))?;
+    if capacity == 0 {
+        return Ok(String::new());
+    }
+    let mut buffer = vec![0_u8; capacity];
+    let mut written = 0_u64;
+    native.check(route(
+        buffer.as_mut_ptr().cast::<core::ffi::c_char>(),
+        required,
+        &mut written,
+    ))?;
+    let written =
+        usize::try_from(written).map_err(|_| CnaError::InvalidInput("CNA text is too large"))?;
+    buffer.truncate(written.min(capacity));
+    while buffer.last() == Some(&0) {
+        buffer.pop();
+    }
+    String::from_utf8(buffer).map_err(|_| CnaError::InvalidInput("CNA text is not valid UTF-8"))
+}
+
+macro_rules! extension_texture {
+    ($field:ident, $get:ident, $set:ident, $has:ident, $native_get:ident, $native_set:ident, $doc:literal) => {
+        #[doc = $doc]
+        ///
+        /// The view borrows this value: CNA publishes a *fresh* handle for the
+        /// slot, which has to be released, so it is a lifetime-bound view
+        /// rather than a plain texture.
+        pub fn $get(&self) -> Result<Option<BorrowedRenderTarget<'_>>> {
+            let mut value = sys::CNA_INVALID_HANDLE;
+            // SAFETY: the handle is owned and the output is a live local.
+            self.native
+                .check(unsafe { (self.native.engine.$native_get)(self.handle, &mut value) })?;
+            if value == sys::CNA_INVALID_HANDLE {
+                return Ok(None);
+            }
+            let Some(device) = self.textures.$field.as_ref().and_then(Texture2D::GraphicsDevice)
+            else {
+                // SAFETY: the handle is the view CNA just published; releasing
+                // it here rather than leaking it is the only correct choice
+                // when there is no device to wrap it with.
+                let _ = unsafe { (self.native.render_target_destroy)(value) };
+                return Err(CnaError::InvalidInput(
+                    "the texture slot names a texture this value does not hold",
+                ));
+            };
+            BorrowedRenderTarget::new(&self.native, device, value).map(Some)
+        }
+
+        #[doc = $doc]
+        ///
+        /// **Takes** the texture: CNA keeps a raw pointer and retains nothing,
+        /// so this value holds it for exactly as long as CNA points at it, and
+        /// `None` clears the slot and releases the previous one.
+        pub fn $set(&mut self, texture: Option<Texture2D>) -> Result<()> {
+            let handle = match texture.as_ref() {
+                Some(texture) => texture.handle()?,
+                None => sys::CNA_INVALID_HANDLE,
+            };
+            // SAFETY: the extensions handle is owned and the texture handle is
+            // live for the call, kept alive afterwards by the value this
+            // stores.
+            self.native
+                .check(unsafe { (self.native.engine.$native_set)(self.handle, handle) })?;
+            self.textures.$field = texture;
+            Ok(())
+        }
+
+        #[doc = $doc]
+        ///
+        /// Whether the slot is filled, without publishing a view to ask.
+        #[must_use]
+        pub const fn $has(&self) -> bool {
+            self.textures.$field.is_some()
+        }
+    };
+}
+
+impl PbrMaterialExtensions {
+    extension_texture!(
+        clearcoat,
+        clearcoat_texture,
+        set_clearcoat_texture,
+        has_clearcoat_texture,
+        pbr_material_extensions_get_clearcoat_texture,
+        pbr_material_extensions_set_clearcoat_texture,
+        "The clearcoat strength texture."
+    );
+    extension_texture!(
+        clearcoat_roughness,
+        clearcoat_roughness_texture,
+        set_clearcoat_roughness_texture,
+        has_clearcoat_roughness_texture,
+        pbr_material_extensions_get_clearcoat_roughness_texture,
+        pbr_material_extensions_set_clearcoat_roughness_texture,
+        "The clearcoat roughness texture."
+    );
+    extension_texture!(
+        clearcoat_normal,
+        clearcoat_normal_texture,
+        set_clearcoat_normal_texture,
+        has_clearcoat_normal_texture,
+        pbr_material_extensions_get_clearcoat_normal_texture,
+        pbr_material_extensions_set_clearcoat_normal_texture,
+        "The clearcoat normal map, which is separate from the base normal map."
+    );
+    extension_texture!(
+        sheen_color,
+        sheen_color_texture,
+        set_sheen_color_texture,
+        has_sheen_color_texture,
+        pbr_material_extensions_get_sheen_color_texture,
+        pbr_material_extensions_set_sheen_color_texture,
+        "The sheen colour texture."
+    );
+    extension_texture!(
+        sheen_roughness,
+        sheen_roughness_texture,
+        set_sheen_roughness_texture,
+        has_sheen_roughness_texture,
+        pbr_material_extensions_get_sheen_roughness_texture,
+        pbr_material_extensions_set_sheen_roughness_texture,
+        "The sheen roughness texture."
+    );
+    extension_texture!(
+        transmission,
+        transmission_texture,
+        set_transmission_texture,
+        has_transmission_texture,
+        pbr_material_extensions_get_transmission_texture,
+        pbr_material_extensions_set_transmission_texture,
+        "The transmission factor texture."
+    );
+    extension_texture!(
+        thickness,
+        thickness_texture,
+        set_thickness_texture,
+        has_thickness_texture,
+        pbr_material_extensions_get_thickness_texture,
+        pbr_material_extensions_set_thickness_texture,
+        "The volume thickness texture."
+    );
+    extension_texture!(
+        iridescence,
+        iridescence_texture,
+        set_iridescence_texture,
+        has_iridescence_texture,
+        pbr_material_extensions_get_iridescence_texture,
+        pbr_material_extensions_set_iridescence_texture,
+        "The iridescence strength texture."
+    );
+    extension_texture!(
+        iridescence_thickness,
+        iridescence_thickness_texture,
+        set_iridescence_thickness_texture,
+        has_iridescence_thickness_texture,
+        pbr_material_extensions_get_iridescence_thickness_texture,
+        pbr_material_extensions_set_iridescence_thickness_texture,
+        "The iridescence film thickness texture."
+    );
+
+    /// CNA's own rendering of this extension set as text.
+    pub fn to_native_string(&self) -> Result<String> {
+        let native = Arc::clone(&self.native);
+        let handle = self.handle;
+        copy_native_text(&native, |destination, capacity, out_bytes| {
+            // SAFETY: the handle is owned and this is CNA's size-then-copy
+            // protocol, driven by `copy_native_text`.
+            unsafe {
+                (native.engine.pbr_material_extensions_copy_to_string)(
+                    handle,
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+    }
+}
+
+impl PbrMaterialFull {
+    /// Whether CNA considers this the same material as `other`.
+    ///
+    /// Its own comparison, not a field-by-field Rust one: the structure carries
+    /// texture handle slots and reserved padding, and only upstream knows which
+    /// of them take part.
+    pub fn same_material(&self, other: &Self) -> Result<bool> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: both structures are live locals CNA reads during the call.
+        native.check(unsafe {
+            (native.engine.pbr_material_ext_equals)(&self.inner, &other.inner, &mut value)
+        })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    /// CNA's own hash of this material.
+    pub fn hash_code(&self) -> Result<u64> {
+        let native = Native::process()?;
+        let mut value = 0_u64;
+        // SAFETY: the structure is a live local CNA reads during the call.
+        native.check(unsafe {
+            (native.engine.pbr_material_ext_get_hash_code)(&self.inner, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// CNA's own rendering of this material as text.
+    pub fn to_native_string(&self) -> Result<String> {
+        let native = Native::process()?;
+        let inner = self.inner;
+        copy_native_text(&native, |destination, capacity, out_bytes| {
+            // SAFETY: the structure is a live local and this is CNA's
+            // size-then-copy protocol, driven by `copy_native_text`.
+            unsafe {
+                (native.engine.pbr_material_ext_copy_to_string)(
+                    &inner,
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+    }
+}
+
+/// The thin-film interference a `KHR_materials_iridescence` surface shows.
+///
+/// Two pure functions and no state: the value a shader computes per pixel, and
+/// the GLSL that computes it, so a hand-written shader and this crate cannot
+/// drift apart about what iridescence means.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub struct ThinFilmIridescence;
+
+impl ThinFilmIridescence {
+    /// The interference colour for one viewing angle and film thickness.
+    ///
+    /// `cos_theta` is the cosine of the angle between the view and the normal,
+    /// `thickness_nm` the film thickness in nanometres, and `base_f0` the
+    /// surface's normal-incidence reflectance underneath the film.
+    pub fn evaluate(
+        outside_ior: f32,
+        film_ior: f32,
+        cos_theta: f32,
+        thickness_nm: f32,
+        base_f0: Vector3,
+    ) -> Result<Vector3> {
+        let native = Native::process()?;
+        let base = sys::CNA_Vector3 {
+            x: base_f0.X,
+            y: base_f0.Y,
+            z: base_f0.Z,
+        };
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the reflectance is borrowed for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.thin_film_iridescence_evaluate)(
+                outside_ior,
+                film_ior,
+                cos_theta,
+                thickness_nm,
+                &base,
+                &mut value,
+            )
+        })?;
+        Ok(Vector3 {
+            X: value.x,
+            Y: value.y,
+            Z: value.z,
+        })
+    }
+
+    /// The GLSL that evaluates the same interference.
+    pub fn glsl() -> Result<String> {
+        let native = Native::process()?;
+        let api = Arc::clone(&native);
+        copy_native_text(&native, |destination, capacity, out_bytes| {
+            // SAFETY: CNA's size-then-copy protocol, driven by
+            // `copy_native_text`.
+            unsafe {
+                (api.engine.thin_film_iridescence_copy_glsl)(destination, capacity, out_bytes)
+            }
+        })
+    }
+}
+
+/// A physically based effect that also skins its vertices.
+///
+/// `OWNED`. The same material model as [`PbrEffect`], plus the bone palette an
+/// animated mesh needs -- and CNA refuses the material routes when the handle
+/// is the wrong kind of effect, which is why the two are separate types here
+/// rather than one with a flag.
+pub struct SkinnedPbrEffect {
+    native: Arc<Native>,
+    handle: sys::CNA_EffectHandle,
+    device: GraphicsDevice,
+}
+
+impl SkinnedPbrEffect {
+    /// Creates the effect on a device.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.runtime.skinned_pbr_effect_create)(device.handle()?, &mut handle)
+        })?;
+        Ok(Self {
+            native: Arc::clone(native),
+            handle,
+            device: device.clone(),
+        })
+    }
+
+    /// The device this effect belongs to.
+    #[must_use]
+    pub const fn graphics_device(&self) -> &GraphicsDevice {
+        &self.device
+    }
+
+    /// How many bone weights each vertex carries.
+    pub fn weights_per_vertex(&self) -> Result<i32> {
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.runtime.skinned_pbr_effect_get_weights_per_vertex)(self.handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Sets it.
+    pub fn set_weights_per_vertex(&self, value: i32) -> Result<()> {
+        // SAFETY: the handle is owned.
+        self.native.check(unsafe {
+            (self.native.runtime.skinned_pbr_effect_set_weights_per_vertex)(self.handle, value)
+        })
+    }
+
+    /// Uploads the bone palette.
+    pub fn set_bone_transforms(&self, transforms: &[Matrix]) -> Result<()> {
+        let native_transforms: Vec<sys::CNA_Matrix> = transforms
+            .iter()
+            .copied()
+            .map(crate::extensions::engine::matrix_to_native)
+            .collect();
+        // SAFETY: the handle is owned and the array is borrowed for the call
+        // with its own length.
+        self.native.check(unsafe {
+            (self.native.runtime.skinned_pbr_effect_set_bone_transforms)(
+                self.handle,
+                native_transforms.as_ptr(),
+                native_transforms.len() as u64,
+            )
+        })
+    }
+
+    /// Reads the bone palette back.
+    pub fn bone_transforms(&self, requested: usize) -> Result<Vec<Matrix>> {
+        let mut buffer = vec![sys::CNA_Matrix::default(); requested];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `requested`
+        // writable matrices, which is the capacity passed alongside it.
+        self.native.check(unsafe {
+            (self.native.runtime.skinned_pbr_effect_copy_bone_transforms)(
+                self.handle,
+                requested as u64,
+                buffer.as_mut_ptr(),
+                buffer.len() as u64,
+                &mut count,
+            )
+        })?;
+        let count = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("CNA reported more bones than fit in memory"))?;
+        Ok(buffer
+            .into_iter()
+            .take(count.min(requested))
+            .map(crate::extensions::engine::matrix_from_native)
+            .collect())
+    }
+
+    /// Applies a complete material, every field of which crosses.
+    pub fn apply_full(&self, material: &PbrMaterialFull) -> Result<()> {
+        // SAFETY: the handle is owned and the material is a live local CNA
+        // reads during the call.
+        self.native.check(unsafe {
+            (self.native.engine.skinned_pbr_effect_apply_material)(self.handle, &material.inner)
+        })
+    }
+
+    /// Reads the complete material this effect currently carries.
+    pub fn extract_full(&self) -> Result<PbrMaterialFull> {
+        let mut inner = sys::CNA_PbrMaterialEXT {
+            struct_size: core::mem::size_of::<sys::CNA_PbrMaterialEXT>() as u32,
+            struct_version: 1,
+            ..sys::CNA_PbrMaterialEXT::default()
+        };
+        // SAFETY: the handle is owned and the structure is a caller-owned
+        // versioned output.
+        self.native.check(unsafe {
+            (self.native.engine.skinned_pbr_effect_extract_material)(self.handle, &mut inner)
+        })?;
+        Ok(PbrMaterialFull { inner })
+    }
+}
+
+impl Drop for SkinnedPbrEffect {
+    fn drop(&mut self) {
+        // SAFETY: the handle is owned by this value and released exactly once.
+        // CNA counts it against the parent game's owned children and refuses to
+        // destroy a game while one is outstanding, so leaving it to the process
+        // would abort at shutdown rather than leak quietly.
+        let _ = unsafe { (self.native.effect_destroy)(self.handle) };
     }
 }
