@@ -22,7 +22,7 @@ use crate::error::{CnaError, Result};
 use crate::extensions::engine::BorrowedRenderTarget;
 use crate::graphics::{GraphicsDevice, GraphicsResource, Texture2D};
 use crate::native::Native;
-use crate::value::{Color, Matrix, Vector3};
+use crate::value::{Color, Matrix, Vector3, Vector4};
 
 /// The engine-layer revision the linked library was built with.
 ///
@@ -1580,5 +1580,394 @@ impl Drop for SkinnedPbrEffect {
         // destroy a game while one is outstanding, so leaving it to the process
         // would abort at shutdown rather than leak quietly.
         let _ = unsafe { (self.native.effect_destroy)(self.handle) };
+    }
+}
+
+/// A glTF material's base metallic-roughness values, as the importer read them.
+///
+/// A staging value: [`GltfMaterialBridge::build_material`] turns one of these
+/// plus its textures into a [`PbrMaterialFull`], so an importer describes what
+/// the file said and CNA decides what that means for the renderer.
+#[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
+pub struct GltfMaterialSource {
+    /// `pbrMetallicRoughness.baseColorFactor`.
+    pub base_color_factor: Vector4,
+    /// `pbrMetallicRoughness.metallicFactor`.
+    pub metallic_factor: f32,
+    /// `pbrMetallicRoughness.roughnessFactor`.
+    pub roughness_factor: f32,
+    /// `emissiveFactor`.
+    pub emissive_factor: Vector3,
+    /// `normalTexture.scale`.
+    pub normal_scale: f32,
+    /// `occlusionTexture.strength`.
+    pub occlusion_strength: f32,
+    /// `KHR_materials_ior.ior`.
+    pub ior: f32,
+    /// `KHR_materials_specular.specularFactor`.
+    pub specular_factor: f32,
+    /// `KHR_materials_specular.specularColorFactor`.
+    pub specular_color_factor: Vector3,
+    /// `alphaMode`.
+    pub alpha_mode: AlphaMode,
+    /// `alphaCutoff`.
+    pub alpha_cutoff: f32,
+    /// `doubleSided`.
+    pub double_sided: bool,
+    /// `KHR_texture_transform` texture-coordinate set per slot.
+    pub texture_coordinate_sets: [i32; TEXTURE_SLOT_COUNT],
+    /// `KHR_texture_transform` transform per slot.
+    pub texture_transforms: [TextureTransform; TEXTURE_SLOT_COUNT],
+}
+
+impl GltfMaterialSource {
+    /// CNA's own defaults, asked of the library rather than restated here.
+    pub fn canonical_defaults() -> Result<Self> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_GltfMaterialSourceEXT::default();
+        // SAFETY: the structure is a caller-owned versioned output.
+        native.check(unsafe { (native.engine.gltf_material_source_ext_init)(&mut value) })?;
+        Self::from_native(&value)
+    }
+
+    fn from_native(value: &sys::CNA_GltfMaterialSourceEXT) -> Result<Self> {
+        let mut transforms =
+            [TextureTransform::from_native(sys::CNA_TextureTransformEXT::default());
+                TEXTURE_SLOT_COUNT];
+        for (slot, transform) in transforms.iter_mut().enumerate() {
+            *transform = TextureTransform::from_native(value.texture_transforms_ext[slot]);
+        }
+        Ok(Self {
+            base_color_factor: Vector4 {
+                X: value.base_color_factor.x,
+                Y: value.base_color_factor.y,
+                Z: value.base_color_factor.z,
+                W: value.base_color_factor.w,
+            },
+            metallic_factor: value.metallic_factor,
+            roughness_factor: value.roughness_factor,
+            emissive_factor: Vector3 {
+                X: value.emissive_factor.x,
+                Y: value.emissive_factor.y,
+                Z: value.emissive_factor.z,
+            },
+            normal_scale: value.normal_scale,
+            occlusion_strength: value.occlusion_strength,
+            ior: value.ior_ext,
+            specular_factor: value.specular_factor_ext,
+            specular_color_factor: Vector3 {
+                X: value.specular_color_factor_ext.x,
+                Y: value.specular_color_factor_ext.y,
+                Z: value.specular_color_factor_ext.z,
+            },
+            alpha_mode: AlphaMode::from_native(value.alpha_mode)
+                .ok_or(CnaError::InvalidInput("native alpha mode is unknown"))?,
+            alpha_cutoff: value.alpha_cutoff,
+            double_sided: value.double_sided != sys::CNA_FALSE,
+            texture_coordinate_sets: value.texture_coordinate_sets_ext,
+            texture_transforms: transforms,
+        })
+    }
+
+    fn to_native(self) -> sys::CNA_GltfMaterialSourceEXT {
+        let mut transforms = [sys::CNA_TextureTransformEXT::default(); TEXTURE_SLOT_COUNT];
+        for (slot, transform) in transforms.iter_mut().enumerate() {
+            *transform = self.texture_transforms[slot].to_native();
+        }
+        sys::CNA_GltfMaterialSourceEXT {
+            struct_size: core::mem::size_of::<sys::CNA_GltfMaterialSourceEXT>() as u32,
+            struct_version: 1,
+            base_color_factor: sys::CNA_Vector4 {
+                x: self.base_color_factor.X,
+                y: self.base_color_factor.Y,
+                z: self.base_color_factor.Z,
+                w: self.base_color_factor.W,
+            },
+            metallic_factor: self.metallic_factor,
+            roughness_factor: self.roughness_factor,
+            emissive_factor: sys::CNA_Vector3 {
+                x: self.emissive_factor.X,
+                y: self.emissive_factor.Y,
+                z: self.emissive_factor.Z,
+            },
+            normal_scale: self.normal_scale,
+            occlusion_strength: self.occlusion_strength,
+            ior_ext: self.ior,
+            specular_factor_ext: self.specular_factor,
+            specular_color_factor_ext: sys::CNA_Vector3 {
+                x: self.specular_color_factor.X,
+                y: self.specular_color_factor.Y,
+                z: self.specular_color_factor.Z,
+            },
+            alpha_mode: self.alpha_mode.to_native(),
+            alpha_cutoff: self.alpha_cutoff,
+            double_sided: u8::from(self.double_sided),
+            reserved: [0; 3],
+            texture_coordinate_sets_ext: self.texture_coordinate_sets,
+            texture_transforms_ext: transforms,
+        }
+    }
+}
+
+/// The `KHR_materials_*` factors a glTF file carried, as the importer read them.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct GltfMaterialExtensionSource {
+    /// `KHR_materials_clearcoat.clearcoatFactor`.
+    pub clearcoat_factor: f32,
+    /// `KHR_materials_clearcoat.clearcoatRoughnessFactor`.
+    pub clearcoat_roughness_factor: f32,
+    /// `KHR_materials_sheen.sheenColorFactor`.
+    pub sheen_color_factor: Vector3,
+    /// `KHR_materials_sheen.sheenRoughnessFactor`.
+    pub sheen_roughness_factor: f32,
+    /// `KHR_materials_transmission.transmissionFactor`.
+    pub transmission_factor: f32,
+    /// `KHR_materials_volume.thicknessFactor`.
+    pub thickness_factor: f32,
+    /// `KHR_materials_volume.attenuationDistance`.
+    pub attenuation_distance: f32,
+    /// `KHR_materials_volume.attenuationColor`.
+    pub attenuation_color: Vector3,
+    /// `KHR_materials_iridescence.iridescenceFactor`.
+    pub iridescence_factor: f32,
+    /// `KHR_materials_iridescence.iridescenceIor`.
+    pub iridescence_ior: f32,
+    /// `KHR_materials_iridescence.iridescenceThicknessMinimum`.
+    pub iridescence_thickness_minimum: f32,
+    /// `KHR_materials_iridescence.iridescenceThicknessMaximum`.
+    pub iridescence_thickness_maximum: f32,
+}
+
+impl GltfMaterialExtensionSource {
+    /// CNA's own defaults, asked of the library rather than restated here.
+    pub fn canonical_defaults() -> Result<Self> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_GltfMaterialExtensionSourceEXT::default();
+        // SAFETY: the structure is a caller-owned versioned output.
+        native
+            .check(unsafe { (native.engine.gltf_material_extension_source_ext_init)(&mut value) })?;
+        Ok(Self::from_native(&value))
+    }
+
+    fn from_native(value: &sys::CNA_GltfMaterialExtensionSourceEXT) -> Self {
+        let vector = |v: sys::CNA_Vector3| Vector3 {
+            X: v.x,
+            Y: v.y,
+            Z: v.z,
+        };
+        Self {
+            clearcoat_factor: value.clearcoat_factor_ext,
+            clearcoat_roughness_factor: value.clearcoat_roughness_factor_ext,
+            sheen_color_factor: vector(value.sheen_color_factor_ext),
+            sheen_roughness_factor: value.sheen_roughness_factor_ext,
+            transmission_factor: value.transmission_factor_ext,
+            thickness_factor: value.thickness_factor_ext,
+            attenuation_distance: value.attenuation_distance_ext,
+            attenuation_color: vector(value.attenuation_color_ext),
+            iridescence_factor: value.iridescence_factor_ext,
+            iridescence_ior: value.iridescence_ior_ext,
+            iridescence_thickness_minimum: value.iridescence_thickness_minimum_ext,
+            iridescence_thickness_maximum: value.iridescence_thickness_maximum_ext,
+        }
+    }
+
+    fn to_native(self) -> sys::CNA_GltfMaterialExtensionSourceEXT {
+        let vector = |v: Vector3| sys::CNA_Vector3 {
+            x: v.X,
+            y: v.Y,
+            z: v.Z,
+        };
+        sys::CNA_GltfMaterialExtensionSourceEXT {
+            struct_size: core::mem::size_of::<sys::CNA_GltfMaterialExtensionSourceEXT>() as u32,
+            struct_version: 1,
+            clearcoat_factor_ext: self.clearcoat_factor,
+            clearcoat_roughness_factor_ext: self.clearcoat_roughness_factor,
+            sheen_color_factor_ext: vector(self.sheen_color_factor),
+            sheen_roughness_factor_ext: self.sheen_roughness_factor,
+            transmission_factor_ext: self.transmission_factor,
+            thickness_factor_ext: self.thickness_factor,
+            attenuation_distance_ext: self.attenuation_distance,
+            attenuation_color_ext: vector(self.attenuation_color),
+            iridescence_factor_ext: self.iridescence_factor,
+            iridescence_ior_ext: self.iridescence_ior,
+            iridescence_thickness_minimum_ext: self.iridescence_thickness_minimum,
+            iridescence_thickness_maximum_ext: self.iridescence_thickness_maximum,
+        }
+    }
+}
+
+/// Turns what a glTF importer read into what a CNA renderer shades with.
+///
+/// Two pure functions and no state. The textures are `BORROWED` for the call
+/// only: the bridge records the handles in the material it builds, and the
+/// caller keeps the textures alive afterwards.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub struct GltfMaterialBridge;
+
+impl GltfMaterialBridge {
+    /// Builds a complete material from a glTF source and its seven textures.
+    ///
+    /// `textures` is in [`TextureSlot::ALL`] order, and a slot may be `None`.
+    pub fn build_material(
+        source: GltfMaterialSource,
+        textures: &[Option<&Texture2D>; TEXTURE_SLOT_COUNT],
+    ) -> Result<PbrMaterialFull> {
+        let native = Native::process()?;
+        let source = source.to_native();
+        let mut slots = [sys::CNA_INVALID_HANDLE; TEXTURE_SLOT_COUNT];
+        for (slot, texture) in textures.iter().enumerate() {
+            if let Some(texture) = texture {
+                slots[slot] = texture.handle()?;
+            }
+        }
+        let mut native_textures = sys::CNA_GltfMaterialTexturesEXT {
+            struct_size: core::mem::size_of::<sys::CNA_GltfMaterialTexturesEXT>() as u32,
+            struct_version: 1,
+            slots,
+        };
+        // The initializer fills the versioning; the slots are the caller's, so
+        // they are written after it rather than before.
+        let mut probe = sys::CNA_GltfMaterialTexturesEXT::default();
+        // SAFETY: the structure is a caller-owned versioned output.
+        native.check(unsafe { (native.engine.gltf_material_textures_ext_init)(&mut probe) })?;
+        native_textures.struct_size = probe.struct_size;
+        native_textures.struct_version = probe.struct_version;
+        let mut inner = sys::CNA_PbrMaterialEXT {
+            struct_size: core::mem::size_of::<sys::CNA_PbrMaterialEXT>() as u32,
+            struct_version: 1,
+            ..sys::CNA_PbrMaterialEXT::default()
+        };
+        // SAFETY: both inputs are live locals CNA reads during the call and the
+        // output is a caller-owned versioned structure.
+        native.check(unsafe {
+            (native.engine.gltf_material_bridge_build_material)(
+                &source,
+                &native_textures,
+                &mut inner,
+            )
+        })?;
+        Ok(PbrMaterialFull { inner })
+    }
+
+    /// Fills `destination` from a glTF extension source and its nine textures.
+    ///
+    /// Writes into an extension set the caller already owns, which is CNA's own
+    /// shape for the route: the extensions are a handle, and a handle cannot be
+    /// returned by value.
+    pub fn build_extensions(
+        source: GltfMaterialExtensionSource,
+        textures: &GltfMaterialExtensionTextures<'_>,
+        destination: &PbrMaterialExtensions,
+    ) -> Result<()> {
+        let native = Native::process()?;
+        let source = source.to_native();
+        let native_textures = textures.to_native(&native)?;
+        // SAFETY: both inputs are live locals CNA reads during the call and the
+        // destination handle is owned.
+        native.check(unsafe {
+            (native.engine.gltf_material_bridge_build_extensions)(
+                &source,
+                &native_textures,
+                destination.handle,
+            )
+        })
+    }
+}
+
+/// The nine `KHR_materials_*` textures a glTF file referenced.
+///
+/// Borrowed for the duration of the build call only.
+#[derive(Clone, Copy, Default)]
+#[non_exhaustive]
+pub struct GltfMaterialExtensionTextures<'a> {
+    /// `KHR_materials_clearcoat.clearcoatTexture`.
+    pub clearcoat: Option<&'a Texture2D>,
+    /// `KHR_materials_clearcoat.clearcoatRoughnessTexture`.
+    pub clearcoat_roughness: Option<&'a Texture2D>,
+    /// `KHR_materials_clearcoat.clearcoatNormalTexture`.
+    pub clearcoat_normal: Option<&'a Texture2D>,
+    /// `KHR_materials_sheen.sheenColorTexture`.
+    pub sheen_color: Option<&'a Texture2D>,
+    /// `KHR_materials_sheen.sheenRoughnessTexture`.
+    pub sheen_roughness: Option<&'a Texture2D>,
+    /// `KHR_materials_transmission.transmissionTexture`.
+    pub transmission: Option<&'a Texture2D>,
+    /// `KHR_materials_volume.thicknessTexture`.
+    pub thickness: Option<&'a Texture2D>,
+    /// `KHR_materials_iridescence.iridescenceTexture`.
+    pub iridescence: Option<&'a Texture2D>,
+    /// `KHR_materials_iridescence.iridescenceThicknessTexture`.
+    pub iridescence_thickness: Option<&'a Texture2D>,
+}
+
+impl GltfMaterialExtensionTextures<'_> {
+    fn to_native(&self, native: &Arc<Native>) -> Result<sys::CNA_GltfMaterialExtensionTexturesEXT> {
+        let mut value = sys::CNA_GltfMaterialExtensionTexturesEXT::default();
+        // SAFETY: the structure is a caller-owned versioned output.
+        native.check(unsafe {
+            (native.engine.gltf_material_extension_textures_ext_init)(&mut value)
+        })?;
+        let handle = |texture: Option<&Texture2D>| -> Result<sys::CNA_Handle> {
+            match texture {
+                Some(texture) => texture.handle(),
+                None => Ok(sys::CNA_INVALID_HANDLE),
+            }
+        };
+        value.clearcoat = handle(self.clearcoat)?;
+        value.clearcoat_roughness = handle(self.clearcoat_roughness)?;
+        value.clearcoat_normal = handle(self.clearcoat_normal)?;
+        value.sheen_color = handle(self.sheen_color)?;
+        value.sheen_roughness = handle(self.sheen_roughness)?;
+        value.transmission = handle(self.transmission)?;
+        value.thickness = handle(self.thickness)?;
+        value.iridescence = handle(self.iridescence)?;
+        value.iridescence_thickness = handle(self.iridescence_thickness)?;
+        Ok(value)
+    }
+}
+
+impl PbrMaterialExtensions {
+    /// Wraps a handle another object owns, for a bounded borrow.
+    ///
+    /// The view holds its owner alive and releases only itself. Its texture
+    /// slots answer "the texture slot names a texture this value does not
+    /// hold", because the Rust resources keeping those textures alive belong to
+    /// whoever set them, not to the view.
+    pub(crate) fn from_borrowed_handle(
+        native: &Arc<Native>,
+        handle: sys::CNA_PbrMaterialExtensionsHandle,
+    ) -> Self {
+        Self {
+            native: Arc::clone(native),
+            handle,
+            textures: ExtensionTextures::default(),
+        }
+    }
+
+    pub(crate) const fn native_handle(&self) -> sys::CNA_PbrMaterialExtensionsHandle {
+        self.handle
+    }
+}
+
+impl core::fmt::Debug for GltfMaterialExtensionTextures<'_> {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("GltfMaterialExtensionTextures")
+            .field("clearcoat", &self.clearcoat.is_some())
+            .field("clearcoat_roughness", &self.clearcoat_roughness.is_some())
+            .field("clearcoat_normal", &self.clearcoat_normal.is_some())
+            .field("sheen_color", &self.sheen_color.is_some())
+            .field("sheen_roughness", &self.sheen_roughness.is_some())
+            .field("transmission", &self.transmission.is_some())
+            .field("thickness", &self.thickness.is_some())
+            .field("iridescence", &self.iridescence.is_some())
+            .field(
+                "iridescence_thickness",
+                &self.iridescence_thickness.is_some(),
+            )
+            .finish()
     }
 }

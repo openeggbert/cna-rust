@@ -12,7 +12,9 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use cna::extensions::pbr::{
-    PbrMaterialExtensions, PbrMaterialFull, SkinnedPbrEffect, ThinFilmIridescence,
+    GltfMaterialBridge, GltfMaterialExtensionSource, GltfMaterialExtensionTextures,
+    GltfMaterialSource, PbrMaterialExtensions, PbrMaterialFull, SkinnedPbrEffect,
+    ThinFilmIridescence,
 };
 use cna::extensions::engine::{
     supports_shadow_sampling, DirectionalLight, FxaaPass, GpuTimer, Particle,
@@ -26,7 +28,7 @@ use cna::extensions::engine::{
     ClusteredLightBuffer, ClusteredLightCompute, ClusteredLightSet, ClusteredLightType,
     ClusteredForwardEffect, ClusteredShadingMaterial, ClusteredShadowPolicy, CubeLut,
     DebugDraw, DepthEncoding, EnvironmentProcessor, ImageBasedLight, LightProbe,
-    LightProbeBaker, LightProbeVolume,
+    LightProbeBaker, LightProbeVolume, ShaderEffectFactory,
     DepthNormalPrepass, DisplayColorSpace, FrustumCuller, HdrDisplayOutput, LodGroup,
     LodSelectionMode, ShadowCascadeState, SpotLight, SpotShadowMap, SsaoPass,
     SsrPass, StorageBuffer, TonemapPass, TransparentDrawList, VolumetricFogPass,
@@ -7224,5 +7226,445 @@ fn the_material_extension_texture_slots_are_nine_independent_retained_dependenci
     assert!(
         same,
         "and CNA agrees it is the same material that went in"
+    );
+}
+
+/// What the factory, glTF bridge and newly unblocked routes measured.
+#[derive(Default)]
+struct BridgeFindings {
+    engine_layer: i32,
+    factory_states: Vec<(&'static str, bool, u64)>,
+    factory_clear_while_borrowed: Option<String>,
+    factory_clear_after: Option<String>,
+    pipeline_skybox: Vec<(&'static str, bool, bool)>,
+    gizmo_lines: Vec<(&'static str, i32)>,
+    extensions_round_trip: (f32, f32),
+    probe_contribution: Vec<(&'static str, (f32, f32, f32))>,
+    gltf_defaults: Option<(f32, f32, f32, f32)>,
+    gltf_material: Option<(f32, f32, f32)>,
+    gltf_extension_defaults: Option<(f32, f32, f32, f32)>,
+    built_attenuation: (f32, f32),
+    gltf_extensions_built: Option<(f32, f32, bool)>,
+}
+
+struct BridgeGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<BridgeFindings>>,
+}
+
+impl GameStateAccess for BridgeGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+const TRIVIAL_VERTEX: &str = "#version 300 es\nvoid main() { gl_Position = vec4(0.0, 0.0, 0.0, 1.0); }\n";
+const TRIVIAL_FRAGMENT: &str =
+    "#version 300 es\nprecision mediump float;\nout vec4 c;\nvoid main() { c = vec4(1.0); }\n";
+
+impl Game for BridgeGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+        let mut findings = BridgeFindings {
+            engine_layer: version,
+            ..BridgeFindings::default()
+        };
+        let (_view, projection) = culling_camera();
+
+        // --- the shader effect factory ------------------------------------------
+        let factory = ShaderEffectFactory::new(&device)?;
+        findings.factory_states.push((
+            "before anything is acquired",
+            factory.contains("probe")?,
+            factory.compile_count()?,
+        ));
+        {
+            let first = factory.acquire("probe", TRIVIAL_VERTEX, TRIVIAL_FRAGMENT)?;
+            findings.factory_states.push((
+                "after one acquire",
+                factory.contains("probe")?,
+                factory.compile_count()?,
+            ));
+            let second = factory.acquire("probe", TRIVIAL_VERTEX, TRIVIAL_FRAGMENT)?;
+            findings.factory_states.push((
+                "after the same name again",
+                factory.contains("probe")?,
+                factory.compile_count()?,
+            ));
+            let other = factory.acquire("other", TRIVIAL_VERTEX, TRIVIAL_FRAGMENT)?;
+            findings.factory_states.push((
+                "after a second name",
+                factory.contains("other")?,
+                factory.compile_count()?,
+            ));
+            findings.factory_clear_while_borrowed =
+                factory.clear().err().map(|error| error.to_string());
+            drop(first);
+            drop(second);
+            drop(other);
+        }
+        findings.factory_clear_after = factory.clear().err().map(|error| error.to_string());
+        factory.release()?;
+
+        // --- the pipeline's skybox -----------------------------------------------
+        let mut pipeline = RenderPipeline::new(&device)?;
+        pipeline.resize(64, 48)?;
+        findings.pipeline_skybox.push((
+            "before one is set",
+            pipeline.drawn_skybox()?.is_some(),
+            pipeline.retained_skybox().is_some(),
+        ));
+        let environment = TextureCube::new(&device, 4, false, SurfaceFormat::Color)?;
+        let sky = Arc::new(Skybox::with_environment(&device, environment)?);
+        pipeline.set_skybox(Some(&sky))?;
+        let drawn = pipeline.drawn_skybox()?;
+        findings.pipeline_skybox.push((
+            "after one is set",
+            drawn.is_some(),
+            pipeline.retained_skybox().is_some(),
+        ));
+        findings.pipeline_skybox.push((
+            "and it carries the environment",
+            match drawn.as_ref() {
+                Some(view) => view.environment()?.is_some(),
+                None => false,
+            },
+            true,
+        ));
+        drop(drawn);
+        pipeline.set_skybox(None)?;
+        findings.pipeline_skybox.push((
+            "after clearing",
+            pipeline.drawn_skybox()?.is_some(),
+            pipeline.retained_skybox().is_some(),
+        ));
+
+        // --- the two gizmos that were waiting on other families -------------------
+        let debug = DebugDraw::new(&device)?;
+        findings.gizmo_lines.push(("empty", debug.line_count()?));
+        let volume = Arc::new(LightProbeVolume::new(
+            BoundingBox::new(
+                Vector3::from_x_and_y_and_z(-1.0, -1.0, -1.0),
+                Vector3::from_x_and_y_and_z(1.0, 1.0, 1.0),
+            ),
+            2,
+            2,
+            2,
+        )?);
+        debug.add_probe_volume_gizmo(&volume, Color::Cyan, 0.25)?;
+        findings
+            .gizmo_lines
+            .push(("plus a probe volume", debug.line_count()?));
+        let grid = ClusteredLightGrid::new(&device, 2, 2, 2)?;
+        debug.add_cluster_slice_gizmo(&grid, Matrix::Identity, Color::Magenta)?;
+        findings
+            .gizmo_lines
+            .push(("plus a grid with no projection", debug.line_count()?));
+        grid.set_projection(projection, 1.0, 100.0)?;
+        debug.add_cluster_slice_gizmo(&grid, Matrix::Identity, Color::Magenta)?;
+        findings
+            .gizmo_lines
+            .push(("plus the same grid with one", debug.line_count()?));
+        debug.clear()?;
+
+        // --- the clustered forward effect's newly reachable routes -----------------
+        let mut forward = ClusteredForwardEffect::new(&device)?;
+        let extensions = PbrMaterialExtensions::new()?;
+        extensions.set_clearcoat_factor(0.75)?;
+        extensions.set_sheen_roughness(0.25)?;
+        forward.set_material_extensions(&extensions)?;
+        let borrowed = forward.material_extensions()?;
+        findings.extensions_round_trip = (
+            borrowed.extensions().clearcoat_factor()?,
+            borrowed.extensions().sheen_roughness()?,
+        );
+        drop(borrowed);
+
+        let probe = LightProbe::new()?;
+        probe.set_coefficient(0, Vector3::from_x_and_y_and_z(1.0, 1.0, 1.0))?;
+        forward.set_light_probe(&probe)?;
+        forward.set_light_probe_volume(Some(&volume))?;
+        forward.set_light_probe_volume(None)?;
+
+        let mut lamp = ClusteredLight::canonical_defaults()?;
+        lamp.position = Vector3::from_x_and_y_and_z(0.0, 3.0, 0.0);
+        lamp.range = 20.0;
+        let surface = Vector3::Zero;
+        let normal = Vector3::Up;
+        let camera = Vector3::from_x_and_y_and_z(0.0, 5.0, 0.0);
+        let base = Vector3::from_x_and_y_and_z(1.0, 1.0, 1.0);
+        let neutral = PbrMaterialExtensions::new()?;
+        findings.probe_contribution.push((
+            "with neutral extensions",
+            triple(ClusteredForwardEffect::contribution_with_extensions(
+                lamp, surface, normal, camera, base, 0.0, 0.5, &neutral,
+            )?),
+        ));
+        let sheened = PbrMaterialExtensions::new()?;
+        sheened.set_sheen_color_factor(Vector3::from_x_and_y_and_z(1.0, 0.0, 0.0))?;
+        sheened.set_sheen_roughness(0.5)?;
+        findings.probe_contribution.push((
+            "with red sheen",
+            triple(ClusteredForwardEffect::contribution_with_extensions(
+                lamp, surface, normal, camera, base, 0.0, 0.5, &sheened,
+            )?),
+        ));
+
+        // --- the glTF bridge --------------------------------------------------------
+        let source = GltfMaterialSource::canonical_defaults()?;
+        findings.gltf_defaults = Some((
+            source.base_color_factor.W,
+            source.metallic_factor,
+            source.roughness_factor,
+            source.ior,
+        ));
+        let mut authored = source;
+        authored.metallic_factor = 0.25;
+        authored.roughness_factor = 0.75;
+        authored.emissive_factor = Vector3::from_x_and_y_and_z(0.1, 0.2, 0.3);
+        let slots: [Option<&Texture2D>; 7] = [None; 7];
+        let built = GltfMaterialBridge::build_material(authored, &slots)?;
+        findings.gltf_material = Some((
+            built.emissive_factor().X,
+            built.emissive_factor().Y,
+            built.emissive_factor().Z,
+        ));
+
+        let extension_source = GltfMaterialExtensionSource::canonical_defaults()?;
+        findings.gltf_extension_defaults = Some((
+            extension_source.iridescence_ior,
+            extension_source.attenuation_distance,
+            extension_source.iridescence_thickness_minimum,
+            extension_source.iridescence_thickness_maximum,
+        ));
+        let untouched = PbrMaterialExtensions::new()?;
+        untouched.set_attenuation_distance(-5.0)?;
+        let from_defaults = PbrMaterialExtensions::new()?;
+        from_defaults.set_attenuation_distance(2.5)?;
+        GltfMaterialBridge::build_extensions(
+            extension_source,
+            &GltfMaterialExtensionTextures::default(),
+            &from_defaults,
+        )?;
+        findings.built_attenuation = (
+            untouched.attenuation_distance()?,
+            from_defaults.attenuation_distance()?,
+        );
+        let mut authored = extension_source;
+        authored.clearcoat_factor = 0.5;
+        authored.transmission_factor = 0.25;
+        let destination = PbrMaterialExtensions::new()?;
+        GltfMaterialBridge::build_extensions(
+            authored,
+            &GltfMaterialExtensionTextures::default(),
+            &destination,
+        )?;
+        findings.gltf_extensions_built = Some((
+            destination.clearcoat_factor()?,
+            destination.transmission_factor()?,
+            destination.is_transmission_enabled()?,
+        ));
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn the_factory_caches_by_name_and_the_gltf_bridge_builds_what_the_importer_read() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(BridgeFindings::default()));
+    let game = BridgeGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with a shader factory and the glTF bridge");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+
+    // --- the shader effect factory -------------------------------------------
+    println!("factory: {:?}", findings.factory_states);
+    let (_, contains, compiles) = findings.factory_states[0];
+    assert!(!contains, "a fresh factory caches nothing");
+    assert_eq!(compiles, 0, "and has compiled nothing");
+    let (_, contains, first_compiles) = findings.factory_states[1];
+    assert!(contains, "acquiring a name caches it");
+    assert_eq!(first_compiles, 1, "and compiles it once");
+    let (_, _, repeat_compiles) = findings.factory_states[2];
+    assert_eq!(
+        repeat_compiles, first_compiles,
+        "asking for the same name again is a cache hit, not a second compile"
+    );
+    let (_, contains, second_compiles) = findings.factory_states[3];
+    assert!(contains, "a second name is cached too");
+    assert_eq!(
+        second_compiles,
+        first_compiles + 1,
+        "and compiled once, so the count follows names rather than requests"
+    );
+    assert!(
+        findings.factory_clear_while_borrowed.is_some(),
+        "clearing while a view it published is alive is refused"
+    );
+    assert!(
+        findings.factory_clear_after.is_none(),
+        "and allowed once every view is gone: {:?}",
+        findings.factory_clear_after
+    );
+
+    // --- the pipeline's skybox ------------------------------------------------
+    println!("pipeline skybox: {:?}", findings.pipeline_skybox);
+    assert_eq!(
+        findings.pipeline_skybox[0],
+        ("before one is set", false, false),
+        "a fresh pipeline draws no skybox and retains none"
+    );
+    assert_eq!(
+        findings.pipeline_skybox[1],
+        ("after one is set", true, true),
+        "setting one makes CNA report it and this crate keep it alive"
+    );
+    assert!(
+        findings.pipeline_skybox[2].1,
+        "and the borrowed view reaches the environment through it"
+    );
+    assert_eq!(
+        findings.pipeline_skybox[3],
+        ("after clearing", false, false),
+        "clearing drops both CNA's pointer and the retained Arc"
+    );
+
+    // --- the two gizmos --------------------------------------------------------
+    println!("gizmo lines: {:?}", findings.gizmo_lines);
+    let count = |name: &str| -> i32 {
+        findings
+            .gizmo_lines
+            .iter()
+            .find(|(label, _)| *label == name)
+            .expect("a recorded line count")
+            .1
+    };
+    // A 2x2x2 volume is twelve box edges plus three cross segments per probe.
+    assert_eq!(
+        count("plus a probe volume"),
+        12 + 8 * 3,
+        "a probe volume is its box plus a cross at every probe"
+    );
+    // A grid with no projection has nothing to place, and draws nothing rather
+    // than refusing.
+    assert_eq!(
+        count("plus a grid with no projection"),
+        count("plus a probe volume"),
+        "a grid with no projection adds no lines and does not fail"
+    );
+    assert!(
+        count("plus the same grid with one") > count("plus a grid with no projection"),
+        "and the same grid with a projection does: {:?}",
+        findings.gizmo_lines
+    );
+
+    // --- the clustered forward effect -------------------------------------------
+    let (clearcoat, sheen) = findings.extensions_round_trip;
+    assert!(
+        (clearcoat - 0.75).abs() < 1e-4 && (sheen - 0.25).abs() < 1e-4,
+        "the extensions copied into the effect read back through the borrow: {clearcoat}, {sheen}"
+    );
+    println!("contribution: {:?}", findings.probe_contribution);
+    let neutral = findings.probe_contribution[0].1;
+    let sheened = findings.probe_contribution[1].1;
+    assert!(
+        neutral.0 > 0.0,
+        "a lit surface with neutral extensions receives light: {neutral:?}"
+    );
+    assert!(
+        sheened != neutral,
+        "and a sheen changes what it receives: {sheened:?} against {neutral:?}"
+    );
+    assert!(
+        sheened.0 > neutral.0 && (sheened.2 - neutral.2).abs() < neutral.2.max(1e-6) * 0.5,
+        "a red sheen adds to the red channel: {sheened:?} against {neutral:?}"
+    );
+
+    // --- the glTF bridge ---------------------------------------------------------
+    let (alpha, metallic, roughness, ior) = findings.gltf_defaults.expect("glTF defaults");
+    println!("glTF defaults: alpha {alpha} metallic {metallic} roughness {roughness} ior {ior}");
+    assert!(
+        (alpha - 1.0).abs() < 1e-6,
+        "the default base colour is opaque"
+    );
+    assert!(
+        (metallic - 1.0).abs() < 1e-6 && (roughness - 1.0).abs() < 1e-6,
+        "and glTF's own metallic and roughness defaults are one, not zero"
+    );
+    assert!(
+        (ior - 1.5).abs() < 1e-6,
+        "and the default index of refraction is glTF's 1.5, not 1.0"
+    );
+    assert_eq!(
+        findings.gltf_material,
+        Some((0.1, 0.2, 0.3)),
+        "what the importer read reaches the built material"
+    );
+
+    let (iridescence_ior, attenuation, thin, thick) = findings
+        .gltf_extension_defaults
+        .expect("glTF extension defaults");
+    println!(
+        "glTF extension defaults: ior {iridescence_ior} attenuation {attenuation}          thickness {thin}..{thick}"
+    );
+    assert!(
+        (iridescence_ior - 1.3).abs() < 1e-6,
+        "the iridescence index of refraction defaults to glTF's 1.3"
+    );
+    assert!(
+        (thin - 100.0).abs() < 1e-6 && (thick - 400.0).abs() < 1e-6,
+        "and the iridescence film thickness range to glTF's 100..400 nanometres"
+    );
+    // glTF spells "no volume absorption" as an `attenuationDistance` of
+    // `+Infinity`. CNA spells the same thing as **zero**, consistently: the
+    // importer structure's initializer leaves it at zero, a fresh extension set
+    // is zero, the setter floors negatives to zero, and the shader gates
+    // absorption on `uAttenuationDistance > 0`. An importer that translates
+    // glTF's infinity literally would get a very large finite distance and
+    // almost no absorption, which looks right; one that translates "absent" to
+    // zero gets what CNA means.
+    println!("attenuation: {:?}", findings.built_attenuation);
+    assert_eq!(
+        attenuation, 0.0,
+        "CNA's initializer leaves the attenuation distance at zero"
+    );
+    let (floored, overwritten) = findings.built_attenuation;
+    assert_eq!(
+        floored, 0.0,
+        "a negative attenuation distance is floored at zero rather than kept"
+    );
+    assert_eq!(
+        overwritten, 0.0,
+        "and the bridge writes the source's zero over a distance that had been set,          rather than treating zero as 'leave it alone'"
+    );
+
+    let (clearcoat, transmission, transmits) = findings
+        .gltf_extensions_built
+        .expect("built glTF extensions");
+    assert!(
+        (clearcoat - 0.5).abs() < 1e-4 && (transmission - 0.25).abs() < 1e-4,
+        "the extension factors reach the built set: {clearcoat}, {transmission}"
+    );
+    assert!(
+        transmits,
+        "and a non-zero transmission factor turns transmission on"
     );
 }

@@ -812,6 +812,72 @@ pub type CNA_LightProbeHandle = CNA_Handle;
 pub type CNA_EnvironmentProcessorHandle = CNA_Handle;
 pub type CNA_LightProbeVolumeHandle = CNA_Handle;
 pub type CNA_LightProbeBakerHandle = CNA_Handle;
+pub type CNA_ShaderEffectFactoryHandle = CNA_Handle;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_GltfMaterialSourceEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub base_color_factor: CNA_Vector4,
+    pub metallic_factor: f32,
+    pub roughness_factor: f32,
+    pub emissive_factor: CNA_Vector3,
+    pub normal_scale: f32,
+    pub occlusion_strength: f32,
+    pub ior_ext: f32,
+    pub specular_factor_ext: f32,
+    pub specular_color_factor_ext: CNA_Vector3,
+    pub alpha_mode: CNA_AlphaModeEXT,
+    pub alpha_cutoff: f32,
+    pub double_sided: CNA_Bool,
+    pub reserved: [u8; 3],
+    pub texture_coordinate_sets_ext: [i32; 7],
+    pub texture_transforms_ext: [CNA_TextureTransformEXT; 7],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_GltfMaterialTexturesEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub slots: [CNA_Handle; 7],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_GltfMaterialExtensionSourceEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub clearcoat_factor_ext: f32,
+    pub clearcoat_roughness_factor_ext: f32,
+    pub sheen_color_factor_ext: CNA_Vector3,
+    pub sheen_roughness_factor_ext: f32,
+    pub transmission_factor_ext: f32,
+    pub thickness_factor_ext: f32,
+    pub attenuation_distance_ext: f32,
+    pub attenuation_color_ext: CNA_Vector3,
+    pub iridescence_factor_ext: f32,
+    pub iridescence_ior_ext: f32,
+    pub iridescence_thickness_minimum_ext: f32,
+    pub iridescence_thickness_maximum_ext: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_GltfMaterialExtensionTexturesEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub clearcoat: CNA_Handle,
+    pub clearcoat_roughness: CNA_Handle,
+    pub clearcoat_normal: CNA_Handle,
+    pub sheen_color: CNA_Handle,
+    pub sheen_roughness: CNA_Handle,
+    pub transmission: CNA_Handle,
+    pub thickness: CNA_Handle,
+    pub iridescence: CNA_Handle,
+    pub iridescence_thickness: CNA_Handle,
+}
 pub type CNA_LightProbeSceneDrawCallback =
     Option<unsafe extern "C" fn(*const CNA_Matrix, *const CNA_Matrix, *mut c_void)>;
 
@@ -10184,4 +10250,67 @@ pub type cna_thin_film_iridescence_copy_glsl_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_thin_film_iridescence_evaluate_fn = unsafe extern "C" fn(
     f32, f32, f32, f32, *const CNA_Vector3, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_shader_effect_factory_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_ShaderEffectFactoryHandle,
+) -> CNA_Result;
+pub type cna_shader_effect_factory_acquire_fn = unsafe extern "C" fn(
+    CNA_ShaderEffectFactoryHandle, CNA_StringView, CNA_StringView, CNA_StringView, *mut CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_shader_effect_factory_contains_fn = unsafe extern "C" fn(
+    CNA_ShaderEffectFactoryHandle, CNA_StringView, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_shader_effect_factory_get_compile_count_fn = unsafe extern "C" fn(
+    CNA_ShaderEffectFactoryHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_shader_effect_factory_clear_fn = unsafe extern "C" fn(
+    CNA_ShaderEffectFactoryHandle,
+) -> CNA_Result;
+pub type cna_shader_effect_factory_destroy_fn = unsafe extern "C" fn(
+    CNA_ShaderEffectFactoryHandle,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_get_material_extensions_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, *mut CNA_PbrMaterialExtensionsHandle,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_set_material_extensions_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, CNA_PbrMaterialExtensionsHandle,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_contribution_with_extensions_fn = unsafe extern "C" fn(
+    *const CNA_ClusteredLightEXT, *const CNA_Vector3, *const CNA_Vector3, *const CNA_Vector3, *const CNA_Vector3, f32, f32, CNA_PbrMaterialExtensionsHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_set_light_probe_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, CNA_LightProbeHandle,
+) -> CNA_Result;
+pub type cna_clustered_forward_effect_set_light_probe_volume_fn = unsafe extern "C" fn(
+    CNA_ClusteredForwardEffectHandle, CNA_LightProbeVolumeHandle,
+) -> CNA_Result;
+pub type cna_gltf_material_source_ext_init_fn = unsafe extern "C" fn(
+    *mut CNA_GltfMaterialSourceEXT,
+) -> CNA_Result;
+pub type cna_gltf_material_extension_source_ext_init_fn = unsafe extern "C" fn(
+    *mut CNA_GltfMaterialExtensionSourceEXT,
+) -> CNA_Result;
+pub type cna_gltf_material_textures_ext_init_fn = unsafe extern "C" fn(
+    *mut CNA_GltfMaterialTexturesEXT,
+) -> CNA_Result;
+pub type cna_gltf_material_extension_textures_ext_init_fn = unsafe extern "C" fn(
+    *mut CNA_GltfMaterialExtensionTexturesEXT,
+) -> CNA_Result;
+pub type cna_gltf_material_bridge_build_material_fn = unsafe extern "C" fn(
+    *const CNA_GltfMaterialSourceEXT, *const CNA_GltfMaterialTexturesEXT, *mut CNA_PbrMaterialEXT,
+) -> CNA_Result;
+pub type cna_gltf_material_bridge_build_extensions_fn = unsafe extern "C" fn(
+    *const CNA_GltfMaterialExtensionSourceEXT, *const CNA_GltfMaterialExtensionTexturesEXT, CNA_PbrMaterialExtensionsHandle,
+) -> CNA_Result;
+pub type cna_render_pipeline_get_skybox_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, *mut CNA_SkyboxHandle,
+) -> CNA_Result;
+pub type cna_render_pipeline_set_skybox_fn = unsafe extern "C" fn(
+    CNA_RenderPipelineHandle, CNA_SkyboxHandle,
+) -> CNA_Result;
+pub type cna_debug_draw_add_probe_volume_gizmo_fn = unsafe extern "C" fn(
+    CNA_DebugDrawHandle, CNA_LightProbeVolumeHandle, CNA_Color, f32,
+) -> CNA_Result;
+pub type cna_debug_draw_add_cluster_slice_gizmo_fn = unsafe extern "C" fn(
+    CNA_DebugDrawHandle, CNA_ClusteredLightGridHandle, *const CNA_Matrix, CNA_Color,
 ) -> CNA_Result;

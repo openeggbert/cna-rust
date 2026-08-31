@@ -51,6 +51,7 @@ use crate::graphics::{
     BorrowedHandle, Effect, GraphicsDevice, OwnedEngineChild, SurfaceFormat, Texture2D,
 };
 use crate::native::Native;
+use super::pbr::PbrMaterialExtensions;
 use crate::graphics::{
     CubeMapFace, DepthFormat, RenderTarget2D, SamplerState, Texture3D, TextureCube,
     VertexPositionColor,
@@ -340,6 +341,7 @@ pub struct RenderPipeline {
     transparent: Option<Arc<SceneCallback>>,
     shadow_casters: Option<Arc<SceneCallback>>,
     shadow_map: Option<Arc<ShadowMap>>,
+    skybox: Option<Arc<Skybox>>,
     user_passes: Vec<Arc<PostProcessPass>>,
 }
 
@@ -373,6 +375,7 @@ impl RenderPipeline {
             transparent: None,
             shadow_casters: None,
             shadow_map: None,
+            skybox: None,
             user_passes: Vec::new(),
         })
     }
@@ -10121,6 +10124,7 @@ pub struct ClusteredForwardEffect {
     native: Arc<Native>,
     device: GraphicsDevice,
     opaque_frame: Option<Texture2D>,
+    probe_volume: Option<Arc<LightProbeVolume>>,
 }
 
 impl ClusteredForwardEffect {
@@ -10150,6 +10154,7 @@ impl ClusteredForwardEffect {
             native: Arc::clone(native),
             device: device.clone(),
             opaque_frame: None,
+            probe_volume: None,
         })
     }
 
@@ -11675,6 +11680,380 @@ impl LightProbeBaker {
 }
 
 impl Drop for LightProbeBaker {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// A skybox another engine object owns, viewed for a bounded borrow.
+///
+/// The handle CNA publishes here keeps its owner alive and releases only
+/// itself, so this is a value with a `Drop` and the owner's lifetime.
+pub struct BorrowedSkybox<'owner> {
+    native: Arc<Native>,
+    handle: sys::CNA_Handle,
+    owner: PhantomData<&'owner ()>,
+}
+
+impl BorrowedSkybox<'_> {
+    /// The environment the borrowed skybox carries.
+    ///
+    /// `None` when none is attached. The view is bounded by this borrow, which
+    /// is itself bounded by the pipeline it came from.
+    pub fn environment(&self) -> Result<Option<BorrowedTextureCube<'_>>> {
+        let mut value = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is this view's own and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.skybox_get_environment)(self.handle, &mut value)
+        })?;
+        if value == sys::CNA_INVALID_HANDLE {
+            return Ok(None);
+        }
+        Ok(Some(BorrowedTextureCube {
+            native: Arc::clone(&self.native),
+            handle: value,
+            owner: PhantomData,
+        }))
+    }
+}
+
+impl Drop for BorrowedSkybox<'_> {
+    fn drop(&mut self) {
+        // SAFETY: the handle is this view's own, released exactly once. It
+        // releases the borrow CNA published, never the owner's skybox.
+        let _ = unsafe { (self.native.engine.skybox_destroy)(self.handle) };
+    }
+}
+
+impl RenderPipeline {
+    /// Gives the pipeline a skybox to draw, or `None` to draw none.
+    ///
+    /// **Borrowed, not owned**: CNA keeps a pointer, so the pipeline holds the
+    /// [`Arc`] the caller shares for exactly as long as CNA draws it.
+    pub fn set_skybox(&mut self, skybox: Option<&Arc<Skybox>>) -> Result<()> {
+        let handle = self.core.get()?;
+        let skybox_handle = match skybox {
+            Some(skybox) => skybox.core.get()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        // SAFETY: the pipeline handle is owned and the skybox handle is live
+        // for the call, kept alive afterwards by the `Arc` this stores.
+        self.native.check(unsafe {
+            (self.native.engine.render_pipeline_set_skybox)(handle, skybox_handle)
+        })?;
+        self.skybox = skybox.map(Arc::clone);
+        Ok(())
+    }
+
+    /// The skybox the pipeline draws, viewed for as long as the borrow lives.
+    pub fn drawn_skybox(&self) -> Result<Option<BorrowedSkybox<'_>>> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.render_pipeline_get_skybox)(handle, &mut value)
+        })?;
+        if value == sys::CNA_INVALID_HANDLE {
+            return Ok(None);
+        }
+        Ok(Some(BorrowedSkybox {
+            native: Arc::clone(&self.native),
+            handle: value,
+            owner: PhantomData,
+        }))
+    }
+
+    /// The skybox this value is keeping alive for CNA, if any.
+    #[must_use]
+    pub fn retained_skybox(&self) -> Option<&Arc<Skybox>> {
+        self.skybox.as_ref()
+    }
+}
+
+impl DebugDraw {
+    /// Draws a probe volume as its box plus a cross at every probe.
+    pub fn add_probe_volume_gizmo(
+        &self,
+        volume: &LightProbeVolume,
+        colour: Color,
+        cross_size: f32,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let volume = volume.core.get()?;
+        // SAFETY: both handles are owned and live for the call.
+        self.native.check(unsafe {
+            (self.native.engine.debug_draw_add_probe_volume_gizmo)(
+                handle,
+                volume,
+                native_color(colour),
+                cross_size,
+            )
+        })
+    }
+
+    /// Draws a cluster grid's slices as boxes in world space.
+    ///
+    /// **Draws nothing and succeeds when the grid has no projection yet**:
+    /// there is nothing to place the slices with, and a debug overlay that
+    /// refused would be harder to use than one that stays empty until the grid
+    /// is ready.
+    pub fn add_cluster_slice_gizmo(
+        &self,
+        grid: &ClusteredLightGrid,
+        inverse_view: Matrix,
+        colour: Color,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let grid = grid.core.get()?;
+        let inverse_view = native_matrix(inverse_view);
+        // SAFETY: both handles are owned and the matrix is borrowed for the
+        // call.
+        self.native.check(unsafe {
+            (self.native.engine.debug_draw_add_cluster_slice_gizmo)(
+                handle,
+                grid,
+                &inverse_view,
+                native_color(colour),
+            )
+        })
+    }
+}
+
+impl ClusteredForwardEffect {
+    /// Gives the effect a copy of a set of material extensions.
+    ///
+    /// **Copied, not borrowed**: the effect keeps its own, so the caller's set
+    /// stays theirs.
+    pub fn set_material_extensions(&self, extensions: &PbrMaterialExtensions) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: both handles are owned and live for the call.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_set_material_extensions)(
+                handle,
+                extensions.native_handle(),
+            )
+        })
+    }
+
+    /// The material extensions the effect shades with, borrowed.
+    ///
+    /// The view holds the effect alive and releases only itself. Its texture
+    /// slots answer that they hold no texture, because the Rust resources
+    /// keeping those alive belong to whoever set them.
+    pub fn material_extensions(&self) -> Result<BorrowedMaterialExtensions<'_>> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_get_material_extensions)(
+                handle, &mut value,
+            )
+        })?;
+        Ok(BorrowedMaterialExtensions {
+            extensions: PbrMaterialExtensions::from_borrowed_handle(&self.native, value),
+            owner: PhantomData,
+        })
+    }
+
+    /// Gives the effect a light probe to shade ambient light with.
+    ///
+    /// **Copied, not borrowed**: the effect keeps its own probe.
+    pub fn set_light_probe(&self, probe: &LightProbe) -> Result<()> {
+        let handle = self.core.get()?;
+        let probe = probe.core.get()?;
+        // SAFETY: both handles are owned and live for the call.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_set_light_probe)(handle, probe)
+        })
+    }
+
+    /// Gives the effect a probe volume to sample, or `None` to clear it.
+    ///
+    /// **Borrowed, unlike the single probe**: CNA keeps a pointer, so this
+    /// value holds the [`Arc`] the caller shares for as long as CNA samples it.
+    pub fn set_light_probe_volume(&mut self, volume: Option<&Arc<LightProbeVolume>>) -> Result<()> {
+        let handle = self.core.get()?;
+        let volume_handle = match volume {
+            Some(volume) => volume.core.get()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        // SAFETY: the effect handle is owned and the volume handle is live for
+        // the call, kept alive afterwards by the `Arc` this stores.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_forward_effect_set_light_probe_volume)(
+                handle,
+                volume_handle,
+            )
+        })?;
+        self.probe_volume = volume.map(Arc::clone);
+        Ok(())
+    }
+
+    /// One light's contribution with a set of material extensions applied.
+    ///
+    /// The shorter form of [`contribution`](Self::contribution): the extension
+    /// set carries the clearcoat, sheen, iridescence and subsurface terms that
+    /// the long form spells out one by one.
+    pub fn contribution_with_extensions(
+        light: ClusteredLight,
+        surface: Vector3,
+        normal: Vector3,
+        camera_position: Vector3,
+        base_color: Vector3,
+        metallic: f32,
+        roughness: f32,
+        extensions: &PbrMaterialExtensions,
+    ) -> Result<Vector3> {
+        let native = Native::process()?;
+        let light = light.to_native();
+        let surface = native_vector3(surface);
+        let normal = native_vector3(normal);
+        let camera_position = native_vector3(camera_position);
+        let base_color = native_vector3(base_color);
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: every pointer is a live local borrowed for the call, the
+        // extensions handle is owned, and the output is a live local.
+        native.check(unsafe {
+            (native.engine.clustered_forward_effect_contribution_with_extensions)(
+                &light,
+                &surface,
+                &normal,
+                &camera_position,
+                &base_color,
+                metallic,
+                roughness,
+                extensions.native_handle(),
+                &mut value,
+            )
+        })?;
+        Ok(from_native_vector3(value))
+    }
+}
+
+/// A set of material extensions another object owns, viewed for a borrow.
+pub struct BorrowedMaterialExtensions<'owner> {
+    extensions: PbrMaterialExtensions,
+    owner: PhantomData<&'owner ()>,
+}
+
+impl BorrowedMaterialExtensions<'_> {
+    /// The extensions themselves, borrowed for as long as this view lives.
+    #[must_use]
+    pub const fn extensions(&self) -> &PbrMaterialExtensions {
+        &self.extensions
+    }
+}
+
+/// A cache of compiled shader effects, keyed by name.
+///
+/// `OWNED`. [`acquire`](Self::acquire) compiles on the first request for a name
+/// and hands back a borrowed view afterwards; the factory refuses
+/// [`clear`](Self::clear) and destruction while any view it published is still
+/// alive, which is why the view carries the factory's lifetime.
+pub struct ShaderEffectFactory {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+    device: GraphicsDevice,
+}
+
+impl ShaderEffectFactory {
+    /// Creates a factory on a device.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.shader_effect_factory_create)(device.handle()?, &mut handle)
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.shader_effect_factory_destroy,
+            released: "the shader effect factory has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+            device: device.clone(),
+        })
+    }
+
+    /// The named effect, compiling it on the first request.
+    ///
+    /// The name is the cache key, so two calls with the same name answer the
+    /// same compiled effect and the compile count rises only once.
+    pub fn acquire(
+        &self,
+        name: &str,
+        vertex_source: &str,
+        fragment_source: &str,
+    ) -> Result<BorrowedEffect<'_>> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned, all three views borrow Rust strings that
+        // outlive the call, and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.shader_effect_factory_acquire)(
+                handle,
+                string_view(name),
+                string_view(vertex_source),
+                string_view(fragment_source),
+                &mut value,
+            )
+        })?;
+        Ok(BorrowedEffect::new(&self.native, &self.device, value))
+    }
+
+    /// Whether a name is already cached.
+    pub fn contains(&self, name: &str) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned, the view borrows a Rust string that
+        // outlives the call, and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.shader_effect_factory_contains)(
+                handle,
+                string_view(name),
+                &mut value,
+            )
+        })?;
+        Ok(value != 0)
+    }
+
+    /// How many compiles the factory has actually performed.
+    ///
+    /// The number that says whether the cache is working: it rises once per
+    /// *new* name, not once per request.
+    pub fn compile_count(&self) -> Result<u64> {
+        let handle = self.core.get()?;
+        let mut value = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.shader_effect_factory_get_compile_count)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Empties the cache.
+    ///
+    /// Refused while a view the factory published is still alive.
+    pub fn clear(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.shader_effect_factory_clear)(handle) })
+    }
+
+    /// Releases the factory now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for ShaderEffectFactory {
     fn drop(&mut self) {
         let _ = self.core.release();
     }

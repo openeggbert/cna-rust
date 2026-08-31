@@ -3449,6 +3449,99 @@ extern "C" {
         argument0: CNA_EffectHandle,
         argument1: *const CNA_PbrMaterialEXT,
     ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_contribution_with_extensions(
+        argument0: *const CNA_ClusteredLightEXT,
+        argument1: *const CNA_Vector3,
+        argument2: *const CNA_Vector3,
+        argument3: *const CNA_Vector3,
+        argument4: *const CNA_Vector3,
+        argument5: f32,
+        argument6: f32,
+        argument7: CNA_PbrMaterialExtensionsHandle,
+        argument8: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_get_material_extensions(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: *mut CNA_PbrMaterialExtensionsHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_set_light_probe(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: CNA_LightProbeHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_set_light_probe_volume(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: CNA_LightProbeVolumeHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_forward_effect_set_material_extensions(
+        argument0: CNA_ClusteredForwardEffectHandle,
+        argument1: CNA_PbrMaterialExtensionsHandle,
+    ) -> CNA_Result;
+    pub fn cna_debug_draw_add_cluster_slice_gizmo(
+        argument0: CNA_DebugDrawHandle,
+        argument1: CNA_ClusteredLightGridHandle,
+        argument2: *const CNA_Matrix,
+        argument3: CNA_Color,
+    ) -> CNA_Result;
+    pub fn cna_debug_draw_add_probe_volume_gizmo(
+        argument0: CNA_DebugDrawHandle,
+        argument1: CNA_LightProbeVolumeHandle,
+        argument2: CNA_Color,
+        argument3: f32,
+    ) -> CNA_Result;
+    pub fn cna_gltf_material_bridge_build_extensions(
+        argument0: *const CNA_GltfMaterialExtensionSourceEXT,
+        argument1: *const CNA_GltfMaterialExtensionTexturesEXT,
+        argument2: CNA_PbrMaterialExtensionsHandle,
+    ) -> CNA_Result;
+    pub fn cna_gltf_material_bridge_build_material(
+        argument0: *const CNA_GltfMaterialSourceEXT,
+        argument1: *const CNA_GltfMaterialTexturesEXT,
+        argument2: *mut CNA_PbrMaterialEXT,
+    ) -> CNA_Result;
+    pub fn cna_gltf_material_extension_source_ext_init(
+        argument0: *mut CNA_GltfMaterialExtensionSourceEXT,
+    ) -> CNA_Result;
+    pub fn cna_gltf_material_extension_textures_ext_init(
+        argument0: *mut CNA_GltfMaterialExtensionTexturesEXT,
+    ) -> CNA_Result;
+    pub fn cna_gltf_material_source_ext_init(
+        argument0: *mut CNA_GltfMaterialSourceEXT,
+    ) -> CNA_Result;
+    pub fn cna_gltf_material_textures_ext_init(
+        argument0: *mut CNA_GltfMaterialTexturesEXT,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_get_skybox(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: *mut CNA_SkyboxHandle,
+    ) -> CNA_Result;
+    pub fn cna_render_pipeline_set_skybox(
+        argument0: CNA_RenderPipelineHandle,
+        argument1: CNA_SkyboxHandle,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_factory_acquire(
+        argument0: CNA_ShaderEffectFactoryHandle,
+        argument1: CNA_StringView,
+        argument2: CNA_StringView,
+        argument3: CNA_StringView,
+        argument4: *mut CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_factory_clear(argument0: CNA_ShaderEffectFactoryHandle) -> CNA_Result;
+    pub fn cna_shader_effect_factory_contains(
+        argument0: CNA_ShaderEffectFactoryHandle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_factory_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_ShaderEffectFactoryHandle,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_factory_destroy(
+        argument0: CNA_ShaderEffectFactoryHandle,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_factory_get_compile_count(
+        argument0: CNA_ShaderEffectFactoryHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
     pub fn cna_skinned_pbr_effect_copy_bone_transforms(
         argument0: CNA_EffectHandle,
         argument1: u64,

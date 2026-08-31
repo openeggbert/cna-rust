@@ -144,6 +144,7 @@ the criterion above is unchanged, only its precondition has been met.
 | light probes, image-based lights and the environment processor | `light_probe_ext`, `image_based_light_ext`, `environment_processor` | 34 | `VERIFIED_GPU` |
 | probe volumes and the probe baker | `light_probe_volume_ext`, `light_probe_baker` | 27 | `VERIFIED_GPU` |
 | the material extension texture slots, material identity, thin-film iridescence and the skinned PBR effect | `pbr_material_extensions_*_texture`, `pbr_material_ext`, `thin_film_iridescence`, `skinned_pbr_effect` | 31 | `VERIFIED_STATE` |
+| the shader-effect factory, the glTF material bridge, the pipeline's skybox and the routes that were waiting on other families | `shader_effect_factory`, `gltf_material_*`, `render_pipeline_*_skybox`, the last `clustered_forward_effect` and `debug_draw` routes | 21 | `VERIFIED_GPU` |
 
 ### What the GPU artifact changed about the evidence
 
@@ -353,4 +354,28 @@ three found something:
   medium around it is not short-circuited, though: the Airy summation still
   runs and shifts the colour by about 0.001, so "same index" is not "no film".
   Total internal reflection returns white.
+- **CNA spells "no volume absorption" as zero, where glTF spells it
+  `+Infinity`.** `cna_gltf_material_extension_source_ext_init` leaves
+  `attenuation_distance_ext` at zero, a fresh `PbrMaterialExtensions` reads zero,
+  the setter floors negatives to zero, and the shader gates absorption on
+  `uAttenuationDistance > 0`. The convention is consistent -- but an importer
+  that translates glTF's infinity literally lands on a very large finite
+  distance and almost no absorption, which *looks* right, while one that
+  translates "absent" to zero gets what CNA means. The bridge also writes a
+  source's zero over a distance that had already been set, so zero is a value
+  rather than "leave it alone".
+- **glTF's own metallic and roughness defaults are one, not zero,** and the
+  default index of refraction is 1.5 -- all three of which
+  `cna_gltf_material_source_ext_init` reproduces. A staging structure zeroed by
+  the caller would give a perfectly smooth dielectric where the format's default
+  is a fully rough metal.
+- **The shader-effect factory's compile count follows names, not requests.**
+  Two acquires of the same name compile once; a second name compiles again. The
+  factory refuses `clear` while any effect view it published is still alive and
+  allows it once they are gone, which is the counted-borrow rule again.
+- **A cluster-slice gizmo drawn from a grid with no projection adds no lines and
+  succeeds.** There is nothing to place the slices with, and upstream chose an
+  overlay that stays empty until the grid is ready over one that refuses. The
+  test asserts the line count is *unchanged* rather than that the call returned
+  `Ok`, which is the difference between measuring the rule and measuring nothing.
 
