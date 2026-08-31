@@ -51,8 +51,12 @@ use crate::graphics::{
     BorrowedHandle, Effect, GraphicsDevice, OwnedEngineChild, SurfaceFormat, Texture2D,
 };
 use crate::native::Native;
-use crate::graphics::{DepthFormat, RenderTarget2D, SamplerState, Texture3D, TextureCube};
-use crate::value::{BoundingBox, Color, Matrix, Vector2, Vector3, Vector4};
+use crate::graphics::{
+    DepthFormat, RenderTarget2D, SamplerState, Texture3D, TextureCube, VertexPositionColor,
+};
+use crate::value::{
+    BoundingBox, BoundingFrustum, BoundingSphere, Color, Matrix, Vector2, Vector3, Vector4,
+};
 
 use super::pbr::{EngineRenderSettings, RenderQuality, ShadowQuality, TonemappingMode};
 
@@ -7876,6 +7880,778 @@ impl CubeLut {
 }
 
 impl Drop for CubeLut {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// Immediate-mode line drawing for diagnostics.
+///
+/// `OWNED`. Everything it draws is a line list, so
+/// [`DebugDraw::line_count`] and [`DebugDraw::vertices`] are exact values: a
+/// box is twelve lines, a cross is three, and a sphere is however many
+/// segments it was asked for, three times over.
+pub struct DebugDraw {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl DebugDraw {
+    /// Creates the debug drawer on a device.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe { (native.engine.debug_draw_create)(device.handle()?, &mut handle) })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.debug_draw_destroy,
+            released: "the debug drawer has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+        })
+    }
+
+    /// Opens a batch for a camera.
+    pub fn begin(&self, view: Matrix, projection: Matrix) -> Result<()> {
+        let handle = self.core.get()?;
+        let view = native_matrix(view);
+        let projection = native_matrix(projection);
+        // SAFETY: the handle is owned and both matrices are borrowed for the call.
+        self.native
+            .check(unsafe { (self.native.engine.debug_draw_begin)(handle, &view, &projection) })
+    }
+
+    /// Draws the batch and closes it.
+    pub fn end(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.debug_draw_end)(handle) })
+    }
+
+    /// Discards everything queued without drawing it.
+    pub fn clear(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.debug_draw_clear)(handle) })
+    }
+
+    /// How many lines are queued.
+    pub fn line_count(&self) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native
+            .check(unsafe { (self.native.engine.debug_draw_get_line_count)(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    /// Whether the lines are depth tested against the scene.
+    pub fn is_depth_tested(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native
+            .check(unsafe { (self.native.engine.debug_draw_is_depth_tested)(handle, &mut value) })?;
+        Ok(value != 0)
+    }
+
+    /// Turns depth testing on or off.
+    pub fn set_depth_tested(&self, value: bool) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the flag is a canonical boolean.
+        self.native.check(unsafe {
+            (self.native.engine.debug_draw_set_depth_tested)(handle, u8::from(value))
+        })
+    }
+
+    /// Queues one line.
+    pub fn add_line(&self, from: Vector3, to: Vector3, color: Color) -> Result<()> {
+        let handle = self.core.get()?;
+        let from = native_vector3(from);
+        let to = native_vector3(to);
+        // SAFETY: the handle is owned and both points are borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.debug_draw_add_line)(handle, &from, &to, native_color(color))
+        })
+    }
+
+    /// Queues the twelve edges of a box.
+    pub fn add_box(&self, bounds: BoundingBox, color: Color) -> Result<()> {
+        let handle = self.core.get()?;
+        let bounds = native_bounds(bounds);
+        // SAFETY: the handle is owned and the bounds are borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.debug_draw_add_box)(handle, &bounds, native_color(color))
+        })
+    }
+
+    /// Queues three axis-aligned segments through a point.
+    pub fn add_cross(&self, centre: Vector3, size: f32, color: Color) -> Result<()> {
+        let handle = self.core.get()?;
+        let centre = native_vector3(centre);
+        // SAFETY: the handle is owned and the point is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.debug_draw_add_cross)(handle, &centre, size, native_color(color))
+        })
+    }
+
+    /// Queues three rings approximating a sphere.
+    pub fn add_sphere(
+        &self,
+        centre: Vector3,
+        radius: f32,
+        color: Color,
+        segments: i32,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let centre = native_vector3(centre);
+        // SAFETY: the handle is owned and the point is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.debug_draw_add_sphere)(
+                handle,
+                &centre,
+                radius,
+                native_color(color),
+                segments,
+            )
+        })
+    }
+
+    /// Queues the same three rings around a bounding sphere.
+    pub fn add_bounding_sphere(
+        &self,
+        sphere: BoundingSphere,
+        color: Color,
+        segments: i32,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let sphere = sys::CNA_BoundingSphere {
+            center: native_vector3(sphere.Center),
+            radius: sphere.Radius,
+        };
+        // SAFETY: the handle is owned and the sphere is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.debug_draw_add_bounding_sphere)(
+                handle,
+                &sphere,
+                native_color(color),
+                segments,
+            )
+        })
+    }
+
+    /// Queues a camera frustum's own twelve edges.
+    pub fn add_frustum(&self, frustum: &BoundingFrustum, color: Color) -> Result<()> {
+        let handle = self.core.get()?;
+        let frustum = sys::CNA_BoundingFrustum {
+            matrix: native_matrix(frustum.Matrix()),
+        };
+        // SAFETY: the handle is owned and the frustum is by value.
+        self.native.check(unsafe {
+            (self.native.engine.debug_draw_add_frustum)(handle, frustum, native_color(color))
+        })
+    }
+
+    /// Queues a gizmo showing where a directional light points.
+    pub fn add_directional_light_gizmo(
+        &self,
+        light: DirectionalLight,
+        origin: Vector3,
+        length: f32,
+        color: Color,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let light = light.to_native();
+        let origin = native_vector3(origin);
+        // SAFETY: the handle is owned and both structures are borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.debug_draw_add_directional_light_gizmo)(
+                handle,
+                &light,
+                &origin,
+                length,
+                native_color(color),
+            )
+        })
+    }
+
+    /// Queues a gizmo showing a point light's position and range.
+    pub fn add_point_light_gizmo(&self, light: PointLight, color: Color) -> Result<()> {
+        let handle = self.core.get()?;
+        let light = light.to_native();
+        // SAFETY: the handle is owned and the light is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.debug_draw_add_point_light_gizmo)(
+                handle,
+                &light,
+                native_color(color),
+            )
+        })
+    }
+
+    /// Queues a gizmo showing a spot light's cone.
+    pub fn add_spot_light_gizmo(
+        &self,
+        light: SpotLight,
+        color: Color,
+        segments: i32,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let light = light.to_native();
+        // SAFETY: the handle is owned and the light is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.debug_draw_add_spot_light_gizmo)(
+                handle,
+                &light,
+                native_color(color),
+                segments,
+            )
+        })
+    }
+
+    /// Queues a gizmo showing each of a cascaded shadow map's splits.
+    pub fn add_cascade_gizmo(&self, map: &CascadedShadowMap, color: Color) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: both handles are live for the call.
+        self.native.check(unsafe {
+            (self.native.engine.debug_draw_add_cascade_gizmo)(
+                handle,
+                map.core.get()?,
+                native_color(color),
+            )
+        })
+    }
+
+    /// The queued lines as vertices, ready to draw elsewhere.
+    ///
+    /// `depth_tested` selects which of the two queues to read: the drawer keeps
+    /// them apart because they need different device state, and a caller
+    /// reading only one and finding it short would otherwise have no way to
+    /// tell which.
+    pub fn vertices(&self, depth_tested: bool) -> Result<Vec<VertexPositionColor>> {
+        let handle = self.core.get()?;
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the count.
+        let probe = unsafe {
+            (self.native.engine.debug_draw_copy_vertices)(
+                handle,
+                u8::from(depth_tested),
+                core::ptr::null_mut(),
+                0,
+                &mut required,
+            )
+        };
+        if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+            self.native.check(probe)?;
+        }
+        let capacity = usize::try_from(required)
+            .map_err(|_| CnaError::InvalidInput("the vertex count does not fit in memory"))?;
+        if capacity == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![sys::CNA_VertexPositionColor::default(); capacity];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `capacity`
+        // writable vertices, which is the count passed alongside it.
+        self.native.check(unsafe {
+            (self.native.engine.debug_draw_copy_vertices)(
+                handle,
+                u8::from(depth_tested),
+                buffer.as_mut_ptr(),
+                required,
+                &mut count,
+            )
+        })?;
+        let count = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("CNA reported more vertices than fit in memory"))?;
+        Ok(buffer
+            .into_iter()
+            .take(count.min(capacity))
+            .map(|vertex| VertexPositionColor {
+                Position: from_native_vector3(vertex.position),
+                Color: Color::from_r_and_g_and_b_and_a_as_int32_and_int32_and_int32_and_int32(
+                    i32::from(vertex.color.r),
+                    i32::from(vertex.color.g),
+                    i32::from(vertex.color.b),
+                    i32::from(vertex.color.a),
+                ),
+            })
+            .collect())
+    }
+
+    /// Releases the drawer now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for DebugDraw {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// A camera frustum, and the visibility questions it answers.
+///
+/// `OWNED`, and device-free: culling is arithmetic, so the culler needs no
+/// graphics device and is not registered against one.
+pub struct FrustumCuller {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl FrustumCuller {
+    /// Creates a culler with no camera yet.
+    pub fn new() -> Result<Self> {
+        let native = Native::process()?;
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the output is a live local.
+        native.check(unsafe { (native.engine.frustum_culler_ext_create)(&mut handle) })?;
+        Ok(Self {
+            core: Arc::new(EngineHandle {
+                native: Arc::clone(&native),
+                handle: Mutex::new(handle),
+                destroy: native.engine.frustum_culler_ext_destroy,
+                released: "the frustum culler has been released",
+            }),
+            native,
+        })
+    }
+
+    /// Sets the camera from a view and a projection.
+    pub fn set_camera(&self, view: Matrix, projection: Matrix) -> Result<()> {
+        let handle = self.core.get()?;
+        let view = native_matrix(view);
+        let projection = native_matrix(projection);
+        // SAFETY: the handle is owned and both matrices are borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.frustum_culler_ext_set_camera)(handle, &view, &projection)
+        })
+    }
+
+    /// Sets the camera from a combined view-projection.
+    pub fn set_view_projection(&self, value: Matrix) -> Result<()> {
+        let handle = self.core.get()?;
+        let value = native_matrix(value);
+        // SAFETY: the handle is owned and the matrix is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.frustum_culler_ext_set_view_projection)(handle, &value)
+        })
+    }
+
+    /// The frustum the culler is testing against.
+    pub fn frustum(&self) -> Result<BoundingFrustum> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_BoundingFrustum::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.frustum_culler_ext_get_frustum)(handle, &mut value)
+        })?;
+        Ok(BoundingFrustum::new(from_native_matrix(value.matrix)))
+    }
+
+    /// Whether one box is at least partly inside the frustum.
+    pub fn is_box_visible(&self, bounds: BoundingBox) -> Result<bool> {
+        let handle = self.core.get()?;
+        let bounds = native_bounds(bounds);
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the handle is owned, the bounds are borrowed for the call and
+        // the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.frustum_culler_ext_is_box_visible)(handle, &bounds, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Whether one sphere is at least partly inside the frustum.
+    pub fn is_sphere_visible(&self, sphere: BoundingSphere) -> Result<bool> {
+        let handle = self.core.get()?;
+        let sphere = sys::CNA_BoundingSphere {
+            center: native_vector3(sphere.Center),
+            radius: sphere.Radius,
+        };
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the handle is owned, the sphere is borrowed for the call and
+        // the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.frustum_culler_ext_is_sphere_visible)(handle, &sphere, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// The indices of the boxes that survive the frustum, in order.
+    pub fn cull_boxes(&self, boxes: &[BoundingBox]) -> Result<Vec<u64>> {
+        let handle = self.core.get()?;
+        let native_boxes: Vec<sys::CNA_BoundingBox> =
+            boxes.iter().copied().map(native_bounds).collect();
+        let mut visible = vec![0_u64; boxes.len()];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned, the input is borrowed for the call with
+        // its own length, and the destination holds one index per input.
+        self.native.check(unsafe {
+            (self.native.engine.frustum_culler_ext_cull_boxes)(
+                handle,
+                native_boxes.as_ptr(),
+                native_boxes.len() as u64,
+                visible.as_mut_ptr(),
+                visible.len() as u64,
+                &mut count,
+            )
+        })?;
+        let count = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("CNA reported more indices than fit in memory"))?;
+        visible.truncate(count.min(boxes.len()));
+        Ok(visible)
+    }
+
+    /// The indices of the spheres that survive the frustum, in order.
+    pub fn cull_spheres(&self, spheres: &[BoundingSphere]) -> Result<Vec<u64>> {
+        let handle = self.core.get()?;
+        let native_spheres: Vec<sys::CNA_BoundingSphere> = spheres
+            .iter()
+            .map(|sphere| sys::CNA_BoundingSphere {
+                center: native_vector3(sphere.Center),
+                radius: sphere.Radius,
+            })
+            .collect();
+        let mut visible = vec![0_u64; spheres.len()];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned, the input is borrowed for the call with
+        // its own length, and the destination holds one index per input.
+        self.native.check(unsafe {
+            (self.native.engine.frustum_culler_ext_cull_spheres)(
+                handle,
+                native_spheres.as_ptr(),
+                native_spheres.len() as u64,
+                visible.as_mut_ptr(),
+                visible.len() as u64,
+                &mut count,
+            )
+        })?;
+        let count = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("CNA reported more indices than fit in memory"))?;
+        visible.truncate(count.min(spheres.len()));
+        Ok(visible)
+    }
+
+    /// The transforms whose bounds survive the frustum, in order.
+    ///
+    /// The instancing path: many world transforms, each paired with the world
+    /// bounds of the instance it places, and what comes back is the transforms
+    /// themselves rather than their indices, ready to upload.
+    ///
+    /// `bounds` is parallel to `transforms` and may be **shorter**. CNA's rule
+    /// for the tail is that a transform with no bound of its own is *kept*, not
+    /// dropped, which is the opposite of what a caller who passed a short array
+    /// by accident would expect; it is stated in CNA's own header and passed
+    /// through here unchanged rather than papered over.
+    pub fn cull_transforms(
+        &self,
+        transforms: &[Matrix],
+        bounds: &[BoundingBox],
+    ) -> Result<Vec<Matrix>> {
+        let handle = self.core.get()?;
+        let native_transforms: Vec<sys::CNA_Matrix> =
+            transforms.iter().copied().map(native_matrix).collect();
+        let bounds: Vec<sys::CNA_BoundingBox> =
+            bounds.iter().copied().map(native_bounds).collect();
+        let mut visible = vec![sys::CNA_Matrix::default(); transforms.len()];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned, both inputs are borrowed for the call
+        // with their own lengths, and the destination holds one transform per
+        // input.
+        self.native.check(unsafe {
+            (self.native.engine.frustum_culler_ext_cull_transforms)(
+                handle,
+                native_transforms.as_ptr(),
+                native_transforms.len() as u64,
+                bounds.as_ptr(),
+                bounds.len() as u64,
+                visible.as_mut_ptr(),
+                visible.len() as u64,
+                &mut count,
+            )
+        })?;
+        let count = usize::try_from(count).map_err(|_| {
+            CnaError::InvalidInput("CNA reported more transforms than fit in memory")
+        })?;
+        visible.truncate(count.min(transforms.len()));
+        Ok(visible.into_iter().map(from_native_matrix).collect())
+    }
+
+    /// Releases the culler now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for FrustumCuller {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// How a level-of-detail group decides which level to use.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum LodSelectionMode {
+    /// By distance alone.
+    #[default]
+    Distance,
+    /// By how many pixels the object covers.
+    ScreenSpaceError,
+}
+
+impl LodSelectionMode {
+    const fn from_native(value: sys::CNA_LodSelectionMode) -> Option<Self> {
+        Some(match value {
+            sys::CNA_LOD_SELECTION_MODE_DISTANCE => Self::Distance,
+            sys::CNA_LOD_SELECTION_MODE_SCREEN_SPACE_ERROR => Self::ScreenSpaceError,
+            _ => return None,
+        })
+    }
+
+    const fn to_native(self) -> sys::CNA_LodSelectionMode {
+        match self {
+            Self::Distance => sys::CNA_LOD_SELECTION_MODE_DISTANCE,
+            Self::ScreenSpaceError => sys::CNA_LOD_SELECTION_MODE_SCREEN_SPACE_ERROR,
+        }
+    }
+}
+
+/// One level in a [`LodGroup`].
+///
+/// The mesh part is reported as *presence* rather than published: CNA names it
+/// with a `ModelMeshPart` handle, and this crate's `ModelMeshPart` is a managed
+/// projection with no native handle of its own, so a value carrying one would
+/// be a raw handle in the safe API.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[non_exhaustive]
+pub struct LodLevel {
+    /// The distance beyond which the next level takes over.
+    pub max_distance: f32,
+    /// Whether a mesh part is attached to this level.
+    pub has_part: bool,
+}
+
+/// A set of detail levels and the rule that picks between them.
+///
+/// `OWNED`, and device-free. Levels may be added without a mesh part, which is
+/// what makes the selection rule usable from Rust: a caller adds the distances,
+/// asks [`LodGroup::select_index`] which level a distance falls in, and keeps
+/// its own table of what to draw for each.
+pub struct LodGroup {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl LodGroup {
+    /// Creates an empty group.
+    pub fn new() -> Result<Self> {
+        let native = Native::process()?;
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the output is a live local.
+        native.check(unsafe { (native.engine.lod_group_ext_create)(&mut handle) })?;
+        Ok(Self {
+            core: Arc::new(EngineHandle {
+                native: Arc::clone(&native),
+                handle: Mutex::new(handle),
+                destroy: native.engine.lod_group_ext_destroy,
+                released: "the LOD group has been released",
+            }),
+            native,
+        })
+    }
+
+    /// Adds a level that takes over out to a distance.
+    ///
+    /// The mesh part upstream also accepts is left out deliberately: see
+    /// [`LodLevel`].
+    pub fn add_level(&self, max_distance: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned; an invalid part handle is upstream's
+        // documented "no part", and the distance is by value.
+        self.native.check(unsafe {
+            (self.native.engine.lod_group_ext_add_level)(
+                handle,
+                max_distance,
+                sys::CNA_INVALID_HANDLE,
+            )
+        })
+    }
+
+    /// Removes every level.
+    pub fn clear(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.lod_group_ext_clear)(handle) })
+    }
+
+    /// Every level, in the order they were added.
+    pub fn levels(&self) -> Result<Vec<LodLevel>> {
+        let handle = self.core.get()?;
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the count.
+        let probe = unsafe {
+            (self.native.engine.lod_group_ext_copy_levels)(
+                handle,
+                core::ptr::null_mut(),
+                0,
+                &mut required,
+            )
+        };
+        if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+            self.native.check(probe)?;
+        }
+        let capacity = usize::try_from(required)
+            .map_err(|_| CnaError::InvalidInput("the level count does not fit in memory"))?;
+        if capacity == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![sys::CNA_LodLevelEXT::default(); capacity];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `capacity`
+        // writable levels, which is the count passed alongside it.
+        self.native.check(unsafe {
+            (self.native.engine.lod_group_ext_copy_levels)(
+                handle,
+                buffer.as_mut_ptr(),
+                required,
+                &mut count,
+            )
+        })?;
+        let count = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("CNA reported more levels than fit in memory"))?;
+        Ok(buffer
+            .into_iter()
+            .take(count.min(capacity))
+            .map(|level| LodLevel {
+                max_distance: level.max_distance,
+                has_part: level.part != sys::CNA_INVALID_HANDLE,
+            })
+            .collect())
+    }
+
+    /// Which level a distance falls in, or `-1` for none.
+    ///
+    /// The boundary is **exclusive**: a level added with `max_distance` covers
+    /// distances strictly below it, so a distance sitting exactly on a boundary
+    /// belongs to the *next* level. Past the last boundary the answer is `-1`,
+    /// meaning "draw nothing at all" -- the group does not fall back to its
+    /// coarsest level. A negative distance is clamped to zero rather than
+    /// refused, and an empty group answers `-1`.
+    ///
+    /// This call is **not** a pure query: it remembers the level it chose, and
+    /// [`set_hysteresis`](Self::set_hysteresis) makes the next call sticky near
+    /// that level's boundary. Call [`reset_hysteresis`](Self::reset_hysteresis)
+    /// to ask again without that memory.
+    pub fn select_index(&self, distance: f32) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.lod_group_ext_select_index)(handle, distance, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// How the group decides which level to use.
+    pub fn selection_mode(&self) -> Result<LodSelectionMode> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_LodSelectionMode = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.lod_group_ext_get_selection_mode)(handle, &mut value)
+        })?;
+        LodSelectionMode::from_native(value)
+            .ok_or(CnaError::InvalidInput("native LOD selection mode is unknown"))
+    }
+
+    /// Sets how the group decides.
+    pub fn set_selection_mode(&self, value: LodSelectionMode) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the identity is canonical.
+        self.native.check(unsafe {
+            (self.native.engine.lod_group_ext_set_selection_mode)(handle, value.to_native())
+        })
+    }
+
+    /// How far past a boundary the group holds its current level.
+    ///
+    /// Hysteresis is what stops an object at a boundary flickering between two
+    /// levels, so it is state rather than a pure rule -- which is why
+    /// [`LodGroup::reset_hysteresis`] exists.
+    pub fn hysteresis(&self) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native
+            .check(unsafe { (self.native.engine.lod_group_ext_get_hysteresis)(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    /// Sets how far past a boundary the group holds its level.
+    pub fn set_hysteresis(&self, value: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the value is by value.
+        self.native
+            .check(unsafe { (self.native.engine.lod_group_ext_set_hysteresis)(handle, value) })
+    }
+
+    /// Forgets which level was last selected.
+    pub fn reset_hysteresis(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.lod_group_ext_reset_hysteresis)(handle) })
+    }
+
+    /// The camera the screen-space rule measures against.
+    pub fn set_screen_space_parameters(
+        &self,
+        object_radius: f32,
+        vertical_field_of_view: f32,
+        viewport_height: f32,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and every value is by value.
+        self.native.check(unsafe {
+            (self.native.engine.lod_group_ext_set_screen_space_parameters)(
+                handle,
+                object_radius,
+                vertical_field_of_view,
+                viewport_height,
+            )
+        })
+    }
+
+    /// How many pixels the object covers at a distance.
+    pub fn projected_radius_pixels(&self, distance: f32) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.lod_group_ext_projected_radius_pixels)(handle, distance, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Releases the group now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for LodGroup {
     fn drop(&mut self) {
         let _ = self.core.release();
     }

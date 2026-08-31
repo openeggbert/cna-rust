@@ -19,8 +19,8 @@ use cna::extensions::engine::{
     FullscreenPass, HeightFogPass, LensFlarePass, LightShaftPass, LutInterpolation, MemoryBarrier,
     MotionBlurPass, RenderPipeline, ScopedRenderTarget, ShadowMap, Skybox, SpatialUpscalePass,
     CascadedShadowMap, CubeShadowMap, PointLight, PunctualLight, PunctualLightKind,
-    AutoExposure, CubeLut, DepthEncoding, DepthNormalPrepass, DisplayColorSpace,
-    HdrDisplayOutput, ShadowCascadeState, SpotLight, SpotShadowMap, SsaoPass,
+    AutoExposure, CubeLut, DebugDraw, DepthEncoding, DepthNormalPrepass, DisplayColorSpace,
+    FrustumCuller, HdrDisplayOutput, LodGroup, LodSelectionMode, ShadowCascadeState, SpotLight, SpotShadowMap, SsaoPass,
     SsrPass, StorageBuffer, TonemapPass, TransparentDrawList, VolumetricFogPass,
     WeightedBlendedTransparency,
 };
@@ -33,7 +33,8 @@ use cna::Microsoft::Xna::Framework::Graphics::{
     DepthFormat, SurfaceFormat, Texture2D, TextureCube,
 };
 use cna::Microsoft::Xna::Framework::{
-    BoundingBox, Color, Game, GameContext, GameTime, Matrix, Vector2, Vector3,
+    BoundingBox, BoundingFrustum, BoundingSphere, Color, Game, GameContext, GameTime, Matrix,
+    Vector2, Vector3,
 };
 use cna::{run_for_frames, CnaError, ErrorCategory, GameState, GameStateAccess, Result};
 
@@ -3836,5 +3837,448 @@ fn the_display_encode_and_the_lut_parser_answer_with_exact_values() {
         findings.hdr10_encode,
         findings.lut_title,
         findings.lut_size,
+    );
+}
+
+/// What the culling, LOD and debug-draw run measured.
+#[derive(Default)]
+struct CullingFindings {
+    engine_layer: i32,
+    line_counts: Vec<(&'static str, i32)>,
+    vertices_depth_tested: usize,
+    vertices_overlay: usize,
+    first_line: Option<((f32, f32, f32), u32)>,
+    depth_tested_round_trip: Option<(bool, bool)>,
+    box_visibility: Vec<((f32, f32, f32), bool)>,
+    sphere_visibility: Vec<(f32, bool)>,
+    culled_boxes: Vec<u64>,
+    culled_transforms: usize,
+    culled_short_bounds: usize,
+    frustum_matrix_matches: Option<bool>,
+    lod_levels: Vec<(f32, bool)>,
+    lod_selection: Vec<(f32, i32)>,
+    lod_mode_round_trip: Option<LodSelectionMode>,
+    lod_hysteresis: f32,
+    lod_sticky: Vec<(&'static str, i32)>,
+    projected_radius: Vec<(f32, f32)>,
+}
+
+struct CullingGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<CullingFindings>>,
+}
+
+impl GameStateAccess for CullingGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+/// A camera looking down -Z from the origin, with a 90-degree field of view.
+fn culling_camera() -> (Matrix, Matrix) {
+    (
+        Matrix::CreateLookAt(
+            Vector3::Zero,
+            Vector3::from_x_and_y_and_z(0.0, 0.0, -1.0),
+            Vector3::Up,
+        ),
+        Matrix::CreatePerspectiveFieldOfView(std::f32::consts::FRAC_PI_2, 1.0, 1.0, 100.0),
+    )
+}
+
+fn unit_box_at(x: f32, y: f32, z: f32) -> BoundingBox {
+    BoundingBox::new(
+        Vector3::from_x_and_y_and_z(x - 0.5, y - 0.5, z - 0.5),
+        Vector3::from_x_and_y_and_z(x + 0.5, y + 0.5, z + 0.5),
+    )
+}
+
+impl Game for CullingGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+        let mut findings = CullingFindings {
+            engine_layer: version,
+            ..CullingFindings::default()
+        };
+        let (view, projection) = culling_camera();
+
+        // --- frustum culling -----------------------------------------------
+        let culler = FrustumCuller::new()?;
+        culler.set_camera(view, projection)?;
+        // The culler's own frustum must be the camera's view-projection: a
+        // culler testing against a different matrix would still answer, just
+        // wrongly.
+        findings.frustum_matrix_matches =
+            Some(culler.frustum()?.Matrix() == view * projection);
+
+        // Straight ahead is inside; behind, and far off to the side, are not.
+        let probes = [
+            (0.0_f32, 0.0_f32, -10.0_f32),
+            (0.0, 0.0, 10.0),
+            (0.0, 0.0, -1000.0),
+            (100.0, 0.0, -10.0),
+        ];
+        let mut boxes = Vec::new();
+        for (x, y, z) in probes {
+            let bounds = unit_box_at(x, y, z);
+            findings
+                .box_visibility
+                .push(((x, y, z), culler.is_box_visible(bounds)?));
+            boxes.push(bounds);
+        }
+        findings.culled_boxes = culler.cull_boxes(&boxes)?;
+        for radius in [0.5_f32, 50.0, 70.0] {
+            findings.sphere_visibility.push((
+                radius,
+                culler.is_sphere_visible(BoundingSphere {
+                    Center: Vector3::from_x_and_y_and_z(0.0, 0.0, 60.0),
+                    Radius: radius,
+                })?,
+            ));
+        }
+        let transforms: Vec<Matrix> = probes
+            .iter()
+            .map(|(x, y, z)| Matrix::CreateTranslation(Vector3::from_x_and_y_and_z(*x, *y, *z)))
+            .collect();
+        findings.culled_transforms = culler.cull_transforms(&transforms, &boxes)?.len();
+        // The documented tail rule: a transform with no bound of its own is
+        // kept. Two bounds for four transforms must keep the visible one of the
+        // first two plus both of the unpaired ones.
+        findings.culled_short_bounds = culler
+            .cull_transforms(&transforms, &boxes[..2])?
+            .len();
+
+        // --- levels of detail ----------------------------------------------
+        let lod = LodGroup::new()?;
+        for distance in [10.0_f32, 25.0, 60.0] {
+            lod.add_level(distance)?;
+        }
+        findings.lod_levels = lod
+            .levels()?
+            .into_iter()
+            .map(|level| (level.max_distance, level.has_part))
+            .collect();
+        lod.set_hysteresis(0.0)?;
+        findings.lod_hysteresis = lod.hysteresis()?;
+        for distance in [1.0_f32, 10.0, 20.0, 40.0, 1_000.0] {
+            lod.reset_hysteresis()?;
+            findings
+                .lod_selection
+                .push((distance, lod.select_index(distance)?));
+        }
+        // Hysteresis: having settled on a level, a distance that crosses the
+        // next boundary by less than the margin must hold the old level, and
+        // forgetting the old level must let it move.
+        lod.set_hysteresis(3.0)?;
+        lod.reset_hysteresis()?;
+        findings
+            .lod_sticky
+            .push(("settled at 20", lod.select_index(20.0)?));
+        findings
+            .lod_sticky
+            .push(("nudged to 26", lod.select_index(26.0)?));
+        findings
+            .lod_sticky
+            .push(("pushed to 40", lod.select_index(40.0)?));
+        lod.reset_hysteresis()?;
+        findings
+            .lod_sticky
+            .push(("26 with no memory", lod.select_index(26.0)?));
+        lod.set_hysteresis(0.0)?;
+        lod.reset_hysteresis()?;
+
+        lod.set_selection_mode(LodSelectionMode::ScreenSpaceError)?;
+        findings.lod_mode_round_trip = lod.selection_mode().ok();
+        lod.set_screen_space_parameters(1.0, std::f32::consts::FRAC_PI_2, 1_080.0)?;
+        for distance in [1.0_f32, 10.0, 100.0] {
+            findings
+                .projected_radius
+                .push((distance, lod.projected_radius_pixels(distance)?));
+        }
+
+        // --- debug drawing --------------------------------------------------
+        let debug = DebugDraw::new(&device)?;
+        findings.line_counts.push(("empty", debug.line_count()?));
+        debug.add_line(
+            Vector3::Zero,
+            Vector3::from_x_and_y_and_z(1.0, 0.0, 0.0),
+            Color::Red,
+        )?;
+        findings.line_counts.push(("one line", debug.line_count()?));
+        debug.add_box(unit_box_at(0.0, 0.0, -5.0), Color::Lime)?;
+        findings.line_counts.push(("plus a box", debug.line_count()?));
+        debug.add_cross(Vector3::Zero, 1.0, Color::White)?;
+        findings.line_counts.push(("plus a cross", debug.line_count()?));
+        debug.add_sphere(Vector3::Zero, 1.0, Color::Blue, 8)?;
+        findings.line_counts.push(("plus a sphere", debug.line_count()?));
+        debug.add_bounding_sphere(
+            BoundingSphere {
+                Center: Vector3::Zero,
+                Radius: 2.0,
+            },
+            Color::Yellow,
+            8,
+        )?;
+        findings
+            .line_counts
+            .push(("plus a bounding sphere", debug.line_count()?));
+        debug.add_frustum(&BoundingFrustum::new(view * projection), Color::Magenta)?;
+        findings.line_counts.push(("plus a frustum", debug.line_count()?));
+
+        let sun = DirectionalLight::canonical_defaults()?;
+        debug.add_directional_light_gizmo(sun, Vector3::Zero, 4.0, Color::Orange)?;
+        debug.add_point_light_gizmo(PointLight::canonical_defaults()?, Color::Cyan)?;
+        debug.add_spot_light_gizmo(SpotLight::canonical_defaults()?, Color::Pink, 8)?;
+        let cascades = CascadedShadowMap::new(&device, ShadowQuality::Low, 2)?;
+        cascades.update(sun, view, projection)?;
+        debug.add_cascade_gizmo(&cascades, Color::Gray)?;
+        findings
+            .line_counts
+            .push(("plus every gizmo", debug.line_count()?));
+
+        let depth_vertices = debug.vertices(true)?;
+        let overlay_vertices = debug.vertices(false)?;
+        findings.vertices_depth_tested = depth_vertices.len();
+        findings.vertices_overlay = overlay_vertices.len();
+        let queued = if depth_vertices.is_empty() {
+            &overlay_vertices
+        } else {
+            &depth_vertices
+        };
+        findings.first_line = queued.first().map(|vertex| {
+            (
+                (vertex.Position.X, vertex.Position.Y, vertex.Position.Z),
+                vertex.Color.PackedValue(),
+            )
+        });
+
+        let before = debug.is_depth_tested()?;
+        debug.set_depth_tested(!before)?;
+        findings.depth_tested_round_trip = Some((before, debug.is_depth_tested()?));
+        debug.set_depth_tested(before)?;
+
+        debug.clear()?;
+        findings.line_counts.push(("cleared", debug.line_count()?));
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+fn culling_lod_and_debug_drawing_count_exactly_what_they_produce() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(CullingFindings::default()));
+    let game = CullingGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with a culler, a LOD group and a debug drawer");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+
+    // --- frustum culling ---------------------------------------------------
+    assert_eq!(
+        findings.frustum_matrix_matches,
+        Some(true),
+        "the culler tests against the camera it was given"
+    );
+    println!("box visibility: {:?}", findings.box_visibility);
+    let visible: Vec<bool> = findings.box_visibility.iter().map(|(_, v)| *v).collect();
+    assert_eq!(
+        visible,
+        vec![true, false, false, false],
+        "only the box in front of the camera and inside the far plane is visible"
+    );
+    // The culled indices must be exactly the visible ones, in order.
+    let expected: Vec<u64> = visible
+        .iter()
+        .enumerate()
+        .filter(|(_, v)| **v)
+        .map(|(index, _)| index as u64)
+        .collect();
+    assert_eq!(
+        findings.culled_boxes, expected,
+        "culling a list gives back the indices the per-box test agrees on"
+    );
+    assert_eq!(
+        findings.culled_transforms, expected.len(),
+        "culling transforms keeps as many as culling their boxes did"
+    );
+    assert_eq!(
+        findings.culled_short_bounds,
+        visible[..2].iter().filter(|v| **v).count() + 2,
+        "a transform past the end of the bounds array is kept, not dropped"
+    );
+    // A sphere centred 60 units behind the camera becomes visible once it is
+    // large enough to reach in front of the near plane, one unit ahead. Radius
+    // is the only thing that changes between the three tests, and the answer
+    // has to turn over between 50 and 70 rather than being constant.
+    println!("sphere visibility: {:?}", findings.sphere_visibility);
+    assert_eq!(
+        findings
+            .sphere_visibility
+            .iter()
+            .map(|(_, v)| *v)
+            .collect::<Vec<bool>>(),
+        vec![false, false, true],
+        "a sphere behind the camera is culled until its radius reaches into view"
+    );
+
+    // --- levels of detail --------------------------------------------------
+    assert_eq!(
+        findings.lod_levels,
+        vec![(10.0, false), (25.0, false), (60.0, false)],
+        "the levels come back as they were added, each with no mesh part"
+    );
+    assert!(
+        findings.lod_hysteresis.abs() < 1e-6,
+        "hysteresis is off for the selection test: {}",
+        findings.lod_hysteresis
+    );
+    println!("lod selection: {:?}", findings.lod_selection);
+    // Each distance lands in the first level whose boundary is strictly above
+    // it, and anything past the last boundary is dropped entirely rather than
+    // falling back to the coarsest level.
+    for (distance, index) in &findings.lod_selection {
+        let expected = findings
+            .lod_levels
+            .iter()
+            .position(|(boundary, _)| distance < boundary)
+            .map_or(-1_i32, |position| position as i32);
+        assert_eq!(
+            *index, expected,
+            "{distance} selects the first level strictly above it"
+        );
+    }
+    // The boundary distance itself belongs to the next level, not to the level
+    // it closes: a wrong comparison operator changes exactly this answer.
+    assert_eq!(
+        findings
+            .lod_selection
+            .iter()
+            .find(|(distance, _)| (*distance - 10.0).abs() < 1e-6)
+            .map(|(_, index)| *index),
+        Some(1),
+        "a distance sitting on a boundary belongs to the level above it"
+    );
+    println!("lod hysteresis: {:?}", findings.lod_sticky);
+    let sticky: std::collections::HashMap<&str, i32> =
+        findings.lod_sticky.iter().copied().collect();
+    assert_eq!(sticky["settled at 20"], 1, "20 is in the middle level");
+    assert_eq!(
+        sticky["nudged to 26"], 1,
+        "26 is one unit past the boundary, inside the three-unit margin, so the level holds"
+    );
+    assert_eq!(
+        sticky["pushed to 40"], 2,
+        "40 is well past the margin, so the level moves"
+    );
+    assert_eq!(
+        sticky["26 with no memory"], 2,
+        "and with the memory reset, 26 selects the level it really falls in"
+    );
+    assert_eq!(
+        findings.lod_mode_round_trip,
+        Some(LodSelectionMode::ScreenSpaceError),
+        "the selection mode round-trips as an identity"
+    );
+    // Projected size falls with distance, which is the whole basis of the
+    // screen-space rule -- and it falls by the documented law rather than by
+    // some monotonic curve that merely looks right. With a unit radius, a
+    // ninety-degree vertical field of view and a 1080-pixel viewport, the half
+    // extent at distance d is 2d, so the answer must be 540/d exactly.
+    println!("projected radius: {:?}", findings.projected_radius);
+    for (distance, pixels) in &findings.projected_radius {
+        let expected = 540.0 / distance;
+        assert!(
+            (pixels - expected).abs() < expected * 1e-4,
+            "at {distance} units the projected radius is {pixels}, not {expected}"
+        );
+    }
+
+    // --- debug drawing -----------------------------------------------------
+    println!("line counts: {:?}", findings.line_counts);
+    let counts: std::collections::HashMap<&str, i32> =
+        findings.line_counts.iter().copied().collect();
+    assert_eq!(counts["empty"], 0, "a fresh drawer has nothing queued");
+    assert_eq!(counts["one line"], 1, "a line is one line");
+    assert_eq!(counts["plus a box"], 1 + 12, "a box is its twelve edges");
+    assert_eq!(counts["plus a cross"], 1 + 12 + 3, "a cross is three segments");
+    assert_eq!(
+        counts["plus a sphere"],
+        1 + 12 + 3 + 8 * 3,
+        "an eight-segment sphere is three eight-segment rings"
+    );
+    assert_eq!(
+        counts["plus a bounding sphere"],
+        1 + 12 + 3 + 8 * 3 + 8 * 3,
+        "and a bounding sphere is drawn exactly the same way"
+    );
+    assert_eq!(
+        counts["plus a frustum"],
+        1 + 12 + 3 + 8 * 3 + 8 * 3 + 12,
+        "a frustum is twelve edges like any other box"
+    );
+    assert!(
+        counts["plus every gizmo"] > counts["plus a frustum"],
+        "every gizmo adds lines: {:?}",
+        findings.line_counts
+    );
+    assert_eq!(counts["cleared"], 0, "clearing leaves nothing queued");
+
+    // Two vertices per line, and every line landed in the queue the drawer's
+    // own depth-test flag names -- a drawer that filed them in the other queue
+    // would draw the same lines with the wrong depth behaviour.
+    let total_vertices = findings.vertices_depth_tested + findings.vertices_overlay;
+    assert_eq!(
+        total_vertices,
+        counts["plus every gizmo"] as usize * 2,
+        "every queued line is two vertices, across both queues"
+    );
+    let (depth_tested, _) = findings
+        .depth_tested_round_trip
+        .expect("the depth-test flag was read");
+    let (used, empty) = if depth_tested {
+        (findings.vertices_depth_tested, findings.vertices_overlay)
+    } else {
+        (findings.vertices_overlay, findings.vertices_depth_tested)
+    };
+    assert_eq!(used, total_vertices, "the lines went into the queue the flag selects");
+    assert_eq!(empty, 0, "and the other queue stayed empty");
+    let (position, color) = findings.first_line.expect("a first vertex");
+    assert_eq!(
+        position,
+        (0.0, 0.0, 0.0),
+        "the first vertex is where the first line started"
+    );
+    assert_eq!(
+        color,
+        Color::Red.PackedValue(),
+        "and carries the colour that line was given"
+    );
+
+    let (before, after) = findings
+        .depth_tested_round_trip
+        .expect("the depth-test flag was toggled");
+    assert_ne!(before, after, "the depth-test flag round-trips");
+
+    println!(
+        "culling: {} boxes visible of 4 | lod levels {:?} | debug lines {:?}",
+        findings.culled_boxes.len(),
+        findings.lod_levels,
+        counts["plus every gizmo"],
     );
 }

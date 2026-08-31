@@ -777,6 +777,22 @@ pub type CNA_WeightedBlendedTransparencyHandle = CNA_Handle;
 pub type CNA_HdrDisplayOutputHandle = CNA_Handle;
 pub type CNA_AutoExposureHandle = CNA_Handle;
 pub type CNA_CubeLutHandle = CNA_Handle;
+pub type CNA_DebugDrawHandle = CNA_Handle;
+pub type CNA_FrustumCullerEXTHandle = CNA_Handle;
+pub type CNA_LodGroupEXTHandle = CNA_Handle;
+pub type CNA_ModelMeshPartHandle = CNA_Handle;
+pub type CNA_LodSelectionMode = u32;
+
+pub const CNA_LOD_SELECTION_MODE_DISTANCE: CNA_LodSelectionMode = 0;
+pub const CNA_LOD_SELECTION_MODE_SCREEN_SPACE_ERROR: CNA_LodSelectionMode = 1;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_LodLevelEXT {
+    pub part: CNA_ModelMeshPartHandle,
+    pub max_distance: f32,
+    pub reserved0: u32,
+}
 pub type CNA_DisplayColorSpace = u32;
 
 pub const CNA_DISPLAY_COLOR_SPACE_SRGB: CNA_DisplayColorSpace = 0;
@@ -1471,6 +1487,26 @@ pub struct CNA_Vector4 {
     pub y: f32,
     pub z: f32,
     pub w: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_BoundingSphere {
+    pub center: CNA_Vector3,
+    pub radius: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_BoundingFrustum {
+    pub matrix: CNA_Matrix,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_VertexPositionColor {
+    pub position: CNA_Vector3,
+    pub color: CNA_Color,
 }
 
 #[repr(C)]
@@ -9400,4 +9436,125 @@ pub type cna_hdr_display_output_set_paper_white_nits_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_hdr_display_output_set_peak_nits_fn = unsafe extern "C" fn(
     CNA_HdrDisplayOutputHandle, f32,
+) -> CNA_Result;
+
+// --- CNA engine layer: debug drawing, frustum culling and LOD groups (engine_layer.h) ---
+pub type cna_debug_draw_add_bounding_sphere_fn = unsafe extern "C" fn(
+    CNA_DebugDrawHandle, *const CNA_BoundingSphere, CNA_Color, i32,
+) -> CNA_Result;
+pub type cna_debug_draw_add_box_fn = unsafe extern "C" fn(
+    CNA_DebugDrawHandle, *const CNA_BoundingBox, CNA_Color,
+) -> CNA_Result;
+pub type cna_debug_draw_add_cascade_gizmo_fn = unsafe extern "C" fn(
+    CNA_DebugDrawHandle, CNA_CascadedShadowMapHandle, CNA_Color,
+) -> CNA_Result;
+pub type cna_debug_draw_add_cross_fn = unsafe extern "C" fn(
+    CNA_DebugDrawHandle, *const CNA_Vector3, f32, CNA_Color,
+) -> CNA_Result;
+pub type cna_debug_draw_add_directional_light_gizmo_fn = unsafe extern "C" fn(
+    CNA_DebugDrawHandle, *const CNA_DirectionalLightEXT, *const CNA_Vector3, f32, CNA_Color,
+) -> CNA_Result;
+pub type cna_debug_draw_add_frustum_fn = unsafe extern "C" fn(
+    CNA_DebugDrawHandle, CNA_BoundingFrustum, CNA_Color,
+) -> CNA_Result;
+pub type cna_debug_draw_add_line_fn = unsafe extern "C" fn(
+    CNA_DebugDrawHandle, *const CNA_Vector3, *const CNA_Vector3, CNA_Color,
+) -> CNA_Result;
+pub type cna_debug_draw_add_point_light_gizmo_fn = unsafe extern "C" fn(
+    CNA_DebugDrawHandle, *const CNA_PointLightEXT, CNA_Color,
+) -> CNA_Result;
+pub type cna_debug_draw_add_sphere_fn = unsafe extern "C" fn(
+    CNA_DebugDrawHandle, *const CNA_Vector3, f32, CNA_Color, i32,
+) -> CNA_Result;
+pub type cna_debug_draw_add_spot_light_gizmo_fn = unsafe extern "C" fn(
+    CNA_DebugDrawHandle, *const CNA_SpotLightEXT, CNA_Color, i32,
+) -> CNA_Result;
+pub type cna_debug_draw_begin_fn = unsafe extern "C" fn(
+    CNA_DebugDrawHandle, *const CNA_Matrix, *const CNA_Matrix,
+) -> CNA_Result;
+pub type cna_debug_draw_clear_fn = unsafe extern "C" fn(CNA_DebugDrawHandle) -> CNA_Result;
+pub type cna_debug_draw_copy_vertices_fn = unsafe extern "C" fn(
+    CNA_DebugDrawHandle, CNA_Bool, *mut CNA_VertexPositionColor, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_debug_draw_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_DebugDrawHandle,
+) -> CNA_Result;
+pub type cna_debug_draw_destroy_fn = unsafe extern "C" fn(CNA_DebugDrawHandle) -> CNA_Result;
+pub type cna_debug_draw_end_fn = unsafe extern "C" fn(CNA_DebugDrawHandle) -> CNA_Result;
+pub type cna_debug_draw_get_line_count_fn = unsafe extern "C" fn(
+    CNA_DebugDrawHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_debug_draw_is_depth_tested_fn = unsafe extern "C" fn(
+    CNA_DebugDrawHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_debug_draw_set_depth_tested_fn = unsafe extern "C" fn(
+    CNA_DebugDrawHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_frustum_culler_ext_create_fn = unsafe extern "C" fn(
+    *mut CNA_FrustumCullerEXTHandle,
+) -> CNA_Result;
+pub type cna_frustum_culler_ext_cull_boxes_fn = unsafe extern "C" fn(
+    CNA_FrustumCullerEXTHandle, *const CNA_BoundingBox, u64, *mut u64, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_frustum_culler_ext_cull_spheres_fn = unsafe extern "C" fn(
+    CNA_FrustumCullerEXTHandle, *const CNA_BoundingSphere, u64, *mut u64, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_frustum_culler_ext_cull_transforms_fn = unsafe extern "C" fn(
+    CNA_FrustumCullerEXTHandle, *const CNA_Matrix, u64, *const CNA_BoundingBox, u64, *mut CNA_Matrix, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_frustum_culler_ext_destroy_fn = unsafe extern "C" fn(
+    CNA_FrustumCullerEXTHandle,
+) -> CNA_Result;
+pub type cna_frustum_culler_ext_get_frustum_fn = unsafe extern "C" fn(
+    CNA_FrustumCullerEXTHandle, *mut CNA_BoundingFrustum,
+) -> CNA_Result;
+pub type cna_frustum_culler_ext_is_box_visible_fn = unsafe extern "C" fn(
+    CNA_FrustumCullerEXTHandle, *const CNA_BoundingBox, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_frustum_culler_ext_is_sphere_visible_fn = unsafe extern "C" fn(
+    CNA_FrustumCullerEXTHandle, *const CNA_BoundingSphere, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_frustum_culler_ext_set_camera_fn = unsafe extern "C" fn(
+    CNA_FrustumCullerEXTHandle, *const CNA_Matrix, *const CNA_Matrix,
+) -> CNA_Result;
+pub type cna_frustum_culler_ext_set_view_projection_fn = unsafe extern "C" fn(
+    CNA_FrustumCullerEXTHandle, *const CNA_Matrix,
+) -> CNA_Result;
+pub type cna_lod_group_ext_add_level_fn = unsafe extern "C" fn(
+    CNA_LodGroupEXTHandle, f32, CNA_ModelMeshPartHandle,
+) -> CNA_Result;
+pub type cna_lod_group_ext_clear_fn = unsafe extern "C" fn(CNA_LodGroupEXTHandle) -> CNA_Result;
+pub type cna_lod_group_ext_copy_levels_fn = unsafe extern "C" fn(
+    CNA_LodGroupEXTHandle, *mut CNA_LodLevelEXT, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_lod_group_ext_create_fn = unsafe extern "C" fn(
+    *mut CNA_LodGroupEXTHandle,
+) -> CNA_Result;
+pub type cna_lod_group_ext_destroy_fn = unsafe extern "C" fn(CNA_LodGroupEXTHandle) -> CNA_Result;
+pub type cna_lod_group_ext_get_hysteresis_fn = unsafe extern "C" fn(
+    CNA_LodGroupEXTHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_lod_group_ext_get_selection_mode_fn = unsafe extern "C" fn(
+    CNA_LodGroupEXTHandle, *mut CNA_LodSelectionMode,
+) -> CNA_Result;
+pub type cna_lod_group_ext_projected_radius_pixels_fn = unsafe extern "C" fn(
+    CNA_LodGroupEXTHandle, f32, *mut f32,
+) -> CNA_Result;
+pub type cna_lod_group_ext_reset_hysteresis_fn = unsafe extern "C" fn(
+    CNA_LodGroupEXTHandle,
+) -> CNA_Result;
+pub type cna_lod_group_ext_select_fn = unsafe extern "C" fn(
+    CNA_LodGroupEXTHandle, f32, *mut CNA_ModelMeshPartHandle,
+) -> CNA_Result;
+pub type cna_lod_group_ext_select_index_fn = unsafe extern "C" fn(
+    CNA_LodGroupEXTHandle, f32, *mut i32,
+) -> CNA_Result;
+pub type cna_lod_group_ext_set_hysteresis_fn = unsafe extern "C" fn(
+    CNA_LodGroupEXTHandle, f32,
+) -> CNA_Result;
+pub type cna_lod_group_ext_set_screen_space_parameters_fn = unsafe extern "C" fn(
+    CNA_LodGroupEXTHandle, f32, f32, f32,
+) -> CNA_Result;
+pub type cna_lod_group_ext_set_selection_mode_fn = unsafe extern "C" fn(
+    CNA_LodGroupEXTHandle, CNA_LodSelectionMode,
 ) -> CNA_Result;

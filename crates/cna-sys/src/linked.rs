@@ -8385,4 +8385,196 @@ extern "C" {
         argument0: CNA_HdrDisplayOutputHandle,
         argument1: f32,
     ) -> CNA_Result;
+    pub fn cna_debug_draw_add_bounding_sphere(
+        argument0: CNA_DebugDrawHandle,
+        argument1: *const CNA_BoundingSphere,
+        argument2: CNA_Color,
+        argument3: i32,
+    ) -> CNA_Result;
+    pub fn cna_debug_draw_add_box(
+        argument0: CNA_DebugDrawHandle,
+        argument1: *const CNA_BoundingBox,
+        argument2: CNA_Color,
+    ) -> CNA_Result;
+    pub fn cna_debug_draw_add_cascade_gizmo(
+        argument0: CNA_DebugDrawHandle,
+        argument1: CNA_CascadedShadowMapHandle,
+        argument2: CNA_Color,
+    ) -> CNA_Result;
+    pub fn cna_debug_draw_add_cross(
+        argument0: CNA_DebugDrawHandle,
+        argument1: *const CNA_Vector3,
+        argument2: f32,
+        argument3: CNA_Color,
+    ) -> CNA_Result;
+    pub fn cna_debug_draw_add_directional_light_gizmo(
+        argument0: CNA_DebugDrawHandle,
+        argument1: *const CNA_DirectionalLightEXT,
+        argument2: *const CNA_Vector3,
+        argument3: f32,
+        argument4: CNA_Color,
+    ) -> CNA_Result;
+    pub fn cna_debug_draw_add_frustum(
+        argument0: CNA_DebugDrawHandle,
+        argument1: CNA_BoundingFrustum,
+        argument2: CNA_Color,
+    ) -> CNA_Result;
+    pub fn cna_debug_draw_add_line(
+        argument0: CNA_DebugDrawHandle,
+        argument1: *const CNA_Vector3,
+        argument2: *const CNA_Vector3,
+        argument3: CNA_Color,
+    ) -> CNA_Result;
+    pub fn cna_debug_draw_add_point_light_gizmo(
+        argument0: CNA_DebugDrawHandle,
+        argument1: *const CNA_PointLightEXT,
+        argument2: CNA_Color,
+    ) -> CNA_Result;
+    pub fn cna_debug_draw_add_sphere(
+        argument0: CNA_DebugDrawHandle,
+        argument1: *const CNA_Vector3,
+        argument2: f32,
+        argument3: CNA_Color,
+        argument4: i32,
+    ) -> CNA_Result;
+    pub fn cna_debug_draw_add_spot_light_gizmo(
+        argument0: CNA_DebugDrawHandle,
+        argument1: *const CNA_SpotLightEXT,
+        argument2: CNA_Color,
+        argument3: i32,
+    ) -> CNA_Result;
+    pub fn cna_debug_draw_begin(
+        argument0: CNA_DebugDrawHandle,
+        argument1: *const CNA_Matrix,
+        argument2: *const CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_debug_draw_clear(argument0: CNA_DebugDrawHandle) -> CNA_Result;
+    pub fn cna_debug_draw_copy_vertices(
+        argument0: CNA_DebugDrawHandle,
+        argument1: CNA_Bool,
+        argument2: *mut CNA_VertexPositionColor,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_debug_draw_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_DebugDrawHandle,
+    ) -> CNA_Result;
+    pub fn cna_debug_draw_destroy(argument0: CNA_DebugDrawHandle) -> CNA_Result;
+    pub fn cna_debug_draw_end(argument0: CNA_DebugDrawHandle) -> CNA_Result;
+    pub fn cna_debug_draw_get_line_count(
+        argument0: CNA_DebugDrawHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_debug_draw_is_depth_tested(
+        argument0: CNA_DebugDrawHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_debug_draw_set_depth_tested(
+        argument0: CNA_DebugDrawHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_frustum_culler_ext_create(argument0: *mut CNA_FrustumCullerEXTHandle) -> CNA_Result;
+    pub fn cna_frustum_culler_ext_cull_boxes(
+        argument0: CNA_FrustumCullerEXTHandle,
+        argument1: *const CNA_BoundingBox,
+        argument2: u64,
+        argument3: *mut u64,
+        argument4: u64,
+        argument5: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_frustum_culler_ext_cull_spheres(
+        argument0: CNA_FrustumCullerEXTHandle,
+        argument1: *const CNA_BoundingSphere,
+        argument2: u64,
+        argument3: *mut u64,
+        argument4: u64,
+        argument5: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_frustum_culler_ext_cull_transforms(
+        argument0: CNA_FrustumCullerEXTHandle,
+        argument1: *const CNA_Matrix,
+        argument2: u64,
+        argument3: *const CNA_BoundingBox,
+        argument4: u64,
+        argument5: *mut CNA_Matrix,
+        argument6: u64,
+        argument7: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_frustum_culler_ext_destroy(argument0: CNA_FrustumCullerEXTHandle) -> CNA_Result;
+    pub fn cna_frustum_culler_ext_get_frustum(
+        argument0: CNA_FrustumCullerEXTHandle,
+        argument1: *mut CNA_BoundingFrustum,
+    ) -> CNA_Result;
+    pub fn cna_frustum_culler_ext_is_box_visible(
+        argument0: CNA_FrustumCullerEXTHandle,
+        argument1: *const CNA_BoundingBox,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_frustum_culler_ext_is_sphere_visible(
+        argument0: CNA_FrustumCullerEXTHandle,
+        argument1: *const CNA_BoundingSphere,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_frustum_culler_ext_set_camera(
+        argument0: CNA_FrustumCullerEXTHandle,
+        argument1: *const CNA_Matrix,
+        argument2: *const CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_frustum_culler_ext_set_view_projection(
+        argument0: CNA_FrustumCullerEXTHandle,
+        argument1: *const CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_lod_group_ext_add_level(
+        argument0: CNA_LodGroupEXTHandle,
+        argument1: f32,
+        argument2: CNA_ModelMeshPartHandle,
+    ) -> CNA_Result;
+    pub fn cna_lod_group_ext_clear(argument0: CNA_LodGroupEXTHandle) -> CNA_Result;
+    pub fn cna_lod_group_ext_copy_levels(
+        argument0: CNA_LodGroupEXTHandle,
+        argument1: *mut CNA_LodLevelEXT,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_lod_group_ext_create(argument0: *mut CNA_LodGroupEXTHandle) -> CNA_Result;
+    pub fn cna_lod_group_ext_destroy(argument0: CNA_LodGroupEXTHandle) -> CNA_Result;
+    pub fn cna_lod_group_ext_get_hysteresis(
+        argument0: CNA_LodGroupEXTHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_lod_group_ext_get_selection_mode(
+        argument0: CNA_LodGroupEXTHandle,
+        argument1: *mut CNA_LodSelectionMode,
+    ) -> CNA_Result;
+    pub fn cna_lod_group_ext_projected_radius_pixels(
+        argument0: CNA_LodGroupEXTHandle,
+        argument1: f32,
+        argument2: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_lod_group_ext_reset_hysteresis(argument0: CNA_LodGroupEXTHandle) -> CNA_Result;
+    pub fn cna_lod_group_ext_select(
+        argument0: CNA_LodGroupEXTHandle,
+        argument1: f32,
+        argument2: *mut CNA_ModelMeshPartHandle,
+    ) -> CNA_Result;
+    pub fn cna_lod_group_ext_select_index(
+        argument0: CNA_LodGroupEXTHandle,
+        argument1: f32,
+        argument2: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_lod_group_ext_set_hysteresis(
+        argument0: CNA_LodGroupEXTHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_lod_group_ext_set_screen_space_parameters(
+        argument0: CNA_LodGroupEXTHandle,
+        argument1: f32,
+        argument2: f32,
+        argument3: f32,
+    ) -> CNA_Result;
+    pub fn cna_lod_group_ext_set_selection_mode(
+        argument0: CNA_LodGroupEXTHandle,
+        argument1: CNA_LodSelectionMode,
+    ) -> CNA_Result;
 }

@@ -137,6 +137,7 @@ the criterion above is unchanged, only its precondition has been met.
 | spot, cube and cascaded shadow maps, and the punctual light values | `spot_shadow_map`, `cube_shadow_map`, `cascaded_shadow_map`, `point_light_ext`, `spot_light_ext`, `punctual_light_ext`, `shadow_cascade_state_ext` | 61 | `VERIFIED_STATE` |
 | the depth/normal prepass and both transparency paths | `depth_normal_prepass`, `weighted_blended_transparency`, `transparent_draw_list` | 49 | `VERIFIED_STATE` |
 | HDR display output, auto exposure and `.cube` lookup tables | `hdr_display_output`, `auto_exposure_ext`, `cube_lut` | 39 | `VERIFIED_STATE` |
+| debug drawing, frustum culling and levels of detail | `debug_draw`, `frustum_culler_ext`, `lod_group_ext` | 41 | `VERIFIED_STATE` |
 
 ### What the GPU artifact changed about the evidence
 
@@ -197,4 +198,21 @@ three found something:
   direction the sun is in" in the header suggests. Measured by sweeping five
   view directions at one elevation: the sky is dimmest at right angles to the
   vector and brightest at the far end of the sweep.
+- **`cull_transforms` is not "one local box, many instances".** The bounds array
+  is parallel to the transforms and holds *world* bounds, and the tail rule is
+  the surprising half: a transform with no bound of its own is **kept**, not
+  dropped. A Rust wrapper that passed a single shared box therefore returned
+  three of four transforms where the per-box test agreed on one, and the three
+  extra ones were the unpaired tail sailing through. The header states the rule;
+  it was the measurement that made anyone read it.
+- **A LOD boundary is exclusive, and past the last one there is no level.**
+  `selectIndex` is an `upper_bound`, so a distance sitting exactly on a level's
+  `max_distance` belongs to the *next* level, and a distance beyond the coarsest
+  level answers `-1` -- "draw nothing" -- rather than clamping to the coarsest.
+  Both halves are the sort of off-by-one that a `>= 0` assertion would never see.
+- **`select_index` is not a query.** It stores the level it chose, and with a
+  hysteresis margin set, the next call near that level's boundary answers the
+  remembered level instead of the one the distance falls in. Two identical calls
+  with the same argument legitimately return different answers; the Rust doc
+  says so and the test pins both sides of it around a three-unit margin.
 
