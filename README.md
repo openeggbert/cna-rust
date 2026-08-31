@@ -235,9 +235,27 @@ CNA_ROOT=/path/to/cna python3 tools/c-api-inventory/inventory.py
 # Builds an outside consumer from exactly the files the crates would ship.
 python3 tools/package-consumer/verify.py
 
+# Direct linkage: builds an out-of-tree consumer, proves CNA resolves at link
+# time and that no dynamic loader is imported, and runs a real route.
+CNA_NATIVE_LIBRARY=/path/to/libcna_c_api.so \
+  python3 tools/direct-link-consumer/verify.py
+
 CNA_NATIVE_LIBRARY=/path/to/libcna_c_api.so \
   cargo test --workspace --all-features --test native_stress -- --nocapture
 ```
+
+`--all-features` enables `direct-link`, which makes CNA a **link-time**
+dependency, so those test binaries need the library on the run-time path as
+well as on the link path:
+
+```bash
+CNA_NATIVE_LIBRARY=/path/to/libcna_c_api.so \
+LD_LIBRARY_PATH=/path/to:$LD_LIBRARY_PATH \
+  cargo test --workspace --all-features
+```
+
+The default `cargo test --workspace` is dynamic-loading only and needs no
+`LD_LIBRARY_PATH`: it resolves the library itself from `CNA_NATIVE_LIBRARY`.
 
 The normal API verifier exits zero for the selected profile. It uses Mono for
 neutral CLR extraction and compiler rustdoc JSON for Rust API inspection. The

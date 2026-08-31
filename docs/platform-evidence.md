@@ -143,6 +143,14 @@ what the scan finds, and a mutation test covers the unreadable-call-form case.
 | a real route executes | renderer, platform, platform name, and a full `GraphicsDevice` create/use/dispose |
 | ordinary dynamic mode still works | yes, and remains the default |
 
+One practical consequence, worth stating because it looks like a regression the
+first time it happens: `cargo test --workspace --all-features` enables
+`direct-link`, so those binaries need the library on the **run-time** path as
+well. Without `LD_LIBRARY_PATH` the harness reports exit status 127 for a
+native suite, which is the dynamic loader failing to find `libcna_c_api.so`,
+not a test failure. The default `cargo test --workspace` is dynamic-loading
+only and needs no such path, because it resolves the library itself.
+
 `tools/direct-link-consumer/verify.py` performs all of these. It deliberately
 checks the executable's own dynamic imports rather than only that it compiled:
 a build that quietly kept `dlopen` would pass a compile check and fail on the
