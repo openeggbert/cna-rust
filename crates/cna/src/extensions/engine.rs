@@ -9513,3 +9513,512 @@ impl Drop for ClusteredLightAssignment {
         let _ = self.core.release();
     }
 }
+
+/// Which of a scene's lights are allowed to cast shadows this frame.
+///
+/// `OWNED`, and a pure CPU object. A scene may hold hundreds of clustered
+/// lights and a renderer can afford shadow maps for a handful, so the policy
+/// scores them and admits the best few; the hysteresis margin is what stops two
+/// similarly-scored lights swapping the same slot every frame.
+///
+/// Takes the graphics device, for the reason [`ClusteredLightSet::new`] gives.
+pub struct ClusteredShadowPolicy {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl ClusteredShadowPolicy {
+    /// How many shadow-casting lights a policy admits unless told otherwise.
+    pub const DEFAULT_BUDGET: i32 = sys::CNA_CLUSTERED_SHADOW_DEFAULT_BUDGET_EXT;
+    /// The score margin a light must beat to displace one already selected.
+    pub const DEFAULT_HYSTERESIS: f32 = sys::CNA_CLUSTERED_SHADOW_DEFAULT_HYSTERESIS_EXT;
+
+    /// Creates a policy with a shadow budget.
+    pub fn new(device: &GraphicsDevice, budget: i32) -> Result<Self> {
+        let native = device.state_native();
+        let mut policy = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.clustered_shadow_policy_create)(device.handle()?, budget, &mut policy)
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(policy),
+            destroy: native.engine.clustered_shadow_policy_destroy,
+            released: "the clustered shadow policy has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+        })
+    }
+
+    /// Scores a light set and selects which of its lights may cast.
+    pub fn select(
+        &self,
+        lights: &ClusteredLightSet,
+        view: Matrix,
+        projection: Matrix,
+        camera_position: Vector3,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let set = lights.core.get()?;
+        let view = native_matrix(view);
+        let projection = native_matrix(projection);
+        let camera_position = native_vector3(camera_position);
+        // SAFETY: both handles are owned, and the matrices and the position are
+        // borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_shadow_policy_select)(
+                handle,
+                set,
+                &view,
+                &projection,
+                &camera_position,
+            )
+        })
+    }
+
+    /// How many lights may cast shadows at once.
+    pub fn budget(&self) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_shadow_policy_get_budget)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Sets how many lights may cast shadows at once.
+    pub fn set_budget(&self, budget: i32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.clustered_shadow_policy_set_budget)(handle, budget) })
+    }
+
+    /// The margin a light must beat to displace one already selected.
+    pub fn hysteresis(&self) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_shadow_policy_get_hysteresis)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Sets that margin.
+    pub fn set_hysteresis(&self, hysteresis: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_shadow_policy_set_hysteresis)(handle, hysteresis)
+        })
+    }
+
+    /// The indices of the lights currently admitted.
+    pub fn selected(&self) -> Result<Vec<i32>> {
+        let handle = self.core.get()?;
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the count.
+        let probe = unsafe {
+            (self.native.engine.clustered_shadow_policy_copy_selected)(
+                handle,
+                core::ptr::null_mut(),
+                0,
+                &mut required,
+            )
+        };
+        if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+            self.native.check(probe)?;
+        }
+        let capacity = usize::try_from(required)
+            .map_err(|_| CnaError::InvalidInput("the selection does not fit in memory"))?;
+        if capacity == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![0_i32; capacity];
+        let mut count = 0_u64;
+        // SAFETY: the handle is owned and the destination holds `capacity`
+        // writable indices, which is the count passed alongside it.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_shadow_policy_copy_selected)(
+                handle,
+                buffer.as_mut_ptr(),
+                required,
+                &mut count,
+            )
+        })?;
+        let count = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("CNA reported more indices than fit in memory"))?;
+        buffer.truncate(count.min(capacity));
+        Ok(buffer)
+    }
+
+    /// Whether one light index is currently admitted.
+    pub fn is_selected(&self, light_index: i32) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_shadow_policy_is_selected)(
+                handle,
+                light_index,
+                &mut value,
+            )
+        })?;
+        Ok(value != 0)
+    }
+
+    /// The score the policy last computed for one light.
+    pub fn score(&self, light_index: i32) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_shadow_policy_get_score)(handle, light_index, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// How many lights asked to cast a shadow.
+    pub fn request_count(&self) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_shadow_policy_get_request_count)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// How many asked and were refused.
+    ///
+    /// The number that says whether the budget is too small, which the
+    /// selection alone does not.
+    pub fn refused_count(&self) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_shadow_policy_get_refused_count)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Forgets every selection and score.
+    pub fn reset(&self) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.engine.clustered_shadow_policy_reset)(handle) })
+    }
+
+    /// Releases the policy now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for ClusteredShadowPolicy {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// The uploaded light list a clustered shader reads.
+///
+/// `OWNED`. The buffer owns three textures and **lends none of them**: there is
+/// no accessor for them, only [`bind`](Self::bind), so nothing here can outlive
+/// the buffer and destruction is never refused for an outstanding view.
+pub struct ClusteredLightBuffer {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl ClusteredLightBuffer {
+    /// Creates a buffer on a device.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut buffer = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.clustered_light_buffer_create)(device.handle()?, &mut buffer)
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(buffer),
+            destroy: native.engine.clustered_light_buffer_destroy,
+            released: "the clustered light buffer has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+        })
+    }
+
+    /// The GLSL a shader needs to read an uploaded light list.
+    ///
+    /// A property of the format rather than of any one buffer, so it needs no
+    /// buffer to ask.
+    pub fn light_lookup_glsl() -> Result<String> {
+        let native = Native::process()?;
+        copy_text(&native, |api, destination, capacity, out_bytes| {
+            // SAFETY: CNA's size-then-copy protocol, driven by `copy_text`.
+            unsafe {
+                (api.clustered_light_buffer_copy_light_lookup_glsl)(
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+    }
+
+    /// Uploads a set, a grid and an assignment as one consistent trio.
+    ///
+    /// The three must agree -- the assignment's light indices are positions in
+    /// the set and its cluster indices positions in the grid. A mismatched trio
+    /// is refused, because uploading it would light the wrong objects with the
+    /// wrong lamps rather than fail visibly.
+    pub fn upload(
+        &self,
+        lights: &ClusteredLightSet,
+        grid: &ClusteredLightGrid,
+        assignment: &ClusteredLightAssignment,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let lights = lights.core.get()?;
+        let grid = grid.core.get()?;
+        let assignment = assignment.core.get()?;
+        // SAFETY: all four handles are owned and live for the call.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_buffer_upload)(handle, lights, grid, assignment)
+        })
+    }
+
+    /// Binds the uploaded textures to three consecutive units of an effect.
+    pub fn bind(&self, effect: &Effect, first_unit: i32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the buffer handle is owned, the effect is borrowed for the
+        // call, and the unit is passed through.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_buffer_bind)(
+                handle,
+                effect.native_handle()?,
+                first_unit,
+            )
+        })
+    }
+
+    /// Whether anything has been uploaded yet.
+    pub fn is_uploaded(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_buffer_is_uploaded)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// How many lights the last upload carried.
+    pub fn light_count(&self) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_buffer_get_light_count)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// How many clusters the last upload carried.
+    pub fn cluster_count(&self) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_buffer_get_cluster_count)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// How many light references the last upload carried.
+    pub fn reference_count(&self) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_buffer_get_reference_count)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Releases the buffer and its textures now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for ClusteredLightBuffer {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// The GPU program that sorts lights into clusters.
+///
+/// `OWNED`, and it **degrades rather than refuses**: on a renderer without
+/// compute shaders [`assign`](Self::assign) still produces the same assignment
+/// on the CPU, and [`used_compute`](Self::used_compute) says which path ran.
+/// [`is_supported`](Self::is_supported) answering `false` is therefore a fact
+/// about performance, not about correctness.
+pub struct ClusteredLightCompute {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl ClusteredLightCompute {
+    /// The per-cluster light capacity used unless told otherwise.
+    pub const DEFAULT_STRIDE: i32 = sys::CNA_CLUSTERED_COMPUTE_DEFAULT_STRIDE_EXT;
+
+    /// Creates the program with a per-cluster light capacity.
+    pub fn new(device: &GraphicsDevice, stride: i32) -> Result<Self> {
+        let native = device.state_native();
+        let mut compute = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.clustered_light_compute_create)(device.handle()?, stride, &mut compute)
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(compute),
+            destroy: native.engine.clustered_light_compute_destroy,
+            released: "the clustered light compute program has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+        })
+    }
+
+    /// Whether the GPU path compiled.
+    pub fn is_supported(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_compute_is_supported)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Why the GPU path is unavailable; empty when it compiled.
+    pub fn unsupported_reason(&self) -> Result<String> {
+        let handle = self.core.get()?;
+        copy_text(&self.native, |api, destination, capacity, out_bytes| {
+            // SAFETY: the handle is owned and this is CNA's size-then-copy
+            // protocol, driven by `copy_text`.
+            unsafe {
+                (api.clustered_light_compute_copy_unsupported_reason)(
+                    handle,
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+    }
+
+    /// The per-cluster light capacity.
+    pub fn stride(&self) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_compute_get_stride)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Sorts light bounds into a grid's clusters, filling an assignment.
+    pub fn assign(
+        &self,
+        grid: &ClusteredLightGrid,
+        view: Matrix,
+        bounds: &[BoundingSphere],
+        assignment: &ClusteredLightAssignment,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let grid_handle = grid.core.get()?;
+        let out = assignment.core.get()?;
+        let view = native_matrix(view);
+        let native_bounds: Vec<sys::CNA_BoundingSphere> = bounds
+            .iter()
+            .map(|sphere| sys::CNA_BoundingSphere {
+                center: native_vector3(sphere.Center),
+                radius: sphere.Radius,
+            })
+            .collect();
+        // SAFETY: all three handles are owned, and the matrix and sphere array
+        // are borrowed for the call with the array's own length.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_compute_assign)(
+                handle,
+                grid_handle,
+                &view,
+                native_bounds.as_ptr(),
+                native_bounds.len() as u64,
+                out,
+            )
+        })
+    }
+
+    /// Whether the last assignment ran on the GPU.
+    pub fn used_compute(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_compute_used_compute)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Whether the last assignment overflowed a cluster's capacity.
+    ///
+    /// A cluster holding more lights than the stride drops the excess, so this
+    /// says a larger stride is needed rather than that anything failed.
+    pub fn has_overflowed(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.clustered_light_compute_has_overflowed)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Releases the program now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for ClusteredLightCompute {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}

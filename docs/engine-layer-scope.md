@@ -139,6 +139,7 @@ the criterion above is unchanged, only its precondition has been met.
 | HDR display output, auto exposure and `.cube` lookup tables | `hdr_display_output`, `auto_exposure_ext`, `cube_lut` | 39 | `VERIFIED_STATE` |
 | debug drawing, frustum culling and levels of detail | `debug_draw`, `frustum_culler_ext`, `lod_group_ext` | 41 | `VERIFIED_STATE` |
 | the clustered light set, the cluster grid and the light-to-cluster assignment | `clustered_light_ext`, `clustered_light_set`, `clustered_light_grid`, `clustered_light_assignment` | 43 | `VERIFIED_STATE` |
+| the shadow budget, the light upload buffer and the compute sort | `clustered_shadow_policy`, `clustered_light_buffer`, `clustered_light_compute` | 30 | `VERIFIED_GPU` |
 
 ### What the GPU artifact changed about the evidence
 
@@ -235,4 +236,20 @@ three found something:
   clusters and zero references but still one offset -- the single zero that
   empties them -- because the offset array is always one longer than the cluster
   count. A test asserting "everything is zero after clear" reads that as a bug.
+- **A shadow-budget score is zero beyond the light's own range,** because the
+  policy ranks with the same windowed inverse square the clustered shader
+  shades with, and that window is zero at `distance >= range`. Five casters
+  spread from 5 to 45 units with a range of 8 therefore produced *one*
+  candidate, not five, and a budget of two admitted one light while refusing
+  four. The fix in the test was to put each caster inside its own range; the
+  finding is that "in the frustum" is not the same question as "reaches the
+  camera", and only the second one scores.
+- **The compute sort really runs on this host, and agrees with the CPU.**
+  `cna_clustered_light_compute_is_supported` answers true on the OPENGLES3
+  artifact and `used_compute` confirms the GPU path ran; its cluster offsets
+  are identical to the CPU sort's and its light references are the same
+  multiset. The documented CPU fallback could **not** be measured here: every
+  artifact on this host either has the engine layer *and* compute, or neither,
+  so `NOT_MEASURED_HERE` is the honest label for the fallback branch rather
+  than `VERIFIED`.
 

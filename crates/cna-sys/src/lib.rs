@@ -800,6 +800,13 @@ pub const CNA_CLUSTER_GRID_DEFAULT_TILES_X_EXT: i32 = 16;
 pub const CNA_CLUSTER_GRID_DEFAULT_TILES_Y_EXT: i32 = 8;
 pub const CNA_CLUSTER_GRID_DEFAULT_SLICE_COUNT_EXT: i32 = 24;
 pub const CNA_CLUSTERED_ASSIGNMENT_MAX_LIGHTS_EXT: i32 = 1024;
+pub const CNA_CLUSTERED_SHADOW_DEFAULT_BUDGET_EXT: i32 = 4;
+pub const CNA_CLUSTERED_SHADOW_DEFAULT_HYSTERESIS_EXT: f32 = 1.25;
+pub const CNA_CLUSTERED_COMPUTE_DEFAULT_STRIDE_EXT: i32 = 64;
+
+pub type CNA_ClusteredShadowPolicyHandle = CNA_Handle;
+pub type CNA_ClusteredLightBufferHandle = CNA_Handle;
+pub type CNA_ClusteredLightComputeHandle = CNA_Handle;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -9718,4 +9725,94 @@ pub type cna_clustered_light_set_remove_at_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_clustered_light_set_replace_at_fn = unsafe extern "C" fn(
     CNA_ClusteredLightSetHandle, i32, *const CNA_ClusteredLightEXT,
+) -> CNA_Result;
+pub type cna_clustered_light_buffer_bind_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightBufferHandle, CNA_EffectHandle, i32,
+) -> CNA_Result;
+pub type cna_clustered_light_buffer_copy_light_lookup_glsl_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_clustered_light_buffer_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_ClusteredLightBufferHandle,
+) -> CNA_Result;
+pub type cna_clustered_light_buffer_destroy_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightBufferHandle,
+) -> CNA_Result;
+pub type cna_clustered_light_buffer_get_cluster_count_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightBufferHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_light_buffer_get_light_count_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightBufferHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_light_buffer_get_reference_count_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightBufferHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_light_buffer_is_uploaded_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightBufferHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_clustered_light_buffer_upload_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightBufferHandle, CNA_ClusteredLightSetHandle, CNA_ClusteredLightGridHandle, CNA_ClusteredLightAssignmentHandle,
+) -> CNA_Result;
+pub type cna_clustered_light_compute_assign_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightComputeHandle, CNA_ClusteredLightGridHandle, *const CNA_Matrix, *const CNA_BoundingSphere, u64, CNA_ClusteredLightAssignmentHandle,
+) -> CNA_Result;
+pub type cna_clustered_light_compute_copy_unsupported_reason_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightComputeHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_clustered_light_compute_create_fn = unsafe extern "C" fn(
+    CNA_Handle, i32, *mut CNA_ClusteredLightComputeHandle,
+) -> CNA_Result;
+pub type cna_clustered_light_compute_destroy_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightComputeHandle,
+) -> CNA_Result;
+pub type cna_clustered_light_compute_get_stride_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightComputeHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_light_compute_has_overflowed_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightComputeHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_clustered_light_compute_is_supported_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightComputeHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_clustered_light_compute_used_compute_fn = unsafe extern "C" fn(
+    CNA_ClusteredLightComputeHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_clustered_shadow_policy_copy_selected_fn = unsafe extern "C" fn(
+    CNA_ClusteredShadowPolicyHandle, *mut i32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_clustered_shadow_policy_create_fn = unsafe extern "C" fn(
+    CNA_Handle, i32, *mut CNA_ClusteredShadowPolicyHandle,
+) -> CNA_Result;
+pub type cna_clustered_shadow_policy_destroy_fn = unsafe extern "C" fn(
+    CNA_ClusteredShadowPolicyHandle,
+) -> CNA_Result;
+pub type cna_clustered_shadow_policy_get_budget_fn = unsafe extern "C" fn(
+    CNA_ClusteredShadowPolicyHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_shadow_policy_get_hysteresis_fn = unsafe extern "C" fn(
+    CNA_ClusteredShadowPolicyHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_clustered_shadow_policy_get_refused_count_fn = unsafe extern "C" fn(
+    CNA_ClusteredShadowPolicyHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_shadow_policy_get_request_count_fn = unsafe extern "C" fn(
+    CNA_ClusteredShadowPolicyHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_clustered_shadow_policy_get_score_fn = unsafe extern "C" fn(
+    CNA_ClusteredShadowPolicyHandle, i32, *mut f32,
+) -> CNA_Result;
+pub type cna_clustered_shadow_policy_is_selected_fn = unsafe extern "C" fn(
+    CNA_ClusteredShadowPolicyHandle, i32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_clustered_shadow_policy_reset_fn = unsafe extern "C" fn(
+    CNA_ClusteredShadowPolicyHandle,
+) -> CNA_Result;
+pub type cna_clustered_shadow_policy_select_fn = unsafe extern "C" fn(
+    CNA_ClusteredShadowPolicyHandle, CNA_ClusteredLightSetHandle, *const CNA_Matrix, *const CNA_Matrix, *const CNA_Vector3,
+) -> CNA_Result;
+pub type cna_clustered_shadow_policy_set_budget_fn = unsafe extern "C" fn(
+    CNA_ClusteredShadowPolicyHandle, i32,
+) -> CNA_Result;
+pub type cna_clustered_shadow_policy_set_hysteresis_fn = unsafe extern "C" fn(
+    CNA_ClusteredShadowPolicyHandle, f32,
 ) -> CNA_Result;

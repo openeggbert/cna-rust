@@ -20,7 +20,8 @@ use cna::extensions::engine::{
     MotionBlurPass, RenderPipeline, ScopedRenderTarget, ShadowMap, Skybox, SpatialUpscalePass,
     CascadedShadowMap, CubeShadowMap, PointLight, PunctualLight, PunctualLightKind,
     AutoExposure, ClusteredLight, ClusteredLightAssignment, ClusteredLightGrid,
-    ClusteredLightSet, ClusteredLightType, CubeLut, DebugDraw, DepthEncoding,
+    ClusteredLightBuffer, ClusteredLightCompute, ClusteredLightSet, ClusteredLightType,
+    ClusteredShadowPolicy, CubeLut, DebugDraw, DepthEncoding,
     DepthNormalPrepass, DisplayColorSpace, FrustumCuller, HdrDisplayOutput, LodGroup,
     LodSelectionMode, ShadowCascadeState, SpotLight, SpotShadowMap, SsaoPass,
     SsrPass, StorageBuffer, TonemapPass, TransparentDrawList, VolumetricFogPass,
@@ -4911,4 +4912,426 @@ fn clustered_lighting_sorts_the_lights_it_is_given_into_the_grid_it_is_given() {
     for (name, refused) in &findings.bad_adoptions {
         assert!(refused, "{name} is refused");
     }
+}
+
+/// Where the shadow-budget probes put their five casters, nearest first.
+const SHADOW_DISTANCES: [f32; 5] = [2.0, 4.0, 6.0, 8.0, 10.0];
+
+/// What the shadow-budget, upload-buffer and compute-assignment run measured.
+#[derive(Default)]
+struct ClusteredGpuFindings {
+    engine_layer: i32,
+    budget_round_trip: (i32, i32),
+    hysteresis_round_trip: (f32, f32),
+    fresh_policy: (usize, i32, i32),
+    scores: Vec<f32>,
+    selection: Vec<i32>,
+    selection_counts: (i32, i32),
+    is_selected_agrees: bool,
+    generous_budget: (usize, i32, i32),
+    after_policy_reset: (usize, i32, i32),
+    sticky_selection: Vec<(&'static str, Vec<i32>)>,
+    glsl: String,
+    fresh_buffer: (bool, i32, i32, i32),
+    bind_before_upload: Option<String>,
+    after_upload: (bool, i32, i32, i32),
+    expected_upload: (i32, i32, i32),
+    bind_after_upload: Option<String>,
+    mismatched_grid: Option<String>,
+    mismatched_lights: Option<String>,
+    bad_stride: bool,
+    stride_round_trip: i32,
+    compute_supported: bool,
+    compute_reason: String,
+    compute_offsets: Vec<i32>,
+    compute_indices: Vec<i32>,
+    cpu_offsets: Vec<i32>,
+    cpu_indices: Vec<i32>,
+    used_compute: bool,
+    overflow: Vec<(&'static str, bool)>,
+}
+
+struct ClusteredGpuGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<ClusteredGpuFindings>>,
+}
+
+impl GameStateAccess for ClusteredGpuGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for ClusteredGpuGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+        let mut findings = ClusteredGpuFindings {
+            engine_layer: version,
+            ..ClusteredGpuFindings::default()
+        };
+        let (view, projection) = culling_camera();
+        let camera = Vector3::Zero;
+
+        // --- the shadow budget ----------------------------------------------
+        let policy = ClusteredShadowPolicy::new(&device, 2)?;
+        let first_budget = policy.budget()?;
+        policy.set_budget(5)?;
+        findings.budget_round_trip = (first_budget, policy.budget()?);
+        let first_hysteresis = policy.hysteresis()?;
+        policy.set_hysteresis(2.5)?;
+        findings.hysteresis_round_trip = (first_hysteresis, policy.hysteresis()?);
+        policy.set_hysteresis(first_hysteresis)?;
+        policy.set_budget(2)?;
+        findings.fresh_policy = (
+            policy.selected()?.len(),
+            policy.request_count()?,
+            policy.refused_count()?,
+        );
+
+        // Five casters at increasing distances, plus two that do not ask.
+        // Every one is inside the frustum *and* inside its own range: CNA's
+        // falloff is zero at or beyond the range, so a light further away than
+        // it reaches scores nothing and never becomes a candidate at all.
+        let lights = ClusteredLightSet::new(&device)?;
+        for distance in SHADOW_DISTANCES {
+            let mut light = clustered_light_at(0.0, 0.0, -distance, 20.0)?;
+            light.casts_shadows = true;
+            lights.add(light)?;
+        }
+        for step in 0..2 {
+            lights.add(clustered_light_at(0.0, 0.0, -3.0 - 2.0 * step as f32, 20.0)?)?;
+        }
+        policy.select(&lights, view, projection, camera)?;
+        findings.scores = (0..lights.count()?)
+            .map(|index| policy.score(index))
+            .collect::<Result<Vec<f32>>>()?;
+        findings.selection = policy.selected()?;
+        findings.selection_counts = (policy.request_count()?, policy.refused_count()?);
+        findings.is_selected_agrees = (0..lights.count()?)
+            .map(|index| {
+                Ok(policy.is_selected(index)? == findings.selection.contains(&index))
+            })
+            .collect::<Result<Vec<bool>>>()?
+            .into_iter()
+            .all(|agrees| agrees);
+
+        policy.reset()?;
+        policy.set_budget(50)?;
+        policy.select(&lights, view, projection, camera)?;
+        findings.generous_budget = (
+            policy.selected()?.len(),
+            policy.request_count()?,
+            policy.refused_count()?,
+        );
+
+        policy.reset()?;
+        findings.after_policy_reset = (
+            policy.selected()?.len(),
+            policy.request_count()?,
+            policy.refused_count()?,
+        );
+
+        // Hysteresis: with a margin nothing can beat, the incumbent survives a
+        // scene that has turned around underneath it; forgetting the incumbent
+        // lets the new best win.
+        policy.set_budget(1)?;
+        policy.set_hysteresis(1.0e6)?;
+        policy.select(&lights, view, projection, camera)?;
+        findings
+            .sticky_selection
+            .push(("settled", policy.selected()?));
+        for (index, distance) in SHADOW_DISTANCES.iter().rev().enumerate() {
+            let mut moved = lights.get(index as i32)?;
+            moved.position = Vector3::from_x_and_y_and_z(0.0, 0.0, -distance);
+            lights.replace_at(index as i32, moved)?;
+        }
+        policy.select(&lights, view, projection, camera)?;
+        findings
+            .sticky_selection
+            .push(("scene reversed", policy.selected()?));
+        policy.reset()?;
+        policy.select(&lights, view, projection, camera)?;
+        findings
+            .sticky_selection
+            .push(("memory reset", policy.selected()?));
+        policy.set_hysteresis(ClusteredShadowPolicy::DEFAULT_HYSTERESIS)?;
+
+        // --- the upload buffer ------------------------------------------------
+        findings.glsl = ClusteredLightBuffer::light_lookup_glsl()?;
+        let buffer = ClusteredLightBuffer::new(&device)?;
+        findings.fresh_buffer = (
+            buffer.is_uploaded()?,
+            buffer.light_count()?,
+            buffer.cluster_count()?,
+            buffer.reference_count()?,
+        );
+
+        let grid = ClusteredLightGrid::new(&device, 4, 3, 8)?;
+        grid.set_projection(projection, 1.0, 100.0)?;
+        let assignment = ClusteredLightAssignment::new(&device)?;
+        assignment.assign(&grid, view, &lights.bounds()?)?;
+
+        // A shadow map's caster effect is the only effect reachable without
+        // content; binding into it is what the refusal-before-upload case needs.
+        let shadow = ShadowMap::new(&device, ShadowQuality::Low)?;
+        if let Some(caster) = shadow.caster_effect()? {
+            findings.bind_before_upload =
+                buffer.bind(caster.effect(), 0).err().map(|e| e.to_string());
+        }
+
+        buffer.upload(&lights, &grid, &assignment)?;
+        findings.after_upload = (
+            buffer.is_uploaded()?,
+            buffer.light_count()?,
+            buffer.cluster_count()?,
+            buffer.reference_count()?,
+        );
+        findings.expected_upload = (
+            lights.count()?,
+            grid.cluster_count()?,
+            assignment.total_reference_count()?,
+        );
+        if let Some(caster) = shadow.caster_effect()? {
+            findings.bind_after_upload =
+                buffer.bind(caster.effect(), 0).err().map(|e| e.to_string());
+        }
+
+        // A trio that disagrees is refused rather than uploaded.
+        let other_grid = ClusteredLightGrid::new(&device, 2, 2, 2)?;
+        other_grid.set_projection(projection, 1.0, 100.0)?;
+        findings.mismatched_grid = buffer
+            .upload(&lights, &other_grid, &assignment)
+            .err()
+            .map(|e| e.to_string());
+        let wider = ClusteredLightAssignment::new(&device)?;
+        wider.adopt(lights.count()? + 5, &vec![0; grid.cluster_count()? as usize + 1], &[])?;
+        findings.mismatched_lights = buffer
+            .upload(&lights, &grid, &wider)
+            .err()
+            .map(|e| e.to_string());
+        other_grid.release()?;
+        wider.release()?;
+
+        // --- the compute assignment -------------------------------------------
+        findings.bad_stride = ClusteredLightCompute::new(&device, 0).is_err();
+        let compute = ClusteredLightCompute::new(&device, 32)?;
+        findings.stride_round_trip = compute.stride()?;
+        findings.compute_supported = compute.is_supported()?;
+        findings.compute_reason = compute.unsupported_reason()?;
+
+        let computed = ClusteredLightAssignment::new(&device)?;
+        compute.assign(&grid, view, &lights.bounds()?, &computed)?;
+        findings.used_compute = compute.used_compute()?;
+        findings.compute_offsets = computed.offsets()?;
+        findings.compute_indices = computed.indices()?;
+        findings.cpu_offsets = assignment.offsets()?;
+        findings.cpu_indices = assignment.indices()?;
+
+        findings
+            .overflow
+            .push(("a stride of thirty-two", compute.has_overflowed()?));
+        let narrow = ClusteredLightCompute::new(&device, 1)?;
+        narrow.assign(&grid, view, &lights.bounds()?, &computed)?;
+        findings
+            .overflow
+            .push(("a stride of one", narrow.has_overflowed()?));
+        narrow.release()?;
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn the_shadow_budget_the_upload_buffer_and_the_compute_sort_agree_with_the_cpu() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(ClusteredGpuFindings::default()));
+    let game = ClusteredGpuGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with a shadow policy, a light buffer and a compute sort");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+
+    // --- the shadow budget -------------------------------------------------
+    assert_eq!(
+        findings.budget_round_trip,
+        (2, 5),
+        "the budget is what it was created with, and then what it was set to"
+    );
+    println!("hysteresis: {:?}", findings.hysteresis_round_trip);
+    assert!(
+        (findings.hysteresis_round_trip.0 - ClusteredShadowPolicy::DEFAULT_HYSTERESIS).abs() < 1e-6,
+        "a fresh policy carries CNA's own default margin"
+    );
+    assert!(
+        (findings.hysteresis_round_trip.1 - 2.5).abs() < 1e-6,
+        "and the margin round-trips"
+    );
+    assert_eq!(
+        findings.fresh_policy,
+        (0, 0, 0),
+        "a policy that has not scored anything admits, requests and refuses nothing"
+    );
+
+    println!("scores: {:?}", findings.scores);
+    println!("selection: {:?}", findings.selection);
+    assert_eq!(
+        findings.selection_counts,
+        (5, 3),
+        "five lights asked to cast, and with a budget of two, three were refused"
+    );
+    assert_eq!(
+        findings.selection.len(),
+        2,
+        "the budget is a ceiling on the selection, not a suggestion"
+    );
+    assert!(
+        findings.is_selected_agrees,
+        "asking about one light agrees with the list of all of them"
+    );
+    // The two admitted are the two highest-scoring: a policy that admitted the
+    // first two it saw, or the last two, would pass every count above.
+    let mut ranked: Vec<(usize, f32)> = findings.scores.iter().copied().enumerate().collect();
+    ranked.sort_by(|left, right| right.1.total_cmp(&left.1));
+    let mut expected: Vec<i32> = ranked[..2].iter().map(|(index, _)| *index as i32).collect();
+    expected.sort_unstable();
+    let mut admitted = findings.selection.clone();
+    admitted.sort_unstable();
+    assert_eq!(
+        admitted, expected,
+        "the admitted lights are the highest-scoring ones: scores {:?}",
+        findings.scores
+    );
+    // The two lights that never asked score nothing and are never admitted.
+    assert!(
+        findings.scores[5..].iter().all(|score| *score == 0.0),
+        "a light that does not cast shadows is not scored: {:?}",
+        findings.scores
+    );
+
+    assert_eq!(
+        findings.generous_budget,
+        (5, 5, 0),
+        "a budget larger than the demand admits every caster and refuses none"
+    );
+    assert_eq!(
+        findings.after_policy_reset,
+        (0, 0, 0),
+        "resetting forgets the selection, the requests and the refusals"
+    );
+
+    println!("sticky selection: {:?}", findings.sticky_selection);
+    let settled = &findings.sticky_selection[0].1;
+    let reversed = &findings.sticky_selection[1].1;
+    let after_reset = &findings.sticky_selection[2].1;
+    assert_eq!(settled.len(), 1, "a budget of one admits one light");
+    assert_eq!(
+        reversed, settled,
+        "a margin nothing can beat keeps the incumbent even when the scene turns around"
+    );
+    assert_ne!(
+        after_reset, settled,
+        "and forgetting the incumbent lets the new best win"
+    );
+
+    // --- the upload buffer -------------------------------------------------
+    println!(
+        "light lookup GLSL: {} bytes, first line {:?}",
+        findings.glsl.len(),
+        findings.glsl.lines().next()
+    );
+    assert!(
+        !findings.glsl.is_empty(),
+        "the shader-side lookup is published, not left to the caller to guess"
+    );
+    assert!(
+        findings.glsl.contains("cluster") || findings.glsl.contains("Cluster"),
+        "and it is the cluster lookup: {:?}",
+        findings.glsl.lines().next()
+    );
+
+    assert_eq!(
+        findings.fresh_buffer,
+        (false, 0, 0, 0),
+        "a buffer that has uploaded nothing says so and counts nothing"
+    );
+    assert!(
+        findings.bind_before_upload.is_some(),
+        "binding a buffer that holds no light list is refused"
+    );
+
+    let (uploaded, lights, clusters, references) = findings.after_upload;
+    assert!(uploaded, "the upload succeeded");
+    assert_eq!(
+        (lights, clusters, references),
+        findings.expected_upload,
+        "and carried exactly the set, the grid and the assignment it was given"
+    );
+    println!("bind after upload: {:?}", findings.bind_after_upload);
+
+    assert!(
+        findings.mismatched_grid.is_some(),
+        "a grid whose cluster count the assignment does not describe is refused"
+    );
+    assert!(
+        findings.mismatched_lights.is_some(),
+        "and so is an assignment naming more lights than the set holds"
+    );
+
+    // --- the compute assignment --------------------------------------------
+    assert!(findings.bad_stride, "a non-positive stride is refused");
+    assert_eq!(findings.stride_round_trip, 32, "the stride round-trips");
+    println!(
+        "compute supported: {} reason: {:?}",
+        findings.compute_supported, findings.compute_reason
+    );
+    assert_eq!(
+        findings.compute_reason.is_empty(),
+        findings.compute_supported,
+        "the reason is empty exactly when the program compiled"
+    );
+    assert_eq!(
+        findings.used_compute, findings.compute_supported,
+        "the GPU path ran exactly when it was available"
+    );
+
+    // The whole promise of the fallback: the same assignment either way.
+    assert_eq!(
+        findings.compute_offsets, findings.cpu_offsets,
+        "the compute sort produces the CPU sort's cluster offsets"
+    );
+    let mut computed = findings.compute_indices.clone();
+    let mut expected = findings.cpu_indices.clone();
+    computed.sort_unstable();
+    expected.sort_unstable();
+    assert_eq!(
+        computed, expected,
+        "and the same light references: {:?} against {:?}",
+        findings.compute_indices, findings.cpu_indices
+    );
+
+    println!("overflow: {:?}", findings.overflow);
+    assert!(
+        !findings.overflow[0].1,
+        "thirty-two lights per cluster is room to spare for seven lights"
+    );
+    assert!(
+        findings.overflow[1].1,
+        "one light per cluster is not, and the flag says so rather than the call failing"
+    );
 }

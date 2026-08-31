@@ -8758,6 +8758,141 @@ extern "C" {
         argument1: i32,
         argument2: *const CNA_ClusteredLightEXT,
     ) -> CNA_Result;
+    pub fn cna_clustered_light_buffer_bind(
+        argument0: CNA_ClusteredLightBufferHandle,
+        argument1: CNA_EffectHandle,
+        argument2: i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_buffer_copy_light_lookup_glsl(
+        argument0: *mut c_char,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_buffer_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_ClusteredLightBufferHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_buffer_destroy(
+        argument0: CNA_ClusteredLightBufferHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_buffer_get_cluster_count(
+        argument0: CNA_ClusteredLightBufferHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_buffer_get_light_count(
+        argument0: CNA_ClusteredLightBufferHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_buffer_get_reference_count(
+        argument0: CNA_ClusteredLightBufferHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_buffer_is_uploaded(
+        argument0: CNA_ClusteredLightBufferHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_buffer_upload(
+        argument0: CNA_ClusteredLightBufferHandle,
+        argument1: CNA_ClusteredLightSetHandle,
+        argument2: CNA_ClusteredLightGridHandle,
+        argument3: CNA_ClusteredLightAssignmentHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_compute_assign(
+        argument0: CNA_ClusteredLightComputeHandle,
+        argument1: CNA_ClusteredLightGridHandle,
+        argument2: *const CNA_Matrix,
+        argument3: *const CNA_BoundingSphere,
+        argument4: u64,
+        argument5: CNA_ClusteredLightAssignmentHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_compute_copy_unsupported_reason(
+        argument0: CNA_ClusteredLightComputeHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_compute_create(
+        argument0: CNA_Handle,
+        argument1: i32,
+        argument2: *mut CNA_ClusteredLightComputeHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_compute_destroy(
+        argument0: CNA_ClusteredLightComputeHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_compute_get_stride(
+        argument0: CNA_ClusteredLightComputeHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_compute_has_overflowed(
+        argument0: CNA_ClusteredLightComputeHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_compute_is_supported(
+        argument0: CNA_ClusteredLightComputeHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_clustered_light_compute_used_compute(
+        argument0: CNA_ClusteredLightComputeHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_clustered_shadow_policy_copy_selected(
+        argument0: CNA_ClusteredShadowPolicyHandle,
+        argument1: *mut i32,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_clustered_shadow_policy_create(
+        argument0: CNA_Handle,
+        argument1: i32,
+        argument2: *mut CNA_ClusteredShadowPolicyHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_shadow_policy_destroy(
+        argument0: CNA_ClusteredShadowPolicyHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_shadow_policy_get_budget(
+        argument0: CNA_ClusteredShadowPolicyHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_shadow_policy_get_hysteresis(
+        argument0: CNA_ClusteredShadowPolicyHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_shadow_policy_get_refused_count(
+        argument0: CNA_ClusteredShadowPolicyHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_shadow_policy_get_request_count(
+        argument0: CNA_ClusteredShadowPolicyHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_shadow_policy_get_score(
+        argument0: CNA_ClusteredShadowPolicyHandle,
+        argument1: i32,
+        argument2: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_shadow_policy_is_selected(
+        argument0: CNA_ClusteredShadowPolicyHandle,
+        argument1: i32,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_clustered_shadow_policy_reset(
+        argument0: CNA_ClusteredShadowPolicyHandle,
+    ) -> CNA_Result;
+    pub fn cna_clustered_shadow_policy_select(
+        argument0: CNA_ClusteredShadowPolicyHandle,
+        argument1: CNA_ClusteredLightSetHandle,
+        argument2: *const CNA_Matrix,
+        argument3: *const CNA_Matrix,
+        argument4: *const CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_clustered_shadow_policy_set_budget(
+        argument0: CNA_ClusteredShadowPolicyHandle,
+        argument1: i32,
+    ) -> CNA_Result;
+    pub fn cna_clustered_shadow_policy_set_hysteresis(
+        argument0: CNA_ClusteredShadowPolicyHandle,
+        argument1: f32,
+    ) -> CNA_Result;
     pub fn cna_lod_group_ext_set_hysteresis(
         argument0: CNA_LodGroupEXTHandle,
         argument1: f32,
