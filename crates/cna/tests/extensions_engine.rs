@@ -12,8 +12,9 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use cna::extensions::models::{
-    AnimationClip, AnimationPlayer, BoneTrack, ClipTargetSpace, Keyframe, MorphTargetData,
-    MorphTargetDelta, MorphWeightKeyframe, MorphWeightTrack, SkinnedModel, SkinningData,
+    create_infinite_perspective_field_of_view, AnimationClip, AnimationPlayer, BoneTrack,
+    ClipTargetSpace, Keyframe, ModelAnimations, MorphTargetData, MorphTargetDelta,
+    MorphWeightKeyframe, MorphWeightTrack, SkinnedModel, SkinningData,
 };
 use cna::extensions::pbr::{
     GltfMaterialBridge, GltfMaterialExtensionSource, GltfMaterialExtensionTextures,
@@ -53,8 +54,8 @@ use cna::extensions::pbr::{
 };
 use cna::Microsoft::Xna::Framework::Graphics::{
     BufferUsage, CubeMapFace, DepthFormat, IndexBuffer, IndexElementSize, PrimitiveType,
-    SurfaceFormat, Texture2D, TextureCube, VertexBuffer, VertexElement,
-    VertexPositionColor, VertexPositionNormalTexture,
+    SamplerState, SurfaceFormat, Texture2D, TextureAddressMode, TextureCube, TextureFilter,
+    VertexBuffer, VertexElement, VertexPositionColor, VertexPositionNormalTexture,
 };
 use cna::Microsoft::Xna::Framework::{
     BoundingBox, BoundingFrustum, BoundingSphere, Color, Game, GameContext, GameTime, Matrix,
@@ -10577,5 +10578,165 @@ fn morph_targets_blend_the_base_pose_by_the_weights_they_are_given() {
             ("after clearing", false),
         ],
         "a mesh part takes a copy of the morph data and can be cleared again"
+    );
+}
+
+/// What the scene-animation, sampler-slot and infinite-projection run measured.
+#[derive(Default)]
+struct SceneAnimationFindings {
+    type_name: String,
+    counts: (u64, u64),
+    names: Vec<String>,
+    clips: Vec<(f64, u64, String)>,
+    after_setting_space: String,
+    samplers: Vec<(String, String, String)>,
+    infinite: Option<(f32, f32, f32, f32)>,
+    finite: Option<(f32, f32)>,
+    bad_projection: bool,
+}
+
+struct SceneAnimationGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<SceneAnimationFindings>>,
+}
+
+impl GameStateAccess for SceneAnimationGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for SceneAnimationGame {
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let device = game.GraphicsDevice()?;
+        let mut findings = SceneAnimationFindings::default();
+
+        let empty = ModelAnimations::new(&[])?;
+        let animations = ModelAnimations::new(&[
+            ("walk".to_owned(), slide_clip()),
+            ("wave".to_owned(), slide_clip()),
+        ])?;
+        findings.type_name = animations.type_name()?;
+        findings.counts = (empty.clip_count()?, animations.clip_count()?);
+        for index in 0..animations.clip_count()? {
+            findings.names.push(animations.clip_name_at(index)?);
+            let (info, space) = animations.clip_at(index)?;
+            findings.clips.push((
+                info.duration_seconds,
+                info.track_count,
+                format!("{space:?}"),
+            ));
+        }
+        // A scene-node clip is the whole reason this type exists separately
+        // from a skeleton's.
+        animations.set_clip_target_space_at(0, ClipTargetSpace::SceneNode)?;
+        findings.after_setting_space = format!("{:?}", animations.clip_at(0)?.1);
+
+        // Every slot has its own sampler, and they are independent.
+        let part = NativeMeshPart::new(None, None, 3, 1, 0, 0)?;
+        let mut anisotropic = SamplerState::new();
+        anisotropic.SetFilter(TextureFilter::Anisotropic);
+        anisotropic.SetAddressU(TextureAddressMode::Mirror);
+        part.set_sampler_state(TextureSlot::Normal, &anisotropic)?;
+        for slot in [TextureSlot::BaseColor, TextureSlot::Normal] {
+            let state = part.sampler_state(slot, &device)?;
+            findings.samplers.push((
+                format!("{slot:?}"),
+                format!("{:?}", state.Filter()),
+                format!("{:?}", state.AddressU()),
+            ));
+        }
+
+        // An infinite projection has no far plane, so its third column differs
+        // from a finite one's while the rest of the matrix matches.
+        let infinite = create_infinite_perspective_field_of_view(
+            std::f32::consts::FRAC_PI_2,
+            1.0,
+            1.0,
+        )?;
+        let finite =
+            Matrix::CreatePerspectiveFieldOfView(std::f32::consts::FRAC_PI_2, 1.0, 1.0, 100.0);
+        findings.infinite = Some((infinite.M11, infinite.M22, infinite.M33, infinite.M43));
+        findings.finite = Some((finite.M33, finite.M43));
+        findings.bad_projection =
+            create_infinite_perspective_field_of_view(0.0, 1.0, 1.0).is_err();
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+fn a_scene_carries_its_own_clips_and_a_gltf_camera_may_have_no_far_plane() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(SceneAnimationFindings::default()));
+    let game = SceneAnimationGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with scene animations");
+
+    let findings = findings.lock().expect("findings");
+    assert!(!findings.type_name.is_empty(), "the set knows its own name");
+    assert_eq!(
+        findings.counts,
+        (0, 2),
+        "an empty set holds nothing and a two-clip set holds two"
+    );
+    assert_eq!(
+        findings.names,
+        vec!["walk".to_owned(), "wave".to_owned()],
+        "the clips keep the names they were given, in order"
+    );
+    println!("clips: {:?}", findings.clips);
+    for (duration, tracks, space) in &findings.clips {
+        assert!((duration - 2.0).abs() < 1e-9, "each keeps its duration");
+        assert_eq!(*tracks, 1, "and its track count");
+        assert_eq!(
+            space, "JointPalette",
+            "and targets the joint palette until told otherwise"
+        );
+    }
+    assert_eq!(
+        findings.after_setting_space, "SceneNode",
+        "a scene-node clip is what this type exists for, and the space round-trips"
+    );
+
+    // The sampler slots are independent: setting one leaves the others alone.
+    println!("samplers: {:?}", findings.samplers);
+    assert_eq!(
+        findings.samplers[0].1, "Linear",
+        "a slot never set keeps the default filter"
+    );
+    assert_eq!(findings.samplers[0].2, "Wrap", "and the default addressing");
+    assert_eq!(
+        findings.samplers[1].1, "Anisotropic",
+        "and the slot that was set keeps what it was given"
+    );
+    assert_eq!(findings.samplers[1].2, "Mirror", "including its addressing");
+
+    // An infinite projection agrees with a finite one everywhere the far plane
+    // does not reach, and differs exactly where it does.
+    let (m11, m22, m33, m43) = findings.infinite.expect("an infinite projection");
+    let (finite_m33, finite_m43) = findings.finite.expect("a finite one");
+    println!("infinite: {m11} {m22} {m33} {m43} | finite: {finite_m33} {finite_m43}");
+    assert!(
+        (m11 - 1.0).abs() < 1e-5 && (m22 - 1.0).abs() < 1e-5,
+        "a ninety-degree field of view at aspect one scales both axes by one"
+    );
+    assert!(
+        (m33 + 1.0).abs() < 1e-5,
+        "and with no far plane the depth scale is exactly -1: {m33}"
+    );
+    assert!(
+        (m33 - finite_m33).abs() > 1e-3 && (m43 - finite_m43).abs() > 1e-3,
+        "which is not what a finite projection gives: {m33}/{m43} against \
+         {finite_m33}/{finite_m43}"
+    );
+    assert!(
+        findings.bad_projection,
+        "a zero field of view is refused rather than producing a degenerate matrix"
     );
 }

@@ -99,18 +99,6 @@
       "rationale": "PBR, custom shader sources and material extras are CNAEXT effect concepts"
     },
     {
-      "id": "modern-models",
-      "category": "CNA_EXTENSION_BACKING",
-      "names": [
-        "cna_skinned_model_*",
-        "cna_skinning_data_*",
-        "cna_morph_target_*",
-        "cna_animation_player_*",
-        "cna_model_animations_*"
-      ],
-      "rationale": "skinning, morph targets and animation playback are CNAEXT model concepts"
-    },
-    {
       "id": "value-semantics",
       "category": "MANAGED_BY_DESIGN",
       "names": [

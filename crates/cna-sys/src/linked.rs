@@ -9265,6 +9265,66 @@ extern "C" {
         argument3: u64,
         argument4: *mut u64,
     ) -> CNA_Result;
+    pub fn cna_matrix_create_infinite_perspective_field_of_view_ext(
+        argument0: f32,
+        argument1: f32,
+        argument2: f32,
+        argument3: *mut CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_model_animations_ext_copy_clip_name_at(
+        argument0: CNA_ModelAnimationsEXTHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_animations_ext_copy_type_name(
+        argument0: CNA_ModelAnimationsEXTHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_animations_ext_create(
+        argument0: *const CNA_NamedAnimationClipEXTDescriptor,
+        argument1: u64,
+        argument2: *mut CNA_ModelAnimationsEXTHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_animations_ext_destroy(argument0: CNA_ModelAnimationsEXTHandle) -> CNA_Result;
+    pub fn cna_model_animations_ext_get_clip_count(
+        argument0: CNA_ModelAnimationsEXTHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_animations_ext_get_clip_info_at(
+        argument0: CNA_ModelAnimationsEXTHandle,
+        argument1: u64,
+        argument2: *mut f64,
+        argument3: *mut u64,
+        argument4: *mut CNA_ClipTargetSpaceEXT,
+    ) -> CNA_Result;
+    pub fn cna_model_animations_ext_get_clip_name_byte_count_at(
+        argument0: CNA_ModelAnimationsEXTHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_animations_ext_get_type_name_byte_count(
+        argument0: CNA_ModelAnimationsEXTHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_animations_ext_set_clip_target_space_at(
+        argument0: CNA_ModelAnimationsEXTHandle,
+        argument1: u64,
+        argument2: CNA_ClipTargetSpaceEXT,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_part_get_sampler_state_ext(
+        argument0: CNA_ModelMeshPartHandle,
+        argument1: CNA_PbrTextureSlot,
+        argument2: *mut CNA_SamplerState,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_part_set_sampler_state_ext(
+        argument0: CNA_ModelMeshPartHandle,
+        argument1: CNA_PbrTextureSlot,
+        argument2: *const CNA_SamplerState,
+    ) -> CNA_Result;
     pub fn cna_model_mesh_part_create(
         argument0: CNA_VertexBufferHandle,
         argument1: CNA_IndexBufferHandle,

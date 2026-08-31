@@ -951,7 +951,7 @@ impl SamplerState {
         Self::preset(false, "", TextureFilter::Linear, TextureAddressMode::Wrap)
     }
 
-    pub(super) fn from_native(
+    pub(crate) fn from_native(
         value: sys::CNA_SamplerState,
         device: &GraphicsDevice,
     ) -> Option<Self> {

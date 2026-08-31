@@ -2310,3 +2310,262 @@ const fn from_vector(value: sys::CNA_Vector3) -> Vector3 {
         Z: value.z,
     }
 }
+
+/// The animation clips a scene declares, separate from any one skeleton.
+///
+/// `OWNED`. A glTF scene may animate scene nodes rather than a joint palette,
+/// and those clips belong to the model rather than to a skeleton -- which is
+/// what this holds. The two index spaces are why
+/// [`set_clip_target_space_at`](Self::set_clip_target_space_at) exists.
+pub struct ModelAnimations {
+    handle: Mutex<sys::CNA_ModelAnimationsEXTHandle>,
+    native: Arc<Native>,
+}
+
+impl ModelAnimations {
+    /// Creates a set of named clips.
+    pub fn new(clips: &[(String, AnimationClip)]) -> Result<Self> {
+        let native = Native::process()?;
+        let staged = StagedClips::new(clips);
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: every array the descriptors point at outlives the call, and
+        // the output is a live local.
+        native.check(unsafe {
+            (native.engine.model_animations_ext_create)(
+                if staged.named.is_empty() {
+                    core::ptr::null()
+                } else {
+                    staged.named.as_ptr()
+                },
+                staged.named.len() as u64,
+                &mut handle,
+            )
+        })?;
+        Ok(Self {
+            handle: Mutex::new(handle),
+            native,
+        })
+    }
+
+    fn get(&self) -> Result<sys::CNA_ModelAnimationsEXTHandle> {
+        let handle = *self
+            .handle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if handle == sys::CNA_INVALID_HANDLE {
+            return Err(CnaError::InvalidInput(
+                "the model animations have been released",
+            ));
+        }
+        Ok(handle)
+    }
+
+    /// CNA's own name for the type.
+    pub fn type_name(&self) -> Result<String> {
+        let handle = self.get()?;
+        let mut required = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self
+                .native
+                .engine
+                .model_animations_ext_get_type_name_byte_count)(handle, &mut required)
+        })?;
+        read_text(required, |destination, capacity, out_bytes| {
+            // SAFETY: the handle is owned and the destination holds `capacity`
+            // writable bytes.
+            unsafe {
+                (self.native.engine.model_animations_ext_copy_type_name)(
+                    handle,
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+        .and_then(|text| text.ok_or(CnaError::InvalidInput("CNA text is not valid UTF-8")))
+    }
+
+    /// How many clips the set holds.
+    pub fn clip_count(&self) -> Result<u64> {
+        let handle = self.get()?;
+        let mut value = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.model_animations_ext_get_clip_count)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// The name of the clip at an index.
+    pub fn clip_name_at(&self, index: u64) -> Result<String> {
+        let handle = self.get()?;
+        let mut required = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self
+                .native
+                .engine
+                .model_animations_ext_get_clip_name_byte_count_at)(
+                handle, index, &mut required
+            )
+        })?;
+        read_text(required, |destination, capacity, out_bytes| {
+            // SAFETY: the handle is owned and the destination holds `capacity`
+            // writable bytes.
+            unsafe {
+                (self.native.engine.model_animations_ext_copy_clip_name_at)(
+                    handle,
+                    index,
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+        .and_then(|text| text.ok_or(CnaError::InvalidInput("CNA text is not valid UTF-8")))
+    }
+
+    /// The clip at an index: how long it runs, how many tracks it has, and
+    /// which index space those tracks target.
+    pub fn clip_at(&self, index: u64) -> Result<(ClipInfo, ClipTargetSpace)> {
+        let handle = self.get()?;
+        let mut duration = 0.0_f64;
+        let mut tracks = 0_u64;
+        let mut space: sys::CNA_ClipTargetSpaceEXT = 0;
+        // SAFETY: the handle is owned and all three outputs are live locals.
+        self.native.check(unsafe {
+            (self.native.engine.model_animations_ext_get_clip_info_at)(
+                handle,
+                index,
+                &mut duration,
+                &mut tracks,
+                &mut space,
+            )
+        })?;
+        Ok((
+            ClipInfo {
+                duration_seconds: duration,
+                track_count: tracks,
+            },
+            ClipTargetSpace::from_native(space)
+                .ok_or(CnaError::InvalidInput("native clip target space is unknown"))?,
+        ))
+    }
+
+    /// States which index space one clip's bone indices are in.
+    pub fn set_clip_target_space_at(&self, index: u64, value: ClipTargetSpace) -> Result<()> {
+        let handle = self.get()?;
+        // SAFETY: the handle is owned and the identity is canonical.
+        self.native.check(unsafe {
+            (self
+                .native
+                .engine
+                .model_animations_ext_set_clip_target_space_at)(
+                handle,
+                index,
+                value.to_native(),
+            )
+        })
+    }
+
+    /// Releases the set now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        let mut guard = self
+            .handle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let handle = *guard;
+        if handle == sys::CNA_INVALID_HANDLE {
+            return Ok(());
+        }
+        // SAFETY: the handle was published by this object's own create route
+        // and is released exactly once, here.
+        self.native
+            .check(unsafe { (self.native.engine.model_animations_ext_destroy)(handle) })?;
+        *guard = sys::CNA_INVALID_HANDLE;
+        Ok(())
+    }
+}
+
+impl Drop for ModelAnimations {
+    fn drop(&mut self) {
+        let _ = self.release();
+    }
+}
+
+impl NativeMeshPart {
+    /// The sampler state one texture slot is read with.
+    ///
+    /// The seven slots are the same identities [`TextureSlot`] names. Upstream
+    /// keeps the textures and their samplers in two separate arrays; the slot
+    /// identity spans both, so a caller has one vocabulary for a texture and
+    /// the sampler that reads it.
+    ///
+    /// [`TextureSlot`]: crate::extensions::pbr::TextureSlot
+    pub fn sampler_state(
+        &self,
+        slot: crate::extensions::pbr::TextureSlot,
+        device: &crate::graphics::GraphicsDevice,
+    ) -> Result<crate::graphics::SamplerState> {
+        let handle = self.native_handle()?;
+        let native = self.api();
+        let mut value = sys::CNA_SamplerState {
+            struct_size: core::mem::size_of::<sys::CNA_SamplerState>() as u32,
+            struct_version: 1,
+            ..sys::CNA_SamplerState::default()
+        };
+        // SAFETY: the handle is owned and the structure is a caller-owned
+        // versioned output.
+        native.check(unsafe {
+            (native.engine.model_mesh_part_get_sampler_state_ext)(
+                handle,
+                slot as u32,
+                &mut value,
+            )
+        })?;
+        crate::graphics::SamplerState::from_native(value, device)
+            .ok_or(CnaError::InvalidInput("native sampler state is unknown"))
+    }
+
+    /// Sets it.
+    pub fn set_sampler_state(
+        &self,
+        slot: crate::extensions::pbr::TextureSlot,
+        state: &crate::graphics::SamplerState,
+    ) -> Result<()> {
+        let handle = self.native_handle()?;
+        let native = self.api();
+        let value = state.native();
+        // SAFETY: the handle is owned and the structure is borrowed for the
+        // call.
+        native.check(unsafe {
+            (native.engine.model_mesh_part_set_sampler_state_ext)(handle, slot as u32, &value)
+        })
+    }
+}
+
+/// A perspective projection with no far plane.
+///
+/// XNA's perspective factories all take one. A glTF camera may declare none,
+/// and clamping one in would move geometry the source meant to remain visible.
+pub fn create_infinite_perspective_field_of_view(
+    field_of_view: f32,
+    aspect_ratio: f32,
+    near_plane_distance: f32,
+) -> Result<Matrix> {
+    let native = Native::process()?;
+    let mut value = sys::CNA_Matrix::default();
+    // SAFETY: the output is a live local.
+    native.check(unsafe {
+        (native
+            .engine
+            .matrix_create_infinite_perspective_field_of_view_ext)(
+            field_of_view,
+            aspect_ratio,
+            near_plane_distance,
+            &mut value,
+        )
+    })?;
+    Ok(from_matrix(value))
+}

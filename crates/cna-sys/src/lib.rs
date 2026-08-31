@@ -820,6 +820,8 @@ pub type CNA_SkinnedModelEXTHandle = CNA_Handle;
 pub type CNA_SkinningDataHandle = CNA_Handle;
 pub type CNA_AnimationPlayerHandle = CNA_Handle;
 pub type CNA_MorphTargetDataEXTHandle = CNA_Handle;
+pub type CNA_ModelAnimationsEXTHandle = CNA_Handle;
+pub type CNA_PbrTextureSlot = u32;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -10959,4 +10961,40 @@ pub type cna_morph_target_data_ext_set_weights_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_morph_weight_track_ext_evaluate_fn = unsafe extern "C" fn(
     *const CNA_MorphWeightTrackEXTDescriptor, f64, *mut f32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_animations_ext_create_fn = unsafe extern "C" fn(
+    *const CNA_NamedAnimationClipEXTDescriptor, u64, *mut CNA_ModelAnimationsEXTHandle,
+) -> CNA_Result;
+pub type cna_model_animations_ext_destroy_fn = unsafe extern "C" fn(
+    CNA_ModelAnimationsEXTHandle,
+) -> CNA_Result;
+pub type cna_model_animations_ext_get_type_name_byte_count_fn = unsafe extern "C" fn(
+    CNA_ModelAnimationsEXTHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_model_animations_ext_copy_type_name_fn = unsafe extern "C" fn(
+    CNA_ModelAnimationsEXTHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_animations_ext_get_clip_count_fn = unsafe extern "C" fn(
+    CNA_ModelAnimationsEXTHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_model_animations_ext_get_clip_name_byte_count_at_fn = unsafe extern "C" fn(
+    CNA_ModelAnimationsEXTHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_animations_ext_copy_clip_name_at_fn = unsafe extern "C" fn(
+    CNA_ModelAnimationsEXTHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_animations_ext_get_clip_info_at_fn = unsafe extern "C" fn(
+    CNA_ModelAnimationsEXTHandle, u64, *mut f64, *mut u64, *mut CNA_ClipTargetSpaceEXT,
+) -> CNA_Result;
+pub type cna_model_animations_ext_set_clip_target_space_at_fn = unsafe extern "C" fn(
+    CNA_ModelAnimationsEXTHandle, u64, CNA_ClipTargetSpaceEXT,
+) -> CNA_Result;
+pub type cna_model_mesh_part_get_sampler_state_ext_fn = unsafe extern "C" fn(
+    CNA_ModelMeshPartHandle, CNA_PbrTextureSlot, *mut CNA_SamplerState,
+) -> CNA_Result;
+pub type cna_model_mesh_part_set_sampler_state_ext_fn = unsafe extern "C" fn(
+    CNA_ModelMeshPartHandle, CNA_PbrTextureSlot, *const CNA_SamplerState,
+) -> CNA_Result;
+pub type cna_matrix_create_infinite_perspective_field_of_view_ext_fn = unsafe extern "C" fn(
+    f32, f32, f32, *mut CNA_Matrix,
 ) -> CNA_Result;
