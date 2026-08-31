@@ -73,7 +73,8 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-EXT-008 | Raw joystick enumeration, capabilities and capture | `input_joystick.h` | DONE |
 | RUST-EXT-014a | Text input, IME composition and candidate lists | `input_text.h` | DONE |
 | RUST-EXT-014b | Device enumeration, hot-plug events and mouse cursors | `input_devices.h`, `input_cursor.h` | DONE |
-| RUST-EXT-014c | Haptics | `input_haptics.h` | READY |
+| RUST-EXT-014c | Haptics: enumeration, capabilities, rumble and gain | `input_haptics.h` | DONE, real forces `HARDWARE_PENDING` |
+| RUST-EXT-014d | Haptic *effects*: the create/run/update/status family | `input_haptics.h` | READY |
 | RUST-ABI-013 | Gate that both acquisition modes declare the same routes | `tools/native-abi/verify.py` | DONE |
 | RUST-EXT-009 | Sensors: accelerometer, compass, gyroscope | `sensors.h`, `input_devices.h` | DONE, real readings `HARDWARE_PENDING` |
 | RUST-EXT-010a | Engine layer: render-pipeline settings, presets, normalization, text | `engine_layer.h` | DONE |
@@ -94,7 +95,7 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-PACKAGE-002 | MSRV 1.74 evidence | `tools/msrv/audit.py` denylist; two real violations found and fixed. Compiling with 1.74 is still `MSRV_RUNTIME_NOT_RUN` | DONE |
 | RUST-TEMPLATE-001 | Template against the live artifact | 60/600 frames on ABI 0.20 | DONE |
 | RUST-TEMPLATE-002 | Template modern-extension canary | `--extensions-smoke` | DONE |
-| RUST-TEMPLATE-003 | Generated standalone project on the live ABI | workspace tests, 60/600 frames, extension canary, no developer path | DONE |
+| RUST-TEMPLATE-003 | Generated standalone project on the live ABI | re-verified on ABI 0.21; the canary caught the generator dropping `cna-sys`'s new build script, now taken from the manifest | DONE |
 
 ## Qualification, 2026-08-31
 

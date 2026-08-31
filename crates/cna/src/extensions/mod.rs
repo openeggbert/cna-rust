@@ -10,6 +10,7 @@ pub mod devices;
 pub mod events;
 pub mod gamer_services;
 pub mod graphics;
+pub mod haptics;
 pub mod input;
 pub mod input_devices;
 pub mod logging;

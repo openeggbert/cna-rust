@@ -3336,6 +3336,111 @@ extern "C" {
         argument0: CNA_EffectHandle,
         argument1: CNA_Bool,
     ) -> CNA_Result;
+    pub fn cna_haptics_get_count(argument0: CNA_Handle, argument1: *mut u32) -> CNA_Result;
+    pub fn cna_haptics_get_id_at(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut u32,
+    ) -> CNA_Result;
+    pub fn cna_haptics_get_name_size_at(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_haptics_copy_name_at(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_haptics_open(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut CNA_HapticDeviceHandle,
+    ) -> CNA_Result;
+    pub fn cna_haptics_open_from_joystick(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut CNA_HapticDeviceHandle,
+    ) -> CNA_Result;
+    pub fn cna_haptics_open_from_mouse(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_HapticDeviceHandle,
+    ) -> CNA_Result;
+    pub fn cna_haptics_get_is_joystick_haptic(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_haptics_get_is_mouse_haptic(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_destroy(argument0: CNA_HapticDeviceHandle) -> CNA_Result;
+    pub fn cna_haptic_device_dispose(argument0: CNA_HapticDeviceHandle) -> CNA_Result;
+    pub fn cna_haptic_device_get_is_open(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_get_capabilities(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: *mut CNA_HapticCapabilities,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_init_rumble(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_play_rumble(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: f32,
+        argument2: u32,
+        argument3: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_stop_rumble(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_set_gain(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: i32,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_set_autocenter(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: i32,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_pause(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_resume(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_stop_all_effects(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_get_name_size(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_copy_name(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_haptic_capabilities_init(argument0: *mut CNA_HapticCapabilities) -> CNA_Result;
+    pub fn cna_haptic_capabilities_equals(
+        argument0: *const CNA_HapticCapabilities,
+        argument1: CNA_StringView,
+        argument2: *const CNA_HapticCapabilities,
+        argument3: CNA_StringView,
+        argument4: *mut CNA_Bool,
+    ) -> CNA_Result;
     pub fn cna_sensors_get_count(argument0: CNA_Handle, argument1: *mut u32) -> CNA_Result;
     pub fn cna_sensors_get_info_at(
         argument0: CNA_Handle,

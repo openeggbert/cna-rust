@@ -214,6 +214,25 @@ pub const CNA_SHADOW_QUALITY_LOW: CNA_ShadowQuality = 1;
 pub const CNA_SHADOW_QUALITY_MEDIUM: CNA_ShadowQuality = 2;
 pub const CNA_SHADOW_QUALITY_HIGH: CNA_ShadowQuality = 3;
 pub const CNA_SHADOW_QUALITY_ULTRA: CNA_ShadowQuality = 4;
+pub const CNA_HAPTIC_FEATURE_NONE: CNA_HapticFeature = 0;
+pub const CNA_HAPTIC_FEATURE_CONSTANT: CNA_HapticFeature = 0x0000_0001;
+pub const CNA_HAPTIC_FEATURE_SINE: CNA_HapticFeature = 0x0000_0002;
+pub const CNA_HAPTIC_FEATURE_SQUARE: CNA_HapticFeature = 0x0000_0004;
+pub const CNA_HAPTIC_FEATURE_TRIANGLE: CNA_HapticFeature = 0x0000_0008;
+pub const CNA_HAPTIC_FEATURE_SAWTOOTH_UP: CNA_HapticFeature = 0x0000_0010;
+pub const CNA_HAPTIC_FEATURE_SAWTOOTH_DOWN: CNA_HapticFeature = 0x0000_0020;
+pub const CNA_HAPTIC_FEATURE_RAMP: CNA_HapticFeature = 0x0000_0040;
+pub const CNA_HAPTIC_FEATURE_SPRING: CNA_HapticFeature = 0x0000_0080;
+pub const CNA_HAPTIC_FEATURE_DAMPER: CNA_HapticFeature = 0x0000_0100;
+pub const CNA_HAPTIC_FEATURE_INERTIA: CNA_HapticFeature = 0x0000_0200;
+pub const CNA_HAPTIC_FEATURE_FRICTION: CNA_HapticFeature = 0x0000_0400;
+pub const CNA_HAPTIC_FEATURE_LEFT_RIGHT: CNA_HapticFeature = 0x0000_0800;
+pub const CNA_HAPTIC_FEATURE_CUSTOM: CNA_HapticFeature = 0x0000_8000;
+pub const CNA_HAPTIC_FEATURE_GAIN: CNA_HapticFeature = 0x0001_0000;
+pub const CNA_HAPTIC_FEATURE_AUTOCENTER: CNA_HapticFeature = 0x0002_0000;
+pub const CNA_HAPTIC_FEATURE_STATUS: CNA_HapticFeature = 0x0004_0000;
+pub const CNA_HAPTIC_FEATURE_PAUSE: CNA_HapticFeature = 0x0008_0000;
+pub const CNA_HAPTIC_FEATURE_ALL: CNA_HapticFeature = 0x000F_8FFF;
 pub const CNA_SENSOR_TYPE_UNKNOWN: CNA_SensorType = 0;
 pub const CNA_SENSOR_TYPE_ACCELEROMETER: CNA_SensorType = 1;
 pub const CNA_SENSOR_TYPE_GYROSCOPE: CNA_SensorType = 2;
@@ -745,6 +764,23 @@ pub struct CNA_RenderPipelineSettings {
     pub bloom_enabled: CNA_Bool,
     pub ssao_enabled: CNA_Bool,
     pub shadows_enabled: CNA_Bool,
+}
+
+pub type CNA_HapticDeviceHandle = CNA_Handle;
+pub type CNA_HapticFeature = u32;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_HapticCapabilities {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub features: CNA_HapticFeature,
+    pub axis_count: i32,
+    pub max_effects: i32,
+    pub max_effects_playing: i32,
+    pub is_open: CNA_Bool,
+    pub rumble_supported: CNA_Bool,
+    pub reserved: [u8; 2],
 }
 
 pub type CNA_SensorEventRegistrationHandle = CNA_Handle;
@@ -4751,6 +4787,73 @@ pub type cna_pbr_effect_get_vertex_color_enabled_ext_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_pbr_effect_set_vertex_color_enabled_ext_fn = unsafe extern "C" fn(
     CNA_EffectHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptics_get_count_fn = unsafe extern "C" fn(CNA_Handle, *mut u32) -> CNA_Result;
+pub type cna_haptics_get_id_at_fn = unsafe extern "C" fn(CNA_Handle, u32, *mut u32) -> CNA_Result;
+pub type cna_haptics_get_name_size_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut u64,
+) -> CNA_Result;
+pub type cna_haptics_copy_name_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_haptics_open_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut CNA_HapticDeviceHandle,
+) -> CNA_Result;
+pub type cna_haptics_open_from_joystick_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut CNA_HapticDeviceHandle,
+) -> CNA_Result;
+pub type cna_haptics_open_from_mouse_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_HapticDeviceHandle,
+) -> CNA_Result;
+pub type cna_haptics_get_is_joystick_haptic_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptics_get_is_mouse_haptic_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptic_device_destroy_fn = unsafe extern "C" fn(CNA_HapticDeviceHandle) -> CNA_Result;
+pub type cna_haptic_device_dispose_fn = unsafe extern "C" fn(CNA_HapticDeviceHandle) -> CNA_Result;
+pub type cna_haptic_device_get_is_open_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptic_device_get_capabilities_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, *mut CNA_HapticCapabilities,
+) -> CNA_Result;
+pub type cna_haptic_device_init_rumble_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptic_device_play_rumble_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, f32, u32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptic_device_stop_rumble_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptic_device_set_gain_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, i32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptic_device_set_autocenter_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, i32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptic_device_pause_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptic_device_resume_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptic_device_stop_all_effects_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptic_device_get_name_size_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_haptic_device_copy_name_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_haptic_capabilities_init_fn = unsafe extern "C" fn(
+    *mut CNA_HapticCapabilities,
+) -> CNA_Result;
+pub type cna_haptic_capabilities_equals_fn = unsafe extern "C" fn(
+    *const CNA_HapticCapabilities, CNA_StringView, *const CNA_HapticCapabilities, CNA_StringView, *mut CNA_Bool,
 ) -> CNA_Result;
 pub type cna_sensors_get_count_fn = unsafe extern "C" fn(CNA_Handle, *mut u32) -> CNA_Result;
 pub type cna_sensors_get_info_at_fn = unsafe extern "C" fn(

@@ -720,3 +720,44 @@ empty text is the degenerate case of the same rule.
 
 `PbrEffect` from `RUST-EXT-005` is the other engine-layer object already bound,
 so the layer now has two working slices rather than a survey.
+
+## Haptics (RUST-EXT-014c, 2026-08-31)
+
+XNA had exactly one haptic operation: `GamePad.SetVibration(index, left,
+right)` -- two motor amplitudes on a controller. CNA reports the *device*: how
+many axes forces can be directed along, how many effects it holds, how many can
+play at once, which waveform and condition families it supports, and whether it
+takes a global gain or an autocentre setting.
+
+These are not the same thing, and this module deliberately does not compress
+the second into the first. `GamePad.SetVibration` stays exactly where XNA put
+it; a wheel that supports spring, damper and friction conditions is described
+here, because describing it as "left motor, right motor" would discard almost
+everything true about it. `HapticFeatures::LEFT_RIGHT` is one bit of
+seventeen, and a test walks all of them to prove no two share a bit -- two
+features collapsing onto one would make a device claim a capability it lacks.
+
+### Two measurements that shaped the API
+
+**`Applied` is its own type.** CNA answers "did it apply" separately from "did
+it succeed", and that distinction is load-bearing. Setting a gain on a device
+with no gain control is not an error, but it also did not happen. Folding the
+two together would let a settings screen show a working slider that never
+buzzes.
+
+**Opening an unknown identifier is not an error.** Measured: `open(u32::MAX)`
+succeeds and hands back a device object whose `is_open` is false, whose
+capabilities are empty, and whose every operation reports `Applied(false)`.
+That is coherent, and it is exactly the case `Applied` exists for. The test
+asserts all of it rather than the refusal an earlier draft assumed.
+
+**`-1` is not `0`.** The default capabilities report `max_effects` and
+`max_effects_playing` as `-1`, meaning *not known*, where zero would mean "holds
+no effects" -- a real and different answer. The projection passes the `-1`
+through, and the test asserts it, because rewriting it to zero would turn an
+unknown into a claim.
+
+Real forces are `HARDWARE_PENDING`: no haptic device is attached to this host.
+Everything else -- enumeration agreeing with its count, capability reads,
+opening and closing, and CNA's own name-inclusive capability equality -- is
+measured.
