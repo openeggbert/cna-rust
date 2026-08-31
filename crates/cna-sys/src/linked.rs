@@ -3349,6 +3349,165 @@ extern "C" {
         argument0: CNA_EffectHandle,
         argument1: CNA_Bool,
     ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_create(
+        argument0: *mut CNA_PbrMaterialExtensionsHandle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_destroy(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_copy_from(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: CNA_PbrMaterialExtensionsHandle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_equals(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: CNA_PbrMaterialExtensionsHandle,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_hash_code(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_is_neutral(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_is_sheen_enabled(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_is_transmission_enabled(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_is_iridescence_enabled(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_is_subsurface_enabled(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_clearcoat_factor(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_clearcoat_factor(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_clearcoat_roughness(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_clearcoat_roughness(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_clearcoat_normal_scale(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_clearcoat_normal_scale(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_sheen_roughness(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_sheen_roughness(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_transmission_factor(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_transmission_factor(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_thickness_factor(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_thickness_factor(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_attenuation_distance(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_attenuation_distance(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_iridescence_factor(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_iridescence_factor(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_iridescence_ior(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_iridescence_ior(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_iridescence_thickness_minimum(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_iridescence_thickness_minimum(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_iridescence_thickness_maximum(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_iridescence_thickness_maximum(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_subsurface_wrap(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_subsurface_wrap(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_sheen_color_factor(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_sheen_color_factor(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *const CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_attenuation_color(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_attenuation_color(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *const CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_get_subsurface_color(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_extensions_set_subsurface_color(
+        argument0: CNA_PbrMaterialExtensionsHandle,
+        argument1: *const CNA_Vector3,
+    ) -> CNA_Result;
     pub fn cna_haptic_effect_init(argument0: *mut CNA_HapticEffect) -> CNA_Result;
     pub fn cna_haptic_effect_equals(
         argument0: *const CNA_HapticEffect,

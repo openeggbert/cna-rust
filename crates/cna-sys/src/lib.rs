@@ -874,6 +874,7 @@ pub struct CNA_RenderPipelineSettings {
     pub shadows_enabled: CNA_Bool,
 }
 
+pub type CNA_PbrMaterialExtensionsHandle = CNA_Handle;
 pub type CNA_HapticDeviceHandle = CNA_Handle;
 pub type CNA_HapticEffectType = u32;
 pub type CNA_HapticDirectionType = u32;
@@ -4951,6 +4952,126 @@ pub type cna_pbr_effect_get_vertex_color_enabled_ext_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_pbr_effect_set_vertex_color_enabled_ext_fn = unsafe extern "C" fn(
     CNA_EffectHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_create_fn = unsafe extern "C" fn(
+    *mut CNA_PbrMaterialExtensionsHandle,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_destroy_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_copy_from_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, CNA_PbrMaterialExtensionsHandle,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_equals_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, CNA_PbrMaterialExtensionsHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_get_hash_code_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_is_neutral_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_is_sheen_enabled_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_is_transmission_enabled_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_is_iridescence_enabled_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_is_subsurface_enabled_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_get_clearcoat_factor_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_set_clearcoat_factor_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_get_clearcoat_roughness_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_set_clearcoat_roughness_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_get_clearcoat_normal_scale_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_set_clearcoat_normal_scale_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_get_sheen_roughness_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_set_sheen_roughness_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_get_transmission_factor_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_set_transmission_factor_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_get_thickness_factor_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_set_thickness_factor_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_get_attenuation_distance_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_set_attenuation_distance_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_get_iridescence_factor_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_set_iridescence_factor_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_get_iridescence_ior_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_set_iridescence_ior_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_get_iridescence_thickness_minimum_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_set_iridescence_thickness_minimum_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_get_iridescence_thickness_maximum_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_set_iridescence_thickness_maximum_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_get_subsurface_wrap_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_set_subsurface_wrap_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, f32,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_get_sheen_color_factor_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_set_sheen_color_factor_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *const CNA_Vector3,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_get_attenuation_color_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_set_attenuation_color_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *const CNA_Vector3,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_get_subsurface_color_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_pbr_material_extensions_set_subsurface_color_fn = unsafe extern "C" fn(
+    CNA_PbrMaterialExtensionsHandle, *const CNA_Vector3,
 ) -> CNA_Result;
 pub type cna_haptic_effect_init_fn = unsafe extern "C" fn(*mut CNA_HapticEffect) -> CNA_Result;
 pub type cna_haptic_effect_equals_fn = unsafe extern "C" fn(

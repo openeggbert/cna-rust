@@ -11,7 +11,8 @@
 
 use cna::extensions::pbr::{
     engine_layer_version, engine_layer_version_string, AlphaMode, EngineRenderSettings, PbrEffect,
-    PbrMaterial, PbrMaterialFull, RenderPipelineSettings, RenderQuality, ShadowQuality,
+    PbrMaterial, PbrMaterialExtensions, PbrMaterialFull, RenderPipelineSettings, RenderQuality,
+    ShadowQuality,
     TextureSlot, TextureTransform, TonemappingMode,
 };
 use cna::Microsoft::Xna::Framework::Graphics::{
@@ -488,4 +489,103 @@ fn a_complete_material_round_trips_through_an_effect() {
     material
         .apply_state(&device)
         .expect("a material's device state applies");
+}
+
+#[test]
+fn the_gltf_material_extensions_are_neutral_until_something_is_set() {
+    if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
+        return;
+    }
+    if engine_layer_version().expect("version") == 0 {
+        assert!(PbrMaterialExtensions::new().is_err());
+        return;
+    }
+
+    let extensions = PbrMaterialExtensions::new().expect("a new extension set");
+    // A fresh set behaves as though the material carried no extensions at all.
+    // That is the property a renderer branches on, so it is the one to assert.
+    assert!(
+        extensions.is_neutral().expect("neutral"),
+        "a new extension set is neutral"
+    );
+    assert!(!extensions.is_sheen_enabled().expect("sheen"));
+    assert!(!extensions.is_transmission_enabled().expect("transmission"));
+    assert!(!extensions.is_iridescence_enabled().expect("iridescence"));
+    assert!(!extensions.is_subsurface_enabled().expect("subsurface"));
+
+    // Distinguishable values across every family, so a value read back from a
+    // neighbouring accessor is visible rather than plausible.
+    extensions.set_clearcoat_factor(0.1).expect("clearcoat");
+    extensions.set_clearcoat_roughness(0.2).expect("clearcoat roughness");
+    extensions.set_clearcoat_normal_scale(0.3).expect("clearcoat normal");
+    extensions.set_sheen_roughness(0.4).expect("sheen roughness");
+    extensions.set_transmission_factor(0.5).expect("transmission");
+    extensions.set_thickness_factor(0.6).expect("thickness");
+    extensions.set_attenuation_distance(7.5).expect("attenuation distance");
+    extensions.set_iridescence_factor(0.8).expect("iridescence");
+    extensions.set_iridescence_ior(1.9).expect("iridescence ior");
+    extensions.set_iridescence_thickness_minimum(110.0).expect("thickness min");
+    extensions.set_iridescence_thickness_maximum(220.0).expect("thickness max");
+    extensions.set_subsurface_wrap(0.55).expect("subsurface wrap");
+    extensions
+        .set_sheen_color_factor(Vector3::from_x_and_y_and_z(0.11, 0.22, 0.33))
+        .expect("sheen colour");
+    extensions
+        .set_attenuation_color(Vector3::from_x_and_y_and_z(0.44, 0.55, 0.66))
+        .expect("attenuation colour");
+    extensions
+        .set_subsurface_color(Vector3::from_x_and_y_and_z(0.77, 0.88, 0.99))
+        .expect("subsurface colour");
+
+    assert_eq!(extensions.clearcoat_factor().expect("clearcoat"), 0.1);
+    assert_eq!(extensions.clearcoat_roughness().expect("roughness"), 0.2);
+    assert_eq!(extensions.clearcoat_normal_scale().expect("normal"), 0.3);
+    assert_eq!(extensions.sheen_roughness().expect("sheen"), 0.4);
+    assert_eq!(extensions.transmission_factor().expect("transmission"), 0.5);
+    assert_eq!(extensions.thickness_factor().expect("thickness"), 0.6);
+    assert_eq!(extensions.attenuation_distance().expect("attenuation"), 7.5);
+    assert_eq!(extensions.iridescence_factor().expect("iridescence"), 0.8);
+    assert_eq!(extensions.iridescence_ior().expect("ior"), 1.9);
+    assert_eq!(extensions.iridescence_thickness_minimum().expect("min"), 110.0);
+    assert_eq!(extensions.iridescence_thickness_maximum().expect("max"), 220.0);
+    assert_eq!(extensions.subsurface_wrap().expect("wrap"), 0.55);
+    assert_eq!(
+        extensions.sheen_color_factor().expect("sheen colour"),
+        Vector3::from_x_and_y_and_z(0.11, 0.22, 0.33)
+    );
+    assert_eq!(
+        extensions.attenuation_color().expect("attenuation colour"),
+        Vector3::from_x_and_y_and_z(0.44, 0.55, 0.66)
+    );
+    assert_eq!(
+        extensions.subsurface_color().expect("subsurface colour"),
+        Vector3::from_x_and_y_and_z(0.77, 0.88, 0.99)
+    );
+
+    // Having set them, the set is no longer neutral and the families that were
+    // given a contributing value say so.
+    assert!(
+        !extensions.is_neutral().expect("no longer neutral"),
+        "a set with values is not neutral"
+    );
+    assert!(extensions.is_transmission_enabled().expect("transmission"));
+    assert!(extensions.is_iridescence_enabled().expect("iridescence"));
+
+    // Copying reproduces every value, and CNA's own equality agrees.
+    let copy = PbrMaterialExtensions::new().expect("a second set");
+    assert!(
+        !copy.same_extensions(&extensions).expect("differ before copy"),
+        "a neutral set differs from one with values"
+    );
+    copy.copy_from(&extensions).expect("copy");
+    assert!(
+        copy.same_extensions(&extensions).expect("equal after copy"),
+        "a copy equals its source"
+    );
+    assert_eq!(copy.clearcoat_factor().expect("copied"), 0.1);
+    assert_eq!(
+        copy.hash_code().expect("copied hash"),
+        extensions.hash_code().expect("hash"),
+        "equal extension sets hash equally"
+    );
 }

@@ -954,3 +954,156 @@ impl PbrEffect {
         Ok(PbrMaterialFull { inner })
     }
 }
+
+/// glTF's optional material extensions, as one owned object.
+///
+/// Clearcoat, sheen, transmission, volume attenuation, iridescence and
+/// subsurface scattering: the `KHR_materials_*` state a physically based
+/// material may carry beyond the base metallic-roughness model. XNA has no
+/// counterpart for any of it.
+///
+/// An owned handle rather than a value, because CNA models it as one -- it is
+/// the largest single engine-layer family and upstream keeps it behind a
+/// handle so it can grow without moving anything.
+///
+/// The texture slots are deliberately not exposed. They are non-owning handles
+/// in the canonical API, and a safe Rust value holding one would be a
+/// raw-handle leak; the same rule that keeps textures off [`PbrMaterialFull`]
+/// keeps them off this.
+#[derive(Debug)]
+pub struct PbrMaterialExtensions {
+    native: Arc<Native>,
+    handle: sys::CNA_PbrMaterialExtensionsHandle,
+}
+
+macro_rules! extension_scalar {
+    ($get:ident, $set:ident, $native_get:ident, $native_set:ident, $doc:literal) => {
+        #[doc = $doc]
+        pub fn $get(&self) -> Result<f32> {
+            let mut value = 0.0_f32;
+            // SAFETY: the handle is owned and the output is a live local.
+            self.native
+                .check(unsafe { (self.native.runtime.$native_get)(self.handle, &mut value) })?;
+            Ok(value)
+        }
+
+        #[doc = $doc]
+        pub fn $set(&self, value: f32) -> Result<()> {
+            // SAFETY: the handle is owned and the value is by value.
+            self.native
+                .check(unsafe { (self.native.runtime.$native_set)(self.handle, value) })
+        }
+    };
+}
+
+macro_rules! extension_color {
+    ($get:ident, $set:ident, $native_get:ident, $native_set:ident, $doc:literal) => {
+        #[doc = $doc]
+        pub fn $get(&self) -> Result<Vector3> {
+            let mut value = sys::CNA_Vector3::default();
+            // SAFETY: the handle is owned and the output is a live local.
+            self.native
+                .check(unsafe { (self.native.runtime.$native_get)(self.handle, &mut value) })?;
+            Ok(Vector3 {
+                X: value.x,
+                Y: value.y,
+                Z: value.z,
+            })
+        }
+
+        #[doc = $doc]
+        pub fn $set(&self, value: Vector3) -> Result<()> {
+            let native_value = sys::CNA_Vector3 {
+                x: value.X,
+                y: value.Y,
+                z: value.Z,
+            };
+            // SAFETY: the vector is a live local CNA reads during the call.
+            self.native
+                .check(unsafe { (self.native.runtime.$native_set)(self.handle, &native_value) })
+        }
+    };
+}
+
+macro_rules! extension_flag {
+    ($name:ident, $native:ident, $doc:literal) => {
+        #[doc = $doc]
+        pub fn $name(&self) -> Result<bool> {
+            let mut value = sys::CNA_FALSE;
+            // SAFETY: the handle is owned and the output is a live local.
+            self.native
+                .check(unsafe { (self.native.runtime.$native)(self.handle, &mut value) })?;
+            Ok(value != sys::CNA_FALSE)
+        }
+    };
+}
+
+impl PbrMaterialExtensions {
+    /// A new extension set, at CNA's neutral defaults.
+    pub fn new() -> Result<Self> {
+        let native = Native::process()?;
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the output is a live local receiving a newly owned handle.
+        native.check(unsafe { (native.runtime.pbr_ext_create)(&mut handle) })?;
+        Ok(Self { native, handle })
+    }
+
+    /// Copies every value from `source` into this set.
+    pub fn copy_from(&self, source: &Self) -> Result<()> {
+        // SAFETY: both handles are owned and live for the call.
+        self.native
+            .check(unsafe { (self.native.runtime.pbr_ext_copy_from)(self.handle, source.handle) })
+    }
+
+    /// Whether CNA considers these the same extensions as `other`.
+    pub fn same_extensions(&self, other: &Self) -> Result<bool> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: both handles are owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.runtime.pbr_ext_equals)(self.handle, other.handle, &mut value)
+        })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    /// CNA's own hash of this extension set.
+    pub fn hash_code(&self) -> Result<u64> {
+        let mut value = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native
+            .check(unsafe { (self.native.runtime.pbr_ext_get_hash_code)(self.handle, &mut value) })?;
+        Ok(value)
+    }
+
+    extension_flag!(
+        is_neutral, pbr_ext_is_neutral,
+        "Whether every extension is at its neutral value, so the material behaves as though it carried none."
+    );
+    extension_flag!(is_sheen_enabled, pbr_ext_is_sheen_enabled, "Whether sheen contributes.");
+    extension_flag!(is_transmission_enabled, pbr_ext_is_transmission_enabled, "Whether transmission contributes.");
+    extension_flag!(is_iridescence_enabled, pbr_ext_is_iridescence_enabled, "Whether iridescence contributes.");
+    extension_flag!(is_subsurface_enabled, pbr_ext_is_subsurface_enabled, "Whether subsurface scattering contributes.");
+
+    extension_scalar!(clearcoat_factor, set_clearcoat_factor, pbr_ext_get_clearcoat_factor, pbr_ext_set_clearcoat_factor, "`KHR_materials_clearcoat.clearcoatFactor`.");
+    extension_scalar!(clearcoat_roughness, set_clearcoat_roughness, pbr_ext_get_clearcoat_roughness, pbr_ext_set_clearcoat_roughness, "`KHR_materials_clearcoat.clearcoatRoughnessFactor`.");
+    extension_scalar!(clearcoat_normal_scale, set_clearcoat_normal_scale, pbr_ext_get_clearcoat_normal_scale, pbr_ext_set_clearcoat_normal_scale, "The clearcoat normal map's intensity.");
+    extension_scalar!(sheen_roughness, set_sheen_roughness, pbr_ext_get_sheen_roughness, pbr_ext_set_sheen_roughness, "`KHR_materials_sheen.sheenRoughnessFactor`.");
+    extension_scalar!(transmission_factor, set_transmission_factor, pbr_ext_get_transmission_factor, pbr_ext_set_transmission_factor, "`KHR_materials_transmission.transmissionFactor`.");
+    extension_scalar!(thickness_factor, set_thickness_factor, pbr_ext_get_thickness_factor, pbr_ext_set_thickness_factor, "`KHR_materials_volume.thicknessFactor`.");
+    extension_scalar!(attenuation_distance, set_attenuation_distance, pbr_ext_get_attenuation_distance, pbr_ext_set_attenuation_distance, "`KHR_materials_volume.attenuationDistance`.");
+    extension_scalar!(iridescence_factor, set_iridescence_factor, pbr_ext_get_iridescence_factor, pbr_ext_set_iridescence_factor, "`KHR_materials_iridescence.iridescenceFactor`.");
+    extension_scalar!(iridescence_ior, set_iridescence_ior, pbr_ext_get_iridescence_ior, pbr_ext_set_iridescence_ior, "`KHR_materials_iridescence.iridescenceIor`.");
+    extension_scalar!(iridescence_thickness_minimum, set_iridescence_thickness_minimum, pbr_ext_get_iridescence_thickness_minimum, pbr_ext_set_iridescence_thickness_minimum, "The thin-film thickness range's lower bound.");
+    extension_scalar!(iridescence_thickness_maximum, set_iridescence_thickness_maximum, pbr_ext_get_iridescence_thickness_maximum, pbr_ext_set_iridescence_thickness_maximum, "The thin-film thickness range's upper bound.");
+    extension_scalar!(subsurface_wrap, set_subsurface_wrap, pbr_ext_get_subsurface_wrap, pbr_ext_set_subsurface_wrap, "How far light wraps around a subsurface-scattering surface.");
+
+    extension_color!(sheen_color_factor, set_sheen_color_factor, pbr_ext_get_sheen_color_factor, pbr_ext_set_sheen_color_factor, "`KHR_materials_sheen.sheenColorFactor`.");
+    extension_color!(attenuation_color, set_attenuation_color, pbr_ext_get_attenuation_color, pbr_ext_set_attenuation_color, "`KHR_materials_volume.attenuationColor`.");
+    extension_color!(subsurface_color, set_subsurface_color, pbr_ext_get_subsurface_color, pbr_ext_set_subsurface_color, "The colour subsurface scattering tints light with.");
+}
+
+impl Drop for PbrMaterialExtensions {
+    fn drop(&mut self) {
+        // SAFETY: the handle is owned by this value and released exactly once.
+        let _ = unsafe { (self.native.runtime.pbr_ext_destroy)(self.handle) };
+    }
+}

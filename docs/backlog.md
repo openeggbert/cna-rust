@@ -64,7 +64,7 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-EXT-003 | Renderer capability report, limits and feature support | `graphics.h`, `graphics_device.h` | DONE |
 | RUST-EXT-004 | Post-processing effects: CRT, depth, ASCII | `graphics_ext.h` | DONE |
 | RUST-EXT-005 | PBR material, effect and render-pipeline settings | `graphics_ext.h`, `effects.h`, `engine_layer.h` | DONE |
-| RUST-EXT-005b | The extended `PbrMaterialEXT` with its texture slots and per-slot transforms | `graphics_ext.h` | READY |
+| RUST-EXT-005b | The extended `PbrMaterialEXT` with its texture slots and per-slot transforms | `graphics_ext.h`, `engine_layer.h` | DONE |
 | RUST-EXT-006 | `.cnb` container: open, metadata, Texture2D | `cnb.h` | DONE |
 | RUST-EXT-013a | `.cnb` Model: graph, geometry, materials | `cnb.h` | DONE |
 | RUST-EXT-013b | `.cnb` loader registry, writer and native content manager | `cnb.h`, `content.h` | DONE |
@@ -78,7 +78,8 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-ABI-013 | Gate that both acquisition modes declare the same routes | `tools/native-abi/verify.py` | DONE |
 | RUST-EXT-009 | Sensors: accelerometer, compass, gyroscope | `sensors.h`, `input_devices.h` | DONE, real readings `HARDWARE_PENDING` |
 | RUST-EXT-010a | Engine layer: render-pipeline settings, presets, normalization, text | `engine_layer.h` | DONE |
-| RUST-EXT-010b | The other 848 engine-layer routes across 224 families | `engine_layer.h` | **scoped**: reachable on this artifact -- every engine object constructs -- but a headless device renders nothing, so their semantics cannot be asserted beyond "it returned success". A slice qualifies when its semantics can be asserted exactly; a GPU-backed artifact is the trigger. See [docs/engine-layer-scope.md](engine-layer-scope.md) | PRODUCT_DECISION_REQUIRED |
+| RUST-EXT-010c | Engine layer: the `KHR_materials_*` extension set | `engine_layer.h` | DONE |
+| RUST-EXT-010b | The other 808 engine-layer routes across 224 families | `engine_layer.h` | **scoped**: reachable on this artifact -- every engine object constructs -- but a headless device renders nothing, so their semantics cannot be asserted beyond "it returned success". A slice qualifies when its semantics can be asserted exactly; a GPU-backed artifact is the trigger. See [docs/engine-layer-scope.md](engine-layer-scope.md) | PRODUCT_DECISION_REQUIRED |
 
 ## Platform and packaging
 
