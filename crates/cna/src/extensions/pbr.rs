@@ -726,3 +726,231 @@ impl EngineRenderSettings {
         self
     }
 }
+
+/// How one texture's coordinates are transformed before sampling.
+///
+/// glTF's `KHR_texture_transform`, per slot.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TextureTransform {
+    /// Translation, applied after scaling and rotation.
+    pub offset: (f32, f32),
+    /// Per-axis scale.
+    pub scale: (f32, f32),
+    /// Counter-clockwise rotation, in radians.
+    pub rotation: f32,
+}
+
+impl TextureTransform {
+    const fn from_native(value: sys::CNA_TextureTransformEXT) -> Self {
+        Self {
+            offset: (value.offset.x, value.offset.y),
+            scale: (value.scale.x, value.scale.y),
+            rotation: value.rotation,
+        }
+    }
+
+    const fn to_native(self) -> sys::CNA_TextureTransformEXT {
+        sys::CNA_TextureTransformEXT {
+            struct_size: core::mem::size_of::<sys::CNA_TextureTransformEXT>() as u32,
+            struct_version: 1,
+            offset: sys::CNA_Vector2 {
+                x: self.offset.0,
+                y: self.offset.1,
+            },
+            scale: sys::CNA_Vector2 {
+                x: self.scale.0,
+                y: self.scale.1,
+            },
+            rotation: self.rotation,
+        }
+    }
+}
+
+/// The number of per-slot state entries a material carries.
+///
+/// Seven, in the importer's own order -- base colour, normal,
+/// metallic-roughness, occlusion, emissive, specular, specular colour. This is
+/// deliberately **not** the same as the eight texture *names*
+/// [`CnbMaterialTexture`](crate::extensions::content::CnbMaterialTexture)
+/// addresses, which include `DualTextureEffect`'s second layer; upstream warns
+/// that confusing the two index spaces is a real trap, so they are separate
+/// types here and neither can be passed where the other belongs.
+pub const TEXTURE_SLOT_COUNT: usize = 7;
+
+/// A material's per-slot state entry.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[non_exhaustive]
+pub enum TextureSlot {
+    BaseColor,
+    Normal,
+    MetallicRoughness,
+    Occlusion,
+    Emissive,
+    Specular,
+    SpecularColor,
+}
+
+impl TextureSlot {
+    /// Every slot, in the importer's own order.
+    pub const ALL: [Self; TEXTURE_SLOT_COUNT] = [
+        Self::BaseColor,
+        Self::Normal,
+        Self::MetallicRoughness,
+        Self::Occlusion,
+        Self::Emissive,
+        Self::Specular,
+        Self::SpecularColor,
+    ];
+
+    const fn index(self) -> usize {
+        match self {
+            Self::BaseColor => 0,
+            Self::Normal => 1,
+            Self::MetallicRoughness => 2,
+            Self::Occlusion => 3,
+            Self::Emissive => 4,
+            Self::Specular => 5,
+            Self::SpecularColor => 6,
+        }
+    }
+}
+
+/// The complete PBR material, including its per-slot state.
+///
+/// This is the shape `PbrEffect::apply_full` and `extract_full` exchange, and
+/// it is an owned value with accessors rather than a public structure for the
+/// same reason [`EngineRenderSettings`] is: the `repr(C)` field set is the
+/// ABI's shape, and a later CNA field would otherwise be a breaking change.
+///
+/// Textures are absent here too. The canonical structure has non-owning handle
+/// slots; a safe Rust value holding them would be a raw-handle leak, and the
+/// lifetime relationship belongs on the effect.
+#[derive(Clone, Copy, Debug)]
+pub struct PbrMaterialFull {
+    inner: sys::CNA_PbrMaterialEXT,
+}
+
+impl PbrMaterialFull {
+    /// The canonical defaults, taken from CNA.
+    pub fn canonical_defaults() -> Result<Self> {
+        let native = Native::process()?;
+        let mut inner = sys::CNA_PbrMaterialEXT {
+            struct_size: core::mem::size_of::<sys::CNA_PbrMaterialEXT>() as u32,
+            struct_version: 1,
+            ..sys::CNA_PbrMaterialEXT::default()
+        };
+        // SAFETY: the structure is a caller-owned versioned output.
+        native.check(unsafe { (native.runtime.pbr_material_init_ext)(&mut inner) })?;
+        Ok(Self { inner })
+    }
+
+    settings_scalar!(metallic_factor, set_metallic_factor, metallic_factor, f32, "Metallic factor.");
+    settings_scalar!(roughness_factor, set_roughness_factor, roughness_factor, f32, "Roughness factor.");
+    settings_scalar!(normal_scale, set_normal_scale, normal_scale, f32, "Normal-map intensity.");
+    settings_scalar!(occlusion_strength, set_occlusion_strength, occlusion_strength, f32, "Occlusion strength.");
+    settings_scalar!(ior, set_ior, ior, f32, "Index of refraction.");
+    settings_scalar!(specular_factor, set_specular_factor, specular_factor, f32, "Specular strength.");
+    settings_scalar!(alpha_cutoff, set_alpha_cutoff, alpha_cutoff, f32, "Alpha-mask threshold.");
+    settings_flag!(double_sided, set_double_sided, double_sided, "Whether the surface renders from both sides.");
+    settings_flag!(output_encoded_to_srgb, set_output_encoded_to_srgb, output_encoded_to_srgb, "Whether output is sRGB-encoded.");
+
+    /// How the material's alpha is interpreted.
+    pub fn alpha_mode(&self) -> Result<AlphaMode> {
+        AlphaMode::from_native(self.inner.alpha_mode).ok_or(CnaError::UnsupportedRuntime(
+            "CNA named an alpha mode this build does not know",
+        ))
+    }
+
+    /// Sets how the material's alpha is interpreted.
+    pub fn set_alpha_mode(&mut self, value: AlphaMode) -> &mut Self {
+        self.inner.alpha_mode = value.to_native();
+        self
+    }
+
+    /// The emissive factor.
+    #[must_use]
+    pub const fn emissive_factor(&self) -> Vector3 {
+        Vector3 {
+            X: self.inner.emissive_factor.x,
+            Y: self.inner.emissive_factor.y,
+            Z: self.inner.emissive_factor.z,
+        }
+    }
+
+    /// Sets the emissive factor.
+    pub fn set_emissive_factor(&mut self, value: Vector3) -> &mut Self {
+        self.inner.emissive_factor = sys::CNA_Vector3 {
+            x: value.X,
+            y: value.Y,
+            z: value.Z,
+        };
+        self
+    }
+
+    /// Which UV set a slot samples.
+    #[must_use]
+    pub const fn texture_coordinate_set(&self, slot: TextureSlot) -> i32 {
+        self.inner.texture_coordinate_sets[slot.index()]
+    }
+
+    /// Sets which UV set a slot samples.
+    pub fn set_texture_coordinate_set(&mut self, slot: TextureSlot, value: i32) -> &mut Self {
+        self.inner.texture_coordinate_sets[slot.index()] = value;
+        self
+    }
+
+    /// One slot's coordinate transform.
+    #[must_use]
+    pub const fn texture_transform(&self, slot: TextureSlot) -> TextureTransform {
+        TextureTransform::from_native(self.inner.texture_transforms[slot.index()])
+    }
+
+    /// Sets one slot's coordinate transform.
+    pub fn set_texture_transform(
+        &mut self,
+        slot: TextureSlot,
+        value: TextureTransform,
+    ) -> &mut Self {
+        self.inner.texture_transforms[slot.index()] = value.to_native();
+        self
+    }
+
+    /// Applies the device state this material implies -- blending, depth write
+    /// and culling.
+    ///
+    /// Separate from applying the material to an effect, because it changes the
+    /// *device*, not the effect, and doing both silently would be two
+    /// unrelated side effects under one name.
+    pub fn apply_state(&self, device: &GraphicsDevice) -> Result<()> {
+        let native = device.state_native();
+        // SAFETY: the material is a live local CNA reads during the call and
+        // the device handle is live.
+        native.check(unsafe {
+            (native.runtime.pbr_material_apply_state)(&self.inner, device.handle()?)
+        })
+    }
+}
+
+impl PbrEffect {
+    /// Applies a complete material, every field of which crosses.
+    pub fn apply_full(&self, material: &PbrMaterialFull) -> Result<()> {
+        // SAFETY: the material is a live local CNA reads during the call.
+        self.native.check(unsafe {
+            (self.native.runtime.pbr_effect_apply_material)(self.handle, &material.inner)
+        })
+    }
+
+    /// Reads the complete material this effect currently carries.
+    pub fn extract_full(&self) -> Result<PbrMaterialFull> {
+        let mut inner = sys::CNA_PbrMaterialEXT {
+            struct_size: core::mem::size_of::<sys::CNA_PbrMaterialEXT>() as u32,
+            struct_version: 1,
+            ..sys::CNA_PbrMaterialEXT::default()
+        };
+        // SAFETY: the structure is a caller-owned versioned output.
+        self.native.check(unsafe {
+            (self.native.runtime.pbr_effect_extract_material)(self.handle, &mut inner)
+        })?;
+        Ok(PbrMaterialFull { inner })
+    }
+}

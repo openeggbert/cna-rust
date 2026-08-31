@@ -11,12 +11,14 @@
 
 use cna::extensions::pbr::{
     engine_layer_version, engine_layer_version_string, AlphaMode, EngineRenderSettings, PbrEffect,
-    PbrMaterial, RenderPipelineSettings, RenderQuality, ShadowQuality, TonemappingMode,
+    PbrMaterial, PbrMaterialFull, RenderPipelineSettings, RenderQuality, ShadowQuality,
+    TextureSlot, TextureTransform, TonemappingMode,
 };
 use cna::Microsoft::Xna::Framework::Graphics::{
     GraphicsDevice, GraphicsProfile, PresentationParameters,
 };
 use cna::Microsoft::Xna::Framework::{GraphicsDeviceInformation, Vector3};
+use cna::CnaError;
 
 fn device() -> GraphicsDevice {
     let parameters = PresentationParameters::new();
@@ -383,4 +385,107 @@ fn serialized_settings_report_how_many_fields_were_recognised() {
             "an unapplied field leaves the value alone"
         );
     }
+}
+
+#[test]
+fn a_complete_material_round_trips_through_an_effect() {
+    if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
+        return;
+    }
+    if engine_layer_version().expect("version") == 0 {
+        return;
+    }
+    let device = device();
+    let effect = PbrEffect::new(&device).expect("a PbrEffect");
+
+    let mut material = PbrMaterialFull::canonical_defaults().expect("material defaults");
+    material
+        .set_metallic_factor(0.1)
+        .set_roughness_factor(0.2)
+        .set_normal_scale(0.3)
+        .set_occlusion_strength(0.4)
+        .set_ior(1.6)
+        .set_specular_factor(0.7)
+        .set_alpha_cutoff(0.8)
+        .set_double_sided(true)
+        .set_output_encoded_to_srgb(true)
+        .set_alpha_mode(AlphaMode::Mask)
+        .set_emissive_factor(Vector3::from_x_and_y_and_z(0.11, 0.22, 0.33));
+
+    // Every slot gets a *different* transform and coordinate set, so a slot
+    // read back from a neighbour is visible rather than plausible. This is the
+    // seven-entry per-slot space, which upstream warns is not the same as the
+    // eight texture *names*; passing one where the other belongs is the trap,
+    // and the two are separate types here so it cannot be done.
+    for (ordinal, slot) in TextureSlot::ALL.into_iter().enumerate() {
+        let ordinal = ordinal as f32;
+        material
+            // glTF has two UV sets, and CNA enforces it: anything but 0 or 1
+            // is refused when the material is applied, which the assertion
+            // below proves rather than assumes.
+            .set_texture_coordinate_set(slot, (ordinal as i32) % 2)
+            .set_texture_transform(
+                slot,
+                TextureTransform {
+                    offset: (ordinal, ordinal + 0.5),
+                    scale: (1.0 + ordinal, 2.0 + ordinal),
+                    rotation: 0.25 * ordinal,
+                },
+            );
+    }
+
+    effect.apply_full(&material).expect("apply the whole material");
+    let read = effect.extract_full().expect("extract it back");
+
+    assert_eq!(read.metallic_factor(), 0.1);
+    assert_eq!(read.roughness_factor(), 0.2);
+    assert_eq!(read.normal_scale(), 0.3);
+    assert_eq!(read.occlusion_strength(), 0.4);
+    assert_eq!(read.ior(), 1.6);
+    assert_eq!(read.specular_factor(), 0.7);
+    assert_eq!(read.alpha_cutoff(), 0.8);
+    assert!(read.double_sided());
+    assert!(read.output_encoded_to_srgb());
+    assert_eq!(read.alpha_mode().expect("alpha mode"), AlphaMode::Mask);
+    assert_eq!(
+        read.emissive_factor(),
+        Vector3::from_x_and_y_and_z(0.11, 0.22, 0.33)
+    );
+
+    for (ordinal, slot) in TextureSlot::ALL.into_iter().enumerate() {
+        let ordinal = ordinal as f32;
+        assert_eq!(
+            read.texture_coordinate_set(slot),
+            (ordinal as i32) % 2,
+            "slot {slot:?} kept its own coordinate set"
+        );
+        assert_eq!(
+            read.texture_transform(slot),
+            TextureTransform {
+                offset: (ordinal, ordinal + 0.5),
+                scale: (1.0 + ordinal, 2.0 + ordinal),
+                rotation: 0.25 * ordinal,
+            },
+            "slot {slot:?} kept its own transform"
+        );
+    }
+
+    // A coordinate set outside glTF's two is refused when the material is
+    // applied, rather than silently clamped into one of them -- which would
+    // sample the wrong UVs and look almost right.
+    let mut invalid = PbrMaterialFull::canonical_defaults().expect("defaults");
+    invalid.set_texture_coordinate_set(TextureSlot::BaseColor, 5);
+    let refused = effect.apply_full(&invalid);
+    assert!(
+        matches!(&refused, Err(CnaError::Native { message, .. })
+            if message.contains("texture-coordinate set must be 0 or 1")),
+        "an out-of-range coordinate set is refused, got {refused:?}"
+    );
+
+    // Applying the device state a material implies is a separate operation,
+    // because it changes the device and not the effect; doing both under one
+    // name would be two unrelated side effects.
+    material
+        .apply_state(&device)
+        .expect("a material's device state applies");
 }

@@ -3227,6 +3227,19 @@ extern "C" {
         argument1: CNA_StringView,
         argument2: *mut i32,
     ) -> CNA_Result;
+    pub fn cna_pbr_material_ext_init(argument0: *mut CNA_PbrMaterialEXT) -> CNA_Result;
+    pub fn cna_pbr_effect_apply_material(
+        argument0: CNA_EffectHandle,
+        argument1: *const CNA_PbrMaterialEXT,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_extract_material(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_PbrMaterialEXT,
+    ) -> CNA_Result;
+    pub fn cna_pbr_material_apply_state(
+        argument0: *const CNA_PbrMaterialEXT,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
     pub fn cna_pbr_material_init(argument0: *mut CNA_PbrMaterial) -> CNA_Result;
     pub fn cna_render_pipeline_settings_init(
         argument0: *mut CNA_RenderPipelineSettings,

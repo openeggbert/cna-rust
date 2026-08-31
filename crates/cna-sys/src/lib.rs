@@ -734,6 +734,93 @@ pub struct CNA_RenderPipelineSettingsEXT {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_TextureTransformEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub offset: CNA_Vector2,
+    pub scale: CNA_Vector2,
+    pub rotation: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_PbrMaterialEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub albedo_texture: CNA_Handle,
+    pub normal_texture: CNA_Handle,
+    pub metallic_roughness_texture: CNA_Handle,
+    pub ambient_occlusion_texture: CNA_Handle,
+    pub emissive_texture: CNA_Handle,
+    pub specular_texture: CNA_Handle,
+    pub specular_color_texture: CNA_Handle,
+    pub albedo_color: CNA_Color,
+    pub emissive_factor: CNA_Vector3,
+    pub specular_color_factor: CNA_Vector3,
+    pub metallic_factor: f32,
+    pub roughness_factor: f32,
+    pub normal_scale: f32,
+    pub occlusion_strength: f32,
+    pub ior: f32,
+    pub specular_factor: f32,
+    pub alpha_cutoff: f32,
+    pub alpha_mode: CNA_AlphaModeEXT,
+    pub double_sided: CNA_Bool,
+    pub base_color_texture_srgb: CNA_Bool,
+    pub emissive_texture_srgb: CNA_Bool,
+    pub specular_color_texture_srgb: CNA_Bool,
+    pub output_encoded_to_srgb: CNA_Bool,
+    pub reserved: [u8; 3],
+    pub texture_coordinate_sets: [i32; 7],
+    pub texture_transforms: [CNA_TextureTransformEXT; 7],
+}
+
+impl Default for CNA_PbrMaterialEXT {
+    fn default() -> Self {
+        // SAFETY-free: every field is a plain scalar, handle or `repr(C)`
+        // aggregate of them, so an all-zero value is a valid instance. CNA's
+        // own initializer overwrites it before it is used.
+        Self {
+            struct_size: 0,
+            struct_version: 0,
+            albedo_texture: 0,
+            normal_texture: 0,
+            metallic_roughness_texture: 0,
+            ambient_occlusion_texture: 0,
+            emissive_texture: 0,
+            specular_texture: 0,
+            specular_color_texture: 0,
+            albedo_color: CNA_Color::default(),
+            emissive_factor: CNA_Vector3::default(),
+            specular_color_factor: CNA_Vector3::default(),
+            metallic_factor: 0.0,
+            roughness_factor: 0.0,
+            normal_scale: 0.0,
+            occlusion_strength: 0.0,
+            ior: 0.0,
+            specular_factor: 0.0,
+            alpha_cutoff: 0.0,
+            alpha_mode: 0,
+            double_sided: 0,
+            base_color_texture_srgb: 0,
+            emissive_texture_srgb: 0,
+            specular_color_texture_srgb: 0,
+            output_encoded_to_srgb: 0,
+            reserved: [0; 3],
+            texture_coordinate_sets: [0; 7],
+            texture_transforms: [CNA_TextureTransformEXT {
+                struct_size: 0,
+                struct_version: 0,
+                offset: CNA_Vector2 { x: 0.0, y: 0.0 },
+                scale: CNA_Vector2 { x: 0.0, y: 0.0 },
+                rotation: 0.0,
+            }; 7],
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct CNA_PbrMaterial {
     pub albedo_texture: CNA_Handle,
     pub normal_texture: CNA_Handle,
@@ -4702,6 +4789,16 @@ pub type cna_render_pipeline_settings_ext_apply_render_quality_preset_fn = unsaf
 ) -> CNA_Result;
 pub type cna_render_pipeline_settings_ext_apply_from_string_fn = unsafe extern "C" fn(
     *mut CNA_RenderPipelineSettingsEXT, CNA_StringView, *mut i32,
+) -> CNA_Result;
+pub type cna_pbr_material_ext_init_fn = unsafe extern "C" fn(*mut CNA_PbrMaterialEXT) -> CNA_Result;
+pub type cna_pbr_effect_apply_material_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *const CNA_PbrMaterialEXT,
+) -> CNA_Result;
+pub type cna_pbr_effect_extract_material_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_PbrMaterialEXT,
+) -> CNA_Result;
+pub type cna_pbr_material_apply_state_fn = unsafe extern "C" fn(
+    *const CNA_PbrMaterialEXT, CNA_Handle,
 ) -> CNA_Result;
 pub type cna_pbr_material_init_fn = unsafe extern "C" fn(*mut CNA_PbrMaterial) -> CNA_Result;
 pub type cna_render_pipeline_settings_init_fn = unsafe extern "C" fn(
