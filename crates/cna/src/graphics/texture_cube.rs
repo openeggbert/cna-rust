@@ -309,6 +309,21 @@ impl TextureCube {
     }
 }
 
+impl TextureCube {
+    /// The native handle, for a route that is about to take ownership of it.
+    ///
+    /// Paired with [`TextureCube::relinquish`]: read the handle, call the
+    /// consuming route, and only relinquish when it succeeded.
+    pub(crate) fn native_handle(&self) -> Result<sys::CNA_Handle> {
+        self.state.require_handle()
+    }
+
+    /// Forgets the handle after a consuming route has taken it.
+    pub(crate) fn relinquish(&self) {
+        self.state.relinquish();
+    }
+}
+
 pub(super) fn color_to_native(value: Color) -> sys::CNA_Color {
     sys::CNA_Color {
         r: value.R(),

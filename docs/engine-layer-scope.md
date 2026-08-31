@@ -132,6 +132,7 @@ the criterion above is unchanged, only its precondition has been met.
 | post-process chain, passes, target pool, tonemap and FXAA | `post_process_chain`, `post_process_pass`, `blit_pass`, `render_target_pool`, `tonemap_pass`, `fxaa_pass` | 49 | `VERIFIED_PIXEL` |
 | GPU timers and particle systems | `gpu_timer`, `particle_system`, `particle` | 35 | `VERIFIED_GPU` |
 | storage buffers and compute shaders | `storage_buffer`, `compute_shader`, `graphics_memory_barrier` | 23 | `VERIFIED_GPU` |
+| decals, cube-map skies and the analytic sky | `decal_pass`, `skybox`, `atmospheric_sky` | 38 | `VERIFIED_STATE` |
 
 ### What the GPU artifact changed about the evidence
 
@@ -162,4 +163,15 @@ three found something:
   is the one engine getter that refuses a destination whose `struct_size` and
   `struct_version` the caller has not filled, where every other getter fills
   them itself.
+- **`cna_skybox_get_environment` publishes a handle too,** and a Rust
+  `has_environment` that only compared it against `CNA_INVALID_HANDLE` leaked
+  one per call. The leak was invisible until game shutdown, which then refused
+  with "All owned C child resources must be destroyed before the game" and
+  named nothing. Every engine query that answers with a handle is now a
+  lifetime-bound view that releases on drop.
+- **`atmospheric_sky`'s `sun_direction` is the direction the light travels,**
+  the same convention `DirectionalLightEXT` uses, and the opposite of what "the
+  direction the sun is in" in the header suggests. Measured by sweeping five
+  view directions at one elevation: the sky is dimmest at right angles to the
+  vector and brightest at the far end of the sweep.
 

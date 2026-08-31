@@ -762,6 +762,9 @@ pub type CNA_GpuTimerHandle = CNA_Handle;
 pub type CNA_ParticleSystemHandle = CNA_Handle;
 pub type CNA_StorageBufferHandle = CNA_Handle;
 pub type CNA_ComputeShaderHandle = CNA_Handle;
+pub type CNA_DecalPassHandle = CNA_Handle;
+pub type CNA_SkyboxHandle = CNA_Handle;
+pub type CNA_AtmosphericSkyHandle = CNA_Handle;
 pub type CNA_GraphicsImageAccess = u32;
 pub type CNA_GraphicsMemoryBarrier = u32;
 
@@ -8291,3 +8294,109 @@ pub type cna_storage_buffer_set_bytes_fn = unsafe extern "C" fn(
 pub type cna_storage_buffer_set_elements_fn = unsafe extern "C" fn(
     CNA_StorageBufferHandle, *const c_void, u64, u64,
 ) -> CNA_Result;
+
+// --- CNA engine layer: decals, skyboxes and atmospheric sky (engine_layer.h) ---
+pub type cna_atmospheric_sky_copy_model_glsl_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_atmospheric_sky_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_AtmosphericSkyHandle,
+) -> CNA_Result;
+pub type cna_atmospheric_sky_destroy_fn = unsafe extern "C" fn(
+    CNA_AtmosphericSkyHandle,
+) -> CNA_Result;
+pub type cna_atmospheric_sky_draw_fn = unsafe extern "C" fn(
+    CNA_AtmosphericSkyHandle, *const CNA_Matrix, *const CNA_Matrix, i32, i32,
+) -> CNA_Result;
+pub type cna_atmospheric_sky_get_intensity_fn = unsafe extern "C" fn(
+    CNA_AtmosphericSkyHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_atmospheric_sky_get_sun_direction_fn = unsafe extern "C" fn(
+    CNA_AtmosphericSkyHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_atmospheric_sky_get_turbidity_fn = unsafe extern "C" fn(
+    CNA_AtmosphericSkyHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_atmospheric_sky_is_supported_fn = unsafe extern "C" fn(
+    CNA_AtmosphericSkyHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_atmospheric_sky_radiance_fn = unsafe extern "C" fn(
+    *const CNA_Vector3, *const CNA_Vector3, f32, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_atmospheric_sky_set_intensity_fn = unsafe extern "C" fn(
+    CNA_AtmosphericSkyHandle, f32,
+) -> CNA_Result;
+pub type cna_atmospheric_sky_set_sun_direction_fn = unsafe extern "C" fn(
+    CNA_AtmosphericSkyHandle, *const CNA_Vector3,
+) -> CNA_Result;
+pub type cna_atmospheric_sky_set_turbidity_fn = unsafe extern "C" fn(
+    CNA_AtmosphericSkyHandle, f32,
+) -> CNA_Result;
+pub type cna_decal_pass_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_DecalPassHandle,
+) -> CNA_Result;
+pub type cna_decal_pass_destroy_fn = unsafe extern "C" fn(CNA_DecalPassHandle) -> CNA_Result;
+pub type cna_decal_pass_draw_fn = unsafe extern "C" fn(
+    CNA_DecalPassHandle, CNA_Handle, *const CNA_Matrix, i32, i32,
+) -> CNA_Result;
+pub type cna_decal_pass_get_max_slope_angle_fn = unsafe extern "C" fn(
+    CNA_DecalPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_decal_pass_get_opacity_fn = unsafe extern "C" fn(
+    CNA_DecalPassHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_decal_pass_get_tint_fn = unsafe extern "C" fn(
+    CNA_DecalPassHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_decal_pass_is_inside_decal_box_fn = unsafe extern "C" fn(
+    *const CNA_Vector3, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_decal_pass_set_camera_fn = unsafe extern "C" fn(
+    CNA_DecalPassHandle, *const CNA_Matrix, *const CNA_Matrix, f32,
+) -> CNA_Result;
+pub type cna_decal_pass_set_max_slope_angle_fn = unsafe extern "C" fn(
+    CNA_DecalPassHandle, f32,
+) -> CNA_Result;
+pub type cna_decal_pass_set_opacity_fn = unsafe extern "C" fn(
+    CNA_DecalPassHandle, f32,
+) -> CNA_Result;
+pub type cna_decal_pass_set_prepass_inputs_fn = unsafe extern "C" fn(
+    CNA_DecalPassHandle, CNA_Handle, CNA_Handle,
+) -> CNA_Result;
+pub type cna_decal_pass_set_tint_fn = unsafe extern "C" fn(
+    CNA_DecalPassHandle, *const CNA_Vector3,
+) -> CNA_Result;
+pub type cna_skybox_compute_view_ray_fn = unsafe extern "C" fn(
+    *const CNA_Matrix, *const CNA_Matrix, f32, f32, f32, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_skybox_create_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Handle, *mut CNA_SkyboxHandle,
+) -> CNA_Result;
+pub type cna_skybox_destroy_fn = unsafe extern "C" fn(CNA_SkyboxHandle) -> CNA_Result;
+pub type cna_skybox_draw_fn = unsafe extern "C" fn(
+    CNA_SkyboxHandle, *const CNA_Matrix, *const CNA_Matrix, i32, i32,
+) -> CNA_Result;
+pub type cna_skybox_get_environment_fn = unsafe extern "C" fn(
+    CNA_SkyboxHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_skybox_get_intensity_fn = unsafe extern "C" fn(
+    CNA_SkyboxHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_skybox_get_tint_fn = unsafe extern "C" fn(
+    CNA_SkyboxHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_skybox_get_yaw_fn = unsafe extern "C" fn(CNA_SkyboxHandle, *mut f32) -> CNA_Result;
+pub type cna_skybox_is_supported_fn = unsafe extern "C" fn(
+    CNA_SkyboxHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_skybox_set_environment_fn = unsafe extern "C" fn(
+    CNA_SkyboxHandle, CNA_Handle,
+) -> CNA_Result;
+pub type cna_skybox_set_intensity_fn = unsafe extern "C" fn(CNA_SkyboxHandle, f32) -> CNA_Result;
+pub type cna_skybox_set_owned_environment_fn = unsafe extern "C" fn(
+    CNA_SkyboxHandle, CNA_Handle,
+) -> CNA_Result;
+pub type cna_skybox_set_tint_fn = unsafe extern "C" fn(
+    CNA_SkyboxHandle, *const CNA_Vector3,
+) -> CNA_Result;
+pub type cna_skybox_set_yaw_fn = unsafe extern "C" fn(CNA_SkyboxHandle, f32) -> CNA_Result;

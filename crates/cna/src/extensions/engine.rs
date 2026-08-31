@@ -51,7 +51,7 @@ use crate::graphics::{
     BorrowedHandle, Effect, GraphicsDevice, OwnedEngineChild, SurfaceFormat, Texture2D,
 };
 use crate::native::Native;
-use crate::graphics::{DepthFormat, RenderTarget2D};
+use crate::graphics::{DepthFormat, RenderTarget2D, TextureCube};
 use crate::value::{BoundingBox, Color, Matrix, Vector3, Vector4};
 
 use super::pbr::{EngineRenderSettings, RenderQuality, ShadowQuality, TonemappingMode};
@@ -3414,6 +3414,660 @@ impl ComputeShader {
 }
 
 impl Drop for ComputeShader {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// A deferred-decal projector.
+///
+/// `OWNED`. Projects a decal texture into whatever target is bound, reading the
+/// depth and normal buffers a prepass produced. Those inputs are
+/// `RETAINED_DEPENDENCY` on the same terms as the pipeline's: CNA keeps raw
+/// pointers and retains nothing.
+pub struct DecalPass {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+    depth: Option<Texture2D>,
+    normals: Option<Texture2D>,
+}
+
+impl DecalPass {
+    /// Creates a decal pass on a device.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe { (native.engine.decal_pass_create)(device.handle()?, &mut handle) })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.decal_pass_destroy,
+            released: "the decal pass has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+            depth: None,
+            normals: None,
+        })
+    }
+
+    /// Gives the pass the depth and normal buffers it projects against.
+    pub fn set_prepass_inputs(
+        &mut self,
+        depth: Option<Texture2D>,
+        normals: Option<Texture2D>,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let depth_handle = match depth.as_ref() {
+            Some(texture) => texture.handle()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        let normal_handle = match normals.as_ref() {
+            Some(texture) => texture.handle()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        // SAFETY: the handle is owned and both texture handles are live for the
+        // call; retention is what this value does with them afterwards.
+        self.native.check(unsafe {
+            (self.native.engine.decal_pass_set_prepass_inputs)(handle, depth_handle, normal_handle)
+        })?;
+        self.depth = depth;
+        self.normals = normals;
+        Ok(())
+    }
+
+    /// Sets the camera the decal pass unprojects with.
+    ///
+    /// A far plane that is not positive is *ignored* upstream, because the
+    /// unprojection divides by it. That is a silent no-op rather than a
+    /// refusal, so it is stated here rather than left to be discovered.
+    pub fn set_camera(&self, view: Matrix, projection: Matrix, far_plane: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        let view = native_matrix(view);
+        let projection = native_matrix(projection);
+        // SAFETY: the handle is owned and both matrices are borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.decal_pass_set_camera)(handle, &view, &projection, far_plane)
+        })
+    }
+
+    /// Projects one decal into the current target.
+    pub fn draw(
+        &self,
+        decal: &Texture2D,
+        decal_world: Matrix,
+        width: i32,
+        height: i32,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let world = native_matrix(decal_world);
+        // SAFETY: the handle is owned, the texture handle is live and the
+        // matrix is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.decal_pass_draw)(
+                handle,
+                decal.handle()?,
+                &world,
+                width,
+                height,
+            )
+        })
+    }
+
+    /// Whether a point in the decal box's local space falls inside it.
+    ///
+    /// A pure function of the point, so a caller can reason about coverage
+    /// without drawing -- and a test can assert the box's own boundary.
+    pub fn is_inside_decal_box(local_position: Vector3) -> Result<bool> {
+        let native = Native::process()?;
+        let point = native_vector3(local_position);
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the point is borrowed for the call and the output is a live local.
+        native.check(unsafe {
+            (native.engine.decal_pass_is_inside_decal_box)(&point, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// How opaque the projection is.
+    pub fn opacity(&self) -> Result<f32> {
+        self.scalar(self.native.engine.decal_pass_get_opacity)
+    }
+
+    /// Sets how opaque the projection is.
+    pub fn set_opacity(&self, value: f32) -> Result<()> {
+        self.set_scalar(self.native.engine.decal_pass_set_opacity, value)
+    }
+
+    /// The steepest surface the decal will still project onto, in radians.
+    pub fn max_slope_angle(&self) -> Result<f32> {
+        self.scalar(self.native.engine.decal_pass_get_max_slope_angle)
+    }
+
+    /// Sets the steepest surface the decal will still project onto.
+    pub fn set_max_slope_angle(&self, value: f32) -> Result<()> {
+        self.set_scalar(self.native.engine.decal_pass_set_max_slope_angle, value)
+    }
+
+    /// The colour the decal is multiplied by.
+    pub fn tint(&self) -> Result<Vector3> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native
+            .check(unsafe { (self.native.engine.decal_pass_get_tint)(handle, &mut value) })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// Sets the colour the decal is multiplied by.
+    pub fn set_tint(&self, value: Vector3) -> Result<()> {
+        let handle = self.core.get()?;
+        let tint = native_vector3(value);
+        // SAFETY: the handle is owned and the colour is borrowed for the call.
+        self.native
+            .check(unsafe { (self.native.engine.decal_pass_set_tint)(handle, &tint) })
+    }
+
+    /// Releases the pass now rather than at drop.
+    pub fn release(&mut self) -> Result<()> {
+        let result = self.core.release();
+        self.depth = None;
+        self.normals = None;
+        result
+    }
+
+    fn scalar(
+        &self,
+        route: unsafe extern "C" fn(sys::CNA_DecalPassHandle, *mut f32) -> sys::CNA_Result,
+    ) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    fn set_scalar(
+        &self,
+        route: unsafe extern "C" fn(sys::CNA_DecalPassHandle, f32) -> sys::CNA_Result,
+        value: f32,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the value is by value.
+        self.native.check(unsafe { route(handle, value) })
+    }
+}
+
+impl Drop for DecalPass {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// A cube map another engine object owns, viewed for a bounded borrow.
+///
+/// Like [`BorrowedRenderTarget`], the handle CNA publishes here is a new one
+/// that aliases its owner and must be released. Leaking it keeps the owner
+/// alive past its device, which CNA reports by refusing to destroy the game.
+pub struct BorrowedTextureCube<'owner> {
+    native: Arc<Native>,
+    handle: sys::CNA_Handle,
+    owner: PhantomData<&'owner ()>,
+}
+
+impl BorrowedTextureCube<'_> {
+    /// The cube map's native size, read through the borrow.
+    pub fn size(&self) -> Result<i32> {
+        let mut info = sys::CNA_TextureCubeInfo {
+            struct_size: core::mem::size_of::<sys::CNA_TextureCubeInfo>() as u32,
+            struct_version: 1,
+            ..sys::CNA_TextureCubeInfo::default()
+        };
+        self.native.texture_cube_info(self.handle, &mut info)?;
+        i32::try_from(info.size)
+            .map_err(|_| CnaError::InvalidInput("cube texture size exceeds i32"))
+    }
+}
+
+impl Drop for BorrowedTextureCube<'_> {
+    fn drop(&mut self) {
+        // SAFETY: the handle is this view's own, released exactly once. It
+        // aliases the owner, so releasing it releases nothing but the view.
+        let _ = self.native.destroy_texture_cube(self.handle);
+    }
+}
+
+/// A cube map the skybox refused to take over.
+pub struct EnvironmentNotTransferred {
+    /// The cube map, still owned by the caller.
+    pub environment: TextureCube,
+    /// Why the transfer was refused.
+    pub error: CnaError,
+}
+
+impl core::fmt::Debug for EnvironmentNotTransferred {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("EnvironmentNotTransferred")
+            .field("error", &self.error)
+            .finish_non_exhaustive()
+    }
+}
+
+impl core::fmt::Display for EnvironmentNotTransferred {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(formatter, "the environment was not taken over: {}", self.error)
+    }
+}
+
+impl std::error::Error for EnvironmentNotTransferred {}
+
+/// A cube-map sky.
+///
+/// `OWNED`. Its environment is either `RETAINED_DEPENDENCY` -- borrowed by CNA
+/// and kept alive here -- or handed over outright through
+/// [`Skybox::set_owned_environment`], which is the consuming form.
+pub struct Skybox {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+    /// The environment CNA borrows. `None` once one has been handed over, since
+    /// the skybox owns that one itself.
+    borrowed_environment: Option<TextureCube>,
+}
+
+impl Skybox {
+    /// Creates a skybox with no environment yet.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        Self::create(device, sys::CNA_INVALID_HANDLE, None)
+    }
+
+    /// Creates a skybox over an environment CNA borrows.
+    ///
+    /// The cube map is taken rather than referenced: CNA keeps a raw pointer to
+    /// it, so Rust is what guarantees it outlives the skybox.
+    pub fn with_environment(device: &GraphicsDevice, environment: TextureCube) -> Result<Self> {
+        let handle = environment.native_handle()?;
+        Self::create(device, handle, Some(environment))
+    }
+
+    fn create(
+        device: &GraphicsDevice,
+        environment: sys::CNA_Handle,
+        retained: Option<TextureCube>,
+    ) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device and environment handles are live and the output is
+        // a live local.
+        native.check(unsafe {
+            (native.engine.skybox_create)(device.handle()?, environment, &mut handle)
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.skybox_destroy,
+            released: "the skybox has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+            borrowed_environment: retained,
+        })
+    }
+
+    /// Whether this renderer can draw a sky.
+    pub fn is_supported(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native
+            .check(unsafe { (self.native.engine.skybox_is_supported)(handle, &mut value) })?;
+        Ok(value != 0)
+    }
+
+    /// Whether an environment is attached.
+    ///
+    /// Answered from CNA rather than from the Rust-side retention, because a
+    /// handed-over environment is the skybox's and this value keeps nothing.
+    ///
+    /// The query is not free: upstream publishes a *new* handle aliasing the
+    /// skybox, and one that is never released keeps the skybox alive past its
+    /// device -- which CNA then refuses to shut the game down over. It is
+    /// released here before answering.
+    pub fn has_environment(&self) -> Result<bool> {
+        Ok(self.environment()?.is_some())
+    }
+
+    /// The attached environment, borrowed for as long as the skybox lives.
+    ///
+    /// `None` when none is attached. The handle CNA publishes here aliases the
+    /// skybox rather than the cube map, so releasing it releases nothing but
+    /// the view -- which is what [`BorrowedTextureCube`] does on drop.
+    pub fn environment(&self) -> Result<Option<BorrowedTextureCube<'_>>> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native
+            .check(unsafe { (self.native.engine.skybox_get_environment)(handle, &mut value) })?;
+        if value == sys::CNA_INVALID_HANDLE {
+            return Ok(None);
+        }
+        Ok(Some(BorrowedTextureCube {
+            native: Arc::clone(&self.native),
+            handle: value,
+            owner: PhantomData,
+        }))
+    }
+
+    /// Attaches an environment CNA borrows, replacing any previous one.
+    pub fn set_environment(&mut self, environment: Option<TextureCube>) -> Result<()> {
+        let handle = self.core.get()?;
+        let cube = match environment.as_ref() {
+            Some(value) => value.native_handle()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        // SAFETY: the handle is owned and the cube handle is live for the call.
+        self.native
+            .check(unsafe { (self.native.engine.skybox_set_environment)(handle, cube) })?;
+        self.borrowed_environment = environment;
+        Ok(())
+    }
+
+    /// Attaches an environment and hands ownership of it to the skybox.
+    ///
+    /// The consuming form. On success the skybox owns the cube map and this
+    /// value forgets its handle; on failure the cube map comes back untouched,
+    /// because upstream releases the handle last and a refusal never leaves the
+    /// caller holding nothing.
+    pub fn set_owned_environment(
+        &mut self,
+        environment: TextureCube,
+    ) -> std::result::Result<(), EnvironmentNotTransferred> {
+        let handle = match self.core.get() {
+            Ok(value) => value,
+            Err(error) => return Err(EnvironmentNotTransferred { environment, error }),
+        };
+        let cube = match environment.native_handle() {
+            Ok(value) => value,
+            Err(error) => return Err(EnvironmentNotTransferred { environment, error }),
+        };
+        // SAFETY: both handles are live; the cube is relinquished only after
+        // the route reports success.
+        let result = self
+            .native
+            .check(unsafe { (self.native.engine.skybox_set_owned_environment)(handle, cube) });
+        match result {
+            Ok(()) => {
+                environment.relinquish();
+                self.borrowed_environment = None;
+                Ok(())
+            }
+            Err(error) => Err(EnvironmentNotTransferred { environment, error }),
+        }
+    }
+
+    /// Draws the sky over whatever target is currently bound.
+    pub fn draw(&self, view: Matrix, projection: Matrix, width: i32, height: i32) -> Result<()> {
+        let handle = self.core.get()?;
+        let view = native_matrix(view);
+        let projection = native_matrix(projection);
+        // SAFETY: the handle is owned and both matrices are borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.skybox_draw)(handle, &view, &projection, width, height)
+        })
+    }
+
+    /// The world direction one screen point looks along, through the rotated sky.
+    ///
+    /// A pure function of its arguments, which is what makes the sky's rotation
+    /// checkable without drawing it.
+    pub fn compute_view_ray(
+        view: Matrix,
+        projection: Matrix,
+        ndc_x: f32,
+        ndc_y: f32,
+        yaw: f32,
+    ) -> Result<Vector3> {
+        let native = Native::process()?;
+        let view = native_matrix(view);
+        let projection = native_matrix(projection);
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: both matrices are borrowed for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.skybox_compute_view_ray)(
+                &view,
+                &projection,
+                ndc_x,
+                ndc_y,
+                yaw,
+                &mut value,
+            )
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// How bright the sky is drawn.
+    pub fn intensity(&self) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native
+            .check(unsafe { (self.native.engine.skybox_get_intensity)(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    /// Sets how bright the sky is drawn.
+    pub fn set_intensity(&self, value: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the value is by value.
+        self.native
+            .check(unsafe { (self.native.engine.skybox_set_intensity)(handle, value) })
+    }
+
+    /// How far the sky is rotated about the vertical axis, in radians.
+    pub fn yaw(&self) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native
+            .check(unsafe { (self.native.engine.skybox_get_yaw)(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    /// Sets how far the sky is rotated about the vertical axis.
+    pub fn set_yaw(&self, value: f32) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the value is by value.
+        self.native
+            .check(unsafe { (self.native.engine.skybox_set_yaw)(handle, value) })
+    }
+
+    /// The colour the sky is multiplied by.
+    pub fn tint(&self) -> Result<Vector3> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native
+            .check(unsafe { (self.native.engine.skybox_get_tint)(handle, &mut value) })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// Sets the colour the sky is multiplied by.
+    pub fn set_tint(&self, value: Vector3) -> Result<()> {
+        let handle = self.core.get()?;
+        let tint = native_vector3(value);
+        // SAFETY: the handle is owned and the colour is borrowed for the call.
+        self.native
+            .check(unsafe { (self.native.engine.skybox_set_tint)(handle, &tint) })
+    }
+
+    /// Releases the skybox now rather than at drop.
+    pub fn release(&mut self) -> Result<()> {
+        let result = self.core.release();
+        self.borrowed_environment = None;
+        result
+    }
+}
+
+impl Drop for Skybox {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// An analytic sky: a Preetham-style model rather than a cube map.
+pub struct AtmosphericSky {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl AtmosphericSky {
+    /// Creates an atmospheric sky on a device.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the output is a live local.
+        native.check(unsafe {
+            (native.engine.atmospheric_sky_create)(device.handle()?, &mut handle)
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.atmospheric_sky_destroy,
+            released: "the atmospheric sky has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+        })
+    }
+
+    /// Whether this renderer can draw the model.
+    pub fn is_supported(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_Bool = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.atmospheric_sky_is_supported)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Draws the sky over whatever target is currently bound.
+    pub fn draw(&self, view: Matrix, projection: Matrix, width: i32, height: i32) -> Result<()> {
+        let handle = self.core.get()?;
+        let view = native_matrix(view);
+        let projection = native_matrix(projection);
+        // SAFETY: the handle is owned and both matrices are borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.atmospheric_sky_draw)(handle, &view, &projection, width, height)
+        })
+    }
+
+    /// The direction the sun is in.
+    pub fn sun_direction(&self) -> Result<Vector3> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.atmospheric_sky_get_sun_direction)(handle, &mut value)
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// Sets the direction the sun is in.
+    pub fn set_sun_direction(&self, value: Vector3) -> Result<()> {
+        let handle = self.core.get()?;
+        let direction = native_vector3(value);
+        // SAFETY: the handle is owned and the direction is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.atmospheric_sky_set_sun_direction)(handle, &direction)
+        })
+    }
+
+    /// How hazy the atmosphere is.
+    pub fn turbidity(&self) -> Result<f32> {
+        self.scalar(self.native.engine.atmospheric_sky_get_turbidity)
+    }
+
+    /// Sets how hazy the atmosphere is.
+    pub fn set_turbidity(&self, value: f32) -> Result<()> {
+        self.set_scalar(self.native.engine.atmospheric_sky_set_turbidity, value)
+    }
+
+    /// How bright the sky is drawn.
+    pub fn intensity(&self) -> Result<f32> {
+        self.scalar(self.native.engine.atmospheric_sky_get_intensity)
+    }
+
+    /// Sets how bright the sky is drawn.
+    pub fn set_intensity(&self, value: f32) -> Result<()> {
+        self.set_scalar(self.native.engine.atmospheric_sky_set_intensity, value)
+    }
+
+    /// The model's radiance along one direction, for a sun and a turbidity.
+    ///
+    /// A pure function, so the model can be evaluated -- and asserted -- without
+    /// a device or a frame.
+    pub fn radiance(direction: Vector3, sun_direction: Vector3, turbidity: f32) -> Result<Vector3> {
+        let native = Native::process()?;
+        let direction = native_vector3(direction);
+        let sun = native_vector3(sun_direction);
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: both directions are borrowed for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.atmospheric_sky_radiance)(&direction, &sun, turbidity, &mut value)
+        })?;
+        Ok(from_native_vector3(value))
+    }
+
+    /// The model's own GLSL, as the engine compiles it.
+    pub fn model_glsl() -> Result<String> {
+        let native = Native::process()?;
+        copy_text(&native, |api, destination, capacity, out_bytes| {
+            // SAFETY: the destination holds `capacity` writable bytes.
+            unsafe { (api.atmospheric_sky_copy_model_glsl)(destination, capacity, out_bytes) }
+        })
+    }
+
+    /// Releases the sky now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+
+    fn scalar(
+        &self,
+        route: unsafe extern "C" fn(sys::CNA_AtmosphericSkyHandle, *mut f32) -> sys::CNA_Result,
+    ) -> Result<f32> {
+        let handle = self.core.get()?;
+        let mut value = 0.0_f32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    fn set_scalar(
+        &self,
+        route: unsafe extern "C" fn(sys::CNA_AtmosphericSkyHandle, f32) -> sys::CNA_Result,
+        value: f32,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the value is by value.
+        self.native.check(unsafe { route(handle, value) })
+    }
+}
+
+impl Drop for AtmosphericSky {
     fn drop(&mut self) {
         let _ = self.core.release();
     }

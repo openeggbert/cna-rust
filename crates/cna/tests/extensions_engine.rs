@@ -14,13 +14,16 @@ use std::sync::{Arc, Mutex};
 use cna::extensions::engine::{
     supports_shadow_sampling, DirectionalLight, FxaaPass, GpuTimer, Particle,
     ParticleEmitterSettings, ParticleSystem, PostProcessChain, PostProcessContext, PostProcessPass,
-    ComputeShader, MemoryBarrier, RenderPipeline, ShadowMap, StorageBuffer, TonemapPass,
+    AtmosphericSky, ComputeShader, DecalPass, MemoryBarrier, RenderPipeline, ShadowMap, Skybox,
+    StorageBuffer, TonemapPass,
 };
 use cna::extensions::graphics::EffectFactoryExt;
 use cna::extensions::pbr::{
     engine_layer_version, RenderQuality, ShadowQuality, TonemappingMode, TransparencyMode,
 };
-use cna::Microsoft::Xna::Framework::Graphics::{DepthFormat, SurfaceFormat, Texture2D};
+use cna::Microsoft::Xna::Framework::Graphics::{
+    DepthFormat, SurfaceFormat, Texture2D, TextureCube,
+};
 use cna::Microsoft::Xna::Framework::{
     BoundingBox, Color, Game, GameContext, GameTime, Matrix, Vector3,
 };
@@ -2022,4 +2025,300 @@ fn a_compute_dispatch_produces_the_exact_values_it_was_asked_for() {
         ),
         None => panic!("the shader was never created"),
     }
+}
+
+/// What a decal and sky run measured.
+#[derive(Default)]
+struct SkyFindings {
+    engine_layer: i32,
+    inside_box: Vec<(f32, bool)>,
+    decal_opacity: f32,
+    decal_slope: f32,
+    decal_tint: Option<(f32, f32, f32)>,
+    skybox_supported: bool,
+    skybox_has_environment_before: Option<bool>,
+    skybox_has_environment_after: Option<bool>,
+    skybox_environment_size: Option<i32>,
+    skybox_yaw: f32,
+    skybox_intensity: f32,
+    view_ray_centre: Option<(f32, f32, f32)>,
+    view_ray_yawed: Option<(f32, f32, f32)>,
+    sky_supported: bool,
+    sky_turbidity: f32,
+    sky_profile: Vec<(usize, f32, f32, f32)>,
+    sky_turbidity_response: Option<(f32, f32)>,
+    sky_glsl_bytes: usize,
+}
+
+struct SkyGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<SkyFindings>>,
+}
+
+impl GameStateAccess for SkyGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for SkyGame {
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+
+        // The decal box is a unit box in its own space, so the boundary is a
+        // pure fact a test can walk rather than a value to read back.
+        let mut inside = Vec::new();
+        for offset in [0.0_f32, 0.25, 0.49, 0.51, 1.0] {
+            inside.push((
+                offset,
+                DecalPass::is_inside_decal_box(Vector3::from_x_and_y_and_z(offset, 0.0, 0.0))?,
+            ));
+        }
+        self.findings.lock().expect("findings").inside_box = inside;
+
+        let decal = DecalPass::new(&device)?;
+        decal.set_opacity(0.625)?;
+        decal.set_max_slope_angle(0.75)?;
+        decal.set_tint(Vector3::from_x_and_y_and_z(0.1, 0.2, 0.3))?;
+        {
+            let mut findings = self.findings.lock().expect("findings");
+            findings.decal_opacity = decal.opacity()?;
+            findings.decal_slope = decal.max_slope_angle()?;
+            let tint = decal.tint()?;
+            findings.decal_tint = Some((tint.X, tint.Y, tint.Z));
+        }
+
+        let mut skybox = Skybox::new(&device)?;
+        {
+            let mut findings = self.findings.lock().expect("findings");
+            findings.skybox_supported = skybox.is_supported()?;
+            findings.skybox_has_environment_before = Some(skybox.has_environment()?);
+        }
+        // The consuming attach: on success the skybox owns the cube map and the
+        // Rust value forgets its handle, so `has_environment` is asked of CNA
+        // rather than of what this test still holds.
+        let cube = TextureCube::new(&device, 4, false, SurfaceFormat::Color)?;
+        skybox
+            .set_owned_environment(cube)
+            .expect("a live cube map is taken over");
+        {
+            let mut findings = self.findings.lock().expect("findings");
+            findings.skybox_has_environment_after = Some(skybox.has_environment()?);
+            // The borrow reaches the cube map itself, not just its presence:
+            // reading its size through the view is what proves the handle names
+            // the environment that was handed over.
+            findings.skybox_environment_size = match skybox.environment()? {
+                Some(view) => Some(view.size()?),
+                None => None,
+            };
+        }
+        skybox.set_yaw(0.5)?;
+        skybox.set_intensity(2.25)?;
+        {
+            let mut findings = self.findings.lock().expect("findings");
+            findings.skybox_yaw = skybox.yaw()?;
+            findings.skybox_intensity = skybox.intensity()?;
+        }
+
+        // The view ray is a pure function, so the sky's rotation is checkable
+        // without drawing: yawing the sky must turn the ray the centre pixel
+        // looks along.
+        let view = Matrix::CreateLookAt(
+            Vector3::Zero,
+            Vector3::from_x_and_y_and_z(0.0, 0.0, -1.0),
+            Vector3::Up,
+        );
+        let projection = Matrix::CreatePerspectiveFieldOfView(1.0, 1.0, 0.1, 100.0);
+        let centre = Skybox::compute_view_ray(view, projection, 0.0, 0.0, 0.0)?;
+        let yawed = Skybox::compute_view_ray(view, projection, 0.0, 0.0, 1.0)?;
+        {
+            let mut findings = self.findings.lock().expect("findings");
+            findings.view_ray_centre = Some((centre.X, centre.Y, centre.Z));
+            findings.view_ray_yawed = Some((yawed.X, yawed.Y, yawed.Z));
+        }
+
+        let sky = AtmosphericSky::new(&device)?;
+        sky.set_turbidity(4.5)?;
+        // A sun low in the sky, so a sweep of view directions at one elevation
+        // varies only in its angle from the sun.
+        let sun = Vector3::NormalizeWithValue(Vector3::from_x_and_y_and_z(1.0, 0.25, 0.0));
+        sky.set_sun_direction(sun)?;
+        let mut profile = Vec::new();
+        for step in 0..5 {
+            let angle = std::f32::consts::PI * (step as f32) / 4.0;
+            let view = Vector3::NormalizeWithValue(Vector3::from_x_and_y_and_z(
+                angle.cos(),
+                0.25,
+                angle.sin(),
+            ));
+            let radiance = AtmosphericSky::radiance(view, sun, 4.5)?;
+            profile.push((step, radiance.X, radiance.Y, radiance.Z));
+        }
+        let hazy = AtmosphericSky::radiance(sun, sun, 9.0)?;
+        let clear = AtmosphericSky::radiance(sun, sun, 2.0)?;
+        {
+            let mut findings = self.findings.lock().expect("findings");
+            findings.sky_supported = sky.is_supported()?;
+            findings.sky_turbidity = sky.turbidity()?;
+            findings.sky_profile = profile;
+            findings.sky_turbidity_response = Some((hazy.X, clear.X));
+            findings.sky_glsl_bytes = AtmosphericSky::model_glsl()?.len();
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn decals_and_skies_answer_with_the_values_they_were_given() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(SkyFindings::default()));
+    let game = SkyGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with a decal pass and two skies");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+
+    // The decal box has a boundary, and a containment test that always said
+    // "yes" would pass every inside case. The outside cases are the assertion.
+    println!("decal box along x: {:?}", findings.inside_box);
+    assert!(
+        findings.inside_box.iter().any(|(_, inside)| *inside),
+        "some point is inside the decal box: {:?}",
+        findings.inside_box
+    );
+    assert!(
+        findings.inside_box.iter().any(|(_, inside)| !*inside),
+        "and some point is outside it: {:?}",
+        findings.inside_box
+    );
+    assert_eq!(
+        findings.inside_box.first().map(|(_, inside)| *inside),
+        Some(true),
+        "the box's own centre is inside it"
+    );
+    assert_eq!(
+        findings.inside_box.last().map(|(_, inside)| *inside),
+        Some(false),
+        "a point a whole unit off centre is outside it"
+    );
+
+    assert!((findings.decal_opacity - 0.625).abs() < 1e-6);
+    assert!((findings.decal_slope - 0.75).abs() < 1e-6);
+    assert_eq!(
+        findings.decal_tint,
+        Some((0.1, 0.2, 0.3)),
+        "the tint round-trips through CNA channel for channel"
+    );
+
+    assert_eq!(
+        findings.skybox_has_environment_before,
+        Some(false),
+        "a skybox created with no environment has none"
+    );
+    assert_eq!(
+        findings.skybox_has_environment_after,
+        Some(true),
+        "and has one after a cube map is handed over"
+    );
+    assert_eq!(
+        findings.skybox_environment_size,
+        Some(4),
+        "the borrowed environment is the four-texel cube map that was handed over"
+    );
+    assert!((findings.skybox_yaw - 0.5).abs() < 1e-6);
+    assert!((findings.skybox_intensity - 2.25).abs() < 1e-6);
+
+    // Yawing the sky must turn the ray. Two rays that agreed would mean the
+    // rotation never reached the computation.
+    let centre = findings.view_ray_centre.expect("a centre ray");
+    let yawed = findings.view_ray_yawed.expect("a yawed ray");
+    let length = (centre.0 * centre.0 + centre.1 * centre.1 + centre.2 * centre.2).sqrt();
+    assert!(
+        (length - 1.0).abs() < 1e-3,
+        "the view ray is a unit direction, not {length}"
+    );
+    let difference = (centre.0 - yawed.0).abs() + (centre.1 - yawed.1).abs() + (centre.2 - yawed.2).abs();
+    assert!(
+        difference > 0.1,
+        "a yaw of one radian turns the ray: {centre:?} vs {yawed:?}"
+    );
+
+    assert!((findings.sky_turbidity - 4.5).abs() < 1e-6);
+    // The model is swept across five view directions at one elevation, from
+    // the sun's azimuth round to the opposite side. Three properties are
+    // asserted, and a stub returning a constant fails all three: radiance is
+    // never negative, it changes monotonically with the angle from the sun, and
+    // the two ends of the sweep are far apart rather than nearly equal.
+    println!("atmospheric sky profile: {:?}", findings.sky_profile);
+    assert_eq!(findings.sky_profile.len(), 5, "the sweep ran");
+    assert!(
+        findings
+            .sky_profile
+            .iter()
+            .all(|(_, r, g, b)| *r >= 0.0 && *g >= 0.0 && *b >= 0.0),
+        "radiance is never negative: {:?}",
+        findings.sky_profile
+    );
+    let red: Vec<f32> = findings.sky_profile.iter().map(|(_, r, _, _)| *r).collect();
+    // The Perez formulation this model follows brightens the sky both toward
+    // the sun and away from it -- the circumsolar term at one end, the
+    // `cos squared` term at the other -- so the sweep is U-shaped with its
+    // minimum at right angles to the sun. Asserting that shape catches a model
+    // that ignored the sun direction (flat), one that only had the circumsolar
+    // term (monotonic), and one returning noise.
+    let minimum = red
+        .iter()
+        .copied()
+        .enumerate()
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .expect("a minimum");
+    assert!(
+        (1..=3).contains(&minimum.0),
+        "the sky is dimmest at right angles to the sun, not at an end: {red:?}"
+    );
+    assert!(
+        red[0] > minimum.1 * 1.2 && red[4] > minimum.1 * 1.2,
+        "and brighter than that both toward the sun and away from it: {red:?}"
+    );
+    // Which *end* is brighter says which way the sun direction points. It is
+    // the far end, so `sun_direction` is the direction the light travels --
+    // the same convention `DirectionalLightEXT` uses, and the opposite of the
+    // one "the direction the sun is in" suggests.
+    assert!(
+        red[4] > red[0],
+        "the brightest end is the one opposite the sun-direction vector: {red:?}"
+    );
+
+    // Turbidity is a real parameter of the model, not an ignored one.
+    let (hazy, clear) = findings
+        .sky_turbidity_response
+        .expect("two turbidities were evaluated");
+    assert!(
+        (hazy - clear).abs() > 1e-9,
+        "a hazier atmosphere gives a different radiance: {hazy} vs {clear}"
+    );
+
+    assert!(
+        findings.sky_glsl_bytes > 100,
+        "the sky model's GLSL is real source, {} bytes",
+        findings.sky_glsl_bytes
+    );
+
+    println!(
+        "sky: skybox supported={} | atmospheric supported={} | turbidity response {:?}",
+        findings.skybox_supported, findings.sky_supported, findings.sky_turbidity_response
+    );
 }

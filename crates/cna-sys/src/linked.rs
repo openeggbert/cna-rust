@@ -6997,4 +6997,152 @@ extern "C" {
         argument2: u64,
         argument3: u64,
     ) -> CNA_Result;
+    pub fn cna_atmospheric_sky_copy_model_glsl(
+        argument0: *mut c_char,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_atmospheric_sky_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_AtmosphericSkyHandle,
+    ) -> CNA_Result;
+    pub fn cna_atmospheric_sky_destroy(argument0: CNA_AtmosphericSkyHandle) -> CNA_Result;
+    pub fn cna_atmospheric_sky_draw(
+        argument0: CNA_AtmosphericSkyHandle,
+        argument1: *const CNA_Matrix,
+        argument2: *const CNA_Matrix,
+        argument3: i32,
+        argument4: i32,
+    ) -> CNA_Result;
+    pub fn cna_atmospheric_sky_get_intensity(
+        argument0: CNA_AtmosphericSkyHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_atmospheric_sky_get_sun_direction(
+        argument0: CNA_AtmosphericSkyHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_atmospheric_sky_get_turbidity(
+        argument0: CNA_AtmosphericSkyHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_atmospheric_sky_is_supported(
+        argument0: CNA_AtmosphericSkyHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_atmospheric_sky_radiance(
+        argument0: *const CNA_Vector3,
+        argument1: *const CNA_Vector3,
+        argument2: f32,
+        argument3: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_atmospheric_sky_set_intensity(
+        argument0: CNA_AtmosphericSkyHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_atmospheric_sky_set_sun_direction(
+        argument0: CNA_AtmosphericSkyHandle,
+        argument1: *const CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_atmospheric_sky_set_turbidity(
+        argument0: CNA_AtmosphericSkyHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_decal_pass_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_DecalPassHandle,
+    ) -> CNA_Result;
+    pub fn cna_decal_pass_destroy(argument0: CNA_DecalPassHandle) -> CNA_Result;
+    pub fn cna_decal_pass_draw(
+        argument0: CNA_DecalPassHandle,
+        argument1: CNA_Handle,
+        argument2: *const CNA_Matrix,
+        argument3: i32,
+        argument4: i32,
+    ) -> CNA_Result;
+    pub fn cna_decal_pass_get_max_slope_angle(
+        argument0: CNA_DecalPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_decal_pass_get_opacity(
+        argument0: CNA_DecalPassHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_decal_pass_get_tint(
+        argument0: CNA_DecalPassHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_decal_pass_is_inside_decal_box(
+        argument0: *const CNA_Vector3,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_decal_pass_set_camera(
+        argument0: CNA_DecalPassHandle,
+        argument1: *const CNA_Matrix,
+        argument2: *const CNA_Matrix,
+        argument3: f32,
+    ) -> CNA_Result;
+    pub fn cna_decal_pass_set_max_slope_angle(
+        argument0: CNA_DecalPassHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_decal_pass_set_opacity(argument0: CNA_DecalPassHandle, argument1: f32) -> CNA_Result;
+    pub fn cna_decal_pass_set_prepass_inputs(
+        argument0: CNA_DecalPassHandle,
+        argument1: CNA_Handle,
+        argument2: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_decal_pass_set_tint(
+        argument0: CNA_DecalPassHandle,
+        argument1: *const CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_skybox_compute_view_ray(
+        argument0: *const CNA_Matrix,
+        argument1: *const CNA_Matrix,
+        argument2: f32,
+        argument3: f32,
+        argument4: f32,
+        argument5: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_skybox_create(
+        argument0: CNA_Handle,
+        argument1: CNA_Handle,
+        argument2: *mut CNA_SkyboxHandle,
+    ) -> CNA_Result;
+    pub fn cna_skybox_destroy(argument0: CNA_SkyboxHandle) -> CNA_Result;
+    pub fn cna_skybox_draw(
+        argument0: CNA_SkyboxHandle,
+        argument1: *const CNA_Matrix,
+        argument2: *const CNA_Matrix,
+        argument3: i32,
+        argument4: i32,
+    ) -> CNA_Result;
+    pub fn cna_skybox_get_environment(
+        argument0: CNA_SkyboxHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_skybox_get_intensity(argument0: CNA_SkyboxHandle, argument1: *mut f32) -> CNA_Result;
+    pub fn cna_skybox_get_tint(
+        argument0: CNA_SkyboxHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_skybox_get_yaw(argument0: CNA_SkyboxHandle, argument1: *mut f32) -> CNA_Result;
+    pub fn cna_skybox_is_supported(
+        argument0: CNA_SkyboxHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_skybox_set_environment(
+        argument0: CNA_SkyboxHandle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_skybox_set_intensity(argument0: CNA_SkyboxHandle, argument1: f32) -> CNA_Result;
+    pub fn cna_skybox_set_owned_environment(
+        argument0: CNA_SkyboxHandle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_skybox_set_tint(
+        argument0: CNA_SkyboxHandle,
+        argument1: *const CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_skybox_set_yaw(argument0: CNA_SkyboxHandle, argument1: f32) -> CNA_Result;
 }
