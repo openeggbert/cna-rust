@@ -162,6 +162,35 @@ def clang_record_fields(cna_root: Path, type_name: str, source: Path) -> list[st
     return fields
 
 
+LINKED_DECLARATION = re.compile(r"^\s*pub fn (?P<name>cna_[a-z0-9_]+)\s*\(", re.M)
+
+
+def linked_coverage(expected: set[str]) -> tuple[int, list[dict]]:
+    """Proves the direct-link module declares every route the manifest names.
+
+    There are two acquisition mechanisms over one inventory, so a route added
+    to the tables and forgotten here would build in dynamic mode and fail to
+    compile only in direct mode -- on whichever machine happened to try that
+    configuration next. This makes it a finding instead.
+    """
+    path = ROOT / "crates/cna-sys/src/linked.rs"
+    if not path.is_file():
+        return 0, [{"code": "LINKED_MODULE_MISSING", "path": str(path)}]
+    declared = {
+        match.group("name")
+        for match in LINKED_DECLARATION.finditer(path.read_text(encoding="utf-8"))
+    }
+    findings = [
+        {"code": "LINKED_DECLARATION_MISSING", "symbol": name}
+        for name in sorted(expected - declared)
+    ]
+    findings.extend(
+        {"code": "LINKED_DECLARATION_UNEXPECTED", "symbol": name}
+        for name in sorted(declared - expected)
+    )
+    return len(declared), findings
+
+
 def layout_field_coverage(cna_root: Path, manifest: dict) -> tuple[int, list[dict]]:
     """Prove the layout manifest names every field its C structure declares.
 
@@ -540,6 +569,9 @@ def main() -> int:
     )
     findings.extend(layout_field_findings)
 
+    linked_declarations, linked_findings = linked_coverage(set(expected))
+    findings.extend(linked_findings)
+
     exports: set[str] | None = None
     actual_version: int | None = None
     if args.library:
@@ -574,6 +606,10 @@ def main() -> int:
         ),
         "missingDeclarations": sum(x["code"] == "MISSING_DECLARATION" for x in findings),
         "arityMismatches": sum(x["code"] == "HEADER_ARITY_MISMATCH" for x in findings),
+        "linkedDeclarations": linked_declarations,
+        "linkedDeclarationFindings": sum(
+            x["code"].startswith("LINKED_") for x in findings
+        ),
         "layoutFieldSetsChecked": layout_fields_checked,
         "layoutFieldSetMismatches": sum(
             x["code"] in {"LAYOUT_FIELD_SET_MISMATCH", "LAYOUT_TYPE_NOT_FOUND"} for x in findings

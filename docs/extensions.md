@@ -448,3 +448,62 @@ CNA validates more than the shape: encoding a font whose declared fallback
 glyph is not one of the font's own characters is refused, because such a font
 would substitute nothing and draw a hole. A test asserts that refusal rather
 than only the happy path.
+
+## Text input, IME composition and candidates (RUST-EXT-014, 2026-08-31)
+
+XNA had nothing like this. `Keyboard.GetState` reports which physical keys are
+down, which cannot spell a character an IME composed, cannot report a draft the
+user has not committed, and cannot see a candidate list at all. All three are
+CNA concepts, so they live in `cna::extensions::text_input` and the strict XNA
+`Keyboard` is untouched.
+
+Three properties of this boundary are load-bearing:
+
+- **Every string CNA passes is borrowed for the call.** Upstream says so for
+  the composition draft and for each candidate, and the views are not
+  NUL-terminated. Everything reaching a Rust handler is copied out before the
+  call returns; no `CNA_StringView` escapes into a `TextEditing` or a
+  `TextEditingCandidates`.
+- **Committed text arrives as UTF-16 code units, not characters.** A code point
+  above U+FFFF arrives as two calls. `Utf16Assembler` rejoins them and reports
+  an unpaired surrogate as exactly that rather than substituting U+FFFD, which
+  would be indistinguishable from a replacement character the user really
+  typed. Its `push` returns both what the unit completed *and* any high
+  surrogate the unit proved unpaired: an earlier draft returned one and
+  silently dropped the other. Seven unit tests cover ASCII, accented, CJK,
+  astral, orphaned-high, high-orphaned-by-high, lone-low and trailing-high.
+- **`selected` is an `Option`.** The container encodes "nothing selected" as
+  `-1`; keeping it signed would let a caller use it as an index.
+
+### One native registration per event kind
+
+CNA delivers each event once per *registration*, and this crate's trampoline
+delivers to every Rust handler. A registration per subscriber therefore
+delivers `registrations x handlers` times -- two subscribers each saw every
+character twice, which the round-trip test caught as `aaéé中中🎮` where
+`aé中🎮` was expected. The registration is now shared per kind, created with
+the first handler and released with the last.
+
+A panicking handler is contained at the boundary and does not stop delivery to
+the others; the test subscribes one deliberate panicker alongside the real
+handler and asserts both that the text arrived intact and that the panicker ran
+once per code unit -- five times, not four, because the emoji is a pair.
+
+### Measured platform behaviour
+
+`cna_text_input_start_ext` succeeds on a HEADLESS host but `is_active` stays
+false: there is no platform text-input service to activate, and CNA reports
+that rather than claiming an activation nothing backs. Measured with
+`build-probe/ext014_text.c`. Delivery is unaffected -- CNA's own raise routes
+carry every event through the real path, so the projection is exercised end to
+end without a keyboard or an IME.
+
+### A route bound in one acquisition mode only
+
+Adding these routes broke the direct-link build, because
+`crates/cna-sys/src/linked.rs` had not been regenerated. The compiler caught it,
+but only in the configuration that happened to be built next. The ABI verifier
+now checks that the linked module declares exactly the manifest's symbols and
+reports `LINKED_DECLARATION_MISSING`, so a route bound in one acquisition mode
+and forgotten in the other is a finding rather than a build failure somewhere
+else.

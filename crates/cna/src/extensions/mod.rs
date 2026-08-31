@@ -15,4 +15,5 @@ pub mod logging;
 pub mod media;
 pub mod net;
 pub mod runtime;
+pub mod text_input;
 pub mod window;

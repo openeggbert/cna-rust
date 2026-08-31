@@ -194,6 +194,17 @@ pub const CNA_CNB_METADATA_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_TEXTURE_INFO_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_MODEL_INFO_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_SPRITE_FONT_INFO_STRUCT_VERSION: u32 = 1;
+pub const CNA_TEXT_INPUT_TYPE_TEXT: CNA_TextInputType = 0;
+pub const CNA_TEXT_INPUT_TYPE_TEXT_NAME: CNA_TextInputType = 1;
+pub const CNA_TEXT_INPUT_TYPE_TEXT_EMAIL: CNA_TextInputType = 2;
+pub const CNA_TEXT_INPUT_TYPE_TEXT_USERNAME: CNA_TextInputType = 3;
+pub const CNA_TEXT_INPUT_TYPE_TEXT_PASSWORD_HIDDEN: CNA_TextInputType = 4;
+pub const CNA_TEXT_INPUT_TYPE_TEXT_PASSWORD_VISIBLE: CNA_TextInputType = 5;
+pub const CNA_TEXT_INPUT_TYPE_NUMBER: CNA_TextInputType = 6;
+pub const CNA_TEXT_INPUT_TYPE_NUMBER_PASSWORD_HIDDEN: CNA_TextInputType = 7;
+pub const CNA_TEXT_INPUT_TYPE_NUMBER_PASSWORD_VISIBLE: CNA_TextInputType = 8;
+pub const CNA_TEXT_INPUT_TYPE_MAXIMUM: CNA_TextInputType =
+    CNA_TEXT_INPUT_TYPE_NUMBER_PASSWORD_VISIBLE;
 pub const CNA_CNB_SOUND_EFFECT_INFO_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_AUDIO_FORMAT_UNKNOWN: CNA_CnbAudioFormat = 0;
 pub const CNA_CNB_AUDIO_FORMAT_PCM16: CNA_CnbAudioFormat = 1;
@@ -594,6 +605,45 @@ pub type CNA_CnbTextureDataHandle = CNA_Handle;
 pub type CNA_CnbModelDataHandle = CNA_Handle;
 pub type CNA_CnbLoaderHandle = CNA_Handle;
 pub type CNA_CnbWriterHandle = CNA_Handle;
+pub type CNA_TextInputRegistrationHandle = CNA_Handle;
+pub type CNA_TextInputType = u32;
+
+/// Receives one committed UTF-16 code unit.
+///
+/// A code point above U+FFFF arrives as two calls -- a high surrogate then a
+/// low surrogate -- exactly as the canonical event delivers it.
+pub type CNA_TextInputCallback = Option<unsafe extern "C" fn(u16, *mut c_void)>;
+
+/// Receives one IME composition update. The info is valid only for the call.
+pub type CNA_TextEditingCallback =
+    Option<unsafe extern "C" fn(*const CNA_TextEditingEventInfo, *mut c_void)>;
+
+/// Receives the current IME candidate list. Valid only for the call.
+pub type CNA_TextEditingCandidatesCallback =
+    Option<unsafe extern "C" fn(*const CNA_TextEditingCandidatesEventInfo, *mut c_void)>;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_TextEditingEventInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub text: CNA_StringView,
+    pub start: i32,
+    pub length: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_TextEditingCandidatesEventInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub candidates: *const CNA_StringView,
+    pub candidate_count: i32,
+    pub selected: i32,
+    pub horizontal: CNA_Bool,
+    pub reserved: [u8; 3],
+}
+
 pub type CNA_CnbSpriteFontDataHandle = CNA_Handle;
 pub type CNA_CnbSoundEffectDataHandle = CNA_Handle;
 pub type CNA_CnbAudioFormat = u32;
@@ -4394,6 +4444,50 @@ pub type cna_cnb_texture_data_get_level_count_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_cnb_texture_data_copy_level_fn = unsafe extern "C" fn(
     CNA_CnbTextureDataHandle, u64, u64, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_text_input_subscribe_text_input_ext_fn = unsafe extern "C" fn(
+    CNA_TextInputCallback, *mut c_void, *mut CNA_TextInputRegistrationHandle,
+) -> CNA_Result;
+pub type cna_text_input_subscribe_text_editing_ext_fn = unsafe extern "C" fn(
+    CNA_TextEditingCallback, *mut c_void, *mut CNA_TextInputRegistrationHandle,
+) -> CNA_Result;
+pub type cna_text_input_subscribe_text_editing_candidates_ext_fn = unsafe extern "C" fn(
+    CNA_TextEditingCandidatesCallback, *mut c_void, *mut CNA_TextInputRegistrationHandle,
+) -> CNA_Result;
+pub type cna_text_input_unsubscribe_ext_fn = unsafe extern "C" fn(
+    CNA_TextInputRegistrationHandle,
+) -> CNA_Result;
+pub type cna_text_input_raise_text_input_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, u16,
+) -> CNA_Result;
+pub type cna_text_input_raise_text_editing_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, i32, i32,
+) -> CNA_Result;
+pub type cna_text_input_raise_text_editing_candidates_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *const CNA_StringView, i32, i32, CNA_Bool,
+) -> CNA_Result;
+pub type cna_text_input_get_window_handle_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut u64,
+) -> CNA_Result;
+pub type cna_text_input_set_window_handle_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, u64,
+) -> CNA_Result;
+pub type cna_text_input_is_active_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_text_input_is_screen_keyboard_shown_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_text_input_is_screen_keyboard_shown_for_window_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_text_input_start_ext_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_text_input_stop_ext_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_text_input_start_with_type_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_TextInputType,
+) -> CNA_Result;
+pub type cna_text_input_set_input_rectangle_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Rectangle,
 ) -> CNA_Result;
 pub type cna_cnb_sprite_font_data_create_fn = unsafe extern "C" fn(
     *mut CNA_CnbSpriteFontDataHandle,

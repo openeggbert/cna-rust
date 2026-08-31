@@ -3213,6 +3213,67 @@ extern "C" {
         argument4: u64,
         argument5: *mut u64,
     ) -> CNA_Result;
+    pub fn cna_text_input_subscribe_text_input_ext(
+        argument0: CNA_TextInputCallback,
+        argument1: *mut c_void,
+        argument2: *mut CNA_TextInputRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_text_input_subscribe_text_editing_ext(
+        argument0: CNA_TextEditingCallback,
+        argument1: *mut c_void,
+        argument2: *mut CNA_TextInputRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_text_input_subscribe_text_editing_candidates_ext(
+        argument0: CNA_TextEditingCandidatesCallback,
+        argument1: *mut c_void,
+        argument2: *mut CNA_TextInputRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_text_input_unsubscribe_ext(argument0: CNA_TextInputRegistrationHandle) -> CNA_Result;
+    pub fn cna_text_input_raise_text_input_ext(argument0: CNA_Handle, argument1: u16) -> CNA_Result;
+    pub fn cna_text_input_raise_text_editing_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: i32,
+        argument3: i32,
+    ) -> CNA_Result;
+    pub fn cna_text_input_raise_text_editing_candidates_ext(
+        argument0: CNA_Handle,
+        argument1: *const CNA_StringView,
+        argument2: i32,
+        argument3: i32,
+        argument4: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_text_input_get_window_handle_ext(
+        argument0: CNA_Handle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_text_input_set_window_handle_ext(
+        argument0: CNA_Handle,
+        argument1: u64,
+    ) -> CNA_Result;
+    pub fn cna_text_input_is_active_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_text_input_is_screen_keyboard_shown_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_text_input_is_screen_keyboard_shown_for_window_ext(
+        argument0: CNA_Handle,
+        argument1: u64,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_text_input_start_ext(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_text_input_stop_ext(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_text_input_start_with_type_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_TextInputType,
+    ) -> CNA_Result;
+    pub fn cna_text_input_set_input_rectangle_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_Rectangle,
+    ) -> CNA_Result;
     pub fn cna_cnb_sprite_font_data_create(
         argument0: *mut CNA_CnbSpriteFontDataHandle,
     ) -> CNA_Result;

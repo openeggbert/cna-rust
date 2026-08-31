@@ -814,6 +814,22 @@
     "cna_cnb_texture_data_get_representation_format": 3,
     "cna_cnb_texture_data_get_level_count": 3,
     "cna_cnb_texture_data_copy_level": 6,
+    "cna_text_input_subscribe_text_input_ext": 3,
+    "cna_text_input_subscribe_text_editing_ext": 3,
+    "cna_text_input_subscribe_text_editing_candidates_ext": 3,
+    "cna_text_input_unsubscribe_ext": 1,
+    "cna_text_input_raise_text_input_ext": 2,
+    "cna_text_input_raise_text_editing_ext": 4,
+    "cna_text_input_raise_text_editing_candidates_ext": 5,
+    "cna_text_input_get_window_handle_ext": 2,
+    "cna_text_input_set_window_handle_ext": 2,
+    "cna_text_input_is_active_ext": 2,
+    "cna_text_input_is_screen_keyboard_shown_ext": 2,
+    "cna_text_input_is_screen_keyboard_shown_for_window_ext": 3,
+    "cna_text_input_start_ext": 1,
+    "cna_text_input_stop_ext": 1,
+    "cna_text_input_start_with_type_ext": 2,
+    "cna_text_input_set_input_rectangle_ext": 2,
     "cna_cnb_sprite_font_data_create": 1,
     "cna_cnb_sprite_font_data_destroy": 1,
     "cna_cnb_sprite_font_data_set_info": 2,
@@ -1445,6 +1461,8 @@
     "CNA_CnbReadLimits": ["struct_size", "struct_version", "max_file_size", "max_chunk_size", "max_total_uncompressed_size", "max_chunk_count", "max_string_bytes", "max_array_element_count", "max_chunk_alignment"],
     "CNA_CnbMetadata": ["struct_size", "struct_version", "present", "reserved", "flags"],
     "CNA_CnbTextureInfo": ["struct_size", "struct_version", "width", "height", "depth", "face_count", "mip_count", "representation_count"],
+    "CNA_TextEditingEventInfo": ["struct_size", "struct_version", "text", "start", "length"],
+    "CNA_TextEditingCandidatesEventInfo": ["struct_size", "struct_version", "candidates", "candidate_count", "selected", "horizontal", "reserved"],
     "CNA_CnbSpriteFontInfo": ["struct_size", "struct_version", "glyph_count", "line_spacing", "spacing", "default_character", "has_default_character", "reserved"],
     "CNA_CnbSoundEffectInfo": ["struct_size", "struct_version", "format", "sample_rate", "channels", "frame_count", "loop_start", "loop_length"],
     "CNA_CnbModelInfo": ["struct_size", "struct_version", "bone_count", "part_count", "mesh_count", "animation_count", "light_count", "has_skeleton", "applies_gltf_lighting_policy", "has_bone_hierarchy", "reserved"],
@@ -1683,6 +1701,11 @@
     "CNA_CNB_ASSET_TYPE_CUSTOM_RANGE_FIRST",
     "CNA_CNB_READ_LIMITS_STRUCT_VERSION", "CNA_CNB_METADATA_STRUCT_VERSION",
     "CNA_CNB_TEXTURE_INFO_STRUCT_VERSION",
+    "CNA_TEXT_INPUT_TYPE_TEXT", "CNA_TEXT_INPUT_TYPE_TEXT_NAME",
+    "CNA_TEXT_INPUT_TYPE_TEXT_EMAIL", "CNA_TEXT_INPUT_TYPE_TEXT_USERNAME",
+    "CNA_TEXT_INPUT_TYPE_TEXT_PASSWORD_HIDDEN", "CNA_TEXT_INPUT_TYPE_TEXT_PASSWORD_VISIBLE",
+    "CNA_TEXT_INPUT_TYPE_NUMBER", "CNA_TEXT_INPUT_TYPE_NUMBER_PASSWORD_HIDDEN",
+    "CNA_TEXT_INPUT_TYPE_NUMBER_PASSWORD_VISIBLE", "CNA_TEXT_INPUT_TYPE_MAXIMUM",
     "CNA_CNB_SPRITE_FONT_INFO_STRUCT_VERSION", "CNA_CNB_SOUND_EFFECT_INFO_STRUCT_VERSION",
     "CNA_CNB_AUDIO_FORMAT_UNKNOWN", "CNA_CNB_AUDIO_FORMAT_PCM16", "CNA_CNB_AUDIO_FORMAT_PCM8",
     "CNA_CNB_AUDIO_FORMAT_PCM_FLOAT32", "CNA_CNB_AUDIO_FORMAT_ADPCM",
@@ -1702,6 +1725,24 @@
     "CNA_POWER_STATE_NO_BATTERY", "CNA_POWER_STATE_CHARGING", "CNA_POWER_STATE_CHARGED"
   ],
   "callbackSignatures": {
+    "CNA_TextInputCallback": {
+      "cReturn": "void",
+      "cParameters": ["uint16_t", "void*"],
+      "rustReturn": "()",
+      "rustParameters": ["u16", "*mut core::ffi::c_void"]
+    },
+    "CNA_TextEditingCallback": {
+      "cReturn": "void",
+      "cParameters": ["const CNA_TextEditingEventInfo*", "void*"],
+      "rustReturn": "()",
+      "rustParameters": ["*const CNA_TextEditingEventInfo", "*mut core::ffi::c_void"]
+    },
+    "CNA_TextEditingCandidatesCallback": {
+      "cReturn": "void",
+      "cParameters": ["const CNA_TextEditingCandidatesEventInfo*", "void*"],
+      "rustReturn": "()",
+      "rustParameters": ["*const CNA_TextEditingCandidatesEventInfo", "*mut core::ffi::c_void"]
+    },
     "CNA_SignedInGamerEventCallback": {
       "cReturn": "void",
       "cParameters": ["void*", "const CNA_SignedInGamerEventInfo*"],

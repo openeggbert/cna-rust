@@ -70,7 +70,9 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-EXT-013c | `.cnb` SpriteFont and SoundEffect, encode and decode | `cnb.h` | DONE |
 | RUST-EXT-007 | Device layer: power, locale, clipboard, display info | `devices.h` | DONE |
 | RUST-EXT-008 | Raw joystick enumeration, capabilities and capture | `input_joystick.h` | DONE |
-| RUST-EXT-014 | Haptics, text input, cursor and device hot-plug | `input_*.h` | READY |
+| RUST-EXT-014a | Text input, IME composition and candidate lists | `input_text.h` | DONE |
+| RUST-EXT-014b | Haptics, cursor and device hot-plug | `input_haptics.h`, `input_cursor.h`, `input_devices.h` | READY |
+| RUST-ABI-013 | Gate that both acquisition modes declare the same routes | `tools/native-abi/verify.py` | DONE |
 | RUST-EXT-009 | Sensors: accelerometer, compass, gyroscope | `sensors.h` | READY |
 | RUST-EXT-010 | CNAEXT engine layer, 857 routes | `engine_layer.h` | READY |
 
