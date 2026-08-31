@@ -29,7 +29,9 @@ use cna::extensions::engine::{
     ClusteredLightBuffer, ClusteredLightCompute, ClusteredLightSet, ClusteredLightType,
     ClusteredForwardEffect, ClusteredShadingMaterial, ClusteredShadowPolicy, CubeLut,
     DebugDraw, DepthEncoding, EnvironmentProcessor, ImageBasedLight, LightProbe,
-    EffectLighting, LightProbeBaker, LightProbeVolume, ShaderEffectFactory,
+    EffectLighting, GpuCullableInstance, GpuInstanceCuller, IndirectDraw,
+    IndirectDrawArguments, IndirectDrawIndexedArguments, InstanceStream, LightProbeBaker,
+    LightProbeVolume, ShaderEffectFactory,
     DepthNormalPrepass, DisplayColorSpace, FrustumCuller, HdrDisplayOutput, LodGroup,
     LodSelectionMode, ShadowCascadeState, SpotLight, SpotShadowMap, SsaoPass,
     SsrPass, StorageBuffer, TonemapPass, TransparentDrawList, VolumetricFogPass,
@@ -41,7 +43,8 @@ use cna::extensions::pbr::{
     TransparencyMode,
 };
 use cna::Microsoft::Xna::Framework::Graphics::{
-    CubeMapFace, DepthFormat, SurfaceFormat, Texture2D, TextureCube,
+    CubeMapFace, DepthFormat, PrimitiveType, SurfaceFormat, Texture2D, TextureCube,
+    VertexElement,
 };
 use cna::Microsoft::Xna::Framework::{
     BoundingBox, BoundingFrustum, BoundingSphere, Color, Game, GameContext, GameTime, Matrix,
@@ -8396,5 +8399,372 @@ fn an_effects_lighting_slots_are_bindings_with_a_lifetime() {
         findings.cleared_on_drop,
         Some((false, false)),
         "dropping the binding cleared both the shadow map and the image-based light"
+    );
+}
+
+/// What the instancing and indirect-draw run measured.
+#[derive(Default)]
+struct InstancingFindings {
+    engine_layer: i32,
+    transform_elements: Vec<(i32, String, String, i32)>,
+    transform_stride: i32,
+    tint_elements: Vec<(i32, String, String, i32)>,
+    tint_stride: i32,
+    indirect_defaults: Option<([u32; 4], [u32; 5])>,
+    cullable_defaults: Option<((f32, f32, f32), (f32, f32, f32))>,
+    culler_supported: bool,
+    culler_reason: String,
+    culler_counts: Vec<(&'static str, i32, i32)>,
+    draw_before_cull: Option<String>,
+    draw_after_reupload: Option<String>,
+    draw_with_no_instances: Option<String>,
+    lookup_glsl: usize,
+    indirect_draw: Vec<(&'static str, Option<String>)>,
+}
+
+struct InstancingGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<InstancingFindings>>,
+}
+
+impl GameStateAccess for InstancingGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+fn describe(elements: Vec<VertexElement>) -> Vec<(i32, String, String, i32)> {
+    elements
+        .into_iter()
+        .map(|element| {
+            (
+                element.Offset(),
+                format!("{:?}", element.VertexElementFormat()),
+                format!("{:?}", element.VertexElementUsage()),
+                element.UsageIndex(),
+            )
+        })
+        .collect()
+}
+
+impl Game for InstancingGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+        let mut findings = InstancingFindings {
+            engine_layer: version,
+            ..InstancingFindings::default()
+        };
+        let (view, projection) = culling_camera();
+
+        findings.transform_elements = describe(InstanceStream::transform_elements()?);
+        findings.transform_stride = InstanceStream::transform_stride()?;
+        findings.tint_elements = describe(InstanceStream::tint_elements()?);
+        findings.tint_stride = InstanceStream::tint_stride()?;
+
+        findings.indirect_defaults = Some((
+            IndirectDrawArguments::canonical_defaults()?.to_words(),
+            IndirectDrawIndexedArguments::canonical_defaults()?.to_words(),
+        ));
+        let cullable = GpuCullableInstance::canonical_defaults()?;
+        findings.cullable_defaults = Some((
+            triple(cullable.bounds.Min),
+            triple(cullable.bounds.Max),
+        ));
+
+        let culler = GpuInstanceCuller::new(&device)?;
+        findings.culler_supported = culler.is_supported()?;
+        findings.culler_reason = culler.unsupported_reason()?;
+        findings.lookup_glsl = GpuInstanceCuller::instance_lookup_glsl()?.len();
+        findings.culler_counts.push((
+            "fresh",
+            culler.instance_count()?,
+            culler.visible_count()?,
+        ));
+        findings.draw_before_cull = culler
+            .draw(PrimitiveType::TriangleList)
+            .err()
+            .map(|error| error.to_string());
+
+        // Four instances: three inside the frustum at increasing depth, one far
+        // behind the camera.
+        let unit = BoundingBox::new(
+            Vector3::from_x_and_y_and_z(-0.5, -0.5, -0.5),
+            Vector3::from_x_and_y_and_z(0.5, 0.5, 0.5),
+        );
+        let mut instances = Vec::new();
+        for z in [-5.0_f32, -15.0, -30.0, 500.0] {
+            let mut instance = cullable;
+            instance.world = Matrix::CreateTranslation(Vector3::from_x_and_y_and_z(0.0, 0.0, z));
+            instance.bounds = BoundingBox::new(
+                Vector3::from_x_and_y_and_z(unit.Min.X, unit.Min.Y, z + unit.Min.Z),
+                Vector3::from_x_and_y_and_z(unit.Max.X, unit.Max.Y, z + unit.Max.Z),
+            );
+            instances.push(instance);
+        }
+        culler.set_instances(&instances)?;
+        findings.culler_counts.push((
+            "uploaded",
+            culler.instance_count()?,
+            culler.visible_count()?,
+        ));
+        if findings.culler_supported {
+            culler.cull(view, projection, 36, 0, 0)?;
+            findings.culler_counts.push((
+                "culled",
+                culler.instance_count()?,
+                culler.visible_count()?,
+            ));
+        }
+        // Re-uploading discards the cull, so the state check fires again before
+        // the zero-instance shortcut can: the "returns before touching the
+        // device" case is reachable only *after* a cull, not instead of one.
+        culler.set_instances(&[])?;
+        findings.draw_after_reupload = culler
+            .draw(PrimitiveType::TriangleList)
+            .err()
+            .map(|error| error.to_string());
+        if findings.culler_supported {
+            culler.cull(view, projection, 36, 0, 0)?;
+            findings.draw_with_no_instances = culler
+                .draw(PrimitiveType::TriangleList)
+                .err()
+                .map(|error| error.to_string());
+            findings.culler_counts.push((
+                "culled with nothing uploaded",
+                culler.instance_count()?,
+                culler.visible_count()?,
+            ));
+        }
+
+        // Indirect draws over a storage buffer of arguments.
+        let mut arguments = IndirectDrawArguments::canonical_defaults()?;
+        arguments.vertex_count = 3;
+        let words = arguments.to_words();
+        match StorageBuffer::with_elements::<u32>(&device, words.len() as u64) {
+            Ok(buffer) => {
+                buffer.set_elements(&words)?;
+                findings.indirect_draw.push((
+                    "non-indexed with zero instances",
+                    IndirectDraw::draw_primitives(
+                        &device,
+                        PrimitiveType::TriangleList,
+                        &buffer,
+                        0,
+                    )
+                    .err()
+                    .map(|error| error.to_string()),
+                ));
+                findings.indirect_draw.push((
+                    "a negative byte offset",
+                    IndirectDraw::draw_primitives(
+                        &device,
+                        PrimitiveType::TriangleList,
+                        &buffer,
+                        -4,
+                    )
+                    .err()
+                    .map(|error| error.to_string()),
+                ));
+            }
+            Err(error) => findings
+                .indirect_draw
+                .push(("a storage buffer", Some(error.to_string()))),
+        }
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn the_instance_stream_describes_itself_and_the_culler_keeps_what_faces_the_camera() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(InstancingFindings::default()));
+    let game = InstancingGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with a GPU instance culler");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+
+    // A world transform streams as four float-four rows, so the declaration is
+    // four elements at sixteen-byte spacing and the stride is sixty-four.
+    println!("transform elements: {:?}", findings.transform_elements);
+    println!("transform stride: {}", findings.transform_stride);
+    assert_eq!(
+        findings.transform_elements.len(),
+        4,
+        "a four-by-four transform streams as four vertex elements"
+    );
+    for (index, (offset, format, _, usage_index)) in
+        findings.transform_elements.iter().enumerate()
+    {
+        assert_eq!(
+            *offset,
+            index as i32 * 16,
+            "element {index} starts one row after the last"
+        );
+        assert_eq!(format, "Vector4", "and each row is a float four");
+        // The rows start at usage index *one*, not zero: index zero is the
+        // mesh's own texture coordinate, and an instance stream that reused it
+        // would collide with the geometry it is instancing.
+        assert_eq!(
+            *usage_index,
+            index as i32 + 1,
+            "and carries its own usage index, so the shader can tell the rows apart"
+        );
+    }
+    assert_eq!(
+        findings.transform_stride, 64,
+        "sixteen floats is sixty-four bytes"
+    );
+
+    println!("tint elements: {:?}", findings.tint_elements);
+    assert_eq!(findings.tint_elements.len(), 1, "a tint is one element");
+    assert_eq!(
+        findings.tint_stride, 4,
+        "a packed colour is four bytes: {}",
+        findings.tint_stride
+    );
+    // A vertex element is addressed by usage *and* index together, so the two
+    // streams are compatible exactly when no (usage, index) pair repeats. The
+    // tint reuses index one, which is safe only because its usage is `Color`
+    // where the transform rows are `TextureCoordinate`.
+    let mut pairs: Vec<(&str, i32)> = findings
+        .transform_elements
+        .iter()
+        .chain(findings.tint_elements.iter())
+        .map(|(_, _, usage, index)| (usage.as_str(), *index))
+        .collect();
+    let count = pairs.len();
+    pairs.sort_unstable();
+    pairs.dedup();
+    assert_eq!(
+        pairs.len(),
+        count,
+        "the two streams share no usage-and-index pair: {:?} and {:?}",
+        findings.transform_elements,
+        findings.tint_elements
+    );
+
+    let (plain, indexed) = findings.indirect_defaults.expect("indirect defaults");
+    println!("indirect defaults: {plain:?} {indexed:?}");
+    assert_eq!(
+        plain,
+        [0, 0, 0, 0],
+        "a default non-indexed argument block draws nothing"
+    );
+    assert_eq!(
+        indexed,
+        [0, 0, 0, 0, 0],
+        "and neither does a default indexed one"
+    );
+
+    let (min, max) = findings.cullable_defaults.expect("cullable defaults");
+    println!("cullable defaults: {min:?} .. {max:?}");
+    assert!(
+        min.0 <= max.0 && min.1 <= max.1 && min.2 <= max.2,
+        "a default instance's bounds are not inverted"
+    );
+
+    println!(
+        "culler supported: {} reason {:?}",
+        findings.culler_supported, findings.culler_reason
+    );
+    assert_eq!(
+        findings.culler_reason.is_empty(),
+        findings.culler_supported,
+        "the reason is empty exactly when the culler works"
+    );
+    assert!(
+        findings.lookup_glsl > 0,
+        "the shader-side instance lookup is published"
+    );
+
+    println!("culler counts: {:?}", findings.culler_counts);
+    assert_eq!(
+        findings.culler_counts[0],
+        ("fresh", 0, 0),
+        "a fresh culler holds nothing and, before a cull, honestly answers zero visible"
+    );
+    assert_eq!(
+        findings.culler_counts[1].1, 4,
+        "four instances uploaded is four instances held"
+    );
+    assert_eq!(
+        findings.culler_counts[1].2, 0,
+        "and uploading is not culling, so nothing is visible yet"
+    );
+    assert!(
+        findings.draw_before_cull.is_some(),
+        "drawing before culling is refused rather than drawing whatever was there"
+    );
+
+    if findings.culler_supported {
+        let (_, held, visible) = findings.culler_counts[2];
+        println!("after culling: {held} held, {visible} visible");
+        assert_eq!(held, 4, "culling does not change how many are held");
+        assert_eq!(
+            visible, 3,
+            "and the three in front of the camera survive while the one behind it does not"
+        );
+    }
+
+    // Re-uploading discards the cull, and the state check fires before the
+    // zero-instance shortcut: "no instances" does not exempt a caller from
+    // culling first.
+    assert!(
+        findings.draw_after_reupload.is_some(),
+        "re-uploading instances discards the cull and drawing is refused again"
+    );
+    if findings.culler_supported {
+        assert!(
+            findings.draw_with_no_instances.is_none(),
+            "but after culling nothing, drawing returns before touching the device: {:?}",
+            findings.draw_with_no_instances
+        );
+        assert_eq!(
+            findings.culler_counts[3],
+            ("culled with nothing uploaded", 0, 0),
+            "and holds and shows nothing"
+        );
+    }
+
+    // An indirect draw supplies the *arguments*, not the geometry, so one
+    // issued with nothing bound fails on the vertex stream rather than drawing
+    // nothing quietly -- and says so by name.
+    println!("indirect draw: {:?}", findings.indirect_draw);
+    let outcome = |name: &str| -> Option<String> {
+        findings
+            .indirect_draw
+            .iter()
+            .find(|(label, _)| *label == name)
+            .and_then(|(_, message)| message.clone())
+    };
+    let unbound = outcome("non-indexed with zero instances")
+        .expect("an indirect draw with nothing bound is refused");
+    assert!(
+        unbound.contains("vertex buffer"),
+        "and names the vertex buffer it wanted: {unbound}"
+    );
+    let negative =
+        outcome("a negative byte offset").expect("a negative argument offset is refused");
+    assert!(
+        negative.contains("offset"),
+        "and a negative offset is refused for being one: {negative}"
     );
 }

@@ -8699,6 +8699,82 @@ extern "C" {
         argument0: CNA_StringView,
         argument1: *mut CNA_CubeLutHandle,
     ) -> CNA_Result;
+    pub fn cna_gpu_cullable_instance_init(argument0: *mut CNA_GpuCullableInstance) -> CNA_Result;
+    pub fn cna_gpu_instance_culler_copy_instance_lookup_glsl(
+        argument0: *mut c_char,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_gpu_instance_culler_copy_unsupported_reason(
+        argument0: CNA_GpuInstanceCullerHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_gpu_instance_culler_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_GpuInstanceCullerHandle,
+    ) -> CNA_Result;
+    pub fn cna_gpu_instance_culler_cull(
+        argument0: CNA_GpuInstanceCullerHandle,
+        argument1: *const CNA_Matrix,
+        argument2: *const CNA_Matrix,
+        argument3: i32,
+        argument4: i32,
+        argument5: i32,
+    ) -> CNA_Result;
+    pub fn cna_gpu_instance_culler_destroy(argument0: CNA_GpuInstanceCullerHandle) -> CNA_Result;
+    pub fn cna_gpu_instance_culler_draw(
+        argument0: CNA_GpuInstanceCullerHandle,
+        argument1: CNA_PrimitiveType,
+    ) -> CNA_Result;
+    pub fn cna_gpu_instance_culler_get_instance_count(
+        argument0: CNA_GpuInstanceCullerHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_gpu_instance_culler_is_supported(
+        argument0: CNA_GpuInstanceCullerHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_gpu_instance_culler_read_visible_count_ext(
+        argument0: CNA_GpuInstanceCullerHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_gpu_instance_culler_set_instances(
+        argument0: CNA_GpuInstanceCullerHandle,
+        argument1: *const CNA_GpuCullableInstance,
+        argument2: u64,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_draw_indexed_primitives_indirect_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PrimitiveType,
+        argument2: CNA_StorageBufferHandle,
+        argument3: i32,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_draw_primitives_indirect_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PrimitiveType,
+        argument2: CNA_StorageBufferHandle,
+        argument3: i32,
+    ) -> CNA_Result;
+    pub fn cna_indirect_draw_arguments_init(
+        argument0: *mut CNA_IndirectDrawArguments,
+    ) -> CNA_Result;
+    pub fn cna_indirect_draw_indexed_arguments_init(
+        argument0: *mut CNA_IndirectDrawIndexedArguments,
+    ) -> CNA_Result;
+    pub fn cna_instanced_renderer_ext_copy_instance_elements(
+        argument0: *mut CNA_VertexElement,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_instanced_renderer_ext_copy_tint_elements(
+        argument0: *mut CNA_VertexElement,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_instanced_renderer_ext_get_instance_stride(argument0: *mut i32) -> CNA_Result;
+    pub fn cna_instanced_renderer_ext_get_tint_stride(argument0: *mut i32) -> CNA_Result;
     pub fn cna_hdr_display_output_create(
         argument0: CNA_Handle,
         argument1: *mut CNA_HdrDisplayOutputHandle,

@@ -53,8 +53,8 @@ use crate::graphics::{
 use crate::native::Native;
 use super::pbr::PbrMaterialExtensions;
 use crate::graphics::{
-    CubeMapFace, DepthFormat, RenderTarget2D, SamplerState, Texture3D, TextureCube,
-    VertexPositionColor,
+    CubeMapFace, DepthFormat, PrimitiveType, RenderTarget2D, SamplerState, Texture3D,
+    TextureCube, VertexElement, VertexElementFormat, VertexElementUsage, VertexPositionColor,
 };
 use crate::value::{
     BoundingBox, BoundingFrustum, BoundingSphere, Color, Matrix, Vector2, Vector3, Vector4,
@@ -13023,5 +13023,496 @@ impl Drop for BorrowedImageBasedLight<'_> {
                 let _ = unsafe { (self.native.render_target_destroy)(handle) };
             }
         }
+    }
+}
+
+/// The XNA identity of a native vertex element format.
+///
+/// The `xna_enum!` types carry no `from_native`, because everything else in the
+/// crate builds them rather than reading them back; the instance declaration is
+/// the first thing CNA describes rather than accepts.
+fn vertex_element_format(value: sys::CNA_VertexElementFormat) -> Result<VertexElementFormat> {
+    Ok(match value {
+        0 => VertexElementFormat::Single,
+        1 => VertexElementFormat::Vector2,
+        2 => VertexElementFormat::Vector3,
+        3 => VertexElementFormat::Vector4,
+        4 => VertexElementFormat::Color,
+        5 => VertexElementFormat::Byte4,
+        6 => VertexElementFormat::Short2,
+        7 => VertexElementFormat::Short4,
+        8 => VertexElementFormat::NormalizedShort2,
+        9 => VertexElementFormat::NormalizedShort4,
+        10 => VertexElementFormat::HalfVector2,
+        11 => VertexElementFormat::HalfVector4,
+        _ => {
+            return Err(CnaError::InvalidInput(
+                "native vertex element format is unknown",
+            ))
+        }
+    })
+}
+
+/// The XNA identity of a native vertex element usage.
+fn vertex_element_usage(value: sys::CNA_VertexElementUsage) -> Result<VertexElementUsage> {
+    Ok(match value {
+        0 => VertexElementUsage::Position,
+        1 => VertexElementUsage::Color,
+        2 => VertexElementUsage::TextureCoordinate,
+        3 => VertexElementUsage::Normal,
+        4 => VertexElementUsage::Binormal,
+        5 => VertexElementUsage::Tangent,
+        6 => VertexElementUsage::BlendIndices,
+        7 => VertexElementUsage::BlendWeight,
+        8 => VertexElementUsage::Depth,
+        9 => VertexElementUsage::Fog,
+        10 => VertexElementUsage::PointSize,
+        11 => VertexElementUsage::Sample,
+        12 => VertexElementUsage::TessellateFactor,
+        _ => {
+            return Err(CnaError::InvalidInput(
+                "native vertex element usage is unknown",
+            ))
+        }
+    })
+}
+
+/// The per-instance vertex data an instanced draw streams.
+///
+/// The declaration and stride are properties of the *format*, not of any one
+/// renderer, so they are asked of the library without one -- which is what lets
+/// a caller build the matching vertex buffer before it has a mesh to instance.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub struct InstanceStream;
+
+impl InstanceStream {
+    /// The vertex elements one instance transform occupies.
+    pub fn transform_elements() -> Result<Vec<VertexElement>> {
+        let native = Native::process()?;
+        Self::elements(&native, native.engine.instanced_renderer_ext_copy_instance_elements)
+    }
+
+    /// How many bytes one instance transform occupies.
+    pub fn transform_stride() -> Result<i32> {
+        let native = Native::process()?;
+        let mut value = 0_i32;
+        // SAFETY: the output is a live local.
+        native
+            .check(unsafe { (native.engine.instanced_renderer_ext_get_instance_stride)(&mut value) })?;
+        Ok(value)
+    }
+
+    /// The vertex elements one instance tint occupies.
+    pub fn tint_elements() -> Result<Vec<VertexElement>> {
+        let native = Native::process()?;
+        Self::elements(&native, native.engine.instanced_renderer_ext_copy_tint_elements)
+    }
+
+    /// How many bytes one instance tint occupies.
+    pub fn tint_stride() -> Result<i32> {
+        let native = Native::process()?;
+        let mut value = 0_i32;
+        // SAFETY: the output is a live local.
+        native
+            .check(unsafe { (native.engine.instanced_renderer_ext_get_tint_stride)(&mut value) })?;
+        Ok(value)
+    }
+
+    fn elements(
+        native: &Arc<Native>,
+        route: unsafe extern "C" fn(*mut sys::CNA_VertexElement, u64, *mut u64) -> sys::CNA_Result,
+    ) -> Result<Vec<VertexElement>> {
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the count.
+        let probe = unsafe { route(core::ptr::null_mut(), 0, &mut required) };
+        if probe != sys::CNA_RESULT_SUCCESS && probe != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+            native.check(probe)?;
+        }
+        let capacity = usize::try_from(required)
+            .map_err(|_| CnaError::InvalidInput("the element count does not fit in memory"))?;
+        if capacity == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![sys::CNA_VertexElement::default(); capacity];
+        let mut count = 0_u64;
+        // SAFETY: the destination holds `capacity` writable elements, which is
+        // the count passed alongside it.
+        native.check(unsafe { route(buffer.as_mut_ptr(), required, &mut count) })?;
+        let count = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("CNA reported more elements than fit in memory"))?;
+        buffer
+            .into_iter()
+            .take(count.min(capacity))
+            .map(|element| {
+                Ok(VertexElement::new(
+                    element.offset,
+                    vertex_element_format(element.format)?,
+                    vertex_element_usage(element.usage)?,
+                    element.usage_index,
+                ))
+            })
+            .collect()
+    }
+}
+
+/// The arguments a non-indexed indirect draw reads out of a buffer.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct IndirectDrawArguments {
+    /// How many vertices to fetch.
+    pub vertex_count: u32,
+    /// How many instances to draw; one for an ordinary draw, zero to draw
+    /// nothing.
+    pub instance_count: u32,
+    /// The first vertex, in elements of the bound stream.
+    pub first_vertex: u32,
+    /// The first instance.
+    ///
+    /// **Must be zero on GL ES.** ES 3.1 has no base-instance parameter and the
+    /// word is required to be zero; a non-zero value there is undefined rather
+    /// than diagnosed, and cannot be checked anywhere -- by the time the draw
+    /// runs the value lives in GPU memory.
+    pub base_instance: u32,
+}
+
+impl IndirectDrawArguments {
+    /// CNA's own defaults, asked of the library rather than restated here.
+    pub fn canonical_defaults() -> Result<Self> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_IndirectDrawArguments::default();
+        // SAFETY: the structure is a caller-owned output.
+        native.check(unsafe { (native.engine.indirect_draw_arguments_init)(&mut value) })?;
+        Ok(Self {
+            vertex_count: value.vertex_count,
+            instance_count: value.instance_count,
+            first_vertex: value.first_vertex,
+            base_instance: value.base_instance,
+        })
+    }
+
+    /// The four words as a GPU buffer holds them.
+    #[must_use]
+    pub const fn to_words(self) -> [u32; 4] {
+        [
+            self.vertex_count,
+            self.instance_count,
+            self.first_vertex,
+            self.base_instance,
+        ]
+    }
+}
+
+/// The arguments an indexed indirect draw reads out of a buffer.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct IndirectDrawIndexedArguments {
+    /// How many indices to fetch.
+    pub index_count: u32,
+    /// How many instances to draw.
+    pub instance_count: u32,
+    /// The first index, in index elements.
+    pub first_index: u32,
+    /// Added to every decoded index, in vertex elements; signed, as the API is.
+    pub base_vertex: i32,
+    /// The first instance; must be zero on GL ES, for the reason
+    /// [`IndirectDrawArguments::base_instance`] gives.
+    pub base_instance: u32,
+}
+
+impl IndirectDrawIndexedArguments {
+    /// CNA's own defaults, asked of the library rather than restated here.
+    pub fn canonical_defaults() -> Result<Self> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_IndirectDrawIndexedArguments::default();
+        // SAFETY: the structure is a caller-owned output.
+        native.check(unsafe { (native.engine.indirect_draw_indexed_arguments_init)(&mut value) })?;
+        Ok(Self {
+            index_count: value.index_count,
+            instance_count: value.instance_count,
+            first_index: value.first_index,
+            base_vertex: value.base_vertex,
+            base_instance: value.base_instance,
+        })
+    }
+
+    /// The five words as a GPU buffer holds them, the base vertex reinterpreted
+    /// as the signed value the API reads it back as.
+    #[must_use]
+    pub const fn to_words(self) -> [u32; 5] {
+        [
+            self.index_count,
+            self.instance_count,
+            self.first_index,
+            self.base_vertex as u32,
+            self.base_instance,
+        ]
+    }
+}
+
+/// One instance a GPU culler tests: where it is, and how big.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct GpuCullableInstance {
+    /// The instance's world transform.
+    pub world: Matrix,
+    /// Its bounds, in the same space the culling frustum is built in.
+    pub bounds: BoundingBox,
+}
+
+impl GpuCullableInstance {
+    /// CNA's own defaults, asked of the library rather than restated here.
+    pub fn canonical_defaults() -> Result<Self> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_GpuCullableInstance::default();
+        // SAFETY: the structure is a caller-owned versioned output.
+        native.check(unsafe { (native.engine.gpu_cullable_instance_init)(&mut value) })?;
+        Ok(Self {
+            world: from_native_matrix(value.world),
+            bounds: from_native_bounds(value.bounds),
+        })
+    }
+
+    fn to_native(self) -> sys::CNA_GpuCullableInstance {
+        sys::CNA_GpuCullableInstance {
+            struct_size: core::mem::size_of::<sys::CNA_GpuCullableInstance>() as u32,
+            struct_version: 1,
+            world: native_matrix(self.world),
+            bounds: native_bounds(self.bounds),
+        }
+    }
+}
+
+/// Culls a list of instances on the GPU and draws what survives, indirectly.
+///
+/// `OWNED`. The culler owns the instance data and the draw command, **not the
+/// geometry**: [`draw`](Self::draw) issues an indirect indexed draw against
+/// whatever vertex and index buffers are currently bound.
+pub struct GpuInstanceCuller {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+}
+
+impl GpuInstanceCuller {
+    /// Creates a culler on a device.
+    pub fn new(device: &GraphicsDevice) -> Result<Self> {
+        let native = device.state_native();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.gpu_instance_culler_create)(device.handle()?, &mut handle)
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.gpu_instance_culler_destroy,
+            released: "the GPU instance culler has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+        })
+    }
+
+    /// Whether this renderer can cull on the GPU at all.
+    pub fn is_supported(&self) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.gpu_instance_culler_is_supported)(handle, &mut value)
+        })?;
+        Ok(value != 0)
+    }
+
+    /// Why it cannot; empty when it can.
+    pub fn unsupported_reason(&self) -> Result<String> {
+        let handle = self.core.get()?;
+        copy_text(&self.native, |api, destination, capacity, out_bytes| {
+            // SAFETY: the handle is owned and this is CNA's size-then-copy
+            // protocol, driven by `copy_text`.
+            unsafe {
+                (api.gpu_instance_culler_copy_unsupported_reason)(
+                    handle,
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+    }
+
+    /// The GLSL a shader reads the surviving instances with.
+    pub fn instance_lookup_glsl() -> Result<String> {
+        let native = Native::process()?;
+        copy_text(&native, |api, destination, capacity, out_bytes| {
+            // SAFETY: CNA's size-then-copy protocol, driven by `copy_text`.
+            unsafe {
+                (api.gpu_instance_culler_copy_instance_lookup_glsl)(
+                    destination,
+                    capacity,
+                    out_bytes,
+                )
+            }
+        })
+    }
+
+    /// Uploads the instances to cull.
+    pub fn set_instances(&self, instances: &[GpuCullableInstance]) -> Result<()> {
+        let handle = self.core.get()?;
+        let native_instances: Vec<sys::CNA_GpuCullableInstance> = instances
+            .iter()
+            .copied()
+            .map(GpuCullableInstance::to_native)
+            .collect();
+        // SAFETY: the handle is owned and the array is borrowed for the call
+        // with its own length.
+        self.native.check(unsafe {
+            (self.native.engine.gpu_instance_culler_set_instances)(
+                handle,
+                native_instances.as_ptr(),
+                native_instances.len() as u64,
+            )
+        })
+    }
+
+    /// How many instances have been uploaded.
+    pub fn instance_count(&self) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.gpu_instance_culler_get_instance_count)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Culls the uploaded instances and builds the indirect draw command.
+    ///
+    /// The command is written from the CPU with an instance count of **zero**
+    /// and the shader adds to it, which is why
+    /// [`visible_count`](Self::visible_count) only means anything after this
+    /// has run.
+    pub fn cull(
+        &self,
+        view: Matrix,
+        projection: Matrix,
+        index_count: i32,
+        first_index: i32,
+        base_vertex: i32,
+    ) -> Result<()> {
+        let handle = self.core.get()?;
+        let view = native_matrix(view);
+        let projection = native_matrix(projection);
+        // SAFETY: the handle is owned and both matrices are borrowed for the
+        // call.
+        self.native.check(unsafe {
+            (self.native.engine.gpu_instance_culler_cull)(
+                handle,
+                &view,
+                &projection,
+                index_count,
+                first_index,
+                base_vertex,
+            )
+        })
+    }
+
+    /// Draws the instances the last cull kept.
+    ///
+    /// Refused before anything has been culled. **The caller must have bound
+    /// the mesh**: this issues an indirect indexed draw against whatever
+    /// buffers are currently bound, because the culler owns the instance data
+    /// and the draw command rather than the geometry. With zero instances
+    /// uploaded it returns before touching the device at all, and so succeeds
+    /// whatever is bound.
+    pub fn draw(&self, primitive_type: PrimitiveType) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the identity is canonical.
+        self.native.check(unsafe {
+            (self.native.engine.gpu_instance_culler_draw)(handle, primitive_type as u32)
+        })
+    }
+
+    /// How many instances the last cull kept.
+    ///
+    /// **Zero rather than a refusal** before a cull has run: a count is a
+    /// number, and zero is the honest one.
+    pub fn visible_count(&self) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.gpu_instance_culler_read_visible_count_ext)(handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Releases the culler now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for GpuInstanceCuller {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// Draws whose counts and offsets the GPU reads out of a buffer.
+///
+/// The point of an indirect draw is that a compute shader may have written
+/// those arguments after the CPU submitted the call, which is why the count is
+/// not a parameter. Binding the vertex stream is still the caller's job: these
+/// supply the *arguments*, not the geometry.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub struct IndirectDraw;
+
+impl IndirectDraw {
+    /// Draws primitives whose arguments the buffer holds.
+    pub fn draw_primitives(
+        device: &GraphicsDevice,
+        primitive_type: PrimitiveType,
+        arguments: &StorageBuffer,
+        byte_offset: i32,
+    ) -> Result<()> {
+        let native = device.state_native();
+        let buffer = arguments.core.get()?;
+        // SAFETY: both handles are live for the call and the identity is
+        // canonical.
+        native.check(unsafe {
+            (native.engine.graphics_device_draw_primitives_indirect_ext)(
+                device.handle()?,
+                primitive_type as u32,
+                buffer,
+                byte_offset,
+            )
+        })
+    }
+
+    /// Draws indexed primitives whose arguments the buffer holds.
+    pub fn draw_indexed_primitives(
+        device: &GraphicsDevice,
+        primitive_type: PrimitiveType,
+        arguments: &StorageBuffer,
+        byte_offset: i32,
+    ) -> Result<()> {
+        let native = device.state_native();
+        let buffer = arguments.core.get()?;
+        // SAFETY: both handles are live for the call and the identity is
+        // canonical.
+        native.check(unsafe {
+            (native.engine.graphics_device_draw_indexed_primitives_indirect_ext)(
+                device.handle()?,
+                primitive_type as u32,
+                buffer,
+                byte_offset,
+            )
+        })
     }
 }

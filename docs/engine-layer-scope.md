@@ -147,6 +147,7 @@ the criterion above is unchanged, only its precondition has been met.
 | the shader-effect factory, the glTF material bridge, the pipeline's skybox and the routes that were waiting on other families | `shader_effect_factory`, `gltf_material_*`, `render_pipeline_*_skybox`, the last `clustered_forward_effect` and `debug_draw` routes | 21 | `VERIFIED_GPU` |
 | area lights, their BRDF table and the shading maths | `area_light_ext`, `area_light_brdf_table`, `area_light_shading`, `clustered_forward_effect_set_area_light` | 17 | `VERIFIED_GPU` |
 | an effect's shadow, punctual-light and image-based-light slots | `effect_*_ext` | 16 | `VERIFIED_STATE` |
+| the instance stream, the GPU instance culler and the indirect draws | `instanced_renderer_ext` (the 4 static routes), `gpu_instance_culler`, `gpu_cullable_instance`, `indirect_draw_*`, `graphics_device_draw_*_indirect_ext` | 19 | `VERIFIED_GPU` |
 
 ### What the GPU artifact changed about the evidence
 
@@ -427,4 +428,40 @@ three found something:
 - **Setting a punctual light's shadow of one kind clears the other.** The two
   slots are one structure, so binding a cube leaves the map empty and vice
   versa; there is no partial update.
+- **The GPU instance culler runs on this host and keeps the right instances.**
+  Four instances uploaded, three of them in front of the camera and one five
+  hundred units behind it: the compute cull kept exactly three. That is GPU
+  compute writing a draw-argument buffer and the CPU reading the count back, not
+  a state round-trip.
+- **`set_instances` discards the cull, and the state check fires before the
+  zero-instance shortcut.** The header says a draw with zero instances "returns
+  before touching the device at all, and therefore succeeds whatever is or is
+  not bound" -- but only *after* a cull. Re-uploading an empty list and drawing
+  is still refused with "Nothing has been culled yet"; culling the empty list
+  first is what makes the draw succeed. "No instances" does not exempt a caller
+  from culling.
+- **The instance stream's transform rows start at usage index one.** Index zero
+  is the mesh's own texture coordinate, and a stream that reused it would
+  collide with the geometry it is instancing. The tint reuses index *one*, which
+  is safe only because its usage is `Color` where the rows are
+  `TextureCoordinate`: a vertex element is addressed by usage and index
+  together, so the test asserts that no (usage, index) pair repeats across the
+  two streams rather than that no index does.
+- **An indirect draw with nothing bound fails on the vertex stream by name.**
+  These routes supply the *arguments*, not the geometry; the failure says
+  "no vertex buffer is bound" rather than drawing nothing quietly, and the test
+  asserts the message rather than merely that it errored.
+
+## What the engine layer still does not reach from Rust
+
+`cna_instanced_renderer_ext_create` takes a `CNA_ModelMeshPartHandle`, and this
+crate's `ModelMeshPart` is a **managed Rust projection with no native handle**:
+the routes that build one, `cna_model_mesh_part_create` and its family, are
+classified `STRICT_XNA_BACKING` because the Rust projection implements them
+itself. Fourteen `instanced_renderer_ext` routes and `cna_lod_group_ext_select`
+are therefore `BLOCKED_BY_PROJECTION`, not by upstream and not by this host:
+they are reachable the moment a native mesh-part handle exists in
+`cna::extensions`, and not before. The four routes of that family that describe
+the *format* rather than a renderer -- the instance and tint declarations and
+their strides -- need no mesh part and are bound.
 

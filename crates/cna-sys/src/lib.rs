@@ -814,6 +814,35 @@ pub type CNA_LightProbeVolumeHandle = CNA_Handle;
 pub type CNA_LightProbeBakerHandle = CNA_Handle;
 pub type CNA_ShaderEffectFactoryHandle = CNA_Handle;
 pub type CNA_AreaLightBrdfTableHandle = CNA_Handle;
+pub type CNA_GpuInstanceCullerHandle = CNA_Handle;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_IndirectDrawArguments {
+    pub vertex_count: u32,
+    pub instance_count: u32,
+    pub first_vertex: u32,
+    pub base_instance: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CNA_IndirectDrawIndexedArguments {
+    pub index_count: u32,
+    pub instance_count: u32,
+    pub first_index: u32,
+    pub base_vertex: i32,
+    pub base_instance: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_GpuCullableInstance {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub world: CNA_Matrix,
+    pub bounds: CNA_BoundingBox,
+}
 pub type CNA_AreaLightShapeEXT = u32;
 
 pub const CNA_AREA_LIGHT_SHAPE_RECTANGLE_EXT: CNA_AreaLightShapeEXT = 0;
@@ -10446,4 +10475,61 @@ pub type cna_effect_set_shadow_map_ext_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_effect_set_shadows_enabled_ext_fn = unsafe extern "C" fn(
     CNA_EffectHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_instanced_renderer_ext_copy_instance_elements_fn = unsafe extern "C" fn(
+    *mut CNA_VertexElement, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_instanced_renderer_ext_get_instance_stride_fn = unsafe extern "C" fn(
+    *mut i32,
+) -> CNA_Result;
+pub type cna_instanced_renderer_ext_copy_tint_elements_fn = unsafe extern "C" fn(
+    *mut CNA_VertexElement, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_instanced_renderer_ext_get_tint_stride_fn = unsafe extern "C" fn(
+    *mut i32,
+) -> CNA_Result;
+pub type cna_indirect_draw_arguments_init_fn = unsafe extern "C" fn(
+    *mut CNA_IndirectDrawArguments,
+) -> CNA_Result;
+pub type cna_indirect_draw_indexed_arguments_init_fn = unsafe extern "C" fn(
+    *mut CNA_IndirectDrawIndexedArguments,
+) -> CNA_Result;
+pub type cna_gpu_cullable_instance_init_fn = unsafe extern "C" fn(
+    *mut CNA_GpuCullableInstance,
+) -> CNA_Result;
+pub type cna_gpu_instance_culler_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_GpuInstanceCullerHandle,
+) -> CNA_Result;
+pub type cna_gpu_instance_culler_destroy_fn = unsafe extern "C" fn(
+    CNA_GpuInstanceCullerHandle,
+) -> CNA_Result;
+pub type cna_gpu_instance_culler_is_supported_fn = unsafe extern "C" fn(
+    CNA_GpuInstanceCullerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_gpu_instance_culler_copy_unsupported_reason_fn = unsafe extern "C" fn(
+    CNA_GpuInstanceCullerHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_gpu_instance_culler_set_instances_fn = unsafe extern "C" fn(
+    CNA_GpuInstanceCullerHandle, *const CNA_GpuCullableInstance, u64,
+) -> CNA_Result;
+pub type cna_gpu_instance_culler_get_instance_count_fn = unsafe extern "C" fn(
+    CNA_GpuInstanceCullerHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_gpu_instance_culler_cull_fn = unsafe extern "C" fn(
+    CNA_GpuInstanceCullerHandle, *const CNA_Matrix, *const CNA_Matrix, i32, i32, i32,
+) -> CNA_Result;
+pub type cna_gpu_instance_culler_draw_fn = unsafe extern "C" fn(
+    CNA_GpuInstanceCullerHandle, CNA_PrimitiveType,
+) -> CNA_Result;
+pub type cna_gpu_instance_culler_read_visible_count_ext_fn = unsafe extern "C" fn(
+    CNA_GpuInstanceCullerHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_gpu_instance_culler_copy_instance_lookup_glsl_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_device_draw_primitives_indirect_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PrimitiveType, CNA_StorageBufferHandle, i32,
+) -> CNA_Result;
+pub type cna_graphics_device_draw_indexed_primitives_indirect_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PrimitiveType, CNA_StorageBufferHandle, i32,
 ) -> CNA_Result;
