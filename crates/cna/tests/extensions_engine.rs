@@ -30,7 +30,8 @@ use cna::extensions::engine::{
     ClusteredForwardEffect, ClusteredShadingMaterial, ClusteredShadowPolicy, CubeLut,
     DebugDraw, DepthEncoding, EnvironmentProcessor, ImageBasedLight, LightProbe,
     EffectLighting, GpuCullableInstance, GpuInstanceCuller, IndirectDraw,
-    IndirectDrawArguments, IndirectDrawIndexedArguments, InstanceStream, LightProbeBaker,
+    IndirectDrawArguments, IndirectDrawIndexedArguments, InstanceStream, InstancedRenderer,
+    LightProbeBaker, NativeMeshPart,
     LightProbeVolume, ShaderEffectFactory,
     DepthNormalPrepass, DisplayColorSpace, FrustumCuller, HdrDisplayOutput, LodGroup,
     LodSelectionMode, ShadowCascadeState, SpotLight, SpotShadowMap, SsaoPass,
@@ -43,8 +44,9 @@ use cna::extensions::pbr::{
     TransparencyMode,
 };
 use cna::Microsoft::Xna::Framework::Graphics::{
-    CubeMapFace, DepthFormat, PrimitiveType, SurfaceFormat, Texture2D, TextureCube,
-    VertexElement,
+    BufferUsage, CubeMapFace, DepthFormat, IndexBuffer, IndexElementSize, PrimitiveType,
+    SurfaceFormat, Texture2D, TextureCube, VertexBuffer, VertexElement,
+    VertexPositionColor,
 };
 use cna::Microsoft::Xna::Framework::{
     BoundingBox, BoundingFrustum, BoundingSphere, Color, Game, GameContext, GameTime, Matrix,
@@ -8766,5 +8768,302 @@ fn the_instance_stream_describes_itself_and_the_culler_keeps_what_faces_the_came
     assert!(
         negative.contains("offset"),
         "and a negative offset is refused for being one: {negative}"
+    );
+}
+
+/// What the native-mesh-part and instanced-renderer run measured.
+#[derive(Default)]
+struct InstancedFindings {
+    engine_layer: i32,
+    part: Option<(i32, i32, i32, i32)>,
+    part_primitive_type: Vec<(&'static str, String)>,
+    empty_part_refused: bool,
+    counts: Vec<(&'static str, i32, i32)>,
+    tints: Vec<(&'static str, bool)>,
+    instancing_supported: bool,
+    fallback: Vec<(&'static str, bool)>,
+    draw_results: Vec<(&'static str, Option<String>, i32, bool)>,
+    lod_parts: Vec<(f32, i32, bool)>,
+}
+
+struct InstancedGame {
+    state: Arc<GameState>,
+    findings: Arc<Mutex<InstancedFindings>>,
+}
+
+impl GameStateAccess for InstancedGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for InstancedGame {
+    #[allow(clippy::too_many_lines)]
+    fn LoadContent(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        let version = engine_layer_version()?;
+        self.findings.lock().expect("findings").engine_layer = version;
+        if version == 0 {
+            return Ok(());
+        }
+        let device = game.GraphicsDevice()?;
+        let mut findings = InstancedFindings {
+            engine_layer: version,
+            ..InstancedFindings::default()
+        };
+
+        // One triangle, as a native mesh part.
+        let declaration = VertexPositionColor::VertexDeclaration();
+        let vertices = VertexBuffer::new(&device, declaration, 3, BufferUsage::None)?;
+        vertices.SetData(&[
+            VertexPositionColor::new(Vector3::Zero, Color::Red),
+            VertexPositionColor::new(Vector3::UnitX, Color::Lime),
+            VertexPositionColor::new(Vector3::UnitY, Color::Blue),
+        ])?;
+        let indices =
+            IndexBuffer::new(&device, IndexElementSize::SixteenBits, 3, BufferUsage::None)?;
+        indices.SetData(&[0_u16, 1, 2])?;
+
+        let part = Arc::new(NativeMeshPart::new(
+            Some(vertices),
+            Some(indices),
+            3,
+            1,
+            0,
+            0,
+        )?);
+        findings.part = Some((
+            part.num_vertices()?,
+            part.primitive_count()?,
+            part.start_index()?,
+            part.vertex_offset()?,
+        ));
+        findings
+            .part_primitive_type
+            .push(("as created", format!("{:?}", part.primitive_type()?)));
+        part.set_primitive_type(PrimitiveType::LineStrip)?;
+        findings
+            .part_primitive_type
+            .push(("after setting", format!("{:?}", part.primitive_type()?)));
+        part.set_primitive_type(PrimitiveType::TriangleList)?;
+
+        // A part with no buffers and no primitives is what the renderer refuses.
+        let empty = NativeMeshPart::new(None, None, 0, 0, 0, 0)?;
+        findings.empty_part_refused = InstancedRenderer::new(&device, &Arc::new(empty)).is_err();
+
+        let renderer = InstancedRenderer::new(&device, &part)?;
+        findings.counts.push((
+            "fresh",
+            renderer.instance_count()?,
+            renderer.instance_capacity()?,
+        ));
+        let transforms: Vec<Matrix> = (0..5)
+            .map(|step| {
+                Matrix::CreateTranslation(Vector3::from_x_and_y_and_z(step as f32, 0.0, 0.0))
+            })
+            .collect();
+        renderer.set_instances(&transforms)?;
+        findings.counts.push((
+            "five uploaded",
+            renderer.instance_count()?,
+            renderer.instance_capacity()?,
+        ));
+        renderer.set_instances(&transforms[..2])?;
+        findings.counts.push((
+            "then two",
+            renderer.instance_count()?,
+            renderer.instance_capacity()?,
+        ));
+        renderer.set_instances(&[])?;
+        findings.counts.push((
+            "then none",
+            renderer.instance_count()?,
+            renderer.instance_capacity()?,
+        ));
+        renderer.set_instances(&transforms)?;
+
+        findings
+            .tints
+            .push(("as created", renderer.tints_enabled()?));
+        // Tints upload while disabled and are simply not bound.
+        renderer.set_instance_tints(&[Color::Red, Color::Lime, Color::Blue, Color::White, Color::Black])?;
+        findings
+            .tints
+            .push(("after uploading while disabled", renderer.tints_enabled()?));
+        renderer.set_tints_enabled(true)?;
+        findings
+            .tints
+            .push(("after enabling", renderer.tints_enabled()?));
+
+        findings.instancing_supported = renderer.is_instancing_supported()?;
+        findings
+            .fallback
+            .push(("as created", renderer.fallback_enabled()?));
+        renderer.set_fallback_enabled(false)?;
+        findings
+            .fallback
+            .push(("after forbidding", renderer.fallback_enabled()?));
+        renderer.set_fallback_enabled(true)?;
+        findings
+            .fallback
+            .push(("after allowing", renderer.fallback_enabled()?));
+
+        // Drawing needs an effect. The shadow map's caster effect is the one
+        // reachable without content.
+        let shadow = ShadowMap::new(&device, ShadowQuality::Low)?;
+        if let Some(caster) = shadow.caster_effect()? {
+            let outcome = renderer
+                .draw(caster.effect())
+                .err()
+                .map(|error| error.to_string());
+            findings.draw_results.push((
+                "with the fallback allowed",
+                outcome,
+                renderer.last_draw_call_count()?,
+                renderer.did_last_draw_instance()?,
+            ));
+            renderer.set_fallback_enabled(false)?;
+            let outcome = renderer
+                .draw(caster.effect())
+                .err()
+                .map(|error| error.to_string());
+            findings.draw_results.push((
+                "with it forbidden",
+                outcome,
+                renderer.last_draw_call_count()?,
+                renderer.did_last_draw_instance()?,
+            ));
+        }
+
+        // A LOD group whose levels are real parts.
+        let lod = LodGroup::new()?;
+        lod.add_part_level(10.0, &part)?;
+        lod.add_level(25.0)?;
+        for distance in [5.0_f32, 20.0, 1_000.0] {
+            lod.reset_hysteresis()?;
+            findings.lod_parts.push((
+                distance,
+                lod.select_index(distance)?,
+                lod.select_has_part(distance)?,
+            ));
+        }
+
+        *self.findings.lock().expect("findings") = findings;
+        Ok(())
+    }
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn a_native_mesh_part_makes_the_instanced_renderer_reachable() {
+    let _one_game = ONE_GAME_AT_A_TIME
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let findings = Arc::new(Mutex::new(InstancedFindings::default()));
+    let game = InstancedGame {
+        state: Arc::new(GameState::default()),
+        findings: Arc::clone(&findings),
+    };
+    run_for_frames(game, 1).expect("one frame with a native mesh part and an instanced renderer");
+
+    let findings = findings.lock().expect("findings");
+    if findings.engine_layer == 0 {
+        println!("engine layer absent from this artifact; nothing to qualify");
+        return;
+    }
+
+    assert_eq!(
+        findings.part,
+        Some((3, 1, 0, 0)),
+        "the four counts are preserved verbatim, as the header says"
+    );
+    println!("primitive type: {:?}", findings.part_primitive_type);
+    assert_eq!(
+        findings.part_primitive_type[0].1, "TriangleList",
+        "a part starts as a triangle list"
+    );
+    assert_eq!(
+        findings.part_primitive_type[1].1, "LineStrip",
+        "and the primitive type round-trips"
+    );
+    assert!(
+        findings.empty_part_refused,
+        "a part with no buffers and no primitives cannot back a renderer"
+    );
+
+    // The capacity never shrinks, which is what makes a varying instance count
+    // allocation-free after the largest frame.
+    println!("counts: {:?}", findings.counts);
+    assert_eq!(findings.counts[0], ("fresh", 0, 0), "a fresh renderer holds nothing");
+    assert_eq!(findings.counts[1].1, 5, "five uploaded is five held");
+    let peak = findings.counts[1].2;
+    assert!(peak >= 5, "and the capacity grew to hold them: {peak}");
+    assert_eq!(findings.counts[2].1, 2, "then two held");
+    assert_eq!(
+        findings.counts[2].2, peak,
+        "and the capacity did not shrink"
+    );
+    assert_eq!(findings.counts[3].1, 0, "then none held");
+    assert_eq!(
+        findings.counts[3].2, peak,
+        "and still did not shrink -- uploading nothing is how a caller stops drawing"
+    );
+
+    println!("tints: {:?}", findings.tints);
+    assert_eq!(
+        findings.tints,
+        vec![
+            ("as created", false),
+            ("after uploading while disabled", false),
+            ("after enabling", true),
+        ],
+        "uploading tints does not enable them: the two are independent"
+    );
+
+    println!("instancing supported: {}", findings.instancing_supported);
+    // The fallback is *forbidden* by default: a renderer without hardware
+    // instancing refuses the draw rather than quietly issuing one call per
+    // instance, so paying that cost is something a caller opts into.
+    assert_eq!(
+        findings.fallback,
+        vec![
+            ("as created", false),
+            ("after forbidding", false),
+            ("after allowing", true),
+        ],
+        "the per-instance fallback is opt-in, and the switch round-trips"
+    );
+
+    println!("draws: {:?}", findings.draw_results);
+    for (name, outcome, calls, instanced) in &findings.draw_results {
+        println!("{name}: {outcome:?}, {calls} draw calls, instanced {instanced}");
+    }
+    if let Some((_, outcome, calls, instanced)) = findings.draw_results.first() {
+        if outcome.is_none() {
+            // Either path is legitimate; what is not legitimate is a draw that
+            // reports neither, or one that claims to have instanced while
+            // issuing one call per instance.
+            assert!(*calls > 0, "a successful draw issued at least one call");
+            if *instanced {
+                assert_eq!(
+                    *calls, 1,
+                    "an instanced draw is one call, not one per instance"
+                );
+            } else {
+                assert!(
+                    *calls > 1,
+                    "and a fallback draw is one call per instance: {calls}"
+                );
+            }
+        }
+    }
+
+    // A LOD group can now carry real parts, which is the point of the native
+    // mesh part existing at all.
+    println!("lod parts: {:?}", findings.lod_parts);
+    assert_eq!(
+        findings.lod_parts,
+        vec![(5.0, 0, true), (20.0, 1, false), (1_000.0, -1, false)],
+        "the near level draws the part, the far level draws nothing, \
+         and past the last boundary there is no level at all"
     );
 }

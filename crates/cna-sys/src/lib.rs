@@ -815,6 +815,7 @@ pub type CNA_LightProbeBakerHandle = CNA_Handle;
 pub type CNA_ShaderEffectFactoryHandle = CNA_Handle;
 pub type CNA_AreaLightBrdfTableHandle = CNA_Handle;
 pub type CNA_GpuInstanceCullerHandle = CNA_Handle;
+pub type CNA_InstancedRendererEXTHandle = CNA_Handle;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -10532,4 +10533,70 @@ pub type cna_graphics_device_draw_primitives_indirect_ext_fn = unsafe extern "C"
 ) -> CNA_Result;
 pub type cna_graphics_device_draw_indexed_primitives_indirect_ext_fn = unsafe extern "C" fn(
     CNA_Handle, CNA_PrimitiveType, CNA_StorageBufferHandle, i32,
+) -> CNA_Result;
+pub type cna_instanced_renderer_ext_create_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_ModelMeshPartHandle, *mut CNA_InstancedRendererEXTHandle,
+) -> CNA_Result;
+pub type cna_instanced_renderer_ext_destroy_fn = unsafe extern "C" fn(
+    CNA_InstancedRendererEXTHandle,
+) -> CNA_Result;
+pub type cna_instanced_renderer_ext_did_last_draw_instance_fn = unsafe extern "C" fn(
+    CNA_InstancedRendererEXTHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_instanced_renderer_ext_draw_fn = unsafe extern "C" fn(
+    CNA_InstancedRendererEXTHandle, CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_instanced_renderer_ext_get_instance_capacity_fn = unsafe extern "C" fn(
+    CNA_InstancedRendererEXTHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_instanced_renderer_ext_get_instance_count_fn = unsafe extern "C" fn(
+    CNA_InstancedRendererEXTHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_instanced_renderer_ext_get_last_draw_call_count_fn = unsafe extern "C" fn(
+    CNA_InstancedRendererEXTHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_instanced_renderer_ext_is_fallback_enabled_fn = unsafe extern "C" fn(
+    CNA_InstancedRendererEXTHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_instanced_renderer_ext_is_instancing_supported_fn = unsafe extern "C" fn(
+    CNA_InstancedRendererEXTHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_instanced_renderer_ext_is_tints_enabled_fn = unsafe extern "C" fn(
+    CNA_InstancedRendererEXTHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_instanced_renderer_ext_set_fallback_enabled_fn = unsafe extern "C" fn(
+    CNA_InstancedRendererEXTHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_instanced_renderer_ext_set_instance_tints_fn = unsafe extern "C" fn(
+    CNA_InstancedRendererEXTHandle, *const CNA_Color, u64,
+) -> CNA_Result;
+pub type cna_instanced_renderer_ext_set_instances_fn = unsafe extern "C" fn(
+    CNA_InstancedRendererEXTHandle, *const CNA_Matrix, u64,
+) -> CNA_Result;
+pub type cna_instanced_renderer_ext_set_tints_enabled_fn = unsafe extern "C" fn(
+    CNA_InstancedRendererEXTHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_model_mesh_part_create_fn = unsafe extern "C" fn(
+    CNA_VertexBufferHandle, CNA_IndexBufferHandle, i32, i32, i32, i32, *mut CNA_ModelMeshPartHandle,
+) -> CNA_Result;
+pub type cna_model_mesh_part_destroy_fn = unsafe extern "C" fn(
+    CNA_ModelMeshPartHandle,
+) -> CNA_Result;
+pub type cna_model_mesh_part_get_num_vertices_fn = unsafe extern "C" fn(
+    CNA_ModelMeshPartHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_model_mesh_part_get_primitive_count_fn = unsafe extern "C" fn(
+    CNA_ModelMeshPartHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_model_mesh_part_get_primitive_type_ext_fn = unsafe extern "C" fn(
+    CNA_ModelMeshPartHandle, *mut CNA_PrimitiveType,
+) -> CNA_Result;
+pub type cna_model_mesh_part_get_start_index_fn = unsafe extern "C" fn(
+    CNA_ModelMeshPartHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_model_mesh_part_get_vertex_offset_fn = unsafe extern "C" fn(
+    CNA_ModelMeshPartHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_model_mesh_part_set_primitive_type_ext_fn = unsafe extern "C" fn(
+    CNA_ModelMeshPartHandle, CNA_PrimitiveType,
 ) -> CNA_Result;

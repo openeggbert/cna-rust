@@ -53,8 +53,9 @@ use crate::graphics::{
 use crate::native::Native;
 use super::pbr::PbrMaterialExtensions;
 use crate::graphics::{
-    CubeMapFace, DepthFormat, PrimitiveType, RenderTarget2D, SamplerState, Texture3D,
-    TextureCube, VertexElement, VertexElementFormat, VertexElementUsage, VertexPositionColor,
+    CubeMapFace, DepthFormat, IndexBuffer, PrimitiveType, RenderTarget2D, SamplerState,
+    Texture3D, TextureCube, VertexBuffer, VertexElement, VertexElementFormat, VertexElementUsage,
+    VertexPositionColor,
 };
 use crate::value::{
     BoundingBox, BoundingFrustum, BoundingSphere, Color, Matrix, Vector2, Vector3, Vector4,
@@ -13514,5 +13515,403 @@ impl IndirectDraw {
                 byte_offset,
             )
         })
+    }
+}
+
+/// A mesh part CNA owns, built to feed the engine layer.
+///
+/// `OWNED`. Deliberately **not** the crate's
+/// [`ModelMeshPart`](crate::Microsoft::Xna::Framework::Graphics::ModelMeshPart),
+/// which is a managed Rust projection with no native handle: the engine layer's
+/// [`InstancedRenderer`] and [`LodGroup::add_part_level`] take a
+/// `CNA_ModelMeshPartHandle`, and nothing in the XNA projection can produce
+/// one. This type exists so those routes are reachable without publishing a raw
+/// handle, and it lives in `cna::extensions` because it is not XNA.
+///
+/// Its two buffers are `RETAINED_DEPENDENCY`: CNA holds them by pointer, so
+/// this value keeps the Rust resources alive for exactly as long as the part
+/// names them.
+pub struct NativeMeshPart {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+    vertex_buffer: Option<VertexBuffer>,
+    index_buffer: Option<IndexBuffer>,
+}
+
+impl NativeMeshPart {
+    /// Creates a part over a vertex and index buffer.
+    ///
+    /// The four counts are preserved verbatim -- CNA validates nothing here --
+    /// so they are what the drawing routes will believe. An
+    /// [`InstancedRenderer`] additionally requires both buffers and at least one
+    /// primitive, and refuses a part that has neither.
+    pub fn new(
+        vertex_buffer: Option<VertexBuffer>,
+        index_buffer: Option<IndexBuffer>,
+        num_vertices: i32,
+        primitive_count: i32,
+        start_index: i32,
+        vertex_offset: i32,
+    ) -> Result<Self> {
+        let native = Native::process()?;
+        let vertex_handle = match vertex_buffer.as_ref() {
+            Some(buffer) => buffer.handle()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        let index_handle = match index_buffer.as_ref() {
+            Some(buffer) => buffer.handle()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: both buffer handles are live for the call and the output is a
+        // live local.
+        native.check(unsafe {
+            (native.engine.model_mesh_part_create)(
+                vertex_handle,
+                index_handle,
+                num_vertices,
+                primitive_count,
+                start_index,
+                vertex_offset,
+                &mut handle,
+            )
+        })?;
+        Ok(Self {
+            core: Arc::new(EngineHandle {
+                native: Arc::clone(&native),
+                handle: Mutex::new(handle),
+                destroy: native.engine.model_mesh_part_destroy,
+                released: "the native mesh part has been released",
+            }),
+            native,
+            vertex_buffer,
+            index_buffer,
+        })
+    }
+
+    fn count(
+        &self,
+        route: unsafe extern "C" fn(sys::CNA_Handle, *mut i32) -> sys::CNA_Result,
+    ) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    /// How many vertices the part draws from.
+    pub fn num_vertices(&self) -> Result<i32> {
+        self.count(self.native.engine.model_mesh_part_get_num_vertices)
+    }
+
+    /// How many primitives it draws.
+    pub fn primitive_count(&self) -> Result<i32> {
+        self.count(self.native.engine.model_mesh_part_get_primitive_count)
+    }
+
+    /// Where in the index buffer it starts.
+    pub fn start_index(&self) -> Result<i32> {
+        self.count(self.native.engine.model_mesh_part_get_start_index)
+    }
+
+    /// What is added to every decoded index.
+    pub fn vertex_offset(&self) -> Result<i32> {
+        self.count(self.native.engine.model_mesh_part_get_vertex_offset)
+    }
+
+    /// What the part draws.
+    pub fn primitive_type(&self) -> Result<PrimitiveType> {
+        let handle = self.core.get()?;
+        let mut value: sys::CNA_PrimitiveType = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.model_mesh_part_get_primitive_type_ext)(handle, &mut value)
+        })?;
+        primitive_type_from_native(value)
+    }
+
+    /// Sets it.
+    pub fn set_primitive_type(&self, value: PrimitiveType) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the identity is canonical.
+        self.native.check(unsafe {
+            (self.native.engine.model_mesh_part_set_primitive_type_ext)(handle, value as u32)
+        })
+    }
+
+    /// The vertex buffer this value is keeping alive for CNA.
+    #[must_use]
+    pub const fn vertex_buffer(&self) -> Option<&VertexBuffer> {
+        self.vertex_buffer.as_ref()
+    }
+
+    /// The index buffer this value is keeping alive for CNA.
+    #[must_use]
+    pub const fn index_buffer(&self) -> Option<&IndexBuffer> {
+        self.index_buffer.as_ref()
+    }
+
+    /// Releases the part now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for NativeMeshPart {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+/// The XNA identity of a native primitive type.
+fn primitive_type_from_native(value: sys::CNA_PrimitiveType) -> Result<PrimitiveType> {
+    Ok(match value {
+        0 => PrimitiveType::TriangleList,
+        1 => PrimitiveType::TriangleStrip,
+        2 => PrimitiveType::LineList,
+        3 => PrimitiveType::LineStrip,
+        _ => return Err(CnaError::InvalidInput("native primitive type is unknown")),
+    })
+}
+
+/// Draws one mesh part many times, once per uploaded transform.
+///
+/// `OWNED`. The part is `RETAINED_DEPENDENCY`: CNA borrows it and it must
+/// outlive the renderer, so this value holds the [`Arc`] the caller shares.
+///
+/// **It degrades rather than refuses.** On a renderer without hardware
+/// instancing, [`draw`](Self::draw) falls back to one draw call per instance --
+/// provided the fallback is enabled and the effect can carry a per-instance
+/// transform. [`did_last_draw_instance`](Self::did_last_draw_instance) says
+/// which path ran and
+/// [`last_draw_call_count`](Self::last_draw_call_count) says what it cost.
+pub struct InstancedRenderer {
+    core: Arc<EngineHandle>,
+    native: Arc<Native>,
+    part: Arc<NativeMeshPart>,
+}
+
+impl InstancedRenderer {
+    /// Creates a renderer over one mesh part.
+    ///
+    /// The part must have both buffers and draw at least one primitive.
+    pub fn new(device: &GraphicsDevice, part: &Arc<NativeMeshPart>) -> Result<Self> {
+        let native = device.state_native();
+        let part_handle = part.core.get()?;
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device and part handles are live for the call and the
+        // output is a live local.
+        native.check(unsafe {
+            (native.engine.instanced_renderer_ext_create)(
+                device.handle()?,
+                part_handle,
+                &mut handle,
+            )
+        })?;
+        let core = Arc::new(EngineHandle {
+            native: Arc::clone(native),
+            handle: Mutex::new(handle),
+            destroy: native.engine.instanced_renderer_ext_destroy,
+            released: "the instanced renderer has been released",
+        });
+        let child: Arc<dyn OwnedEngineChild> = Arc::clone(&core) as Arc<dyn OwnedEngineChild>;
+        device.register_engine_child(&child);
+        Ok(Self {
+            core,
+            native: Arc::clone(native),
+            part: Arc::clone(part),
+        })
+    }
+
+    /// The mesh part this value is keeping alive for CNA.
+    #[must_use]
+    pub fn part(&self) -> &Arc<NativeMeshPart> {
+        &self.part
+    }
+
+    /// Uploads the per-instance world transforms.
+    ///
+    /// The buffer **grows when it has to and is otherwise reused**, so
+    /// re-uploading the same number of instances every frame allocates nothing
+    /// after the first. Uploading none is how a caller stops drawing without
+    /// destroying the renderer.
+    pub fn set_instances(&self, transforms: &[Matrix]) -> Result<()> {
+        let handle = self.core.get()?;
+        let native_transforms: Vec<sys::CNA_Matrix> =
+            transforms.iter().copied().map(native_matrix).collect();
+        // SAFETY: the handle is owned and the array is borrowed for the call
+        // with its own length.
+        self.native.check(unsafe {
+            (self.native.engine.instanced_renderer_ext_set_instances)(
+                handle,
+                native_transforms.as_ptr(),
+                native_transforms.len() as u64,
+            )
+        })
+    }
+
+    /// Uploads the per-instance tints.
+    ///
+    /// Independent of [`set_tints_enabled`](Self::set_tints_enabled): tints can
+    /// be uploaded while disabled and are simply not bound.
+    pub fn set_instance_tints(&self, tints: &[Color]) -> Result<()> {
+        let handle = self.core.get()?;
+        let native_tints: Vec<sys::CNA_Color> = tints.iter().copied().map(native_color).collect();
+        // SAFETY: the handle is owned and the array is borrowed for the call
+        // with its own length.
+        self.native.check(unsafe {
+            (self.native.engine.instanced_renderer_ext_set_instance_tints)(
+                handle,
+                native_tints.as_ptr(),
+                native_tints.len() as u64,
+            )
+        })
+    }
+
+    fn flag(
+        &self,
+        route: unsafe extern "C" fn(sys::CNA_Handle, *mut sys::CNA_Bool) -> sys::CNA_Result,
+    ) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value = 0_u8;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut value) })?;
+        Ok(value != 0)
+    }
+
+    fn count(
+        &self,
+        route: unsafe extern "C" fn(sys::CNA_Handle, *mut i32) -> sys::CNA_Result,
+    ) -> Result<i32> {
+        let handle = self.core.get()?;
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe { route(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    /// Whether the tint stream is bound when drawing.
+    pub fn tints_enabled(&self) -> Result<bool> {
+        self.flag(self.native.engine.instanced_renderer_ext_is_tints_enabled)
+    }
+
+    /// Sets it.
+    pub fn set_tints_enabled(&self, enabled: bool) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the boolean is canonical.
+        self.native.check(unsafe {
+            (self.native.engine.instanced_renderer_ext_set_tints_enabled)(
+                handle,
+                u8::from(enabled),
+            )
+        })
+    }
+
+    /// Whether this renderer can instance in hardware.
+    pub fn is_instancing_supported(&self) -> Result<bool> {
+        self.flag(self.native.engine.instanced_renderer_ext_is_instancing_supported)
+    }
+
+    /// Whether the per-instance fallback is allowed.
+    ///
+    /// **Forbidden by default.** A renderer that cannot instance in hardware
+    /// refuses the draw rather than quietly issuing one call per instance, so
+    /// paying that cost is something a caller opts into.
+    pub fn fallback_enabled(&self) -> Result<bool> {
+        self.flag(self.native.engine.instanced_renderer_ext_is_fallback_enabled)
+    }
+
+    /// Allows or forbids it.
+    pub fn set_fallback_enabled(&self, enabled: bool) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the boolean is canonical.
+        self.native.check(unsafe {
+            (self.native.engine.instanced_renderer_ext_set_fallback_enabled)(
+                handle,
+                u8::from(enabled),
+            )
+        })
+    }
+
+    /// How many instances are uploaded.
+    pub fn instance_count(&self) -> Result<i32> {
+        self.count(self.native.engine.instanced_renderer_ext_get_instance_count)
+    }
+
+    /// How many the buffer can hold without growing.
+    ///
+    /// **Never shrinks**: uploading fewer instances than before leaves the
+    /// capacity where it was, which is what makes a varying instance count
+    /// allocation-free after the largest frame.
+    pub fn instance_capacity(&self) -> Result<i32> {
+        self.count(self.native.engine.instanced_renderer_ext_get_instance_capacity)
+    }
+
+    /// How many draw calls the last draw issued.
+    pub fn last_draw_call_count(&self) -> Result<i32> {
+        self.count(self.native.engine.instanced_renderer_ext_get_last_draw_call_count)
+    }
+
+    /// Whether the last draw instanced rather than falling back.
+    ///
+    /// A record of what happened: it is written by [`draw`](Self::draw) and
+    /// means nothing before the first one.
+    pub fn did_last_draw_instance(&self) -> Result<bool> {
+        self.flag(self.native.engine.instanced_renderer_ext_did_last_draw_instance)
+    }
+
+    /// Draws every uploaded instance.
+    pub fn draw(&self, effect: &Effect) -> Result<()> {
+        let handle = self.core.get()?;
+        // SAFETY: the handle is owned and the effect is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.engine.instanced_renderer_ext_draw)(handle, effect.native_handle()?)
+        })
+    }
+
+    /// Releases the renderer now rather than at drop.
+    pub fn release(&self) -> Result<()> {
+        self.core.release()
+    }
+}
+
+impl Drop for InstancedRenderer {
+    fn drop(&mut self) {
+        let _ = self.core.release();
+    }
+}
+
+impl LodGroup {
+    /// Adds a level drawn from a native mesh part.
+    ///
+    /// The counterpart of [`add_level`](Self::add_level), which adds a level
+    /// that draws nothing. The part is `RETAINED_DEPENDENCY`, so the caller
+    /// keeps it alive; the group stores a pointer.
+    pub fn add_part_level(&self, max_distance: f32, part: &NativeMeshPart) -> Result<()> {
+        let handle = self.core.get()?;
+        let part = part.core.get()?;
+        // SAFETY: both handles are owned and live for the call.
+        self.native.check(unsafe {
+            (self.native.engine.lod_group_ext_add_level)(handle, max_distance, part)
+        })
+    }
+
+    /// The mesh part a distance selects, or `None` when the group answers no
+    /// level or the level draws nothing.
+    ///
+    /// Like [`select_index`](Self::select_index) this remembers what it chose.
+    /// It answers whether the chosen level *has* a part rather than handing one
+    /// back, because the handle CNA publishes is the group's own and this crate
+    /// does not lend raw handles; pair it with `select_index` to know which
+    /// level, and with the parts the caller added to know which part.
+    pub fn select_has_part(&self, distance: f32) -> Result<bool> {
+        let handle = self.core.get()?;
+        let mut value = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.engine.lod_group_ext_select)(handle, distance, &mut value)
+        })?;
+        Ok(value != sys::CNA_INVALID_HANDLE)
     }
 }

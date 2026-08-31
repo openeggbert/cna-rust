@@ -148,6 +148,7 @@ the criterion above is unchanged, only its precondition has been met.
 | area lights, their BRDF table and the shading maths | `area_light_ext`, `area_light_brdf_table`, `area_light_shading`, `clustered_forward_effect_set_area_light` | 17 | `VERIFIED_GPU` |
 | an effect's shadow, punctual-light and image-based-light slots | `effect_*_ext` | 16 | `VERIFIED_STATE` |
 | the instance stream, the GPU instance culler and the indirect draws | `instanced_renderer_ext` (the 4 static routes), `gpu_instance_culler`, `gpu_cullable_instance`, `indirect_draw_*`, `graphics_device_draw_*_indirect_ext` | 19 | `VERIFIED_GPU` |
+| the native mesh part and the instanced renderer | `model_mesh_part` (8 of `models.h`), `instanced_renderer_ext` (the remaining 14), `lod_group_ext_select` | 22 | `VERIFIED_GPU` |
 
 ### What the GPU artifact changed about the evidence
 
@@ -452,16 +453,39 @@ three found something:
   "no vertex buffer is bound" rather than drawing nothing quietly, and the test
   asserts the message rather than merely that it errored.
 
-## What the engine layer still does not reach from Rust
+## The engine layer is bound
 
-`cna_instanced_renderer_ext_create` takes a `CNA_ModelMeshPartHandle`, and this
-crate's `ModelMeshPart` is a **managed Rust projection with no native handle**:
-the routes that build one, `cna_model_mesh_part_create` and its family, are
-classified `STRICT_XNA_BACKING` because the Rust projection implements them
-itself. Fourteen `instanced_renderer_ext` routes and `cna_lod_group_ext_select`
-are therefore `BLOCKED_BY_PROJECTION`, not by upstream and not by this host:
-they are reachable the moment a native mesh-part handle exists in
-`cna::extensions`, and not before. The four routes of that family that describe
-the *format* rather than a renderer -- the instance and tint declarations and
-their strides -- need no mesh part and are bound.
+All 857 routes of `engine_layer.h` are declared, acquired, wrapped and
+qualified. The last fourteen were reachable only through a
+`CNA_ModelMeshPartHandle`, which this crate's `ModelMeshPart` -- a managed Rust
+projection -- has no way to produce, so `NativeMeshPart` now exists in
+`cna::extensions` to build one from a `VertexBuffer` and an `IndexBuffer`. It is
+deliberately *not* the XNA type: it lives beside the engine layer that needs it,
+publishes no raw handle, and holds its two buffers as retained dependencies. The
+same handle is what finally made `cna_lod_group_ext_select` bindable, which an
+earlier slice had left annotated as permanently unwrapped.
+
+`tools/c-api-inventory/classification.json` lost its `engine-layer` rule with
+this slice, because a rule that classifies nothing is dead configuration and the
+inventory gate says so. Every route the rule covered is now bound, so it matched
+nothing; a route added to `engine_layer.h` upstream will surface as
+`UNMAPPED_REQUIRES_REVIEW`, which is the right signal for a new engine route
+rather than a silent reclassification.
+- **The per-instance fallback is forbidden by default.** A renderer without
+  hardware instancing refuses the draw rather than quietly issuing one call per
+  instance, so paying that cost is opt-in. Measured, because the opposite
+  default is the one a reader would guess from "it degrades rather than
+  refuses".
+- **The instance buffer's capacity never shrinks.** Five instances uploaded then
+  two then none leaves the capacity at five throughout, which is what makes a
+  varying instance count allocation-free after the largest frame. Uploading none
+  is how a caller stops drawing without destroying the renderer.
+- **Uploading tints does not enable them.** The two are independent, so tints
+  can be staged while the stream is unbound -- asserted as a three-step
+  sequence rather than as a single round trip.
+- **Hardware instancing runs here.** The renderer drew five instances of a real
+  triangle in **one** draw call with `did_last_draw_instance` true. The test
+  asserts the pair rather than either half: an instanced draw is one call, and a
+  fallback draw is one call per instance, so a renderer claiming to have
+  instanced while issuing five calls fails.
 

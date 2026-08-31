@@ -8763,6 +8763,98 @@ extern "C" {
     pub fn cna_indirect_draw_indexed_arguments_init(
         argument0: *mut CNA_IndirectDrawIndexedArguments,
     ) -> CNA_Result;
+    pub fn cna_instanced_renderer_ext_create(
+        argument0: CNA_Handle,
+        argument1: CNA_ModelMeshPartHandle,
+        argument2: *mut CNA_InstancedRendererEXTHandle,
+    ) -> CNA_Result;
+    pub fn cna_instanced_renderer_ext_destroy(
+        argument0: CNA_InstancedRendererEXTHandle,
+    ) -> CNA_Result;
+    pub fn cna_instanced_renderer_ext_did_last_draw_instance(
+        argument0: CNA_InstancedRendererEXTHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_instanced_renderer_ext_draw(
+        argument0: CNA_InstancedRendererEXTHandle,
+        argument1: CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_instanced_renderer_ext_get_instance_capacity(
+        argument0: CNA_InstancedRendererEXTHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_instanced_renderer_ext_get_instance_count(
+        argument0: CNA_InstancedRendererEXTHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_instanced_renderer_ext_get_last_draw_call_count(
+        argument0: CNA_InstancedRendererEXTHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_instanced_renderer_ext_is_fallback_enabled(
+        argument0: CNA_InstancedRendererEXTHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_instanced_renderer_ext_is_instancing_supported(
+        argument0: CNA_InstancedRendererEXTHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_instanced_renderer_ext_is_tints_enabled(
+        argument0: CNA_InstancedRendererEXTHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_instanced_renderer_ext_set_fallback_enabled(
+        argument0: CNA_InstancedRendererEXTHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_instanced_renderer_ext_set_instance_tints(
+        argument0: CNA_InstancedRendererEXTHandle,
+        argument1: *const CNA_Color,
+        argument2: u64,
+    ) -> CNA_Result;
+    pub fn cna_instanced_renderer_ext_set_instances(
+        argument0: CNA_InstancedRendererEXTHandle,
+        argument1: *const CNA_Matrix,
+        argument2: u64,
+    ) -> CNA_Result;
+    pub fn cna_instanced_renderer_ext_set_tints_enabled(
+        argument0: CNA_InstancedRendererEXTHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_part_create(
+        argument0: CNA_VertexBufferHandle,
+        argument1: CNA_IndexBufferHandle,
+        argument2: i32,
+        argument3: i32,
+        argument4: i32,
+        argument5: i32,
+        argument6: *mut CNA_ModelMeshPartHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_part_destroy(argument0: CNA_ModelMeshPartHandle) -> CNA_Result;
+    pub fn cna_model_mesh_part_get_num_vertices(
+        argument0: CNA_ModelMeshPartHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_part_get_primitive_count(
+        argument0: CNA_ModelMeshPartHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_part_get_primitive_type_ext(
+        argument0: CNA_ModelMeshPartHandle,
+        argument1: *mut CNA_PrimitiveType,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_part_get_start_index(
+        argument0: CNA_ModelMeshPartHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_part_get_vertex_offset(
+        argument0: CNA_ModelMeshPartHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_part_set_primitive_type_ext(
+        argument0: CNA_ModelMeshPartHandle,
+        argument1: CNA_PrimitiveType,
+    ) -> CNA_Result;
     pub fn cna_instanced_renderer_ext_copy_instance_elements(
         argument0: *mut CNA_VertexElement,
         argument1: u64,

@@ -34,12 +34,6 @@
       "rationale": "CLR Type.FullName reflection; Rust has no System.Type projection. The pattern is deliberately broad and also catches routes that merely end in type_name while answering real asset data, so each of those carries an explicit override"
     },
     {
-      "id": "engine-layer",
-      "category": "CNA_EXTENSION_BACKING",
-      "header": "engine_layer.h",
-      "rationale": "CNAEXT engine layer; belongs under cna::extensions, never inside strict XNA"
-    },
-    {
       "id": "cnb-container",
       "category": "CNA_EXTENSION_BACKING",
       "header": "cnb.h",
