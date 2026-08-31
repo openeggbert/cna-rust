@@ -18,6 +18,8 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-ABI-006 | Mutation tests for the ABI gate and manifest | this repository | a wrong version, arity, width, signedness, pointer depth, constness, semantic handle or descriptor fails | `tools/native-abi/tests` | DONE |
 | RUST-ABI-007 | Re-measure every refusal the safe layer carried from ABI 0.7 | canonical headers | a refusal survives only if 0.20 still cannot do it | native stress, `docs/graphics-evidence.md` | DONE |
 | RUST-ABI-008 | Independent `GraphicsDevice` construction over `cna_graphics_device_create` | `graphics_device.h` | XNA's public `GraphicsDevice` constructor stops refusing | native stress | READY |
+| RUST-ABI-009 | Admit live ABI `0.21` and re-classify the routes it added | canonical headers, `docs/c-api/ABI_VERSIONING.md` | reviewed minor is 21; the three added routes carry a true classification | ABI verifier, route inventory | DONE |
+| RUST-ABI-010 | Stop the `*type_name*` rule from absorbing genuine asset data | `tools/c-api-inventory/classification.json` | every route it captures really is CLR reflection | route inventory | DONE |
 
 ## XNA surface
 

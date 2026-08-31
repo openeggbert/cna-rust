@@ -42,7 +42,7 @@ pub const fn cna_abi_version_patch(version: u32) -> u32 {
 /// Major component of the reviewed canonical ABI (`CNA_ABI_VERSION_MAJOR`).
 pub const CNA_ABI_VERSION_MAJOR: u32 = 0;
 /// Minor component of the reviewed canonical ABI (`CNA_ABI_VERSION_MINOR`).
-pub const CNA_ABI_VERSION_MINOR: u32 = 20;
+pub const CNA_ABI_VERSION_MINOR: u32 = 21;
 /// Patch component of the reviewed canonical ABI (`CNA_ABI_VERSION_PATCH`).
 pub const CNA_ABI_VERSION_PATCH: u32 = 0;
 

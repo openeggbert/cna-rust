@@ -15,7 +15,7 @@ cna::Microsoft::Xna::Framework::*
   -> safe Rust facades
   -> audited private bridge
   -> cna_sys
-  -> CNA ABI 0.20 cna_* symbols
+  -> CNA ABI 0.21 cna_* symbols
   -> CNA C++
 ```
 
@@ -93,7 +93,7 @@ hierarchy and deliberate CNA extensions.
   ABI route is exposed. Six converters accept XNA component strings; six
   deliberately reject string input while retaining value-string output.
 - All nineteen Audio types are complete. SoundEffect, instances, dynamic PCM,
-  microphone facades, and XACT use reviewed ABI-0.20 routes with explicit
+  microphone facades, and XACT use reviewed ABI-0.21 routes with explicit
   ownership and the existing owner-thread FrameworkDispatcher. Multi-listener
   Apply3D reaches its canonical route, with CNA's single-gain-pair mixer as the
   remaining fidelity limit; renderer/look-ahead fidelity and malformed-bank
@@ -102,7 +102,7 @@ hierarchy and deliberate CNA extensions.
 - All 24 Media types are complete as one ownership-safe graph. MediaLibrary,
   seven read-only collection facades, Song, MediaSource, process-global
   MediaPlayer/MediaQueue, owner-thread events, fixed visualization buffers,
-  Video, and VideoPlayer use reviewed CNA ABI-0.20 routes. Catalog population,
+  Video, and VideoPlayer use reviewed CNA ABI-0.21 routes. Catalog population,
   picture providers, decoded video, and assets retain explicit platform,
   backend, or asset qualifications. GetTexture wraps a decoded frame in a
   borrowed `Texture2D` that is never destroyed by Rust and is refused once a
@@ -170,7 +170,7 @@ Full platform evidence: [docs/platform-evidence.md](docs/platform-evidence.md).
 
 ## Native setup
 
-Supply a CNA C API library matching ABI 0.20:
+Supply a CNA C API library matching ABI 0.21:
 
 ```text
 CNA_NATIVE_LIBRARY=/absolute/path/to/libcna_c_api.so
@@ -233,7 +233,7 @@ mapping transforms CLR concepts before comparison; it does not compare raw C#
 syntax to Rust syntax or imply other XNA profiles are selected.
 
 `tools/native-stress/run-sanitized.sh` is an optional ASan/UBSan path for a
-separately instrumented exact ABI-0.20 CNA library. Sanitizer status for this
+separately instrumented exact ABI-0.21 CNA library. Sanitizer status for this
 run is `NOT_RUN`; native crash absence is not allocator-level leak proof.
 
 See the [normative mapping](docs/xna-rust-mapping.md),

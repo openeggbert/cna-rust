@@ -10,9 +10,11 @@
 //! incompatible change **as a minor increment** — that is exactly how `0.20.0`
 //! removed eleven renderer identities and moved `CNA_GRAPHICS_RENDERER_MAXIMUM`
 //! from 50 to 49. CNA has also moved the minor for every purely additive
-//! generation since `0.4.0`, so a minor increment does not distinguish the two
-//! cases. A `0.x` consumer therefore cannot admit a higher minor without
-//! re-reviewing it, and this binding admits the reviewed minor exactly.
+//! generation since `0.4.0`, and `0.21.0` is one of those: it only adds
+//! `cna_environment_get_device_type` and an object dictionary's retained
+//! managed type name. A minor increment therefore does not distinguish the two
+//! cases, so a `0.x` consumer cannot admit a higher minor without re-reviewing
+//! it, and this binding admits the reviewed minor exactly.
 //!
 //! From ABI `1.0` onward the canonical contract permits only additive,
 //! backward-compatible change within a major, so a higher minor is admissible
@@ -92,31 +94,31 @@ mod tests {
     #[test]
     fn reviewed_version_is_admitted() {
         assert_eq!(admit(sys::CNA_ABI_VERSION), Ok(()));
-        assert_eq!(sys::CNA_ABI_VERSION, version(0, 20, 0));
+        assert_eq!(sys::CNA_ABI_VERSION, version(0, 21, 0));
     }
 
     #[test]
     fn a_different_major_is_rejected() {
-        assert_eq!(admit(version(1, 20, 0)), Err(Rejection::Major));
-        assert_eq!(admit(version(0xFFFF, 20, 0)), Err(Rejection::Major));
+        assert_eq!(admit(version(1, 21, 0)), Err(Rejection::Major));
+        assert_eq!(admit(version(0xFFFF, 21, 0)), Err(Rejection::Major));
     }
 
     #[test]
     fn an_experimental_minor_must_match_exactly() {
-        assert_eq!(admit(version(0, 19, 0)), Err(Rejection::ExperimentalMinor));
-        assert_eq!(admit(version(0, 21, 0)), Err(Rejection::ExperimentalMinor));
+        assert_eq!(admit(version(0, 20, 0)), Err(Rejection::ExperimentalMinor));
+        assert_eq!(admit(version(0, 22, 0)), Err(Rejection::ExperimentalMinor));
         assert_eq!(admit(version(0, 7, 0)), Err(Rejection::ExperimentalMinor));
     }
 
     #[test]
     fn a_higher_patch_within_the_reviewed_minor_is_additive() {
-        assert_eq!(admit(version(0, 20, 1)), Ok(()));
-        assert_eq!(admit(version(0, 20, 255)), Ok(()));
+        assert_eq!(admit(version(0, 21, 1)), Ok(()));
+        assert_eq!(admit(version(0, 21, 255)), Ok(()));
     }
 
     #[test]
     fn encoding_matches_the_canonical_layout() {
-        assert_eq!(version(0, 20, 0), 0x0000_1400);
+        assert_eq!(version(0, 21, 0), 0x0000_1500);
         assert_eq!(version(1, 2, 3), 0x0001_0203);
         assert_eq!(sys::cna_abi_version_major(0x0001_0203), 1);
         assert_eq!(sys::cna_abi_version_minor(0x0001_0203), 2);

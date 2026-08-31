@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "scope": "Microsoft XNA 4.0 Windows Audio/XACT and Media/Video projection, plus every cna::extensions family",
-  "qualifiedArtifactSha256": "092b2d80a775f39a6ad872d084bc09492576c82ac33641faeb4a3036c7fc347b",
-  "abiVersion": "0.20",
+  "qualifiedArtifactSha256": "3a976d2494580ca9af45fbb2be30c13b01d05477f98ae80796ef26898c97d812",
+  "abiVersion": "0.21",
   "rows": [
     {
       "capability": "SoundEffect",

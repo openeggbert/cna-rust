@@ -7,7 +7,7 @@ Rust game
   -> cna::Microsoft::Xna::Framework::*   strict XNA projection
   -> private family modules              value/input/game/content/graphics/audio/media
   -> crate-private native bridge         typed safe calls over dynamic symbols
-  -> cna_sys                             raw ABI 0.20 declarations
+  -> cna_sys                             raw ABI 0.21 declarations
   -> CNA stable C ABI                    cna_* only
   -> CNA C++
 ```
@@ -21,8 +21,8 @@ concepts remain under `cna::extensions`.
 
 ## Native boundary and ABI evidence
 
-`cna-sys` contains the reviewed ABI-0.20 slice: fixed-width aliases, exact
-semantic handle typedefs, `repr(C)` structures, callbacks, constants, and 731
+`cna-sys` contains the reviewed ABI-0.21 slice: fixed-width aliases, exact
+semantic handle typedefs, `repr(C)` structures, callbacks, constants, and 1,326
 function-pointer declarations. The
 safe bridge is grouped by concern:
 
@@ -53,10 +53,19 @@ The ABI verifier derives full C prototypes from Clang's view of canonical CNA
 headers and compares them with every reviewed `cna-sys` function type. It
 measures return and parameter types, scalar width/signedness, pointer depth and
 constness, callback/struct pointers, and boolean/enum representations. The
-current pass checks 731 functions and 2,496 prototype type positions.
-Independent C and Rust probes make 1,028 measurements across 62 structures,
-seven callback signatures, scalar representations, and 262 constants, with zero
+current pass checks 1,326 functions and 4,574 prototype type positions.
+Independent C and Rust probes make 1,845 measurements across 98 structures,
+19 callback signatures, scalar representations, and 665 constants, with zero
 mismatches.
+
+A second, independent gate covers the 1,119 symbol acquisitions that fill the
+runtime function-pointer tables. Matching prototypes are not enough on their
+own: two neighbouring routes can each be declared correctly and still be wired
+to each other's table field, because the acquisition site casts an untyped
+symbol. The gate therefore derives the expected alias from each acquired
+symbol's own name and proves the field it fills carries *that* route's
+prototype, so a swapped pair fails even though nothing about either declaration
+is wrong.
 
 ## Durable device identity
 
@@ -115,7 +124,7 @@ same provider identity is returned.
 ## Lifecycle and teardown
 
 `Game` is the user lifecycle trait and `GameContext<'callback>` exposes the
-host-owned portion needed during callbacks. CNA ABI 0.20's frame hooks now drive
+host-owned portion needed during callbacks. CNA ABI 0.21's frame hooks now drive
 `Initialize`, `BeginRun`, `BeginDraw`, `EndDraw`, and `EndRun` in addition to
 the original content/update/draw/shutdown callbacks. A measured one-frame run
 has this user-visible order:
@@ -140,7 +149,7 @@ Disposed event
 still proceed. Panic in either ordinary lifecycle callbacks or `BeginDraw` is
 caught before returning through C and becomes `CnaError::Callback`.
 
-CNA ABI 0.20 rejects `cna_game_destroy` while owned child handles remain, but
+CNA ABI 0.21 rejects `cna_game_destroy` while owned child handles remain, but
 CNA itself emits the shutdown lifecycle during destruction. The host therefore
 performs an internal child-release pass after `cna_game_run` and before
 `cna_game_destroy`. That pass invokes neither user `UnloadContent` nor public
@@ -191,7 +200,7 @@ Storage is independent of Game and has strict native ownership:
 CNA synchronously and return a concrete one-shot result retaining state and
 origin identity. Every filesystem and stream operation remains behind CNA;
 `std::fs` is not a backend. Rust validates XNA child-path containment before
-native dispatch because ABI 0.20's `RelativePath` copies valid UTF-8 but does
+native dispatch because ABI 0.21's `RelativePath` copies valid UTF-8 but does
 not enforce all traversal rules. Container Dispose closes streams, observes
 CNA's synchronous Disposing event exactly once, then unregisters/destroys in
 child-first order.
@@ -284,7 +293,7 @@ pre-destroy cleanup do not synthesize the user event.
 `Texture` composes `GraphicsResource`. `Texture2D` completes the selected
 profile's mapped constructors, stream overloads, bounds/format/level metadata,
 generic full/rectangle/mip transfers, PNG/JPEG encoding, and disposal. Data
-routes accept only layouts CNA ABI 0.20 can represent exactly; they validate
+routes accept only layouts CNA ABI 0.21 can represent exactly; they validate
 dimensions, mip/rectangle/window bounds, format/type compatibility, disposed
 parents/children, bad streams, and construction rollback.
 
@@ -474,7 +483,7 @@ VideoPlayer, 20 frame-route, and 50 callback-delivery cycles, including
 wrong-thread retry, stale generations, panic, self-removal, reentrancy, and
 Game recreation. Absence of a crash is not a leak proof.
 `tools/native-stress/run-sanitized.sh` is an optional path requiring a
-separately instrumented exact ABI-0.20 CNA library. Sanitizer status is
+separately instrumented exact ABI-0.21 CNA library. Sanitizer status is
 `not-run`; no sanitizer pass is claimed for the current run.
 
 ## Current blockers and dependency order
@@ -485,7 +494,7 @@ The historical unmodified-build blocker is closed. Canonical CNA HEAD
 `49 == 50`; ABI 0.20.0 removed eleven renderer identities and moved
 `CNA_GRAPHICS_RENDERER_MAXIMUM` to 49, which is exactly that assertion. Runtime
 evidence now uses an out-of-tree build of an unmodified canonical checkout,
-labelled experimental ABI-0.20 HEADLESS.
+labelled experimental ABI-0.21 HEADLESS.
 
 The selected XNA 4.0 Windows runtime Rust projection is structurally complete:
 all 259 expected Rust types are present and every strict diagnostic is zero.

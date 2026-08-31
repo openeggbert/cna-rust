@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "abiVersion": 5120,
+  "abiVersion": 5376,
   "symbols": {
     "cna_get_abi_version": 0,
     "cna_error_get_last_info": 1,

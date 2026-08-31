@@ -31,7 +31,7 @@
       "names": [
         "*type_name*"
       ],
-      "rationale": "CLR Type.FullName reflection; Rust has no System.Type projection"
+      "rationale": "CLR Type.FullName reflection; Rust has no System.Type projection. The pattern is deliberately broad and also catches routes that merely end in type_name while answering real asset data, so each of those carries an explicit override"
     },
     {
       "id": "engine-layer",
@@ -314,6 +314,38 @@
     "cna_title_container_read_ext": {
       "category": "STRICT_XNA_BACKING",
       "rationale": "backs XNA TitleContainer.OpenStream"
+    },
+    "cna_object_dictionary_ext_get_runtime_type_name_size": {
+      "category": "CNA_EXTENSION_BACKING",
+      "rationale": "not reflection: the retained managed identity of a processor-written Model.Tag, which upstream contrasts with the diagnostic C++ spelling and which a reader must branch on"
+    },
+    "cna_object_dictionary_ext_copy_runtime_type_name": {
+      "category": "CNA_EXTENSION_BACKING",
+      "rationale": "not reflection: the retained managed identity of a processor-written Model.Tag, which upstream contrasts with the diagnostic C++ spelling and which a reader must branch on"
+    },
+    "cna_cnb_loader_registry_get_registered_type_name_size": {
+      "category": "CNA_EXTENSION_BACKING",
+      "rationale": "not reflection: the canonical name a .cnb asset type id was registered under, which is loader-registry data"
+    },
+    "cna_cnb_loader_registry_copy_registered_type_name": {
+      "category": "CNA_EXTENSION_BACKING",
+      "rationale": "not reflection: the canonical name a .cnb asset type id was registered under, which is loader-registry data"
+    },
+    "cna_cnb_cnj_result_get_asset_type_name_size": {
+      "category": "CNA_EXTENSION_BACKING",
+      "rationale": "not reflection: the compiled asset type a .cnj compile produced, which is result data"
+    },
+    "cna_cnb_cnj_result_copy_asset_type_name": {
+      "category": "CNA_EXTENSION_BACKING",
+      "rationale": "not reflection: the compiled asset type a .cnj compile produced, which is result data"
+    },
+    "cna_content_type_reader_get_target_type_name_size": {
+      "category": "CNA_EXTENSION_BACKING",
+      "rationale": "not reflection: the canonical target type a content type reader claims, which is reader-dispatch data"
+    },
+    "cna_content_type_reader_copy_target_type_name": {
+      "category": "CNA_EXTENSION_BACKING",
+      "rationale": "not reflection: the canonical target type a content type reader claims, which is reader-dispatch data"
     }
   }
 }

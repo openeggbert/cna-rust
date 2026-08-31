@@ -4,8 +4,8 @@ Generated from `tools/runtime-capabilities/capabilities.json`; do not edit by ha
 
 Scope: Microsoft XNA 4.0 Windows Audio/XACT and Media/Video projection, plus every cna::extensions family
 
-Qualified CNA ABI: `0.20`
-Qualified artifact SHA-256: `092b2d80a775f39a6ad872d084bc09492576c82ac33641faeb4a3036c7fc347b`
+Qualified CNA ABI: `0.21`
+Qualified artifact SHA-256: `3a976d2494580ca9af45fbb2be30c13b01d05477f98ae80796ef26898c97d812`
 
 | Capability | Strict | Runtime status | Evidence |
 |---|---:|---|---|
