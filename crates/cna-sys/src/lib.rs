@@ -194,6 +194,18 @@ pub const CNA_CNB_METADATA_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_TEXTURE_INFO_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_MODEL_INFO_STRUCT_VERSION: u32 = 1;
 pub const CNA_CNB_SPRITE_FONT_INFO_STRUCT_VERSION: u32 = 1;
+pub const CNA_MOUSE_CURSOR_STOCK_ARROW: CNA_MouseCursorStock = 0;
+pub const CNA_MOUSE_CURSOR_STOCK_CROSSHAIR: CNA_MouseCursorStock = 1;
+pub const CNA_MOUSE_CURSOR_STOCK_HAND: CNA_MouseCursorStock = 2;
+pub const CNA_MOUSE_CURSOR_STOCK_IBEAM: CNA_MouseCursorStock = 3;
+pub const CNA_MOUSE_CURSOR_STOCK_NO: CNA_MouseCursorStock = 4;
+pub const CNA_MOUSE_CURSOR_STOCK_SIZE_ALL: CNA_MouseCursorStock = 5;
+pub const CNA_MOUSE_CURSOR_STOCK_SIZE_NESW: CNA_MouseCursorStock = 6;
+pub const CNA_MOUSE_CURSOR_STOCK_SIZE_NS: CNA_MouseCursorStock = 7;
+pub const CNA_MOUSE_CURSOR_STOCK_SIZE_NWSE: CNA_MouseCursorStock = 8;
+pub const CNA_MOUSE_CURSOR_STOCK_SIZE_WE: CNA_MouseCursorStock = 9;
+pub const CNA_MOUSE_CURSOR_STOCK_WAIT: CNA_MouseCursorStock = 10;
+pub const CNA_MOUSE_CURSOR_STOCK_WAIT_ARROW: CNA_MouseCursorStock = 11;
 pub const CNA_TEXT_INPUT_TYPE_TEXT: CNA_TextInputType = 0;
 pub const CNA_TEXT_INPUT_TYPE_TEXT_NAME: CNA_TextInputType = 1;
 pub const CNA_TEXT_INPUT_TYPE_TEXT_EMAIL: CNA_TextInputType = 2;
@@ -605,6 +617,21 @@ pub type CNA_CnbTextureDataHandle = CNA_Handle;
 pub type CNA_CnbModelDataHandle = CNA_Handle;
 pub type CNA_CnbLoaderHandle = CNA_Handle;
 pub type CNA_CnbWriterHandle = CNA_Handle;
+pub type CNA_InputDeviceEventRegistrationHandle = CNA_Handle;
+pub type CNA_MouseCursorHandle = CNA_Handle;
+pub type CNA_MouseCursorStock = u32;
+
+/// Receives one device connection or disconnection.
+pub type CNA_InputDeviceHotplugCallback = Option<unsafe extern "C" fn(u32, *mut c_void)>;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_InputDeviceInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub id: u64,
+}
+
 pub type CNA_TextInputRegistrationHandle = CNA_Handle;
 pub type CNA_TextInputType = u32;
 
@@ -4445,6 +4472,89 @@ pub type cna_cnb_texture_data_get_level_count_fn = unsafe extern "C" fn(
 pub type cna_cnb_texture_data_copy_level_fn = unsafe extern "C" fn(
     CNA_CnbTextureDataHandle, u64, u64, *mut u8, u64, *mut u64,
 ) -> CNA_Result;
+pub type cna_input_devices_get_keyboard_count_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut u32,
+) -> CNA_Result;
+pub type cna_input_devices_get_keyboard_info_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut CNA_InputDeviceInfo,
+) -> CNA_Result;
+pub type cna_input_devices_get_keyboard_name_size_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut u64,
+) -> CNA_Result;
+pub type cna_input_devices_copy_keyboard_name_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_input_devices_get_mouse_count_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut u32,
+) -> CNA_Result;
+pub type cna_input_devices_get_mouse_info_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut CNA_InputDeviceInfo,
+) -> CNA_Result;
+pub type cna_input_devices_get_mouse_name_size_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut u64,
+) -> CNA_Result;
+pub type cna_input_devices_copy_mouse_name_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_input_devices_get_touch_device_count_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut u32,
+) -> CNA_Result;
+pub type cna_input_devices_get_touch_device_info_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut CNA_InputDeviceInfo,
+) -> CNA_Result;
+pub type cna_input_devices_get_touch_device_name_size_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut u64,
+) -> CNA_Result;
+pub type cna_input_devices_copy_touch_device_name_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_input_devices_subscribe_keyboard_connected_ext_fn = unsafe extern "C" fn(
+    CNA_InputDeviceHotplugCallback, *mut c_void, *mut CNA_InputDeviceEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_input_devices_subscribe_keyboard_disconnected_ext_fn = unsafe extern "C" fn(
+    CNA_InputDeviceHotplugCallback, *mut c_void, *mut CNA_InputDeviceEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_input_devices_subscribe_mouse_connected_ext_fn = unsafe extern "C" fn(
+    CNA_InputDeviceHotplugCallback, *mut c_void, *mut CNA_InputDeviceEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_input_devices_subscribe_mouse_disconnected_ext_fn = unsafe extern "C" fn(
+    CNA_InputDeviceHotplugCallback, *mut c_void, *mut CNA_InputDeviceEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_input_devices_unsubscribe_ext_fn = unsafe extern "C" fn(
+    CNA_InputDeviceEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_input_devices_raise_keyboard_connected_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, u32,
+) -> CNA_Result;
+pub type cna_input_devices_raise_keyboard_disconnected_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, u32,
+) -> CNA_Result;
+pub type cna_input_devices_raise_mouse_connected_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, u32,
+) -> CNA_Result;
+pub type cna_input_devices_raise_mouse_disconnected_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, u32,
+) -> CNA_Result;
+pub type cna_input_device_info_init_fn = unsafe extern "C" fn(
+    *mut CNA_InputDeviceInfo,
+) -> CNA_Result;
+pub type cna_input_device_info_equals_fn = unsafe extern "C" fn(
+    *const CNA_InputDeviceInfo, CNA_StringView, *const CNA_InputDeviceInfo, CNA_StringView, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_mouse_cursor_create_ext_fn = unsafe extern "C" fn(
+    *mut CNA_MouseCursorHandle,
+) -> CNA_Result;
+pub type cna_mouse_cursor_create_from_texture2d_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Handle, i32, i32, *mut CNA_MouseCursorHandle,
+) -> CNA_Result;
+pub type cna_mouse_cursor_get_stock_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_MouseCursorStock, *mut CNA_MouseCursorHandle,
+) -> CNA_Result;
+pub type cna_mouse_set_cursor_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_MouseCursorHandle,
+) -> CNA_Result;
+pub type cna_mouse_cursor_destroy_fn = unsafe extern "C" fn(CNA_MouseCursorHandle) -> CNA_Result;
+pub type cna_mouse_cursor_dispose_fn = unsafe extern "C" fn(CNA_MouseCursorHandle) -> CNA_Result;
 pub type cna_text_input_subscribe_text_input_ext_fn = unsafe extern "C" fn(
     CNA_TextInputCallback, *mut c_void, *mut CNA_TextInputRegistrationHandle,
 ) -> CNA_Result;

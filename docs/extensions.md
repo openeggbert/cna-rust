@@ -507,3 +507,46 @@ now checks that the linked module declares exactly the manifest's symbols and
 reports `LINKED_DECLARATION_MISSING`, so a route bound in one acquisition mode
 and forgotten in the other is a finding rather than a build failure somewhere
 else.
+
+## Device enumeration, hot-plug and cursors (RUST-EXT-014b, 2026-08-31)
+
+XNA's input is positional: `Keyboard.GetState()` is *the* keyboard and
+`Mouse.GetState()` is *the* mouse, with no way to ask how many there are, which
+one moved, or when one is unplugged. CNA reports the devices themselves, so
+that lives in `cna::extensions::input_devices`.
+
+### Identity is not an index
+
+Upstream states the enumeration is a point-in-time snapshot and that an index
+is valid only until the device set changes, so no index is handed out as a
+durable reference. `InputDevice::id` is the stable identity, and it is what a
+hot-plug event carries -- a disconnection arrives when the device is already
+gone, so an identifier is the only thing that can still mean anything.
+
+`InputDevice::same_device` asks CNA rather than comparing the Rust fields,
+because CNA defines device equality -- identifier **and** name -- and a
+derived `==` that happened to agree today would be a guess that could quietly
+stop agreeing.
+
+### One registration per transition
+
+The same multiplication bug the text-input work found applies here, so each of
+the four transitions holds one shared native registration, created with its
+first handler and released with its last. The test raises four transitions with
+four distinct identifiers and asserts that each reached exactly its own
+handler, once, with its own identifier -- a mis-wired subscription would show
+up as a keyboard event in the mouse list rather than as a plausible count.
+
+A panicking handler is contained and does not stop delivery to the others.
+
+### Cursors
+
+XNA had no cursor object at all -- `Game.IsMouseVisible` was the whole of it --
+so `MouseCursor` stays out of the XNA `Mouse` projection. A texture-backed
+cursor is the interesting ownership case: CNA copies what it needs during the
+call, so the test drops the texture immediately afterwards and then still uses
+the cursor. Disposal is idempotent.
+
+A headless host has no window to show a cursor on. The test records CNA's
+actual answer rather than asserting one, and requires only that it be one of
+CNA's real answers rather than a crash or a silent success that did nothing.

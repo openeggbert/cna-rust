@@ -3213,6 +3213,135 @@ extern "C" {
         argument4: u64,
         argument5: *mut u64,
     ) -> CNA_Result;
+    pub fn cna_input_devices_get_keyboard_count(
+        argument0: CNA_Handle,
+        argument1: *mut u32,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_get_keyboard_info_at(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut CNA_InputDeviceInfo,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_get_keyboard_name_size_at(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_copy_keyboard_name_at(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_get_mouse_count(
+        argument0: CNA_Handle,
+        argument1: *mut u32,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_get_mouse_info_at(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut CNA_InputDeviceInfo,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_get_mouse_name_size_at(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_copy_mouse_name_at(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_get_touch_device_count(
+        argument0: CNA_Handle,
+        argument1: *mut u32,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_get_touch_device_info_at(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut CNA_InputDeviceInfo,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_get_touch_device_name_size_at(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_copy_touch_device_name_at(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_subscribe_keyboard_connected_ext(
+        argument0: CNA_InputDeviceHotplugCallback,
+        argument1: *mut c_void,
+        argument2: *mut CNA_InputDeviceEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_subscribe_keyboard_disconnected_ext(
+        argument0: CNA_InputDeviceHotplugCallback,
+        argument1: *mut c_void,
+        argument2: *mut CNA_InputDeviceEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_subscribe_mouse_connected_ext(
+        argument0: CNA_InputDeviceHotplugCallback,
+        argument1: *mut c_void,
+        argument2: *mut CNA_InputDeviceEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_subscribe_mouse_disconnected_ext(
+        argument0: CNA_InputDeviceHotplugCallback,
+        argument1: *mut c_void,
+        argument2: *mut CNA_InputDeviceEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_unsubscribe_ext(
+        argument0: CNA_InputDeviceEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_raise_keyboard_connected_ext(
+        argument0: CNA_Handle,
+        argument1: u32,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_raise_keyboard_disconnected_ext(
+        argument0: CNA_Handle,
+        argument1: u32,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_raise_mouse_connected_ext(
+        argument0: CNA_Handle,
+        argument1: u32,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_raise_mouse_disconnected_ext(
+        argument0: CNA_Handle,
+        argument1: u32,
+    ) -> CNA_Result;
+    pub fn cna_input_device_info_init(argument0: *mut CNA_InputDeviceInfo) -> CNA_Result;
+    pub fn cna_input_device_info_equals(
+        argument0: *const CNA_InputDeviceInfo,
+        argument1: CNA_StringView,
+        argument2: *const CNA_InputDeviceInfo,
+        argument3: CNA_StringView,
+        argument4: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_mouse_cursor_create_ext(argument0: *mut CNA_MouseCursorHandle) -> CNA_Result;
+    pub fn cna_mouse_cursor_create_from_texture2d(
+        argument0: CNA_Handle,
+        argument1: CNA_Handle,
+        argument2: i32,
+        argument3: i32,
+        argument4: *mut CNA_MouseCursorHandle,
+    ) -> CNA_Result;
+    pub fn cna_mouse_cursor_get_stock_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_MouseCursorStock,
+        argument2: *mut CNA_MouseCursorHandle,
+    ) -> CNA_Result;
+    pub fn cna_mouse_set_cursor_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_MouseCursorHandle,
+    ) -> CNA_Result;
+    pub fn cna_mouse_cursor_destroy(argument0: CNA_MouseCursorHandle) -> CNA_Result;
+    pub fn cna_mouse_cursor_dispose(argument0: CNA_MouseCursorHandle) -> CNA_Result;
     pub fn cna_text_input_subscribe_text_input_ext(
         argument0: CNA_TextInputCallback,
         argument1: *mut c_void,
