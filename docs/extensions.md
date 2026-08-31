@@ -761,3 +761,27 @@ Real forces are `HARDWARE_PENDING`: no haptic device is attached to this host.
 Everything else -- enumeration agreeing with its count, capability reads,
 opening and closing, and CNA's own name-inclusive capability equality -- is
 measured.
+
+### Effects (RUST-EXT-014d)
+
+Thirteen effect families, of which `LeftRight` -- two motor amplitudes -- is
+the one XNA could express. A test walks all thirteen to prove no two collapse
+onto one identity, which would let a caller build a spring and get a sawtooth.
+
+`HapticEffect` is an owned value with accessors rather than a public
+structure, and the reason is worth stating: it has thirty-one fields, most of
+which are meaningful only for some families -- `ramp_start` for a ramp, the
+three-axis condition arrays for a spring or damper, the two magnitudes for
+rumble. A Rust type asserting which fields apply to which family would be a
+taxonomy this crate invented, and there is no hardware here to check it
+against. `HapticDevice::is_effect_supported` asks CNA instead, which is the
+authority.
+
+Custom samples are copied into the effect, so nothing borrows the caller's
+buffer, and a test drops the source buffer before reading them back. Effect
+equality asks CNA, which compares the sample data alongside the fields: two
+effects differing only in their samples are different effects.
+
+The lifecycle -- create, run, stop, update, status, destroy -- is exercised on
+a device that is not open, and every step must report that it did **not**
+apply. A device pretending to play would be worse than one saying it cannot.

@@ -74,7 +74,7 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-EXT-014a | Text input, IME composition and candidate lists | `input_text.h` | DONE |
 | RUST-EXT-014b | Device enumeration, hot-plug events and mouse cursors | `input_devices.h`, `input_cursor.h` | DONE |
 | RUST-EXT-014c | Haptics: enumeration, capabilities, rumble and gain | `input_haptics.h` | DONE, real forces `HARDWARE_PENDING` |
-| RUST-EXT-014d | Haptic *effects*: the create/run/update/status family | `input_haptics.h` | READY |
+| RUST-EXT-014d | Haptic effects: thirteen families, custom samples, the create/run/update/status lifecycle | `input_haptics.h` | DONE, real playback `HARDWARE_PENDING` |
 | RUST-ABI-013 | Gate that both acquisition modes declare the same routes | `tools/native-abi/verify.py` | DONE |
 | RUST-EXT-009 | Sensors: accelerometer, compass, gyroscope | `sensors.h`, `input_devices.h` | DONE, real readings `HARDWARE_PENDING` |
 | RUST-EXT-010a | Engine layer: render-pipeline settings, presets, normalization, text | `engine_layer.h` | DONE |

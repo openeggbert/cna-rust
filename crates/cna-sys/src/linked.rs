@@ -3349,6 +3349,64 @@ extern "C" {
         argument0: CNA_EffectHandle,
         argument1: CNA_Bool,
     ) -> CNA_Result;
+    pub fn cna_haptic_effect_init(argument0: *mut CNA_HapticEffect) -> CNA_Result;
+    pub fn cna_haptic_effect_equals(
+        argument0: *const CNA_HapticEffect,
+        argument1: *const u16,
+        argument2: u64,
+        argument3: *const CNA_HapticEffect,
+        argument4: *const u16,
+        argument5: u64,
+        argument6: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_haptic_direction_init(argument0: *mut CNA_HapticDirection) -> CNA_Result;
+    pub fn cna_haptic_direction_equals(
+        argument0: *const CNA_HapticDirection,
+        argument1: *const CNA_HapticDirection,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_create_effect(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: *const CNA_HapticEffect,
+        argument2: *const u16,
+        argument3: u64,
+        argument4: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_run_effect(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: i32,
+        argument2: u32,
+        argument3: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_stop_effect(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: i32,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_update_effect(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: i32,
+        argument2: *const CNA_HapticEffect,
+        argument3: *const u16,
+        argument4: u64,
+        argument5: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_destroy_effect(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: i32,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_get_effect_status(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: i32,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_haptic_device_get_is_effect_supported(
+        argument0: CNA_HapticDeviceHandle,
+        argument1: *const CNA_HapticEffect,
+        argument2: *const u16,
+        argument3: u64,
+        argument4: *mut CNA_Bool,
+    ) -> CNA_Result;
     pub fn cna_haptics_get_count(argument0: CNA_Handle, argument1: *mut u32) -> CNA_Result;
     pub fn cna_haptics_get_id_at(
         argument0: CNA_Handle,

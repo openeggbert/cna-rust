@@ -214,6 +214,27 @@ pub const CNA_SHADOW_QUALITY_LOW: CNA_ShadowQuality = 1;
 pub const CNA_SHADOW_QUALITY_MEDIUM: CNA_ShadowQuality = 2;
 pub const CNA_SHADOW_QUALITY_HIGH: CNA_ShadowQuality = 3;
 pub const CNA_SHADOW_QUALITY_ULTRA: CNA_ShadowQuality = 4;
+pub const CNA_HAPTIC_EFFECT_TYPE_CONSTANT: CNA_HapticEffectType = 0;
+pub const CNA_HAPTIC_EFFECT_TYPE_SINE: CNA_HapticEffectType = 1;
+pub const CNA_HAPTIC_EFFECT_TYPE_SQUARE: CNA_HapticEffectType = 2;
+pub const CNA_HAPTIC_EFFECT_TYPE_TRIANGLE: CNA_HapticEffectType = 3;
+pub const CNA_HAPTIC_EFFECT_TYPE_SAWTOOTH_UP: CNA_HapticEffectType = 4;
+pub const CNA_HAPTIC_EFFECT_TYPE_SAWTOOTH_DOWN: CNA_HapticEffectType = 5;
+pub const CNA_HAPTIC_EFFECT_TYPE_RAMP: CNA_HapticEffectType = 6;
+pub const CNA_HAPTIC_EFFECT_TYPE_SPRING: CNA_HapticEffectType = 7;
+pub const CNA_HAPTIC_EFFECT_TYPE_DAMPER: CNA_HapticEffectType = 8;
+pub const CNA_HAPTIC_EFFECT_TYPE_INERTIA: CNA_HapticEffectType = 9;
+pub const CNA_HAPTIC_EFFECT_TYPE_FRICTION: CNA_HapticEffectType = 10;
+pub const CNA_HAPTIC_EFFECT_TYPE_LEFT_RIGHT: CNA_HapticEffectType = 11;
+pub const CNA_HAPTIC_EFFECT_TYPE_CUSTOM: CNA_HapticEffectType = 12;
+pub const CNA_HAPTIC_EFFECT_TYPE_MAXIMUM: CNA_HapticEffectType =
+    CNA_HAPTIC_EFFECT_TYPE_CUSTOM;
+pub const CNA_HAPTIC_DIRECTION_TYPE_POLAR: CNA_HapticDirectionType = 0;
+pub const CNA_HAPTIC_DIRECTION_TYPE_CARTESIAN: CNA_HapticDirectionType = 1;
+pub const CNA_HAPTIC_DIRECTION_TYPE_SPHERICAL: CNA_HapticDirectionType = 2;
+pub const CNA_HAPTIC_DIRECTION_TYPE_STEERING_AXIS: CNA_HapticDirectionType = 3;
+pub const CNA_HAPTIC_DIRECTION_TYPE_MAXIMUM: CNA_HapticDirectionType =
+    CNA_HAPTIC_DIRECTION_TYPE_STEERING_AXIS;
 pub const CNA_HAPTIC_FEATURE_NONE: CNA_HapticFeature = 0;
 pub const CNA_HAPTIC_FEATURE_CONSTANT: CNA_HapticFeature = 0x0000_0001;
 pub const CNA_HAPTIC_FEATURE_SINE: CNA_HapticFeature = 0x0000_0002;
@@ -854,6 +875,52 @@ pub struct CNA_RenderPipelineSettings {
 }
 
 pub type CNA_HapticDeviceHandle = CNA_Handle;
+pub type CNA_HapticEffectType = u32;
+pub type CNA_HapticDirectionType = u32;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_HapticDirection {
+    pub r#type: CNA_HapticDirectionType,
+    pub values: [i32; 3],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_HapticEffect {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub r#type: CNA_HapticEffectType,
+    pub reserved: u32,
+    pub direction: CNA_HapticDirection,
+    pub length: u32,
+    pub delay: u16,
+    pub button: u16,
+    pub interval: u16,
+    pub level: i16,
+    pub period: u16,
+    pub magnitude: i16,
+    pub offset: i16,
+    pub phase: u16,
+    pub ramp_start: i16,
+    pub ramp_end: i16,
+    pub right_saturation: [u16; 3],
+    pub left_saturation: [u16; 3],
+    pub right_coefficient: [i16; 3],
+    pub left_coefficient: [i16; 3],
+    pub deadband: [u16; 3],
+    pub center: [i16; 3],
+    pub large_magnitude: u16,
+    pub small_magnitude: u16,
+    pub custom_period: u16,
+    pub custom_channels: u8,
+    pub reserved2: u8,
+    pub attack_length: u16,
+    pub attack_level: u16,
+    pub fade_length: u16,
+    pub fade_level: u16,
+}
+
 pub type CNA_HapticFeature = u32;
 
 #[repr(C)]
@@ -4884,6 +4951,37 @@ pub type cna_pbr_effect_get_vertex_color_enabled_ext_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_pbr_effect_set_vertex_color_enabled_ext_fn = unsafe extern "C" fn(
     CNA_EffectHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptic_effect_init_fn = unsafe extern "C" fn(*mut CNA_HapticEffect) -> CNA_Result;
+pub type cna_haptic_effect_equals_fn = unsafe extern "C" fn(
+    *const CNA_HapticEffect, *const u16, u64, *const CNA_HapticEffect, *const u16, u64, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptic_direction_init_fn = unsafe extern "C" fn(
+    *mut CNA_HapticDirection,
+) -> CNA_Result;
+pub type cna_haptic_direction_equals_fn = unsafe extern "C" fn(
+    *const CNA_HapticDirection, *const CNA_HapticDirection, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptic_device_create_effect_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, *const CNA_HapticEffect, *const u16, u64, *mut i32,
+) -> CNA_Result;
+pub type cna_haptic_device_run_effect_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, i32, u32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptic_device_stop_effect_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, i32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptic_device_update_effect_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, i32, *const CNA_HapticEffect, *const u16, u64, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptic_device_destroy_effect_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, i32,
+) -> CNA_Result;
+pub type cna_haptic_device_get_effect_status_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, i32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_haptic_device_get_is_effect_supported_fn = unsafe extern "C" fn(
+    CNA_HapticDeviceHandle, *const CNA_HapticEffect, *const u16, u64, *mut CNA_Bool,
 ) -> CNA_Result;
 pub type cna_haptics_get_count_fn = unsafe extern "C" fn(CNA_Handle, *mut u32) -> CNA_Result;
 pub type cna_haptics_get_id_at_fn = unsafe extern "C" fn(CNA_Handle, u32, *mut u32) -> CNA_Result;

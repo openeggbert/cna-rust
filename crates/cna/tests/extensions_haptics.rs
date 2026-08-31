@@ -11,7 +11,8 @@ use std::sync::{Arc, Mutex};
 
 use cna::extensions::haptics::{
     count, enumerate, joystick_is_haptic, mouse_is_haptic, Applied, HapticCapabilities,
-    HapticDevice, HapticFeatures,
+    HapticDevice, HapticDirection, HapticDirectionType, HapticEffect, HapticEffectType,
+    HapticFeatures,
 };
 use cna::Microsoft::Xna::Framework::{Game, GameContext};
 use cna::{run_for_frames, GameState, GameStateAccess, Result};
@@ -23,6 +24,8 @@ struct Observed {
     mouse_haptic: bool,
     joystick_zero_haptic: bool,
     open_unknown_refused: bool,
+    effect_steps: Vec<(&'static str, bool)>,
+    effect_supported: bool,
 }
 
 #[derive(Default)]
@@ -88,6 +91,23 @@ impl Game for HapticGame {
         assert_eq!(phantom.stop_all_effects()?, Applied(false));
         let open_unknown_refused = false;
 
+        // The whole effect lifecycle on that same closed device. No haptic
+        // hardware is attached, so real forces are HARDWARE_PENDING; what can
+        // be measured is that every step answers honestly rather than
+        // pretending to play.
+        let effect = HapticEffect::new(HapticEffectType::LeftRight)?;
+        let effect_supported = phantom.is_effect_supported(&effect)?;
+        let mut effect_steps: Vec<(&'static str, bool)> = Vec::new();
+        if let Ok(id) = phantom.create_effect(&effect) {
+            effect_steps.push(("run", phantom.run_effect(id, 1)?.0));
+            effect_steps.push(("stop", phantom.stop_effect(id)?.0));
+            effect_steps.push(("update", phantom.update_effect(id, &effect)?.0));
+            effect_steps.push(("status", phantom.effect_is_playing(id)?));
+            let _ = phantom.destroy_effect(id);
+        } else {
+            effect_steps.push(("create refused", false));
+        }
+
         *self
             .observed
             .lock()
@@ -97,6 +117,8 @@ impl Game for HapticGame {
             mouse_haptic: mouse_is_haptic(game)?,
             joystick_zero_haptic: joystick_is_haptic(game, 0)?,
             open_unknown_refused,
+            effect_steps,
+            effect_supported,
         };
         Ok(())
     }
@@ -131,6 +153,22 @@ fn haptic_devices_enumerate_and_describe_themselves() {
     if observed.devices == 0 {
         assert!(!observed.mouse_haptic);
         assert!(!observed.joystick_zero_haptic);
+    }
+
+    // Real forces are HARDWARE_PENDING. What is asserted is that a device
+    // which is not open supports no effect and that no step of the effect
+    // lifecycle claims to have applied -- a device pretending to play would
+    // be worse than one that says it cannot.
+    assert!(
+        !observed.effect_supported,
+        "a device that is not open supports no effect"
+    );
+    assert!(!observed.effect_steps.is_empty(), "the lifecycle ran");
+    for (step, reported) in &observed.effect_steps {
+        assert!(
+            !reported,
+            "{step} on a device that is not open must not report that it applied"
+        );
     }
 }
 
@@ -218,3 +256,100 @@ fn the_feature_set_keeps_xnas_vocabulary_separate_from_cnas() {
     assert!(HapticFeatures::NONE.is_empty());
     assert!(!HapticFeatures::NONE.contains(HapticFeatures::LEFT_RIGHT));
 }
+
+#[test]
+fn every_effect_family_and_direction_space_maps_both_ways() {
+    if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
+        return;
+    }
+    // Thirteen effect families, of which LeftRight is the one XNA could
+    // express. Walking all of them proves no two collapse onto one identity,
+    // which would let a caller build a spring and get a sawtooth.
+    let families = [
+        HapticEffectType::Constant,
+        HapticEffectType::Sine,
+        HapticEffectType::Square,
+        HapticEffectType::Triangle,
+        HapticEffectType::SawtoothUp,
+        HapticEffectType::SawtoothDown,
+        HapticEffectType::Ramp,
+        HapticEffectType::Spring,
+        HapticEffectType::Damper,
+        HapticEffectType::Inertia,
+        HapticEffectType::Friction,
+        HapticEffectType::LeftRight,
+        HapticEffectType::Custom,
+    ];
+    let mut seen = Vec::new();
+    for family in families {
+        let effect = HapticEffect::new(family).expect("effect defaults");
+        let kind = effect.kind().expect("kind round-trips");
+        assert_eq!(kind, family, "an effect keeps the family it was built for");
+        assert!(!seen.contains(&kind), "no two families share an identity");
+        seen.push(kind);
+    }
+    assert_eq!(seen.len(), 13);
+
+    let direction = HapticDirection::canonical_defaults().expect("direction defaults");
+    assert!(
+        direction
+            .same_direction(&direction)
+            .expect("a direction equals itself"),
+    );
+    let other = HapticDirection {
+        kind: HapticDirectionType::Cartesian,
+        values: [1, 2, 3],
+    };
+    if direction.kind != HapticDirectionType::Cartesian || direction.values != [1, 2, 3] {
+        assert!(
+            !direction
+                .same_direction(&other)
+                .expect("two different directions differ"),
+        );
+    }
+}
+
+#[test]
+fn an_effect_carries_its_own_fields_and_its_custom_samples() {
+    if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
+        return;
+    }
+    let mut effect = HapticEffect::new(HapticEffectType::LeftRight).expect("effect");
+    effect
+        .set_length(250)
+        .set_magnitude(-1234)
+        .set_rumble_magnitudes(0xC000, 0x3000);
+    assert_eq!(effect.length(), 250);
+    assert_eq!(effect.magnitude(), -1234);
+    assert_eq!(effect.rumble_magnitudes(), (0xC000, 0x3000));
+
+    // The two motor amplitudes are one effect family's two fields here, not
+    // the whole haptic vocabulary as they were in XNA.
+    assert_eq!(effect.kind().expect("kind"), HapticEffectType::LeftRight);
+
+    // Custom samples are copied in, so nothing borrows the caller's buffer.
+    let mut custom = HapticEffect::new(HapticEffectType::Custom).expect("custom effect");
+    {
+        let samples: Vec<u16> = (0..8).map(|value| value * 1000).collect();
+        custom.set_custom_samples(&samples);
+        drop(samples);
+    }
+    assert_eq!(
+        custom.custom_samples(),
+        &[0, 1000, 2000, 3000, 4000, 5000, 6000, 7000],
+        "the samples survived the buffer they came from"
+    );
+
+    // CNA's equality compares the sample data too, so two effects that differ
+    // only in their samples are different effects.
+    let mut same = HapticEffect::new(HapticEffectType::Custom).expect("custom effect");
+    same.set_custom_samples(&[0, 1000, 2000, 3000, 4000, 5000, 6000, 7000]);
+    assert!(custom.same_effect(&same).expect("equal effects"));
+    let mut different = HapticEffect::new(HapticEffectType::Custom).expect("custom effect");
+    different.set_custom_samples(&[9, 9, 9]);
+    assert!(
+        !custom.same_effect(&different).expect("different effects"),
+        "effects differing only in their samples are not equal"
+    );
+}
+

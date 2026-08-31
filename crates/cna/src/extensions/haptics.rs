@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use cna_sys as sys;
 
-use crate::error::Result;
+use crate::error::{CnaError, Result};
 use crate::game::GameContext;
 use crate::native::runtime::read_string;
 use crate::native::Native;
@@ -413,5 +413,381 @@ impl Drop for HapticDevice {
     fn drop(&mut self) {
         // SAFETY: the handle is owned by this value and released exactly once.
         let _ = unsafe { (self.native.runtime.haptic_device_destroy)(self.handle) };
+    }
+}
+
+/// Which family a force-feedback effect belongs to.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[non_exhaustive]
+pub enum HapticEffectType {
+    Constant,
+    Sine,
+    Square,
+    Triangle,
+    SawtoothUp,
+    SawtoothDown,
+    Ramp,
+    Spring,
+    Damper,
+    Inertia,
+    Friction,
+    /// Two-motor rumble: the whole of what XNA could express.
+    LeftRight,
+    Custom,
+}
+
+/// How a force's direction is expressed.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[non_exhaustive]
+pub enum HapticDirectionType {
+    Polar,
+    Cartesian,
+    Spherical,
+    SteeringAxis,
+}
+
+macro_rules! haptic_identity {
+    ($name:ident, $native:ty, $($variant:ident => $constant:ident),+ $(,)?) => {
+        impl $name {
+            const fn from_native(value: $native) -> Option<Self> {
+                Some(match value {
+                    $(sys::$constant => Self::$variant,)+
+                    _ => return None,
+                })
+            }
+
+            const fn to_native(self) -> $native {
+                match self {
+                    $(Self::$variant => sys::$constant,)+
+                }
+            }
+        }
+    };
+}
+
+haptic_identity!(
+    HapticEffectType, sys::CNA_HapticEffectType,
+    Constant => CNA_HAPTIC_EFFECT_TYPE_CONSTANT,
+    Sine => CNA_HAPTIC_EFFECT_TYPE_SINE,
+    Square => CNA_HAPTIC_EFFECT_TYPE_SQUARE,
+    Triangle => CNA_HAPTIC_EFFECT_TYPE_TRIANGLE,
+    SawtoothUp => CNA_HAPTIC_EFFECT_TYPE_SAWTOOTH_UP,
+    SawtoothDown => CNA_HAPTIC_EFFECT_TYPE_SAWTOOTH_DOWN,
+    Ramp => CNA_HAPTIC_EFFECT_TYPE_RAMP,
+    Spring => CNA_HAPTIC_EFFECT_TYPE_SPRING,
+    Damper => CNA_HAPTIC_EFFECT_TYPE_DAMPER,
+    Inertia => CNA_HAPTIC_EFFECT_TYPE_INERTIA,
+    Friction => CNA_HAPTIC_EFFECT_TYPE_FRICTION,
+    LeftRight => CNA_HAPTIC_EFFECT_TYPE_LEFT_RIGHT,
+    Custom => CNA_HAPTIC_EFFECT_TYPE_CUSTOM,
+);
+
+haptic_identity!(
+    HapticDirectionType, sys::CNA_HapticDirectionType,
+    Polar => CNA_HAPTIC_DIRECTION_TYPE_POLAR,
+    Cartesian => CNA_HAPTIC_DIRECTION_TYPE_CARTESIAN,
+    Spherical => CNA_HAPTIC_DIRECTION_TYPE_SPHERICAL,
+    SteeringAxis => CNA_HAPTIC_DIRECTION_TYPE_STEERING_AXIS,
+);
+
+/// A force's direction, in whichever coordinate space it names.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct HapticDirection {
+    pub kind: HapticDirectionType,
+    /// Up to three components; how many are meaningful depends on `kind`.
+    pub values: [i32; 3],
+}
+
+impl HapticDirection {
+    /// CNA's default direction.
+    pub fn canonical_defaults() -> Result<Self> {
+        let native = Native::process()?;
+        let mut value = sys::CNA_HapticDirection::default();
+        // SAFETY: the structure is a caller-owned output CNA fills.
+        native.check(unsafe { (native.runtime.haptic_direction_init)(&mut value) })?;
+        HapticDirectionType::from_native(value.r#type)
+            .map(|kind| Self {
+                kind,
+                values: value.values,
+            })
+            .ok_or(CnaError::UnsupportedRuntime(
+                "CNA named a haptic direction kind this build does not know",
+            ))
+    }
+
+    /// Whether CNA considers this the same direction as `other`.
+    ///
+    /// Asks CNA rather than deriving `==`, for the same reason the device and
+    /// capability comparisons do: CNA decides which of the three components
+    /// matter for a given coordinate space, and a field-by-field Rust
+    /// comparison would call two equivalent directions different.
+    pub fn same_direction(&self, other: &Self) -> Result<bool> {
+        let native = Native::process()?;
+        let left = self.to_native();
+        let right = other.to_native();
+        let mut equal = sys::CNA_FALSE;
+        // SAFETY: both descriptors are live locals and the output is one too.
+        native.check(unsafe {
+            (native.runtime.haptic_direction_equals)(&left, &right, &mut equal)
+        })?;
+        Ok(equal != sys::CNA_FALSE)
+    }
+
+    const fn to_native(self) -> sys::CNA_HapticDirection {
+        sys::CNA_HapticDirection {
+            r#type: self.kind.to_native(),
+            values: self.values,
+        }
+    }
+}
+
+/// One force-feedback effect.
+///
+/// Thirty-one fields, most of which are meaningful only for some effect
+/// families -- `ramp_start` for a ramp, the three-axis condition arrays for a
+/// spring or damper, `large_magnitude` and `small_magnitude` for two-motor
+/// rumble. That is why this is an owned value with accessors rather than a
+/// public structure: a Rust type asserting which fields apply to which family
+/// would be a taxonomy this crate invented, and there is no hardware here to
+/// check it against. CNA's own `is_supported` is the authority instead.
+#[derive(Clone, Debug)]
+pub struct HapticEffect {
+    inner: sys::CNA_HapticEffect,
+    custom: Vec<u16>,
+}
+
+impl HapticEffect {
+    /// CNA's defaults for an effect of one family.
+    pub fn new(kind: HapticEffectType) -> Result<Self> {
+        let native = Native::process()?;
+        let mut inner = sys::CNA_HapticEffect {
+            struct_size: core::mem::size_of::<sys::CNA_HapticEffect>() as u32,
+            struct_version: 1,
+            ..sys::CNA_HapticEffect::default()
+        };
+        // SAFETY: the structure is a caller-owned versioned output.
+        native.check(unsafe { (native.runtime.haptic_effect_init)(&mut inner) })?;
+        inner.r#type = kind.to_native();
+        Ok(Self {
+            inner,
+            custom: Vec::new(),
+        })
+    }
+
+    /// The effect's family.
+    pub fn kind(&self) -> Result<HapticEffectType> {
+        HapticEffectType::from_native(self.inner.r#type).ok_or(CnaError::UnsupportedRuntime(
+            "CNA named a haptic effect kind this build does not know",
+        ))
+    }
+
+    /// The direction the force is applied in.
+    pub fn direction(&self) -> Result<HapticDirection> {
+        HapticDirectionType::from_native(self.inner.direction.r#type)
+            .map(|kind| HapticDirection {
+                kind,
+                values: self.inner.direction.values,
+            })
+            .ok_or(CnaError::UnsupportedRuntime(
+                "CNA named a haptic direction kind this build does not know",
+            ))
+    }
+
+    /// Sets the direction the force is applied in.
+    pub fn set_direction(&mut self, value: HapticDirection) -> &mut Self {
+        self.inner.direction = value.to_native();
+        self
+    }
+
+    /// How long the effect runs, in milliseconds.
+    #[must_use]
+    pub const fn length(&self) -> u32 {
+        self.inner.length
+    }
+
+    /// Sets how long the effect runs.
+    pub fn set_length(&mut self, milliseconds: u32) -> &mut Self {
+        self.inner.length = milliseconds;
+        self
+    }
+
+    /// The effect's magnitude.
+    #[must_use]
+    pub const fn magnitude(&self) -> i16 {
+        self.inner.magnitude
+    }
+
+    /// Sets the effect's magnitude.
+    pub fn set_magnitude(&mut self, value: i16) -> &mut Self {
+        self.inner.magnitude = value;
+        self
+    }
+
+    /// The two motor amplitudes a `LeftRight` effect uses.
+    ///
+    /// This is the pair XNA's `GamePad.SetVibration` exposes, and it is one
+    /// effect family out of thirteen here rather than the whole vocabulary.
+    #[must_use]
+    pub const fn rumble_magnitudes(&self) -> (u16, u16) {
+        (self.inner.large_magnitude, self.inner.small_magnitude)
+    }
+
+    /// Sets the two motor amplitudes a `LeftRight` effect uses.
+    pub fn set_rumble_magnitudes(&mut self, large: u16, small: u16) -> &mut Self {
+        self.inner.large_magnitude = large;
+        self.inner.small_magnitude = small;
+        self
+    }
+
+    /// The samples a `Custom` effect plays.
+    #[must_use]
+    pub fn custom_samples(&self) -> &[u16] {
+        &self.custom
+    }
+
+    /// Sets the samples a `Custom` effect plays.
+    ///
+    /// The samples are copied into this value, so nothing borrows the caller's
+    /// buffer past the call that stores it.
+    pub fn set_custom_samples(&mut self, samples: &[u16]) -> &mut Self {
+        self.custom = samples.to_vec();
+        self
+    }
+
+    /// Whether CNA considers this the same effect as `other`.
+    ///
+    /// Asks CNA, which compares the custom sample data alongside the fields.
+    pub fn same_effect(&self, other: &Self) -> Result<bool> {
+        let native = Native::process()?;
+        let mut equal = sys::CNA_FALSE;
+        // SAFETY: both descriptors and both sample buffers are live for the
+        // duration of the call, with their own lengths.
+        native.check(unsafe {
+            (native.runtime.haptic_effect_equals)(
+                &self.inner,
+                self.samples_pointer(),
+                self.custom.len() as u64,
+                &other.inner,
+                other.samples_pointer(),
+                other.custom.len() as u64,
+                &mut equal,
+            )
+        })?;
+        Ok(equal != sys::CNA_FALSE)
+    }
+
+    fn samples_pointer(&self) -> *const u16 {
+        if self.custom.is_empty() {
+            core::ptr::null()
+        } else {
+            self.custom.as_ptr()
+        }
+    }
+}
+
+/// A created effect, identified on the device that holds it.
+///
+/// Not an owning handle: the device owns the effect, and destroying the device
+/// takes its effects with it. Releasing one early is [`HapticDevice::destroy_effect`].
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct HapticEffectId(i32);
+
+impl HapticEffectId {
+    /// The identifier CNA assigned.
+    #[must_use]
+    pub const fn value(self) -> i32 {
+        self.0
+    }
+}
+
+impl HapticDevice {
+    /// Whether the device can play an effect as described.
+    ///
+    /// CNA is the authority on which fields a family uses, so this is how a
+    /// caller finds out rather than a Rust taxonomy asserting it.
+    pub fn is_effect_supported(&self, effect: &HapticEffect) -> Result<bool> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the descriptor and samples are live for the call.
+        self.native.check(unsafe {
+            (self.native.runtime.haptic_device_get_is_effect_supported)(
+                self.handle,
+                &effect.inner,
+                effect.samples_pointer(),
+                effect.custom.len() as u64,
+                &mut value,
+            )
+        })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    /// Uploads an effect to the device.
+    pub fn create_effect(&self, effect: &HapticEffect) -> Result<HapticEffectId> {
+        let mut id = 0_i32;
+        // SAFETY: the descriptor and samples are live for the call, and the
+        // output is a live local.
+        self.native.check(unsafe {
+            (self.native.runtime.haptic_device_create_effect)(
+                self.handle,
+                &effect.inner,
+                effect.samples_pointer(),
+                effect.custom.len() as u64,
+                &mut id,
+            )
+        })?;
+        Ok(HapticEffectId(id))
+    }
+
+    /// Replaces an uploaded effect's description.
+    pub fn update_effect(&self, id: HapticEffectId, effect: &HapticEffect) -> Result<Applied> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: as for `create_effect`.
+        self.native.check(unsafe {
+            (self.native.runtime.haptic_device_update_effect)(
+                self.handle,
+                id.0,
+                &effect.inner,
+                effect.samples_pointer(),
+                effect.custom.len() as u64,
+                &mut value,
+            )
+        })?;
+        Ok(Applied(value != sys::CNA_FALSE))
+    }
+
+    /// Plays an uploaded effect `iterations` times.
+    pub fn run_effect(&self, id: HapticEffectId, iterations: u32) -> Result<Applied> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.runtime.haptic_device_run_effect)(self.handle, id.0, iterations, &mut value)
+        })?;
+        Ok(Applied(value != sys::CNA_FALSE))
+    }
+
+    /// Stops an uploaded effect.
+    pub fn stop_effect(&self, id: HapticEffectId) -> Result<Applied> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.runtime.haptic_device_stop_effect)(self.handle, id.0, &mut value)
+        })?;
+        Ok(Applied(value != sys::CNA_FALSE))
+    }
+
+    /// Whether an uploaded effect is currently playing.
+    pub fn effect_is_playing(&self, id: HapticEffectId) -> Result<bool> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.runtime.haptic_device_get_effect_status)(self.handle, id.0, &mut value)
+        })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    /// Releases an uploaded effect.
+    pub fn destroy_effect(&self, id: HapticEffectId) -> Result<()> {
+        // SAFETY: the handle is owned and the identifier is by value.
+        self.native
+            .check(unsafe { (self.native.runtime.haptic_device_destroy_effect)(self.handle, id.0) })
     }
 }
