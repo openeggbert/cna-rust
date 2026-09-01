@@ -362,7 +362,7 @@ artifact and run it repeatedly; `REPRO_THREADS`, `REPRO_NO_DESTROY`,
 | 1 thread, create + destroy | OPENGLES3 | 0 / 30 |
 | 6 threads, create + destroy | HEADLESS | 0 / 30 |
 | 6 threads, create only | HEADLESS | 0 / 30 |
-| 6 threads, **create serialised**, destroy free | OPENGLES3 | 0 / 40 |
+| 6 threads, **create serialised**, destroy free | OPENGLES3 | 0 / 120 |
 | 6 threads, create and destroy both serialised | OPENGLES3 | 0 / 40 |
 
 Two things follow from that table. Destroying is not implicated: leaking every

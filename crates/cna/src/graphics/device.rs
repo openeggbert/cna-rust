@@ -463,8 +463,8 @@ impl GraphicsDevice {
         // Rust API may not hand out that race, so construction is serialised
         // here. The measurement behind the choice is that serialising *only*
         // the create call removes the crash: 9 aborts in 40 unserialised runs
-        // of tools/reproducers/ext015h_concurrent_device_create.c, 0 in the 80
-        // serialised ones (40 with destroy free, 40 with it serialised too). Devices may still be used and destroyed
+        // of tools/reproducers/ext015h_concurrent_device_create.c, 0 in 160
+        // serialised ones (120 with destroy free, 40 with it serialised too). Devices may still be used and destroyed
         // concurrently; it is construction alone that races.
         //
         // This lock covers calls made through this crate. A process that also
