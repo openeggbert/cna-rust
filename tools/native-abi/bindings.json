@@ -2959,7 +2959,39 @@
     "cna_vibrate_controller_start": 2,
     "cna_vibrate_controller_start_left_right_ext": 4,
     "cna_vibrate_controller_start_with_intensity_ext": 3,
-    "cna_vibrate_controller_stop": 1
+    "cna_vibrate_controller_stop": 1,
+    "cna_graphics_device_clear_color_depth": 3,
+    "cna_graphics_device_dispose": 1,
+    "cna_graphics_device_executes_shader_effect_source_ext": 2,
+    "cna_graphics_device_get_display_color_space_ext": 2,
+    "cna_graphics_device_get_is_disposed": 2,
+    "cna_graphics_device_get_max_compute_work_group_count_ext": 3,
+    "cna_graphics_device_get_max_compute_work_group_invocations_ext": 2,
+    "cna_graphics_device_get_max_compute_work_group_size_ext": 3,
+    "cna_graphics_device_get_tracked_resource_count": 2,
+    "cna_graphics_device_get_unsupported_3d_call_behavior": 2,
+    "cna_graphics_device_notify_content_lost_resources_ext": 1,
+    "cna_graphics_device_recreate_renderer_for_multi_sample_count_ext": 2,
+    "cna_graphics_device_set_blend_enabled": 2,
+    "cna_graphics_device_set_context_recovery_enabled": 2,
+    "cna_graphics_device_set_current_effect": 2,
+    "cna_graphics_device_set_depth_test_enabled": 2,
+    "cna_graphics_device_set_depth_write_enabled": 2,
+    "cna_graphics_device_set_display_color_space_ext": 3,
+    "cna_graphics_device_set_graphics_profile_ext": 2,
+    "cna_graphics_device_set_string_marker_ext": 2,
+    "cna_graphics_device_set_unsupported_3d_call_behavior": 2,
+    "cna_graphics_device_subscribe_event": 5,
+    "cna_graphics_device_subscribe_resource_created": 4,
+    "cna_graphics_device_subscribe_resource_destroyed": 4,
+    "cna_graphics_device_supports_display_color_space_ext": 3,
+    "cna_graphics_device_supports_image_based_lighting_ext": 2,
+    "cna_graphics_device_supports_surface_format_as_render_target_ext": 3,
+    "cna_graphics_device_unbind_texture": 2,
+    "cna_graphics_device_unsubscribe": 1,
+    "cna_occlusion_query_get_is_pixel_count_precise_ext": 2,
+    "cna_occlusion_query_has_renderer": 2,
+    "cna_primitive_type_get_vertex_count": 3
   },
   "layouts": {
     "CNA_InviteAcceptedEventInfo": ["struct_size", "struct_version", "gamer", "is_current_session", "reserved"],
@@ -3143,9 +3175,11 @@
     "CNA_ObjectDictionaryEntry": ["struct_size", "struct_version", "kind", "is_array", "element_count"],
     "CNA_FileDialogFilter": ["struct_size", "struct_version", "name", "pattern"],
     "CNA_MessageBoxTestLog": ["struct_size", "struct_version", "simple_calls", "choice_calls", "last_type", "last_button_count"],
-    "CNA_VibrationTestLog": ["struct_size", "struct_version", "start_calls", "stop_calls", "left_right_calls", "reserved", "last_duration_ticks", "last_intensity", "last_large_motor", "last_small_motor", "reserved_float"]
+    "CNA_VibrationTestLog": ["struct_size", "struct_version", "start_calls", "stop_calls", "left_right_calls", "reserved", "last_duration_ticks", "last_intensity", "last_large_motor", "last_small_motor", "reserved_float"],
+    "CNA_ResourceCreatedEventInfo": ["struct_size", "struct_version", "has_resource", "reserved"],
+    "CNA_ResourceDestroyedEventInfo": ["struct_size", "struct_version", "has_tag", "reserved", "name"]
   },
-  "scalarTypes": ["CNA_Bool", "CNA_Handle", "CNA_NativeHandleValue", "CNA_DisplayOrientation", "CNA_GameEvent", "CNA_GameWindowEvent", "CNA_GraphicsDeviceManagerEvent", "CNA_GraphicsDeviceStatus", "CNA_GraphicsProfile", "CNA_PresentInterval", "CNA_DepthFormat", "CNA_RenderTargetUsage", "CNA_CubeMapFace", "CNA_RenderTargetKind", "CNA_ShaderStage", "CNA_PlayerIndex", "CNA_GamePadButtonFlags", "CNA_TouchLocationState", "CNA_GestureType", "CNA_FileMode", "CNA_FileAccess", "CNA_FileShare", "CNA_SeekOrigin", "CNA_TextureDataType", "CNA_TextureImageFormat", "CNA_BufferUsage", "CNA_IndexElementSize", "CNA_SetDataOptions", "CNA_ClearOptions", "CNA_PrimitiveType", "CNA_UserVertexSource", "CNA_VertexElementFormat", "CNA_VertexElementUsage", "CNA_VertexType", "CNA_Blend", "CNA_BlendFunction", "CNA_ColorWriteChannels", "CNA_CompareFunction", "CNA_StencilOperation", "CNA_CullMode", "CNA_FillMode", "CNA_TextureAddressMode", "CNA_TextureFilter", "CNA_EffectParameterClass", "CNA_EffectParameterType", "CNA_EffectValueType", "CNA_EffectTextureType", "CNA_AudioChannels", "CNA_SoundState", "CNA_AudioStopOptions", "CNA_MicrophoneState", "CNA_AudioEventRegistrationHandle", "CNA_MediaState", "CNA_MediaSourceType", "CNA_VideoSoundtrackType", "CNA_MediaPlayerEventRegistrationHandle", "CNA_GamerPresenceMode", "CNA_NotificationPosition", "CNA_GamerZone", "CNA_LeaderboardKey", "CNA_LeaderboardOutcome", "CNA_MessageBoxIcon", "CNA_ControllerSensitivity", "CNA_GameDifficulty", "CNA_GamerPrivilegeSetting", "CNA_RacingCameraAngle", "CNA_AvatarBodyType", "CNA_AvatarRendererState", "CNA_AvatarEyebrow", "CNA_AvatarEye", "CNA_AvatarMouth", "CNA_AvatarAnimationPreset", "CNA_AvatarBone", "CNA_PropertyValueKind", "CNA_NetworkSessionEndReason", "CNA_NetworkSessionJoinError", "CNA_NetworkSessionState", "CNA_NetworkSessionType", "CNA_SendDataOptions", "CNA_NetworkEventType", "CNA_SignedInGamerHandle", "CNA_GamerHandle", "CNA_GamerProfileHandle", "CNA_GamerCollectionHandle", "CNA_GamerEnumeratorHandle", "CNA_AchievementHandle", "CNA_AchievementCollectionHandle", "CNA_PropertyDictionaryHandle", "CNA_LeaderboardReaderHandle", "CNA_LeaderboardEntryHandle", "CNA_AvatarDescriptionHandle", "CNA_AvatarAnimationHandle", "CNA_AvatarRendererHandle", "CNA_NetworkSessionPropertiesHandle", "CNA_NetworkSessionPropertyEnumeratorHandle", "CNA_PacketWriterHandle", "CNA_PacketReaderHandle", "CNA_NetworkGamerHandle", "CNA_NetworkMachineHandle", "CNA_AvailableNetworkSessionHandle", "CNA_AvailableNetworkSessionCollectionHandle", "CNA_NetworkSessionHandle", "CNA_NetworkSessionEventRegistrationHandle", "CNA_RenderPipelineHandle", "CNA_ShadowMapHandle", "CNA_PostProcessPassHandle", "CNA_PostProcessChainHandle", "CNA_RenderTargetPoolHandle", "CNA_GpuTimerHandle", "CNA_ParticleSystemHandle", "CNA_StorageBufferHandle", "CNA_ComputeShaderHandle", "CNA_GraphicsImageAccess", "CNA_GraphicsMemoryBarrier", "CNA_DecalPassHandle", "CNA_SkyboxHandle", "CNA_AtmosphericSkyHandle", "CNA_FullscreenPassHandle", "CNA_ScopedRenderTargetHandle", "CNA_SpatialUpscalePassHandle", "CNA_LutInterpolation", "CNA_SpotShadowMapHandle", "CNA_CubeShadowMapHandle", "CNA_CascadedShadowMapHandle", "CNA_PunctualLightKindEXT", "CNA_DepthNormalPrepassHandle", "CNA_TransparentDrawListHandle", "CNA_WeightedBlendedTransparencyHandle", "CNA_DepthEncoding", "CNA_HdrDisplayOutputHandle", "CNA_AutoExposureHandle", "CNA_CubeLutHandle", "CNA_DisplayColorSpace", "CNA_DebugDrawHandle", "CNA_FrustumCullerEXTHandle", "CNA_LodGroupEXTHandle", "CNA_ModelMeshPartHandle", "CNA_LodSelectionMode", "CNA_ClusteredLightType", "CNA_ClusteredLightSetHandle", "CNA_ClusteredLightGridHandle", "CNA_ClusteredLightAssignmentHandle", "CNA_ClusteredShadowPolicyHandle", "CNA_ClusteredLightBufferHandle", "CNA_ClusteredLightComputeHandle", "CNA_EffectHandle", "CNA_ClusteredForwardEffectHandle", "CNA_LightProbeHandle", "CNA_EnvironmentProcessorHandle", "CNA_LightProbeVolumeHandle", "CNA_LightProbeBakerHandle", "CNA_ShaderEffectFactoryHandle", "CNA_AreaLightShapeEXT", "CNA_AreaLightBrdfTableHandle", "CNA_GpuInstanceCullerHandle", "CNA_InstancedRendererEXTHandle", "CNA_VertexBufferHandle", "CNA_IndexBufferHandle", "CNA_SkinnedModelEXTHandle", "CNA_ClipTargetSpaceEXT", "CNA_SkinningDataHandle", "CNA_AnimationPlayerHandle", "CNA_MorphTargetDataEXTHandle", "CNA_ModelAnimationsEXTHandle", "CNA_PbrTextureSlot", "CNA_CameraHandle", "CNA_CameraState", "CNA_CameraPosition", "CNA_ModelHandle", "CNA_ModelBoneHandle", "CNA_ModelBoneCollectionHandle", "CNA_ModelMeshHandle", "CNA_ModelMeshCollectionHandle", "CNA_ModelMeshPartCollectionHandle", "CNA_ModelEffectCollectionHandle", "CNA_GltfImportDiagnosticSeverityEXT", "CNA_GltfImportDiagnosticKindEXT", "CNA_MotionHandle", "CNA_CnbByteWriterHandle", "CNA_CnbReaderHandle", "CNA_CnbAnimationClipHandle", "CNA_CnbModelFromCnjHandle", "CNA_CnjToCnbResultHandle", "CNA_CurveHandle", "CNA_ObjectDictionaryHandle", "CNA_ObjectDictionaryValueKind", "CNA_SystemTrayHandle", "CNA_DeviceType", "CNA_MessageBoxType", "CNA_CurveKeyCollectionHandle", "CNA_CurveLoopType", "CNA_CurveContinuity", "CNA_CnbMorphDeltaStream", "CNA_CnbMorphKeyStream", "CNA_CnbSkeletonMatrixSet"],
+  "scalarTypes": ["CNA_Bool", "CNA_Handle", "CNA_NativeHandleValue", "CNA_DisplayOrientation", "CNA_GameEvent", "CNA_GameWindowEvent", "CNA_GraphicsDeviceManagerEvent", "CNA_GraphicsDeviceStatus", "CNA_GraphicsProfile", "CNA_PresentInterval", "CNA_DepthFormat", "CNA_RenderTargetUsage", "CNA_CubeMapFace", "CNA_RenderTargetKind", "CNA_ShaderStage", "CNA_PlayerIndex", "CNA_GamePadButtonFlags", "CNA_TouchLocationState", "CNA_GestureType", "CNA_FileMode", "CNA_FileAccess", "CNA_FileShare", "CNA_SeekOrigin", "CNA_TextureDataType", "CNA_TextureImageFormat", "CNA_BufferUsage", "CNA_IndexElementSize", "CNA_SetDataOptions", "CNA_ClearOptions", "CNA_PrimitiveType", "CNA_UserVertexSource", "CNA_VertexElementFormat", "CNA_VertexElementUsage", "CNA_VertexType", "CNA_Blend", "CNA_BlendFunction", "CNA_ColorWriteChannels", "CNA_CompareFunction", "CNA_StencilOperation", "CNA_CullMode", "CNA_FillMode", "CNA_TextureAddressMode", "CNA_TextureFilter", "CNA_EffectParameterClass", "CNA_EffectParameterType", "CNA_EffectValueType", "CNA_EffectTextureType", "CNA_AudioChannels", "CNA_SoundState", "CNA_AudioStopOptions", "CNA_MicrophoneState", "CNA_AudioEventRegistrationHandle", "CNA_MediaState", "CNA_MediaSourceType", "CNA_VideoSoundtrackType", "CNA_MediaPlayerEventRegistrationHandle", "CNA_GamerPresenceMode", "CNA_NotificationPosition", "CNA_GamerZone", "CNA_LeaderboardKey", "CNA_LeaderboardOutcome", "CNA_MessageBoxIcon", "CNA_ControllerSensitivity", "CNA_GameDifficulty", "CNA_GamerPrivilegeSetting", "CNA_RacingCameraAngle", "CNA_AvatarBodyType", "CNA_AvatarRendererState", "CNA_AvatarEyebrow", "CNA_AvatarEye", "CNA_AvatarMouth", "CNA_AvatarAnimationPreset", "CNA_AvatarBone", "CNA_PropertyValueKind", "CNA_NetworkSessionEndReason", "CNA_NetworkSessionJoinError", "CNA_NetworkSessionState", "CNA_NetworkSessionType", "CNA_SendDataOptions", "CNA_NetworkEventType", "CNA_SignedInGamerHandle", "CNA_GamerHandle", "CNA_GamerProfileHandle", "CNA_GamerCollectionHandle", "CNA_GamerEnumeratorHandle", "CNA_AchievementHandle", "CNA_AchievementCollectionHandle", "CNA_PropertyDictionaryHandle", "CNA_LeaderboardReaderHandle", "CNA_LeaderboardEntryHandle", "CNA_AvatarDescriptionHandle", "CNA_AvatarAnimationHandle", "CNA_AvatarRendererHandle", "CNA_NetworkSessionPropertiesHandle", "CNA_NetworkSessionPropertyEnumeratorHandle", "CNA_PacketWriterHandle", "CNA_PacketReaderHandle", "CNA_NetworkGamerHandle", "CNA_NetworkMachineHandle", "CNA_AvailableNetworkSessionHandle", "CNA_AvailableNetworkSessionCollectionHandle", "CNA_NetworkSessionHandle", "CNA_NetworkSessionEventRegistrationHandle", "CNA_RenderPipelineHandle", "CNA_ShadowMapHandle", "CNA_PostProcessPassHandle", "CNA_PostProcessChainHandle", "CNA_RenderTargetPoolHandle", "CNA_GpuTimerHandle", "CNA_ParticleSystemHandle", "CNA_StorageBufferHandle", "CNA_ComputeShaderHandle", "CNA_GraphicsImageAccess", "CNA_GraphicsMemoryBarrier", "CNA_DecalPassHandle", "CNA_SkyboxHandle", "CNA_AtmosphericSkyHandle", "CNA_FullscreenPassHandle", "CNA_ScopedRenderTargetHandle", "CNA_SpatialUpscalePassHandle", "CNA_LutInterpolation", "CNA_SpotShadowMapHandle", "CNA_CubeShadowMapHandle", "CNA_CascadedShadowMapHandle", "CNA_PunctualLightKindEXT", "CNA_DepthNormalPrepassHandle", "CNA_TransparentDrawListHandle", "CNA_WeightedBlendedTransparencyHandle", "CNA_DepthEncoding", "CNA_HdrDisplayOutputHandle", "CNA_AutoExposureHandle", "CNA_CubeLutHandle", "CNA_DisplayColorSpace", "CNA_DebugDrawHandle", "CNA_FrustumCullerEXTHandle", "CNA_LodGroupEXTHandle", "CNA_ModelMeshPartHandle", "CNA_LodSelectionMode", "CNA_ClusteredLightType", "CNA_ClusteredLightSetHandle", "CNA_ClusteredLightGridHandle", "CNA_ClusteredLightAssignmentHandle", "CNA_ClusteredShadowPolicyHandle", "CNA_ClusteredLightBufferHandle", "CNA_ClusteredLightComputeHandle", "CNA_EffectHandle", "CNA_ClusteredForwardEffectHandle", "CNA_LightProbeHandle", "CNA_EnvironmentProcessorHandle", "CNA_LightProbeVolumeHandle", "CNA_LightProbeBakerHandle", "CNA_ShaderEffectFactoryHandle", "CNA_AreaLightShapeEXT", "CNA_AreaLightBrdfTableHandle", "CNA_GpuInstanceCullerHandle", "CNA_InstancedRendererEXTHandle", "CNA_VertexBufferHandle", "CNA_IndexBufferHandle", "CNA_SkinnedModelEXTHandle", "CNA_ClipTargetSpaceEXT", "CNA_SkinningDataHandle", "CNA_AnimationPlayerHandle", "CNA_MorphTargetDataEXTHandle", "CNA_ModelAnimationsEXTHandle", "CNA_PbrTextureSlot", "CNA_CameraHandle", "CNA_CameraState", "CNA_CameraPosition", "CNA_ModelHandle", "CNA_ModelBoneHandle", "CNA_ModelBoneCollectionHandle", "CNA_ModelMeshHandle", "CNA_ModelMeshCollectionHandle", "CNA_ModelMeshPartCollectionHandle", "CNA_ModelEffectCollectionHandle", "CNA_GltfImportDiagnosticSeverityEXT", "CNA_GltfImportDiagnosticKindEXT", "CNA_MotionHandle", "CNA_CnbByteWriterHandle", "CNA_CnbReaderHandle", "CNA_CnbAnimationClipHandle", "CNA_CnbModelFromCnjHandle", "CNA_CnjToCnbResultHandle", "CNA_CurveHandle", "CNA_ObjectDictionaryHandle", "CNA_ObjectDictionaryValueKind", "CNA_SystemTrayHandle", "CNA_GraphicsDeviceEventRegistrationHandle", "CNA_GraphicsDeviceEvent", "CNA_Unsupported3DGraphicsCallBehavior", "CNA_DeviceType", "CNA_MessageBoxType", "CNA_CurveKeyCollectionHandle", "CNA_CurveLoopType", "CNA_CurveContinuity", "CNA_CnbMorphDeltaStream", "CNA_CnbMorphKeyStream", "CNA_CnbSkeletonMatrixSet"],
   "constants": [
     "CNA_GAMER_PRESENCE_MODE_NONE", "CNA_GAMER_PRESENCE_MODE_SINGLE_PLAYER", "CNA_GAMER_PRESENCE_MODE_MULTIPLAYER", "CNA_GAMER_PRESENCE_MODE_LOCAL_CO_OP",
     "CNA_GAMER_PRESENCE_MODE_LOCAL_VERSUS", "CNA_GAMER_PRESENCE_MODE_ONLINE_CO_OP", "CNA_GAMER_PRESENCE_MODE_ONLINE_VERSUS", "CNA_GAMER_PRESENCE_MODE_VERSUS_COMPUTER",
@@ -3407,7 +3441,11 @@
     "CNA_OBJECT_DICTIONARY_VALUE_FOREIGN_OBJECT",
     "CNA_DEVICE_TYPE_DEVICE", "CNA_DEVICE_TYPE_EMULATOR",
     "CNA_MESSAGE_BOX_TYPE_ERROR", "CNA_MESSAGE_BOX_TYPE_WARNING",
-    "CNA_MESSAGE_BOX_TYPE_INFORMATION"
+    "CNA_MESSAGE_BOX_TYPE_INFORMATION",
+    "CNA_GRAPHICS_DEVICE_EVENT_DISPOSING", "CNA_GRAPHICS_DEVICE_EVENT_DEVICE_LOST",
+    "CNA_GRAPHICS_DEVICE_EVENT_DEVICE_RESET", "CNA_GRAPHICS_DEVICE_EVENT_DEVICE_RESETTING",
+    "CNA_UNSUPPORTED_3D_GRAPHICS_CALL_BEHAVIOR_THROW",
+    "CNA_UNSUPPORTED_3D_GRAPHICS_CALL_BEHAVIOR_WARN_AND_STUB"
   ],
   "callbackSignatures": {
     "CNA_InputDeviceHotplugCallback": {
@@ -3613,6 +3651,24 @@
       "cParameters": ["void*"],
       "rustReturn": "()",
       "rustParameters": ["*mut core::ffi::c_void"]
+    },
+    "CNA_GraphicsDeviceEventCallback": {
+      "cReturn": "void",
+      "cParameters": ["CNA_Handle", "void*"],
+      "rustReturn": "()",
+      "rustParameters": ["CNA_Handle", "*mut core::ffi::c_void"]
+    },
+    "CNA_GraphicsDeviceResourceCreatedCallback": {
+      "cReturn": "void",
+      "cParameters": ["CNA_Handle", "const CNA_ResourceCreatedEventInfo*", "void*"],
+      "rustReturn": "()",
+      "rustParameters": ["CNA_Handle", "*const CNA_ResourceCreatedEventInfo", "*mut core::ffi::c_void"]
+    },
+    "CNA_GraphicsDeviceResourceDestroyedCallback": {
+      "cReturn": "void",
+      "cParameters": ["CNA_Handle", "const CNA_ResourceDestroyedEventInfo*", "void*"],
+      "rustReturn": "()",
+      "rustParameters": ["CNA_Handle", "*const CNA_ResourceDestroyedEventInfo", "*mut core::ffi::c_void"]
     },
     "CNA_LightProbeSceneDrawCallback": {
       "cReturn": "void",

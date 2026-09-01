@@ -17,6 +17,12 @@ pub struct OcclusionQuery {
 }
 
 impl OcclusionQuery {
+    /// The native handle, for the extension routes in
+    /// [`crate::extensions::graphics_device_ext`].
+    pub(crate) fn native_handle(&self) -> Result<sys::CNA_Handle> {
+        self.state.require_handle()
+    }
+
     pub fn new(graphicsDevice: &GraphicsDevice) -> Result<Self> {
         let mut handle = sys::CNA_INVALID_HANDLE;
         graphicsDevice

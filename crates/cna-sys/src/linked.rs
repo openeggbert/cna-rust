@@ -12468,4 +12468,141 @@ extern "C" {
         argument2: f32,
     ) -> CNA_Result;
     pub fn cna_vibrate_controller_stop(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_graphics_device_clear_color_depth(
+        argument0: CNA_Handle,
+        argument1: CNA_Color,
+        argument2: f32,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_dispose(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_graphics_device_executes_shader_effect_source_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_get_display_color_space_ext(
+        argument0: CNA_Handle,
+        argument1: *mut u32,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_get_is_disposed(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_get_max_compute_work_group_count_ext(
+        argument0: CNA_Handle,
+        argument1: i32,
+        argument2: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_get_max_compute_work_group_invocations_ext(
+        argument0: CNA_Handle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_get_max_compute_work_group_size_ext(
+        argument0: CNA_Handle,
+        argument1: i32,
+        argument2: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_get_tracked_resource_count(
+        argument0: CNA_Handle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_get_unsupported_3d_call_behavior(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Unsupported3DGraphicsCallBehavior,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_notify_content_lost_resources_ext(
+        argument0: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_recreate_renderer_for_multi_sample_count_ext(
+        argument0: CNA_Handle,
+        argument1: i32,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_set_blend_enabled(
+        argument0: CNA_Handle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_set_context_recovery_enabled(
+        argument0: CNA_Handle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_set_current_effect(
+        argument0: CNA_Handle,
+        argument1: CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_set_depth_test_enabled(
+        argument0: CNA_Handle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_set_depth_write_enabled(
+        argument0: CNA_Handle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_set_display_color_space_ext(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_set_graphics_profile_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_GraphicsProfile,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_set_string_marker_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_set_unsupported_3d_call_behavior(
+        argument0: CNA_Handle,
+        argument1: CNA_Unsupported3DGraphicsCallBehavior,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_subscribe_event(
+        argument0: CNA_Handle,
+        argument1: CNA_GraphicsDeviceEvent,
+        argument2: CNA_GraphicsDeviceEventCallback,
+        argument3: *mut c_void,
+        argument4: *mut CNA_GraphicsDeviceEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_subscribe_resource_created(
+        argument0: CNA_Handle,
+        argument1: CNA_GraphicsDeviceResourceCreatedCallback,
+        argument2: *mut c_void,
+        argument3: *mut CNA_GraphicsDeviceEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_subscribe_resource_destroyed(
+        argument0: CNA_Handle,
+        argument1: CNA_GraphicsDeviceResourceDestroyedCallback,
+        argument2: *mut c_void,
+        argument3: *mut CNA_GraphicsDeviceEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_supports_display_color_space_ext(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_supports_image_based_lighting_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_supports_surface_format_as_render_target_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_SurfaceFormat,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_unbind_texture(
+        argument0: CNA_Handle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_unsubscribe(
+        argument0: CNA_GraphicsDeviceEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_occlusion_query_get_is_pixel_count_precise_ext(
+        argument0: CNA_OcclusionQueryHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_occlusion_query_has_renderer(
+        argument0: CNA_OcclusionQueryHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_primitive_type_get_vertex_count(
+        argument0: CNA_PrimitiveType,
+        argument1: i32,
+        argument2: *mut i32,
+    ) -> CNA_Result;
 }

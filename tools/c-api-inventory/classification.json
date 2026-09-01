@@ -536,6 +536,33 @@
         "evidence": "crates/cna/src/graphics/viewport.rs; the projection maths is measured against XNA's documented results in the behaviour corpus"
       },
       {
+        "id": "gamepad-values-in-rust",
+        "status": "DELIBERATE_NON_BINDING",
+        "names": [
+          "cna_gamepad_buttons_init_from_button_array",
+          "cna_gamepad_buttons_init_from_mask",
+          "cna_gamepad_buttons_is_pressed",
+          "cna_gamepad_dpad_init_from_button_array",
+          "cna_gamepad_dpad_init_from_states",
+          "cna_gamepad_dpad_is_pressed",
+          "cna_gamepad_state_init_from_components",
+          "cna_gamepad_state_get_buttons",
+          "cna_gamepad_state_get_dpad",
+          "cna_gamepad_state_get_thumb_sticks",
+          "cna_gamepad_state_get_triggers",
+          "cna_gamepad_thumb_sticks_init_from_positions",
+          "cna_gamepad_triggers_init_from_positions"
+        ],
+        "reason": "a GamePadState is four small values and these construct or read them. crates/cna/src/input/gamepad.rs builds each with a Rust constructor -- GamePadDPad::new, GamePadTriggers::new with its own NaN-aware clamp, GamePadThumbSticks::new, GamePadState's from_... -- and reads them back through Buttons, DPad, ThumbSticks and Triggers. `is_pressed` is GamePadState::IsButtonDown. Binding these would put a fallible native call in front of a field read the compiler already checks. The routes that read a *device* rather than a value -- the touchpad, the motion sensors, the light bar -- are bound, because those are not values Rust holds.",
+        "rustEvidence": [
+          "pub const fn IsButtonDown",
+          "pub const fn ThumbSticks",
+          "pub const fn DPad",
+          "pub struct GamePadButtons"
+        ],
+        "evidence": "crates/cna/src/input/gamepad.rs, and the behaviour corpus which measures the trigger clamp and the button mask against XNA's documented results"
+      },
+      {
         "id": "reflective-reader-writes-at-caller-offsets",
         "status": "DELIBERATE_NON_BINDING",
         "names": [

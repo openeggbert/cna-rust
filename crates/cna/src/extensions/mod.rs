@@ -12,6 +12,7 @@ pub mod engine;
 pub mod events;
 pub mod gamer_services;
 pub mod graphics;
+pub mod graphics_device_ext;
 pub mod haptics;
 pub mod input;
 pub mod input_devices;

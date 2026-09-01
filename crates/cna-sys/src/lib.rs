@@ -689,6 +689,57 @@ pub type CNA_CnbByteWriterHandle = CNA_Handle;
 pub type CNA_CnbAnimationClipHandle = CNA_Handle;
 pub type CNA_CurveHandle = CNA_Handle;
 pub type CNA_SystemTrayHandle = CNA_Handle;
+pub type CNA_GraphicsDeviceEventRegistrationHandle = CNA_Handle;
+
+pub type CNA_GraphicsDeviceEvent = u32;
+
+pub const CNA_GRAPHICS_DEVICE_EVENT_DISPOSING: CNA_GraphicsDeviceEvent = 0;
+pub const CNA_GRAPHICS_DEVICE_EVENT_DEVICE_LOST: CNA_GraphicsDeviceEvent = 1;
+pub const CNA_GRAPHICS_DEVICE_EVENT_DEVICE_RESET: CNA_GraphicsDeviceEvent = 2;
+pub const CNA_GRAPHICS_DEVICE_EVENT_DEVICE_RESETTING: CNA_GraphicsDeviceEvent = 3;
+
+pub type CNA_Unsupported3DGraphicsCallBehavior = u32;
+
+pub const CNA_UNSUPPORTED_3D_GRAPHICS_CALL_BEHAVIOR_THROW:
+    CNA_Unsupported3DGraphicsCallBehavior = 0;
+pub const CNA_UNSUPPORTED_3D_GRAPHICS_CALL_BEHAVIOR_WARN_AND_STUB:
+    CNA_Unsupported3DGraphicsCallBehavior = 1;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_ResourceCreatedEventInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub has_resource: CNA_Bool,
+    pub reserved: [u8; 7],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_ResourceDestroyedEventInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub has_tag: CNA_Bool,
+    pub reserved: [u8; 7],
+    pub name: CNA_StringView,
+}
+
+pub type CNA_GraphicsDeviceEventCallback =
+    Option<unsafe extern "C" fn(graphics_device: CNA_Handle, context: *mut c_void)>;
+pub type CNA_GraphicsDeviceResourceCreatedCallback = Option<
+    unsafe extern "C" fn(
+        graphics_device: CNA_Handle,
+        info: *const CNA_ResourceCreatedEventInfo,
+        context: *mut c_void,
+    ),
+>;
+pub type CNA_GraphicsDeviceResourceDestroyedCallback = Option<
+    unsafe extern "C" fn(
+        graphics_device: CNA_Handle,
+        info: *const CNA_ResourceDestroyedEventInfo,
+        context: *mut c_void,
+    ),
+>;
 
 pub type CNA_DeviceType = u32;
 
@@ -12780,3 +12831,104 @@ pub type cna_vibrate_controller_start_with_intensity_ext_fn = unsafe extern "C" 
     CNA_Handle, i64, f32,
 ) -> CNA_Result;
 pub type cna_vibrate_controller_stop_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+
+// --- RUST-EXT-015e: what a graphics device can say about itself -------------
+//
+// The renderer capabilities a game asks before choosing a path -- compute
+// work-group limits, colour space, which surface formats are render
+// targets -- plus the device's own lifecycle events and the render-state
+// toggles that sit under the strict projection's state objects.
+pub type cna_graphics_device_clear_color_depth_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Color, f32,
+) -> CNA_Result;
+pub type cna_graphics_device_dispose_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_graphics_device_executes_shader_effect_source_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_graphics_device_get_display_color_space_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut u32,
+) -> CNA_Result;
+pub type cna_graphics_device_get_is_disposed_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_graphics_device_get_max_compute_work_group_count_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, i32, *mut i32,
+) -> CNA_Result;
+pub type cna_graphics_device_get_max_compute_work_group_invocations_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut i32,
+) -> CNA_Result;
+pub type cna_graphics_device_get_max_compute_work_group_size_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, i32, *mut i32,
+) -> CNA_Result;
+pub type cna_graphics_device_get_tracked_resource_count_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_device_get_unsupported_3d_call_behavior_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Unsupported3DGraphicsCallBehavior,
+) -> CNA_Result;
+pub type cna_graphics_device_notify_content_lost_resources_ext_fn = unsafe extern "C" fn(
+    CNA_Handle,
+) -> CNA_Result;
+pub type cna_graphics_device_recreate_renderer_for_multi_sample_count_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, i32,
+) -> CNA_Result;
+pub type cna_graphics_device_set_blend_enabled_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_graphics_device_set_context_recovery_enabled_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_graphics_device_set_current_effect_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_graphics_device_set_depth_test_enabled_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_graphics_device_set_depth_write_enabled_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_graphics_device_set_display_color_space_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_graphics_device_set_graphics_profile_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_GraphicsProfile,
+) -> CNA_Result;
+pub type cna_graphics_device_set_string_marker_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView,
+) -> CNA_Result;
+pub type cna_graphics_device_set_unsupported_3d_call_behavior_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Unsupported3DGraphicsCallBehavior,
+) -> CNA_Result;
+pub type cna_graphics_device_subscribe_event_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_GraphicsDeviceEvent, CNA_GraphicsDeviceEventCallback, *mut c_void, *mut CNA_GraphicsDeviceEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_graphics_device_subscribe_resource_created_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_GraphicsDeviceResourceCreatedCallback, *mut c_void, *mut CNA_GraphicsDeviceEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_graphics_device_subscribe_resource_destroyed_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_GraphicsDeviceResourceDestroyedCallback, *mut c_void, *mut CNA_GraphicsDeviceEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_graphics_device_supports_display_color_space_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_graphics_device_supports_image_based_lighting_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_graphics_device_supports_surface_format_as_render_target_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_SurfaceFormat, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_graphics_device_unbind_texture_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Handle,
+) -> CNA_Result;
+pub type cna_graphics_device_unsubscribe_fn = unsafe extern "C" fn(
+    CNA_GraphicsDeviceEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_occlusion_query_get_is_pixel_count_precise_ext_fn = unsafe extern "C" fn(
+    CNA_OcclusionQueryHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_occlusion_query_has_renderer_fn = unsafe extern "C" fn(
+    CNA_OcclusionQueryHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_primitive_type_get_vertex_count_fn = unsafe extern "C" fn(
+    CNA_PrimitiveType, i32, *mut i32,
+) -> CNA_Result;
