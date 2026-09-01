@@ -705,3 +705,75 @@ fn media_text(
 ) -> Result<String> {
     super::runtime::read_string(check, size, copy)
 }
+
+/// The last of `media.h`, `media_player.h` and `media_library.h`.
+impl Native {
+    /// Whether a song of this duration has ended after `elapsed` ticks.
+    ///
+    /// A pure predicate, and a deliberate one: some backends do not raise a
+    /// song-ended event at all, so a player that needs `MediaStateChanged` to
+    /// fire has to watch the clock. CNA's rule for when a song counts as ended
+    /// is what this asks, rather than a comparison this side invents.
+    pub(crate) fn song_ended_by_elapsed(
+        &self,
+        song: sys::CNA_SongHandle,
+        elapsed_ticks: i64,
+    ) -> Result<bool> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the song handle is live and the output is a local.
+        self.check(unsafe {
+            (self.media_player_detect_song_ended_by_elapsed_time_ext)(
+                song,
+                elapsed_ticks,
+                &mut value,
+            )
+        })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    pub(crate) fn media_queue_add(
+        &self,
+        queue: sys::CNA_MediaQueueHandle,
+        song: sys::CNA_SongHandle,
+    ) -> Result<()> {
+        // SAFETY: both handles are live for the call.
+        self.check(unsafe { (self.media_queue_add)(queue, song) })
+    }
+
+    pub(crate) fn media_queue_clear(&self, queue: sys::CNA_MediaQueueHandle) -> Result<()> {
+        // SAFETY: the queue handle is live.
+        self.check(unsafe { (self.media_queue_clear)(queue) })
+    }
+
+    /// The platform token a picture carries.
+    pub(crate) fn picture_token(&self, picture: sys::CNA_PictureHandle) -> Result<String> {
+        media_text(
+            |result| self.check(result),
+            // SAFETY: the handle is live and the output is a local.
+            |out| unsafe { (self.picture_get_token_size_ext)(picture, out) },
+            // SAFETY: the destination has the capacity just measured.
+            |destination, capacity, written| unsafe {
+                (self.picture_copy_token_ext)(picture, destination, capacity, written)
+            },
+        )
+    }
+
+    pub(crate) fn save_picture_from_stream(
+        &self,
+        library: sys::CNA_MediaLibraryHandle,
+        name: &str,
+        stream: sys::CNA_Handle,
+    ) -> Result<sys::CNA_PictureHandle> {
+        let mut picture = 0;
+        // SAFETY: the handles are live and the name outlives the call.
+        self.check(unsafe {
+            (self.media_library_save_picture_from_stream)(
+                library,
+                media_view(name),
+                stream,
+                &mut picture,
+            )
+        })?;
+        Ok(picture)
+    }
+}

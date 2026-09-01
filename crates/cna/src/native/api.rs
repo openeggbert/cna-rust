@@ -723,6 +723,67 @@ pub(crate) struct Native {
     pub(super) song_set_duration: sys::cna_song_set_duration_fn,
     pub(super) song_set_play_count: sys::cna_song_set_play_count_fn,
     pub(super) song_collection_create: sys::cna_song_collection_create_fn,
+    pub(super) ascii_post_process_effect_draw: sys::cna_ascii_post_process_effect_draw_fn,
+    pub(super) assembly_copy_title_ext: sys::cna_assembly_copy_title_ext_fn,
+    pub(super) assembly_set_title_ext: sys::cna_assembly_set_title_ext_fn,
+    pub(super) clipboard_get_has_text: sys::cna_clipboard_get_has_text_fn,
+    pub(super) game_window_get_is_borderless_ext: sys::cna_game_window_get_is_borderless_ext_fn,
+    pub(super) game_window_get_native_window_ext: sys::cna_game_window_get_native_window_ext_fn,
+    pub(super) game_window_minimize_ext: sys::cna_game_window_minimize_ext_fn,
+    pub(super) game_window_restore_ext: sys::cna_game_window_restore_ext_fn,
+    pub(super) game_window_set_is_borderless_ext: sys::cna_game_window_set_is_borderless_ext_fn,
+    pub(super) graphics_adapters_refresh: sys::cna_graphics_adapters_refresh_fn,
+    pub(super) graphics_device_get_backbuffer_data_rgba8: sys::cna_graphics_device_get_backbuffer_data_rgba8_fn,
+    pub(super) graphics_device_get_backbuffer_info: sys::cna_graphics_device_get_backbuffer_info_fn,
+    pub(super) graphics_device_get_native_window_handle: sys::cna_graphics_device_get_native_window_handle_fn,
+    pub(super) graphics_device_information_clone: sys::cna_graphics_device_information_clone_fn,
+    pub(super) graphics_device_manager_get_graphics_device: sys::cna_graphics_device_manager_get_graphics_device_fn,
+    pub(super) graphics_device_manager_get_preferred_presentation_mode_ext: sys::cna_graphics_device_manager_get_preferred_presentation_mode_ext_fn,
+    pub(super) graphics_device_manager_set_preferred_presentation_mode_ext: sys::cna_graphics_device_manager_set_preferred_presentation_mode_ext_fn,
+    pub(super) graphics_device_manager_subscribe_preparing_device_settings: sys::cna_graphics_device_manager_subscribe_preparing_device_settings_fn,
+    pub(super) graphics_device_set_presentation_parameters: sys::cna_graphics_device_set_presentation_parameters_fn,
+    pub(super) graphics_device_set_render_target2d: sys::cna_graphics_device_set_render_target2d_fn,
+    pub(super) graphics_device_set_render_target_cube: sys::cna_graphics_device_set_render_target_cube_fn,
+    pub(super) graphics_renderer_reset_selection_for_tests_ext: sys::cna_graphics_renderer_reset_selection_for_tests_ext_fn,
+    pub(super) index_buffer_subscribe_content_lost: sys::cna_index_buffer_subscribe_content_lost_fn,
+    pub(super) index_buffer_unsubscribe_content_lost: sys::cna_index_buffer_unsubscribe_content_lost_fn,
+    pub(super) input_devices_reset_for_tests_ext: sys::cna_input_devices_reset_for_tests_ext_fn,
+    pub(super) joysticks_raise_connected_ext: sys::cna_joysticks_raise_connected_ext_fn,
+    pub(super) joysticks_raise_disconnected_ext: sys::cna_joysticks_raise_disconnected_ext_fn,
+    pub(super) joysticks_reset_for_tests_ext: sys::cna_joysticks_reset_for_tests_ext_fn,
+    pub(super) joysticks_subscribe_connected_ext: sys::cna_joysticks_subscribe_connected_ext_fn,
+    pub(super) joysticks_subscribe_disconnected_ext: sys::cna_joysticks_subscribe_disconnected_ext_fn,
+    pub(super) joysticks_unsubscribe_ext: sys::cna_joysticks_unsubscribe_ext_fn,
+    pub(super) media_library_save_picture_from_stream: sys::cna_media_library_save_picture_from_stream_fn,
+    pub(super) media_player_detect_song_ended_by_elapsed_time_ext: sys::cna_media_player_detect_song_ended_by_elapsed_time_ext_fn,
+    pub(super) media_queue_add: sys::cna_media_queue_add_fn,
+    pub(super) media_queue_clear: sys::cna_media_queue_clear_fn,
+    pub(super) picture_copy_token_ext: sys::cna_picture_copy_token_ext_fn,
+    pub(super) picture_get_token_size_ext: sys::cna_picture_get_token_size_ext_fn,
+    pub(super) power_get_info: sys::cna_power_get_info_fn,
+    pub(super) presentation_parameters_clone: sys::cna_presentation_parameters_clone_fn,
+    pub(super) presentation_parameters_get_bounds: sys::cna_presentation_parameters_get_bounds_fn,
+    pub(super) render_target_subscribe_content_lost: sys::cna_render_target_subscribe_content_lost_fn,
+    pub(super) render_target_unsubscribe_content_lost: sys::cna_render_target_unsubscribe_content_lost_fn,
+    pub(super) render_target_usage_preserves_contents: sys::cna_render_target_usage_preserves_contents_fn,
+    pub(super) sensors_get_accelerometer: sys::cna_sensors_get_accelerometer_fn,
+    pub(super) sensors_get_gyroscope: sys::cna_sensors_get_gyroscope_fn,
+    pub(super) sprite_batch_draw_mesh_ext: sys::cna_sprite_batch_draw_mesh_ext_fn,
+    pub(super) sprite_batch_submit_scaled_many: sys::cna_sprite_batch_submit_scaled_many_fn,
+    pub(super) storage_container_get_is_disposed: sys::cna_storage_container_get_is_disposed_fn,
+    pub(super) storage_container_get_storage_device: sys::cna_storage_container_get_storage_device_fn,
+    pub(super) storage_copy_root_ext: sys::cna_storage_copy_root_ext_fn,
+    pub(super) storage_get_root_size_ext: sys::cna_storage_get_root_size_ext_fn,
+    pub(super) storage_set_app_name_ext: sys::cna_storage_set_app_name_ext_fn,
+    pub(super) text_input_reset_for_tests_ext: sys::cna_text_input_reset_for_tests_ext_fn,
+    pub(super) texture2d_get_data_rgba8: sys::cna_texture2d_get_data_rgba8_fn,
+    pub(super) texture2d_set_data_rgba8: sys::cna_texture2d_set_data_rgba8_fn,
+    pub(super) texture3d_set_data_bytes: sys::cna_texture3d_set_data_bytes_fn,
+    pub(super) texturecube_create_from_dds_memory: sys::cna_texturecube_create_from_dds_memory_fn,
+    pub(super) vertex_buffer_copy_declaration_elements: sys::cna_vertex_buffer_copy_declaration_elements_fn,
+    pub(super) vertex_buffer_get_data: sys::cna_vertex_buffer_get_data_fn,
+    pub(super) vertex_buffer_subscribe_content_lost: sys::cna_vertex_buffer_subscribe_content_lost_fn,
+    pub(super) vertex_buffer_unsubscribe_content_lost: sys::cna_vertex_buffer_unsubscribe_content_lost_fn,
     pub(super) mouse_get_state: sys::cna_mouse_get_state_fn,
     pub(super) mouse_get_window_handle: sys::cna_mouse_get_window_handle_fn,
     pub(super) mouse_set_window_handle: sys::cna_mouse_set_window_handle_fn,
@@ -2445,6 +2506,189 @@ impl Native {
             ),
             song_collection_create: symbol!(cna_song_collection_create,
                 sys::cna_song_collection_create_fn
+            ),
+            ascii_post_process_effect_draw: symbol!(cna_ascii_post_process_effect_draw,
+                sys::cna_ascii_post_process_effect_draw_fn
+            ),
+            assembly_copy_title_ext: symbol!(cna_assembly_copy_title_ext,
+                sys::cna_assembly_copy_title_ext_fn
+            ),
+            assembly_set_title_ext: symbol!(cna_assembly_set_title_ext,
+                sys::cna_assembly_set_title_ext_fn
+            ),
+            clipboard_get_has_text: symbol!(cna_clipboard_get_has_text,
+                sys::cna_clipboard_get_has_text_fn
+            ),
+            game_window_get_is_borderless_ext: symbol!(cna_game_window_get_is_borderless_ext,
+                sys::cna_game_window_get_is_borderless_ext_fn
+            ),
+            game_window_get_native_window_ext: symbol!(cna_game_window_get_native_window_ext,
+                sys::cna_game_window_get_native_window_ext_fn
+            ),
+            game_window_minimize_ext: symbol!(cna_game_window_minimize_ext,
+                sys::cna_game_window_minimize_ext_fn
+            ),
+            game_window_restore_ext: symbol!(cna_game_window_restore_ext,
+                sys::cna_game_window_restore_ext_fn
+            ),
+            game_window_set_is_borderless_ext: symbol!(cna_game_window_set_is_borderless_ext,
+                sys::cna_game_window_set_is_borderless_ext_fn
+            ),
+            graphics_adapters_refresh: symbol!(cna_graphics_adapters_refresh,
+                sys::cna_graphics_adapters_refresh_fn
+            ),
+            graphics_device_get_backbuffer_data_rgba8: symbol!(cna_graphics_device_get_backbuffer_data_rgba8,
+                sys::cna_graphics_device_get_backbuffer_data_rgba8_fn
+            ),
+            graphics_device_get_backbuffer_info: symbol!(cna_graphics_device_get_backbuffer_info,
+                sys::cna_graphics_device_get_backbuffer_info_fn
+            ),
+            graphics_device_get_native_window_handle: symbol!(cna_graphics_device_get_native_window_handle,
+                sys::cna_graphics_device_get_native_window_handle_fn
+            ),
+            graphics_device_information_clone: symbol!(cna_graphics_device_information_clone,
+                sys::cna_graphics_device_information_clone_fn
+            ),
+            graphics_device_manager_get_graphics_device: symbol!(cna_graphics_device_manager_get_graphics_device,
+                sys::cna_graphics_device_manager_get_graphics_device_fn
+            ),
+            graphics_device_manager_get_preferred_presentation_mode_ext: symbol!(cna_graphics_device_manager_get_preferred_presentation_mode_ext,
+                sys::cna_graphics_device_manager_get_preferred_presentation_mode_ext_fn
+            ),
+            graphics_device_manager_set_preferred_presentation_mode_ext: symbol!(cna_graphics_device_manager_set_preferred_presentation_mode_ext,
+                sys::cna_graphics_device_manager_set_preferred_presentation_mode_ext_fn
+            ),
+            graphics_device_manager_subscribe_preparing_device_settings: symbol!(cna_graphics_device_manager_subscribe_preparing_device_settings,
+                sys::cna_graphics_device_manager_subscribe_preparing_device_settings_fn
+            ),
+            graphics_device_set_presentation_parameters: symbol!(cna_graphics_device_set_presentation_parameters,
+                sys::cna_graphics_device_set_presentation_parameters_fn
+            ),
+            graphics_device_set_render_target2d: symbol!(cna_graphics_device_set_render_target2d,
+                sys::cna_graphics_device_set_render_target2d_fn
+            ),
+            graphics_device_set_render_target_cube: symbol!(cna_graphics_device_set_render_target_cube,
+                sys::cna_graphics_device_set_render_target_cube_fn
+            ),
+            graphics_renderer_reset_selection_for_tests_ext: symbol!(cna_graphics_renderer_reset_selection_for_tests_ext,
+                sys::cna_graphics_renderer_reset_selection_for_tests_ext_fn
+            ),
+            index_buffer_subscribe_content_lost: symbol!(cna_index_buffer_subscribe_content_lost,
+                sys::cna_index_buffer_subscribe_content_lost_fn
+            ),
+            index_buffer_unsubscribe_content_lost: symbol!(cna_index_buffer_unsubscribe_content_lost,
+                sys::cna_index_buffer_unsubscribe_content_lost_fn
+            ),
+            input_devices_reset_for_tests_ext: symbol!(cna_input_devices_reset_for_tests_ext,
+                sys::cna_input_devices_reset_for_tests_ext_fn
+            ),
+            joysticks_raise_connected_ext: symbol!(cna_joysticks_raise_connected_ext,
+                sys::cna_joysticks_raise_connected_ext_fn
+            ),
+            joysticks_raise_disconnected_ext: symbol!(cna_joysticks_raise_disconnected_ext,
+                sys::cna_joysticks_raise_disconnected_ext_fn
+            ),
+            joysticks_reset_for_tests_ext: symbol!(cna_joysticks_reset_for_tests_ext,
+                sys::cna_joysticks_reset_for_tests_ext_fn
+            ),
+            joysticks_subscribe_connected_ext: symbol!(cna_joysticks_subscribe_connected_ext,
+                sys::cna_joysticks_subscribe_connected_ext_fn
+            ),
+            joysticks_subscribe_disconnected_ext: symbol!(cna_joysticks_subscribe_disconnected_ext,
+                sys::cna_joysticks_subscribe_disconnected_ext_fn
+            ),
+            joysticks_unsubscribe_ext: symbol!(cna_joysticks_unsubscribe_ext,
+                sys::cna_joysticks_unsubscribe_ext_fn
+            ),
+            media_library_save_picture_from_stream: symbol!(cna_media_library_save_picture_from_stream,
+                sys::cna_media_library_save_picture_from_stream_fn
+            ),
+            media_player_detect_song_ended_by_elapsed_time_ext: symbol!(cna_media_player_detect_song_ended_by_elapsed_time_ext,
+                sys::cna_media_player_detect_song_ended_by_elapsed_time_ext_fn
+            ),
+            media_queue_add: symbol!(cna_media_queue_add,
+                sys::cna_media_queue_add_fn
+            ),
+            media_queue_clear: symbol!(cna_media_queue_clear,
+                sys::cna_media_queue_clear_fn
+            ),
+            picture_copy_token_ext: symbol!(cna_picture_copy_token_ext,
+                sys::cna_picture_copy_token_ext_fn
+            ),
+            picture_get_token_size_ext: symbol!(cna_picture_get_token_size_ext,
+                sys::cna_picture_get_token_size_ext_fn
+            ),
+            power_get_info: symbol!(cna_power_get_info,
+                sys::cna_power_get_info_fn
+            ),
+            presentation_parameters_clone: symbol!(cna_presentation_parameters_clone,
+                sys::cna_presentation_parameters_clone_fn
+            ),
+            presentation_parameters_get_bounds: symbol!(cna_presentation_parameters_get_bounds,
+                sys::cna_presentation_parameters_get_bounds_fn
+            ),
+            render_target_subscribe_content_lost: symbol!(cna_render_target_subscribe_content_lost,
+                sys::cna_render_target_subscribe_content_lost_fn
+            ),
+            render_target_unsubscribe_content_lost: symbol!(cna_render_target_unsubscribe_content_lost,
+                sys::cna_render_target_unsubscribe_content_lost_fn
+            ),
+            render_target_usage_preserves_contents: symbol!(cna_render_target_usage_preserves_contents,
+                sys::cna_render_target_usage_preserves_contents_fn
+            ),
+            sensors_get_accelerometer: symbol!(cna_sensors_get_accelerometer,
+                sys::cna_sensors_get_accelerometer_fn
+            ),
+            sensors_get_gyroscope: symbol!(cna_sensors_get_gyroscope,
+                sys::cna_sensors_get_gyroscope_fn
+            ),
+            sprite_batch_draw_mesh_ext: symbol!(cna_sprite_batch_draw_mesh_ext,
+                sys::cna_sprite_batch_draw_mesh_ext_fn
+            ),
+            sprite_batch_submit_scaled_many: symbol!(cna_sprite_batch_submit_scaled_many,
+                sys::cna_sprite_batch_submit_scaled_many_fn
+            ),
+            storage_container_get_is_disposed: symbol!(cna_storage_container_get_is_disposed,
+                sys::cna_storage_container_get_is_disposed_fn
+            ),
+            storage_container_get_storage_device: symbol!(cna_storage_container_get_storage_device,
+                sys::cna_storage_container_get_storage_device_fn
+            ),
+            storage_copy_root_ext: symbol!(cna_storage_copy_root_ext,
+                sys::cna_storage_copy_root_ext_fn
+            ),
+            storage_get_root_size_ext: symbol!(cna_storage_get_root_size_ext,
+                sys::cna_storage_get_root_size_ext_fn
+            ),
+            storage_set_app_name_ext: symbol!(cna_storage_set_app_name_ext,
+                sys::cna_storage_set_app_name_ext_fn
+            ),
+            text_input_reset_for_tests_ext: symbol!(cna_text_input_reset_for_tests_ext,
+                sys::cna_text_input_reset_for_tests_ext_fn
+            ),
+            texture2d_get_data_rgba8: symbol!(cna_texture2d_get_data_rgba8,
+                sys::cna_texture2d_get_data_rgba8_fn
+            ),
+            texture2d_set_data_rgba8: symbol!(cna_texture2d_set_data_rgba8,
+                sys::cna_texture2d_set_data_rgba8_fn
+            ),
+            texture3d_set_data_bytes: symbol!(cna_texture3d_set_data_bytes,
+                sys::cna_texture3d_set_data_bytes_fn
+            ),
+            texturecube_create_from_dds_memory: symbol!(cna_texturecube_create_from_dds_memory,
+                sys::cna_texturecube_create_from_dds_memory_fn
+            ),
+            vertex_buffer_copy_declaration_elements: symbol!(cna_vertex_buffer_copy_declaration_elements,
+                sys::cna_vertex_buffer_copy_declaration_elements_fn
+            ),
+            vertex_buffer_get_data: symbol!(cna_vertex_buffer_get_data,
+                sys::cna_vertex_buffer_get_data_fn
+            ),
+            vertex_buffer_subscribe_content_lost: symbol!(cna_vertex_buffer_subscribe_content_lost,
+                sys::cna_vertex_buffer_subscribe_content_lost_fn
+            ),
+            vertex_buffer_unsubscribe_content_lost: symbol!(cna_vertex_buffer_unsubscribe_content_lost,
+                sys::cna_vertex_buffer_unsubscribe_content_lost_fn
             ),
             mouse_get_state: symbol!(cna_mouse_get_state, sys::cna_mouse_get_state_fn),
             mouse_get_window_handle: symbol!(cna_mouse_get_window_handle,

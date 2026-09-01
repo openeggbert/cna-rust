@@ -1239,3 +1239,31 @@ mod tests {
             .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
     }
 }
+
+/// The `storage.h` container facts CNA holds that Rust does not.
+impl StorageContainer {
+    /// Whether CNA considers the container disposed.
+    ///
+    /// A different question from [`IsDisposed`](Self::IsDisposed), which asks
+    /// whether Rust released it. They differ when the device goes away
+    /// underneath a container the Rust value still holds.
+    pub fn NativeIsDisposed(&self) -> Result<bool> {
+        self.state
+            .native
+            .storage_container_is_disposed(self.state.handle()?)
+    }
+
+    /// Whether CNA still associates this container with a storage device.
+    ///
+    /// `StorageDevice` is already reachable through the Rust value; this asks
+    /// CNA, and answers `false` for a container whose device it has dropped --
+    /// the state that makes every subsequent file operation fail, and the one
+    /// a caller otherwise learns about only from that failure.
+    pub fn HasNativeStorageDevice(&self) -> Result<bool> {
+        Ok(self
+            .state
+            .native
+            .storage_container_device(self.state.handle()?)?
+            .is_some())
+    }
+}

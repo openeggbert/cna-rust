@@ -9,6 +9,23 @@ macro_rules! xna_enum {
         pub enum $name {
             $($variant = $value),+
         }
+
+        impl $name {
+            /// The member a native value names, or `None` for one this enum has
+            /// no member for.
+            ///
+            /// Reading an enum *back* from CNA needs this, and until
+            /// `vertex_resources.h`'s element routes were bound nothing did --
+            /// every use went the other way, where `as u32` is enough. `None`
+            /// rather than a default because a value outside the set means CNA
+            /// knows something this build does not, and a silently substituted
+            /// member would hide that.
+            #[must_use]
+            pub const fn from_native_value(value: u32) -> Option<Self> {
+                $(if value == $value as u32 { return Some(Self::$variant); })+
+                None
+            }
+        }
     };
 }
 
@@ -183,7 +200,7 @@ impl ColorWriteChannels {
     pub const Alpha: Self = Self(8);
     pub const All: Self = Self(15);
 
-    pub(super) const fn bits(self) -> u32 {
+    pub(crate) const fn bits(self) -> u32 {
         u32::from_ne_bytes(self.0.to_ne_bytes())
     }
 
@@ -222,7 +239,7 @@ impl ClearOptions {
     pub const DepthBuffer: Self = Self(2);
     pub const Stencil: Self = Self(4);
 
-    pub(super) const fn bits(self) -> u32 {
+    pub(crate) const fn bits(self) -> u32 {
         u32::from_ne_bytes(self.0.to_ne_bytes())
     }
 }
@@ -236,7 +253,7 @@ macro_rules! open_graphics_flags {
         impl $name {
             $(pub const $constant: Self = Self($value);)+
 
-            pub(super) const fn bits(self) -> u32 {
+            pub(crate) const fn bits(self) -> u32 {
                 u32::from_ne_bytes(self.0.to_ne_bytes())
             }
         }
@@ -318,7 +335,7 @@ impl SpriteEffects {
     pub const FlipHorizontally: Self = Self(1);
     pub const FlipVertically: Self = Self(2);
 
-    pub(super) const fn bits(self) -> u32 {
+    pub(crate) const fn bits(self) -> u32 {
         u32::from_ne_bytes(self.0.to_ne_bytes())
     }
 }

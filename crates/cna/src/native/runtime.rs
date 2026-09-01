@@ -9,6 +9,7 @@ use cna_sys as sys;
 use crate::error::{CnaError, Result};
 
 use super::loader::NativeSource;
+use super::Native;
 
 #[derive(Debug)]
 pub(crate) struct RuntimeApi {
@@ -1571,4 +1572,62 @@ pub(crate) fn read_string(
         buffer.pop();
     }
     String::from_utf8(buffer).map_err(|_| CnaError::InvalidInput("CNA text is not valid UTF-8"))
+}
+
+/// The last of `core_ext.h`: the assembly title, and the renderer-selection
+/// test hook.
+impl Native {
+    /// Overrides the title CNA reports for the running assembly.
+    ///
+    /// XNA reads it from the assembly's own metadata, which a Rust binary does
+    /// not have. Without this, everything derived from it -- the default window
+    /// caption, the storage directory name -- falls back to whatever CNA
+    /// guesses from the executable.
+    pub(crate) fn set_assembly_title(&self, title: &str) -> Result<()> {
+        let view = sys::CNA_StringView {
+            data: title.as_ptr().cast(),
+            byte_length: title.len() as u64,
+        };
+        // SAFETY: the title outlives the call, which is all the view borrows.
+        self.check(unsafe { (self.assembly_set_title_ext)(view) })
+    }
+
+    /// The title CNA reports for the running assembly.
+    ///
+    /// One route does both halves: a null destination with a zero capacity asks
+    /// for the size, and the same call with a buffer copies. That is why this
+    /// does not use the size/copy pair the other text routes do.
+    pub(crate) fn assembly_title(&self) -> Result<String> {
+        read_string(
+            |result| self.check(result),
+            // SAFETY: a null destination with a zero capacity is the
+            // documented way to ask for the size. It answers
+            // BUFFER_TOO_SMALL once a title has been set -- the count is still
+            // written -- so that result is a sizing answer here rather than a
+            // failure, which is what the empty-title case hid until a test set
+            // one.
+            |out| unsafe {
+                let result = (self.assembly_copy_title_ext)(core::ptr::null_mut(), 0, out);
+                if result == sys::CNA_RESULT_BUFFER_TOO_SMALL {
+                    sys::CNA_RESULT_SUCCESS
+                } else {
+                    result
+                }
+            },
+            // SAFETY: the destination has the capacity just measured.
+            |destination, capacity, written| unsafe {
+                (self.assembly_copy_title_ext)(destination, capacity, written)
+            },
+        )
+    }
+
+    /// Clears the process-wide renderer choice so the next device re-selects.
+    ///
+    /// The selection is made once and cached for the life of the process, which
+    /// is right for a game and wrong for a test that wants to exercise more
+    /// than one renderer. This is the only way to undo it.
+    pub(crate) fn reset_renderer_selection_for_tests(&self) -> Result<()> {
+        // SAFETY: the route takes nothing.
+        self.check(unsafe { (self.graphics_renderer_reset_selection_for_tests_ext)() })
+    }
 }

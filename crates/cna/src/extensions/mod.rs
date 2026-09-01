@@ -8,6 +8,7 @@
 pub mod audio_ext;
 pub mod content;
 pub mod content_reader;
+pub mod device_surface;
 pub mod devices;
 pub mod effects;
 pub mod engine;
@@ -32,8 +33,10 @@ pub mod native_model;
 pub mod net;
 pub mod object_dictionary;
 pub mod pbr;
+pub mod resource_events;
 pub mod runtime;
 pub mod shader_effect;
 pub mod sensors;
+pub mod storage_ext;
 pub mod text_input;
 pub mod window;

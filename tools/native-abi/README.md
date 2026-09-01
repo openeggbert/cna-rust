@@ -36,14 +36,14 @@ trusted.
 Current reviewed ABI-0.21 evidence is:
 
 ```text
-reviewed functions                  3072
-prototype functions checked         3072
-prototype type measurements        10961
+reviewed functions                  3247
+prototype functions checked         3247
+prototype type measurements        11566
 layout types                         187
 callback signatures                   39
 constants                            902
 all C/Rust measurements             3174
-symbol acquisitions                 3078
+symbol acquisitions                 3243
 symbol type mismatches                 0
 mismatches                             0
 unaudited declarations                 0
@@ -52,7 +52,7 @@ unaudited declarations                 0
 Measured 2026-09-01 against `cnanext/cmake-build-opengles3`, built from cnanext
 `35268971c826d48ec3d40939e9b34a2b0595f94b`.
 
-The 3,072-function slice is intentionally smaller than CNA's 4,054 exported C
+The 3,247-function slice is intentionally smaller than CNA's 4,054 exported C
 functions. It is a reviewed foundation, not a completeness claim; every
 canonical route outside it carries an explicit classification in
 `tools/c-api-inventory/classification.json`, and the census gates on there

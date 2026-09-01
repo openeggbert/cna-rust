@@ -742,3 +742,31 @@ pub fn renderer_fallbacks() -> Result<Vec<RendererFallback>> {
     }
     Ok(result)
 }
+
+/// The title CNA reports for the running assembly.
+///
+/// XNA reads it from the assembly's own metadata. A Rust binary has none, so
+/// without [`set_assembly_title`] everything derived from it -- the default
+/// window caption, the storage directory name -- falls back to whatever CNA
+/// guesses from the executable's file name.
+pub fn assembly_title() -> Result<String> {
+    Native::process()?.assembly_title()
+}
+
+/// Sets the title CNA reports for the running assembly.
+///
+/// Process-wide, and best set before the first `Game` is created: anything
+/// already derived from the old title keeps it.
+pub fn set_assembly_title(title: &str) -> Result<()> {
+    Native::process()?.set_assembly_title(title)
+}
+
+/// Clears the process-wide renderer choice so the next device re-selects.
+///
+/// The selection is made once and cached for the life of the process, which is
+/// right for a game and wrong for a test that wants to exercise more than one
+/// renderer in the same binary. This is the only way to undo it, and it is why
+/// [`current_renderer`] can answer differently twice in one process.
+pub fn reset_renderer_selection_for_tests() -> Result<()> {
+    Native::process()?.reset_renderer_selection_for_tests()
+}

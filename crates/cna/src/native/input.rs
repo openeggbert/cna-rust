@@ -473,3 +473,147 @@ impl Native {
         Ok(processed)
     }
 }
+
+/// The last of `input_joystick.h`, `input_devices.h` and `input_text.h`.
+///
+/// Three groups. The joystick hotplug events are **process-wide**: they take no
+/// game handle, so a registration outlives any one game and is the caller's to
+/// withdraw. The `raise_*` and `reset_for_tests_*` routes are the deterministic
+/// side of the same thing -- a machine with no joystick can still exercise a
+/// game's connect and disconnect handling, which is what those hooks are for.
+/// And `sensors_get_accelerometer` and `_gyroscope` read the *device* sensors
+/// rather than the `sensors.h` objects, so they answer with a reading and a
+/// "was there one" flag rather than a handle.
+impl Native {
+    pub(crate) fn subscribe_joystick_connected(
+        &self,
+        callback: sys::CNA_JoystickHotplugCallback,
+        context: *mut core::ffi::c_void,
+    ) -> Result<sys::CNA_JoystickEventRegistrationHandle> {
+        let mut registration = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the caller keeps `context` alive until it withdraws this
+        // registration, which is the contract the safe layer upholds.
+        self.check(unsafe {
+            (self.joysticks_subscribe_connected_ext)(callback, context, &mut registration)
+        })?;
+        Ok(registration)
+    }
+
+    pub(crate) fn subscribe_joystick_disconnected(
+        &self,
+        callback: sys::CNA_JoystickHotplugCallback,
+        context: *mut core::ffi::c_void,
+    ) -> Result<sys::CNA_JoystickEventRegistrationHandle> {
+        let mut registration = sys::CNA_INVALID_HANDLE;
+        // SAFETY: as above.
+        self.check(unsafe {
+            (self.joysticks_subscribe_disconnected_ext)(callback, context, &mut registration)
+        })?;
+        Ok(registration)
+    }
+
+    pub(crate) fn unsubscribe_joystick(
+        &self,
+        registration: sys::CNA_JoystickEventRegistrationHandle,
+    ) -> Result<()> {
+        // SAFETY: the registration came from a subscribe above and is
+        // withdrawn exactly once.
+        self.check(unsafe { (self.joysticks_unsubscribe_ext)(registration) })
+    }
+
+    pub(crate) fn raise_joystick_connected(
+        &self,
+        game: sys::CNA_Handle,
+        joystick_id: u32,
+    ) -> Result<()> {
+        // SAFETY: the game handle is live and the id is a scalar.
+        self.check(unsafe { (self.joysticks_raise_connected_ext)(game, joystick_id) })
+    }
+
+    pub(crate) fn raise_joystick_disconnected(
+        &self,
+        game: sys::CNA_Handle,
+        joystick_id: u32,
+    ) -> Result<()> {
+        // SAFETY: the game handle is live and the id is a scalar.
+        self.check(unsafe { (self.joysticks_raise_disconnected_ext)(game, joystick_id) })
+    }
+
+    pub(crate) fn reset_joysticks_for_tests(&self, game: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: the game handle is live.
+        self.check(unsafe { (self.joysticks_reset_for_tests_ext)(game) })
+    }
+
+    pub(crate) fn reset_input_devices_for_tests(&self, game: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: the game handle is live.
+        self.check(unsafe { (self.input_devices_reset_for_tests_ext)(game) })
+    }
+
+    pub(crate) fn reset_text_input_for_tests(&self, game: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: the game handle is live.
+        self.check(unsafe { (self.text_input_reset_for_tests_ext)(game) })
+    }
+
+    pub(crate) fn clipboard_has_text(&self, game: sys::CNA_Handle) -> Result<bool> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the game handle is live and the output is a local.
+        self.check(unsafe { (self.clipboard_get_has_text)(game, &mut value) })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    /// The device accelerometer, if it has one.
+    ///
+    /// Answers `None` when the device reports no reading, which is a state
+    /// rather than a failure: a desktop has no accelerometer and says so.
+    pub(crate) fn device_accelerometer(
+        &self,
+        game: sys::CNA_Handle,
+    ) -> Result<Option<sys::CNA_Vector3>> {
+        self.device_sensor(game, self.sensors_get_accelerometer)
+    }
+
+    pub(crate) fn device_gyroscope(
+        &self,
+        game: sys::CNA_Handle,
+    ) -> Result<Option<sys::CNA_Vector3>> {
+        self.device_sensor(game, self.sensors_get_gyroscope)
+    }
+
+    fn device_sensor(
+        &self,
+        game: sys::CNA_Handle,
+        route: unsafe extern "C" fn(
+            sys::CNA_Handle,
+            *mut sys::CNA_Vector3,
+            *mut sys::CNA_Bool,
+        ) -> sys::CNA_Result,
+    ) -> Result<Option<sys::CNA_Vector3>> {
+        let mut value = sys::CNA_Vector3::default();
+        let mut present = sys::CNA_FALSE;
+        // SAFETY: the game handle is live and both outputs are locals.
+        self.check(unsafe { route(game, &mut value, &mut present) })?;
+        Ok((present != sys::CNA_FALSE).then_some(value))
+    }
+
+    /// Battery state, charge percentage and remaining seconds.
+    ///
+    /// Both numbers are reported as `-1` by the platform when unknown, which is
+    /// passed through as `None` rather than as a negative percentage.
+    pub(crate) fn power_info(
+        &self,
+        game: sys::CNA_Handle,
+    ) -> Result<(sys::CNA_PowerState, Option<i32>, Option<i32>)> {
+        let mut state = 0;
+        let mut percent = -1;
+        let mut seconds = -1;
+        // SAFETY: the game handle is live and all three outputs are locals.
+        self.check(unsafe {
+            (self.power_get_info)(game, &mut state, &mut percent, &mut seconds)
+        })?;
+        Ok((
+            state,
+            (percent >= 0).then_some(percent),
+            (seconds >= 0).then_some(seconds),
+        ))
+    }
+}

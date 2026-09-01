@@ -775,6 +775,37 @@ impl AsciiPostProcessEffect {
     }
 }
 
+/// The `graphics_ext.h` route that actually draws the effect.
+impl AsciiPostProcessEffect {
+    /// Draws the effect over a source texture.
+    ///
+    /// `destination` of `None` covers the whole current render target, which is
+    /// what a full-screen post-process wants; a rectangle restricts it, which
+    /// is what a split-screen or a picture-in-picture wants.
+    ///
+    /// Everything else on this type configures the effect. This is the only
+    /// route that puts pixels anywhere, so without it the whole family is
+    /// settings with nothing to apply them to.
+    pub fn Draw(
+        &self,
+        source: &crate::Microsoft::Xna::Framework::Graphics::Texture2D,
+        destination: Option<crate::value::Rectangle>,
+    ) -> crate::error::Result<()> {
+        use crate::extensions::graphics_resource::HasResourceState;
+        let native = destination.map(|value| cna_sys::CNA_Rectangle {
+            x: value.X,
+            y: value.Y,
+            width: value.Width,
+            height: value.Height,
+        });
+        self.device.state_native().draw_ascii_post_process(
+            self.handle,
+            source.resource_state().require_handle()?,
+            native.as_ref(),
+        )
+    }
+}
+
 impl Drop for AsciiPostProcessEffect {
     fn drop(&mut self) {
         if let Ok(native) = self.device.extended_effect_native() {

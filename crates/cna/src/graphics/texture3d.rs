@@ -461,3 +461,43 @@ impl crate::extensions::graphics_resource::HasResourceState for Texture3D {
         &self.state
     }
 }
+
+/// The `texture_volume.h` route that uploads raw bytes.
+impl Texture3D {
+    /// Uploads tightly packed bytes into a sub-volume.
+    ///
+    /// The typed `SetData` already exists and takes elements of a known type;
+    /// this takes the bytes as they are, for a caller that has them in a
+    /// buffer -- a decoded file, a network payload -- and does not want a
+    /// round trip through a typed slice to hand them over.
+    pub fn SetDataBytes(
+        &self,
+        level: i32,
+        left: i32,
+        top: i32,
+        right: i32,
+        bottom: i32,
+        front: i32,
+        back: i32,
+        bytes: &[u8],
+    ) -> Result<()> {
+        let transfer = sys::CNA_Texture3DTransfer {
+            struct_size: size_of::<sys::CNA_Texture3DTransfer>() as u32,
+            struct_version: 1,
+            level,
+            left,
+            top,
+            right,
+            bottom,
+            front,
+            back,
+            reserved: 0,
+            start_index: 0,
+            element_count: bytes.len() as u64,
+        };
+        self.state
+            .device()
+            .state_native()
+            .set_texture3d_bytes(self.state.require_handle()?, &transfer, bytes)
+    }
+}

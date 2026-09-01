@@ -2993,3 +2993,382 @@ impl Native {
         self.check(unsafe { (self.texture2d_save_file)(handle, image_format, view) })
     }
 }
+
+/// The last of `graphics.h`, `render_target.h`, `vertex_resources.h`,
+/// `index_resources.h`, `texture_volume.h` and `display.h`.
+///
+/// Four groups, and the first is the one worth reading.
+///
+/// **ContentLost.** A vertex buffer, an index buffer and a render target each
+/// carry a `ContentLost` event that CNA raises when the device loses its
+/// backing store -- a reset, a lost device, a suspend. XNA has the same event
+/// and a game that does not handle it draws garbage after an alt-tab. Nothing
+/// in Rust could raise it, because nothing in Rust knows the device was reset.
+///
+/// **The RGBA8 fast paths.** `get_data`/`set_data` already exist for the
+/// general typed case; these are the packed-colour ones the renderer can move
+/// without a conversion, plus the back buffer, which has no other reader.
+///
+/// **Vertex declarations.** The stride and the element list, read back from a
+/// declaration or from the buffer that holds one -- what a tool needs to
+/// describe a buffer it did not create.
+///
+/// **Presentation parameters.** Clone, bounds, and setting them on a live
+/// device: the reset path XNA drives through `GraphicsDeviceManager` and CNA
+/// exposes directly.
+impl Native {
+    pub(crate) fn backbuffer_info(
+        &self,
+        device: sys::CNA_Handle,
+    ) -> Result<(u32, u32, sys::CNA_SurfaceFormat)> {
+        let mut info = sys::CNA_BackBufferInfo {
+            struct_size: core::mem::size_of::<sys::CNA_BackBufferInfo>() as u32,
+            struct_version: 1,
+            ..sys::CNA_BackBufferInfo::default()
+        };
+        // SAFETY: the output is a complete versioned local.
+        self.check(unsafe { (self.graphics_device_get_backbuffer_info)(device, &mut info) })?;
+        Ok((info.width, info.height, info.format))
+    }
+
+    pub(crate) fn backbuffer_data(
+        &self,
+        device: sys::CNA_Handle,
+        pixels: &mut [sys::CNA_Color],
+    ) -> Result<usize> {
+        let mut written = 0_u64;
+        // SAFETY: the destination has exactly `pixels.len()` writable colours.
+        self.check(unsafe {
+            (self.graphics_device_get_backbuffer_data_rgba8)(
+                device,
+                pixels.as_mut_ptr(),
+                pixels.len() as u64,
+                &mut written,
+            )
+        })?;
+        Ok(usize::try_from(written).unwrap_or(0).min(pixels.len()))
+    }
+
+    pub(crate) fn set_texture2d_rgba8(
+        &self,
+        texture: sys::CNA_Handle,
+        pixels: &[sys::CNA_Color],
+    ) -> Result<()> {
+        // SAFETY: the slice outlives the call and its length is passed exactly.
+        self.check(unsafe {
+            (self.texture2d_set_data_rgba8)(texture, pixels.as_ptr(), pixels.len() as u64)
+        })
+    }
+
+    pub(crate) fn texture2d_rgba8(
+        &self,
+        texture: sys::CNA_Handle,
+        pixels: &mut [sys::CNA_Color],
+    ) -> Result<usize> {
+        let mut written = 0_u64;
+        // SAFETY: the destination has exactly `pixels.len()` writable colours.
+        self.check(unsafe {
+            (self.texture2d_get_data_rgba8)(
+                texture,
+                pixels.as_mut_ptr(),
+                pixels.len() as u64,
+                &mut written,
+            )
+        })?;
+        Ok(usize::try_from(written).unwrap_or(0).min(pixels.len()))
+    }
+
+    pub(crate) fn set_texture3d_bytes(
+        &self,
+        texture: sys::CNA_Handle,
+        transfer: &sys::CNA_Texture3DTransfer,
+        bytes: &[u8],
+    ) -> Result<()> {
+        // SAFETY: the transfer and the slice both outlive the call, and the
+        // byte count is the slice's own length.
+        self.check(unsafe {
+            (self.texture3d_set_data_bytes)(texture, transfer, bytes.as_ptr(), bytes.len() as u64)
+        })
+    }
+
+    pub(crate) fn create_texture_cube_from_dds(
+        &self,
+        device: sys::CNA_Handle,
+        bytes: &[u8],
+    ) -> Result<sys::CNA_Handle> {
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the slice outlives the call and its length is passed exactly.
+        self.check(unsafe {
+            (self.texturecube_create_from_dds_memory)(
+                device,
+                bytes.as_ptr(),
+                bytes.len() as u64,
+                &mut handle,
+            )
+        })?;
+        Ok(handle)
+    }
+
+    pub(crate) fn submit_scaled_sprites(
+        &self,
+        batch: sys::CNA_Handle,
+        commands: &[sys::CNA_SpriteScaledCommand],
+    ) -> Result<()> {
+        // SAFETY: the slice outlives the call and its length is passed exactly;
+        // a null pointer only ever accompanies a zero count.
+        self.check(unsafe {
+            (self.sprite_batch_submit_scaled_many)(
+                batch,
+                if commands.is_empty() {
+                    core::ptr::null()
+                } else {
+                    commands.as_ptr()
+                },
+                commands.len() as u64,
+            )
+        })
+    }
+
+    pub(crate) fn draw_sprite_mesh(
+        &self,
+        batch: sys::CNA_Handle,
+        mesh: &sys::CNA_SpriteMeshEXT,
+    ) -> Result<()> {
+        // SAFETY: every array the mesh points at outlives the call; the safe
+        // layer is what holds them and checks the counts against them.
+        self.check(unsafe { (self.sprite_batch_draw_mesh_ext)(batch, mesh) })
+    }
+
+    pub(crate) fn set_render_target2d(
+        &self,
+        device: sys::CNA_Handle,
+        target: sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: both handles are live for the call.
+        self.check(unsafe { (self.graphics_device_set_render_target2d)(device, target) })
+    }
+
+    pub(crate) fn set_render_target_cube(
+        &self,
+        device: sys::CNA_Handle,
+        target: sys::CNA_Handle,
+        face: sys::CNA_CubeMapFace,
+    ) -> Result<()> {
+        // SAFETY: both handles are live and the face is a scalar.
+        self.check(unsafe {
+            (self.graphics_device_set_render_target_cube)(device, target, face)
+        })
+    }
+
+    pub(crate) fn usage_preserves_contents(
+        &self,
+        usage: sys::CNA_RenderTargetUsage,
+    ) -> Result<bool> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the usage is a scalar and the output is a local.
+        self.check(unsafe { (self.render_target_usage_preserves_contents)(usage, &mut value) })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    pub(crate) fn subscribe_render_target_content_lost(
+        &self,
+        target: sys::CNA_Handle,
+        callback: sys::CNA_RenderTargetContentLostCallback,
+        context: *mut core::ffi::c_void,
+    ) -> Result<sys::CNA_RenderTargetEventRegistrationHandle> {
+        let mut registration = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the caller keeps `context` alive until it withdraws this
+        // registration, which is the contract the safe layer upholds.
+        self.check(unsafe {
+            (self.render_target_subscribe_content_lost)(
+                target,
+                callback,
+                context,
+                &mut registration,
+            )
+        })?;
+        Ok(registration)
+    }
+
+    pub(crate) fn unsubscribe_render_target_content_lost(
+        &self,
+        registration: sys::CNA_RenderTargetEventRegistrationHandle,
+    ) -> Result<()> {
+        // SAFETY: the registration came from the subscribe above.
+        self.check(unsafe { (self.render_target_unsubscribe_content_lost)(registration) })
+    }
+
+    pub(crate) fn subscribe_vertex_buffer_content_lost(
+        &self,
+        buffer: sys::CNA_VertexBufferHandle,
+        callback: sys::CNA_VertexBufferContentLostCallback,
+        context: *mut core::ffi::c_void,
+    ) -> Result<sys::CNA_VertexBufferEventRegistrationHandle> {
+        let mut registration = sys::CNA_INVALID_HANDLE;
+        // SAFETY: as above.
+        self.check(unsafe {
+            (self.vertex_buffer_subscribe_content_lost)(
+                buffer,
+                callback,
+                context,
+                &mut registration,
+            )
+        })?;
+        Ok(registration)
+    }
+
+    pub(crate) fn unsubscribe_vertex_buffer_content_lost(
+        &self,
+        registration: sys::CNA_VertexBufferEventRegistrationHandle,
+    ) -> Result<()> {
+        // SAFETY: the registration came from the subscribe above.
+        self.check(unsafe { (self.vertex_buffer_unsubscribe_content_lost)(registration) })
+    }
+
+    pub(crate) fn subscribe_index_buffer_content_lost(
+        &self,
+        buffer: sys::CNA_IndexBufferHandle,
+        callback: sys::CNA_IndexBufferContentLostCallback,
+        context: *mut core::ffi::c_void,
+    ) -> Result<sys::CNA_IndexBufferEventRegistrationHandle> {
+        let mut registration = sys::CNA_INVALID_HANDLE;
+        // SAFETY: as above.
+        self.check(unsafe {
+            (self.index_buffer_subscribe_content_lost)(
+                buffer,
+                callback,
+                context,
+                &mut registration,
+            )
+        })?;
+        Ok(registration)
+    }
+
+    pub(crate) fn unsubscribe_index_buffer_content_lost(
+        &self,
+        registration: sys::CNA_IndexBufferEventRegistrationHandle,
+    ) -> Result<()> {
+        // SAFETY: the registration came from the subscribe above.
+        self.check(unsafe { (self.index_buffer_unsubscribe_content_lost)(registration) })
+    }
+
+    pub(crate) fn vertex_buffer_declaration_elements(
+        &self,
+        buffer: sys::CNA_VertexBufferHandle,
+    ) -> Result<Vec<sys::CNA_VertexElement>> {
+        self.copy_elements(|destination, capacity, written| {
+            // SAFETY: the destination has exactly `capacity` writable elements.
+            unsafe {
+                (self.vertex_buffer_copy_declaration_elements)(
+                    buffer,
+                    destination,
+                    capacity,
+                    written,
+                )
+            }
+        })
+    }
+
+    /// Two calls: the first learns the count with a zero capacity, the second
+    /// reads. Both element routes share the shape.
+    fn copy_elements(
+        &self,
+        copy: impl Fn(*mut sys::CNA_VertexElement, u64, *mut u64) -> sys::CNA_Result,
+    ) -> Result<Vec<sys::CNA_VertexElement>> {
+        let mut count = 0_u64;
+        let sized = copy(core::ptr::null_mut(), 0, &mut count);
+        if sized != sys::CNA_RESULT_SUCCESS && sized != sys::CNA_RESULT_BUFFER_TOO_SMALL {
+            self.check(sized)?;
+        }
+        let capacity = usize::try_from(count).unwrap_or(0);
+        let mut elements = vec![sys::CNA_VertexElement::default(); capacity];
+        if capacity == 0 {
+            return Ok(elements);
+        }
+        let mut written = count;
+        self.check(copy(elements.as_mut_ptr(), count, &mut written))?;
+        elements.truncate(usize::try_from(written).unwrap_or(0).min(capacity));
+        Ok(elements)
+    }
+
+    pub(crate) fn vertex_buffer_data(
+        &self,
+        buffer: sys::CNA_VertexBufferHandle,
+        transfer: &sys::CNA_VertexBufferTransfer,
+        destination: &mut [u8],
+    ) -> Result<usize> {
+        let mut written = 0_u64;
+        // SAFETY: the transfer outlives the call and the destination has
+        // exactly its own length in writable bytes.
+        self.check(unsafe {
+            (self.vertex_buffer_get_data)(
+                buffer,
+                transfer,
+                destination.as_mut_ptr().cast(),
+                destination.len() as u64,
+                &mut written,
+            )
+        })?;
+        Ok(usize::try_from(written).unwrap_or(0).min(destination.len()))
+    }
+
+    pub(crate) fn refresh_graphics_adapters(&self, game: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: the game handle is live.
+        self.check(unsafe { (self.graphics_adapters_refresh)(game) })
+    }
+
+    pub(crate) fn clone_presentation_parameters(
+        &self,
+        source: &sys::CNA_PresentationParameters,
+    ) -> Result<sys::CNA_PresentationParameters> {
+        let mut clone = *source;
+        // SAFETY: both are live locals for the duration of the call.
+        self.check(unsafe { (self.presentation_parameters_clone)(source, &mut clone) })?;
+        Ok(clone)
+    }
+
+    pub(crate) fn presentation_parameter_bounds(
+        &self,
+        parameters: &sys::CNA_PresentationParameters,
+    ) -> Result<sys::CNA_Rectangle> {
+        let mut bounds = sys::CNA_Rectangle::default();
+        // SAFETY: the input is a live borrow and the output is a local.
+        self.check(unsafe {
+            (self.presentation_parameters_get_bounds)(parameters, &mut bounds)
+        })?;
+        Ok(bounds)
+    }
+
+    pub(crate) fn set_device_presentation_parameters(
+        &self,
+        device: sys::CNA_Handle,
+        parameters: &sys::CNA_PresentationParameters,
+    ) -> Result<()> {
+        // SAFETY: the device handle is live and the parameters outlive the call.
+        self.check(unsafe {
+            (self.graphics_device_set_presentation_parameters)(device, parameters)
+        })
+    }
+
+    pub(crate) fn clone_device_information(
+        &self,
+        source: &sys::CNA_GraphicsDeviceInformation,
+    ) -> Result<sys::CNA_GraphicsDeviceInformation> {
+        let mut clone = *source;
+        // SAFETY: both are live locals for the duration of the call.
+        self.check(unsafe { (self.graphics_device_information_clone)(source, &mut clone) })?;
+        Ok(clone)
+    }
+
+    pub(crate) fn device_native_window(
+        &self,
+        device: sys::CNA_Handle,
+    ) -> Result<sys::CNA_NativeHandleValue> {
+        let mut value = sys::CNA_NativeHandleValue::default();
+        // SAFETY: the device handle is live and the output is a local.
+        self.check(unsafe {
+            (self.graphics_device_get_native_window_handle)(device, &mut value)
+        })?;
+        Ok(value)
+    }
+}

@@ -461,3 +461,18 @@ impl crate::extensions::graphics_resource::HasResourceState for TextureCube {
         &self.state
     }
 }
+
+/// The `texture_volume.h` route that decodes a cube map from memory.
+impl TextureCube {
+    /// Decodes a DDS cube map already in memory.
+    ///
+    /// The only route to a cube map that is not built face by face. A DDS file
+    /// carries all six faces, their mip chains and their format in one blob,
+    /// and re-deriving that in Rust would mean parsing DDS here.
+    pub fn FromDdsMemory(graphicsDevice: &GraphicsDevice, bytes: &[u8]) -> Result<Self> {
+        let handle = graphicsDevice
+            .state_native()
+            .create_texture_cube_from_dds(graphicsDevice.handle()?, bytes)?;
+        Self::from_owned_handle(graphicsDevice, handle)
+    }
+}

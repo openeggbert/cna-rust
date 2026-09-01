@@ -724,6 +724,22 @@
         ],
         "evidence": "crates/cna/src/audio/xact.rs: the `disposing.emit` calls are on the public Dispose paths (lines 136, 218) and not on the XactChild teardown path the engine drives",
         "task": "RUST-EXT-017"
+      },
+      {
+        "id": "a-vertex-declaration-is-a-rust-value",
+        "status": "DELIBERATE_NON_BINDING",
+        "names": [
+          "cna_vertex_declaration_create_empty",
+          "cna_vertex_declaration_get_stride",
+          "cna_vertex_declaration_copy_elements"
+        ],
+        "reason": "these three take a CNA_VertexDeclarationHandle, and the Rust VertexDeclaration has no native handle at all: crates/cna/src/graphics/vertex.rs keeps its elements and stride in Rust and hands them to CNA by value through native_elements() whenever a buffer is created. There is nothing on this side to call them with. Creating a native declaration purely so they could be called would add a second declaration beside the one that already works, with a lifetime to manage and no capability gained. What is NOT in this rule is cna_vertex_buffer_copy_declaration_elements, which reads the declaration a *buffer* was created with -- a buffer does have a handle, and a tool describing a buffer it did not create has no other route to its layout -- and that one is bound.",
+        "rustEvidence": [
+          "pub struct VertexDeclaration",
+          "pub(crate) fn native_elements",
+          "fn native_elements"
+        ],
+        "evidence": "crates/cna/src/graphics/vertex.rs, whose DeclarationState holds only disposed/name/tag/disposing and no handle; crates/cna/tests/extensions_device_surface.rs reads a buffer's layout back through the route that is bound"
       }
     ],
     "overrides": {}

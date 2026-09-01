@@ -188,26 +188,49 @@ def missing_rust_evidence(rules: dict, source: str) -> list[str]:
 
 
 def safe_layer_call_sites() -> set[str]:
-    """Every native table field the safe Rust layer actually calls.
+    """Every native table field the safe Rust layer can actually reach.
 
     ``BOUND`` means the route is declared in ``cna-sys``.  That is not the same
     as a caller being able to reach it: a route can be declared, resolved at
     load, and still have no safe API in front of it.  The fields are named after
-    the route minus its ``cna_`` prefix, so scanning the safe layer for those
-    identifiers says which bound routes a user can actually call.
+    the route minus its ``cna_`` prefix, so scanning for those identifiers says
+    which bound routes a user can call.
+
+    Reachability is **two hops**, because most of the safe layer does not touch
+    a table field directly.  It calls a wrapper in ``native/`` -- ``fn
+    create_video`` -- and the wrapper calls the field.  Counting only the first
+    hop reported every route behind a wrapper as unreachable, which is how this
+    number once claimed 1,077 dead routes while every one of them had a safe
+    API in front of it.  So: a field is reachable if the safe layer names it, or
+    if the safe layer names a ``native/`` function whose body does.
     """
-    used: set[str] = set()
     root = ROOT / "crates/cna/src"
+    identifier = re.compile(r"\b([a-z][a-z0-9_]{3,})\b")
+
+    outside: set[str] = set()
+    wrapper_calls: dict[str, set[str]] = {}
     for path in root.rglob("*.rs"):
-        # native/ is where the tables are declared and filled; a mention there
-        # is the declaration, not a call site.
+        text = path.read_text(encoding="utf-8")
         if "native" in path.relative_to(root).parts[:1]:
+            # Split the module into functions and record what each one names,
+            # so a wrapper can be credited with the field it calls.
+            for match in re.finditer(
+                r"\n    (?:pub(?:\([a-z()]+\))? )?fn ([a-z][a-z0-9_]*)\s*[(<]", text
+            ):
+                start = match.end()
+                nxt = re.search(r"\n    (?:pub(?:\([a-z()]+\))? )?fn ", text[start:])
+                body = text[start : start + (nxt.start() if nxt else len(text) - start)]
+                wrapper_calls.setdefault(match.group(1), set()).update(
+                    identifier.findall(body)
+                )
             continue
-        # Whole identifiers, not just `table.field`: most of the safe layer
-        # reaches its routes through macros that take the field name as a bare
-        # token, so `engine.foo` never appears literally for those.
-        used |= set(re.findall(r"\b([a-z][a-z0-9_]{3,})\b", path.read_text(encoding="utf-8")))
-    return used
+        outside |= set(identifier.findall(text))
+
+    reachable = set(outside)
+    for wrapper, called in wrapper_calls.items():
+        if wrapper in outside:
+            reachable |= called
+    return reachable
 
 
 def rust_sys_inventory() -> dict:

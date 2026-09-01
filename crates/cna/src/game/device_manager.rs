@@ -1143,3 +1143,191 @@ pub(crate) fn manager_service_type_ids() -> (TypeId, TypeId) {
         TypeId::of::<dyn IGraphicsDeviceService>(),
     )
 }
+
+/// The `runtime_graphics_manager.h` routes with no XNA counterpart.
+///
+/// `PreferredPresentationMode` is the one that adds a capability rather than a
+/// reading: XNA scales the back buffer to the window one way and gives a game
+/// no say. CNA has five, and letterboxing versus stretching is a decision a
+/// game with a fixed-aspect design has to be able to make.
+impl GraphicsDeviceManager {
+    /// The device CNA currently has for this manager, if any.
+    ///
+    /// `GraphicsDevice()` answers the Rust value, which exists from the moment
+    /// the manager creates one. This asks CNA, and answers `None` before the
+    /// device is created and after it is lost -- the two states in which the
+    /// Rust value is present and the native one is not.
+    pub fn HasNativeGraphicsDevice(&self) -> Result<bool> {
+        self.with_native(|native, handle| {
+            Ok(native.manager_graphics_device(handle)?.is_some())
+        })
+    }
+
+    /// How the back buffer is fitted to the window.
+    pub fn PreferredPresentationMode(&self) -> Result<PresentationMode> {
+        self.with_native(|native, handle| {
+            PresentationMode::from_native(native.manager_presentation_mode(handle)?)
+                .ok_or(CnaError::InvalidInput("native presentation mode is unknown"))
+        })
+    }
+
+    /// Sets how the back buffer is fitted to the window.
+    pub fn SetPreferredPresentationMode(&self, value: PresentationMode) -> Result<()> {
+        self.with_native(|native, handle| {
+            native.set_manager_presentation_mode(handle, value as u32)
+        })
+    }
+
+    fn with_native<T>(
+        &self,
+        body: impl FnOnce(&Arc<Native>, sys::CNA_GraphicsDeviceManagerHandle) -> Result<T>,
+    ) -> Result<T> {
+        let guard = self
+            .state
+            .binding
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let binding = guard.as_ref().ok_or(CnaError::InvalidInput(
+            "the graphics device manager has no native binding yet",
+        ))?;
+        body(&binding.native, binding.handle)
+    }
+}
+
+/// How a back buffer is fitted to the window it is presented in.
+///
+/// XNA has no counterpart: it scales one way and offers no choice.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[repr(u32)]
+pub enum PresentationMode {
+    /// Preserve the aspect ratio, with bars where it does not fill.
+    Letterbox = 0,
+    /// Preserve the aspect ratio, cropping what does not fit.
+    Overscan = 1,
+    /// Fill the window, changing the aspect ratio.
+    Stretch = 2,
+    /// Present at the back buffer's own size, unscaled.
+    NativeBackBuffer = 3,
+    /// Fix the height and let the width follow the window.
+    FixedHeightDynamicWidth = 4,
+}
+
+impl PresentationMode {
+    /// The member a native value names, or `None` for one this build does not
+    /// know.
+    #[must_use]
+    pub const fn from_native(value: sys::CNA_PresentationMode) -> Option<Self> {
+        match value {
+            sys::CNA_PRESENTATION_MODE_LETTERBOX => Some(Self::Letterbox),
+            sys::CNA_PRESENTATION_MODE_OVERSCAN => Some(Self::Overscan),
+            sys::CNA_PRESENTATION_MODE_STRETCH => Some(Self::Stretch),
+            sys::CNA_PRESENTATION_MODE_NATIVE_BACK_BUFFER => Some(Self::NativeBackBuffer),
+            sys::CNA_PRESENTATION_MODE_FIXED_HEIGHT_DYNAMIC_WIDTH => {
+                Some(Self::FixedHeightDynamicWidth)
+            }
+            _ => None,
+        }
+    }
+}
+
+/// A live registration on the manager's device-settings observer event.
+///
+/// Withdraws itself on drop, in the only order that is safe: the registration
+/// is cancelled *before* the boxed closure behind it is freed.
+#[must_use = "dropping a DeviceSettingsObserver immediately unsubscribes it"]
+pub struct DeviceSettingsObserver {
+    native: Arc<Native>,
+    registration: Mutex<sys::CNA_GameEventRegistrationHandle>,
+    callback: Mutex<*mut core::ffi::c_void>,
+}
+
+// SAFETY: the pointer is an owned box this value alone frees, and the closure
+// behind it is required to be `Send`.
+unsafe impl Send for DeviceSettingsObserver {}
+
+type SettingsClosure = Box<dyn FnMut(&sys::CNA_GraphicsDeviceInformation) + Send + 'static>;
+
+impl DeviceSettingsObserver {
+    /// Withdraws the registration early. Idempotent.
+    pub fn unsubscribe(&self) -> Result<()> {
+        let mut guard = self
+            .registration
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let registration = core::mem::replace(&mut *guard, sys::CNA_INVALID_HANDLE);
+        if registration == sys::CNA_INVALID_HANDLE {
+            return Ok(());
+        }
+        let result = self.native.unsubscribe_game_event(registration);
+        let mut callback = self
+            .callback
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let pointer = core::mem::replace(&mut *callback, core::ptr::null_mut());
+        if !pointer.is_null() {
+            // SAFETY: the pointer came from `Box::into_raw` below, and the
+            // registration naming it is already withdrawn.
+            drop(unsafe { Box::from_raw(pointer.cast::<SettingsClosure>()) });
+        }
+        result
+    }
+}
+
+impl Drop for DeviceSettingsObserver {
+    fn drop(&mut self) {
+        let _ = self.unsubscribe();
+    }
+}
+
+impl GraphicsDeviceManager {
+    /// Watches the candidate device settings without being able to change them.
+    ///
+    /// The read-only pair to `PreparingDeviceSettings`, which hands a handler a
+    /// mutable configuration so it can edit what the device is created with.
+    /// This one is handed a `*const` and cannot, which is what makes it the
+    /// right subscription for logging or asserting what was chosen: an observer
+    /// that *could* write is an observer a reader has to check for writes.
+    pub fn ObserveDeviceSettings(
+        &self,
+        callback: impl FnMut(&sys::CNA_GraphicsDeviceInformation) + Send + 'static,
+    ) -> Result<DeviceSettingsObserver> {
+        unsafe extern "C" fn trampoline(
+            information: *const sys::CNA_GraphicsDeviceInformation,
+            context: *mut core::ffi::c_void,
+        ) {
+            if context.is_null() || information.is_null() {
+                return;
+            }
+            // SAFETY: the context is the box the observer owns and is freed
+            // only after the registration naming it is withdrawn; the
+            // information is borrowed for the duration of this call.
+            let closure = unsafe { &mut *context.cast::<SettingsClosure>() };
+            let information = unsafe { &*information };
+            // A panic must not cross back into C, and device creation has
+            // nowhere to report one.
+            let _ =
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| closure(information)));
+        }
+
+        let boxed: SettingsClosure = Box::new(callback);
+        let context = Box::into_raw(Box::new(boxed)).cast::<core::ffi::c_void>();
+        let outcome = self.with_native(|native, handle| {
+            native
+                .observe_preparing_device_settings(handle, Some(trampoline), context)
+                .map(|registration| (Arc::clone(native), registration))
+        });
+        match outcome {
+            Ok((native, registration)) => Ok(DeviceSettingsObserver {
+                native,
+                registration: Mutex::new(registration),
+                callback: Mutex::new(context),
+            }),
+            Err(error) => {
+                // CNA never took the pointer, so this is the only owner left.
+                // SAFETY: the box was created immediately above.
+                drop(unsafe { Box::from_raw(context.cast::<SettingsClosure>()) });
+                Err(error)
+            }
+        }
+    }
+}

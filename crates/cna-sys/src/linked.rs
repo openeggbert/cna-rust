@@ -13482,4 +13482,246 @@ extern "C" {
         argument2: u64,
         argument3: *mut CNA_SongCollectionHandle,
     ) -> CNA_Result;
+    pub fn cna_ascii_post_process_effect_draw(
+        argument0: CNA_AsciiPostProcessEffectHandle,
+        argument1: CNA_Handle,
+        argument2: *const CNA_Rectangle,
+    ) -> CNA_Result;
+    pub fn cna_assembly_copy_title_ext(
+        argument0: *mut c_char,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_assembly_set_title_ext(argument0: CNA_StringView) -> CNA_Result;
+    pub fn cna_clipboard_get_has_text(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_game_window_get_is_borderless_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_game_window_get_native_window_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_NativeWindowHandle,
+    ) -> CNA_Result;
+    pub fn cna_game_window_minimize_ext(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_game_window_restore_ext(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_game_window_set_is_borderless_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_graphics_adapters_refresh(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_graphics_device_get_backbuffer_data_rgba8(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Color,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_get_backbuffer_info(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_BackBufferInfo,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_get_native_window_handle(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_NativeHandleValue,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_information_clone(
+        argument0: *const CNA_GraphicsDeviceInformation,
+        argument1: *mut CNA_GraphicsDeviceInformation,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_manager_get_graphics_device(
+        argument0: CNA_GraphicsDeviceManagerHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_manager_get_preferred_presentation_mode_ext(
+        argument0: CNA_GraphicsDeviceManagerHandle,
+        argument1: *mut CNA_PresentationMode,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_manager_set_preferred_presentation_mode_ext(
+        argument0: CNA_GraphicsDeviceManagerHandle,
+        argument1: CNA_PresentationMode,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_manager_subscribe_preparing_device_settings(
+        argument0: CNA_GraphicsDeviceManagerHandle,
+        argument1: CNA_PreparingDeviceSettingsCallback,
+        argument2: *mut c_void,
+        argument3: *mut CNA_GameEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_set_presentation_parameters(
+        argument0: CNA_Handle,
+        argument1: *const CNA_PresentationParameters,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_set_render_target2d(
+        argument0: CNA_Handle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_graphics_device_set_render_target_cube(
+        argument0: CNA_Handle,
+        argument1: CNA_Handle,
+        argument2: CNA_CubeMapFace,
+    ) -> CNA_Result;
+    pub fn cna_graphics_renderer_reset_selection_for_tests_ext() -> CNA_Result;
+    pub fn cna_index_buffer_subscribe_content_lost(
+        argument0: CNA_IndexBufferHandle,
+        argument1: CNA_IndexBufferContentLostCallback,
+        argument2: *mut c_void,
+        argument3: *mut CNA_IndexBufferEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_index_buffer_unsubscribe_content_lost(
+        argument0: CNA_IndexBufferEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_input_devices_reset_for_tests_ext(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_joysticks_raise_connected_ext(argument0: CNA_Handle, argument1: u32) -> CNA_Result;
+    pub fn cna_joysticks_raise_disconnected_ext(
+        argument0: CNA_Handle,
+        argument1: u32,
+    ) -> CNA_Result;
+    pub fn cna_joysticks_reset_for_tests_ext(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_joysticks_subscribe_connected_ext(
+        argument0: CNA_JoystickHotplugCallback,
+        argument1: *mut c_void,
+        argument2: *mut CNA_JoystickEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_joysticks_subscribe_disconnected_ext(
+        argument0: CNA_JoystickHotplugCallback,
+        argument1: *mut c_void,
+        argument2: *mut CNA_JoystickEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_joysticks_unsubscribe_ext(
+        argument0: CNA_JoystickEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_media_library_save_picture_from_stream(
+        argument0: CNA_MediaLibraryHandle,
+        argument1: CNA_StringView,
+        argument2: CNA_Handle,
+        argument3: *mut CNA_PictureHandle,
+    ) -> CNA_Result;
+    pub fn cna_media_player_detect_song_ended_by_elapsed_time_ext(
+        argument0: CNA_SongHandle,
+        argument1: i64,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_media_queue_add(
+        argument0: CNA_MediaQueueHandle,
+        argument1: CNA_SongHandle,
+    ) -> CNA_Result;
+    pub fn cna_media_queue_clear(argument0: CNA_MediaQueueHandle) -> CNA_Result;
+    pub fn cna_picture_copy_token_ext(
+        argument0: CNA_PictureHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_picture_get_token_size_ext(
+        argument0: CNA_PictureHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_power_get_info(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_PowerState,
+        argument2: *mut i32,
+        argument3: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_presentation_parameters_clone(
+        argument0: *const CNA_PresentationParameters,
+        argument1: *mut CNA_PresentationParameters,
+    ) -> CNA_Result;
+    pub fn cna_presentation_parameters_get_bounds(
+        argument0: *const CNA_PresentationParameters,
+        argument1: *mut CNA_Rectangle,
+    ) -> CNA_Result;
+    pub fn cna_render_target_subscribe_content_lost(
+        argument0: CNA_Handle,
+        argument1: CNA_RenderTargetContentLostCallback,
+        argument2: *mut c_void,
+        argument3: *mut CNA_RenderTargetEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_render_target_unsubscribe_content_lost(
+        argument0: CNA_RenderTargetEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_render_target_usage_preserves_contents(
+        argument0: CNA_RenderTargetUsage,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_sensors_get_accelerometer(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Vector3,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_sensors_get_gyroscope(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Vector3,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_sprite_batch_draw_mesh_ext(
+        argument0: CNA_Handle,
+        argument1: *const CNA_SpriteMeshEXT,
+    ) -> CNA_Result;
+    pub fn cna_sprite_batch_submit_scaled_many(
+        argument0: CNA_Handle,
+        argument1: *const CNA_SpriteScaledCommand,
+        argument2: u64,
+    ) -> CNA_Result;
+    pub fn cna_storage_container_get_is_disposed(
+        argument0: CNA_StorageContainerHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_storage_container_get_storage_device(
+        argument0: CNA_StorageContainerHandle,
+        argument1: *mut CNA_StorageDeviceHandle,
+    ) -> CNA_Result;
+    pub fn cna_storage_copy_root_ext(
+        argument0: *mut c_char,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_storage_get_root_size_ext(argument0: *mut u64) -> CNA_Result;
+    pub fn cna_storage_set_app_name_ext(argument0: CNA_StringView) -> CNA_Result;
+    pub fn cna_text_input_reset_for_tests_ext(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_texture2d_get_data_rgba8(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Color,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_texture2d_set_data_rgba8(
+        argument0: CNA_Handle,
+        argument1: *const CNA_Color,
+        argument2: u64,
+    ) -> CNA_Result;
+    pub fn cna_texture3d_set_data_bytes(
+        argument0: CNA_Handle,
+        argument1: *const CNA_Texture3DTransfer,
+        argument2: *const u8,
+        argument3: u64,
+    ) -> CNA_Result;
+    pub fn cna_texturecube_create_from_dds_memory(
+        argument0: CNA_Handle,
+        argument1: *const u8,
+        argument2: u64,
+        argument3: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_vertex_buffer_copy_declaration_elements(
+        argument0: CNA_VertexBufferHandle,
+        argument1: *mut CNA_VertexElement,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_vertex_buffer_get_data(
+        argument0: CNA_VertexBufferHandle,
+        argument1: *const CNA_VertexBufferTransfer,
+        argument2: *mut c_void,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_vertex_buffer_subscribe_content_lost(
+        argument0: CNA_VertexBufferHandle,
+        argument1: CNA_VertexBufferContentLostCallback,
+        argument2: *mut c_void,
+        argument3: *mut CNA_VertexBufferEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_vertex_buffer_unsubscribe_content_lost(
+        argument0: CNA_VertexBufferEventRegistrationHandle,
+    ) -> CNA_Result;
 }

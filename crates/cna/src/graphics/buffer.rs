@@ -726,6 +726,11 @@ impl DynamicVertexBuffer {
     }
 
     pub fn AddContentLostHandler(&self, handler: Box<dyn EventHandler>) -> u64 {
+        // RUST-EXT-018: these handlers are never emitted. Nothing in Rust
+        // knows the device was reset, so nothing here can raise ContentLost --
+        // `crates/cna/src/extensions/resource_events.rs` is the route that
+        // works, over CNA's own event. This registration is kept so the XNA
+        // shape is present and so the bridge has somewhere to deliver to.
         self.content_lost.add(handler)
     }
     pub fn RemoveContentLostHandler(&self, registration: u64) -> bool {
@@ -1306,6 +1311,11 @@ impl DynamicIndexBuffer {
     }
 
     pub fn AddContentLostHandler(&self, handler: Box<dyn EventHandler>) -> u64 {
+        // RUST-EXT-018: these handlers are never emitted. Nothing in Rust
+        // knows the device was reset, so nothing here can raise ContentLost --
+        // `crates/cna/src/extensions/resource_events.rs` is the route that
+        // works, over CNA's own event. This registration is kept so the XNA
+        // shape is present and so the bridge has somewhere to deliver to.
         self.content_lost.add(handler)
     }
     pub fn RemoveContentLostHandler(&self, registration: u64) -> bool {
@@ -1539,5 +1549,17 @@ impl crate::extensions::graphics_resource::HasResourceState for IndexBuffer {
 impl crate::extensions::graphics_resource::HasResourceState for VertexBuffer {
     fn resource_state(&self) -> &super::resource::ResourceState {
         &self.state
+    }
+}
+
+impl crate::extensions::graphics_resource::HasResourceState for DynamicVertexBuffer {
+    fn resource_state(&self) -> &super::resource::ResourceState {
+        &self.inner.state
+    }
+}
+
+impl crate::extensions::graphics_resource::HasResourceState for DynamicIndexBuffer {
+    fn resource_state(&self) -> &super::resource::ResourceState {
+        &self.inner.state
     }
 }

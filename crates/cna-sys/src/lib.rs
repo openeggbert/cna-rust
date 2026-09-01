@@ -757,6 +757,94 @@ pub type CNA_GraphicsResourceTag = u64;
 /// `content_readers.h`: the XNB reader and the process-wide reader registry.
 pub type CNA_ContentReaderHandle = CNA_Handle;
 
+/// `graphics.h`: what the back buffer currently is.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_BackBufferInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub width: u32,
+    pub height: u32,
+    pub format: CNA_SurfaceFormat,
+    pub reserved: u32,
+}
+
+/// `graphics.h`: one sprite in a batched scaled submission.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_SpriteScaledCommand {
+    pub position: CNA_Vector2,
+    pub source: CNA_Rectangle,
+    pub color: CNA_Color,
+    pub rotation: f32,
+    pub origin: CNA_Vector2,
+    pub scale: CNA_Vector2,
+    pub effects: CNA_SpriteEffects,
+    pub layer_depth: f32,
+}
+
+/// `graphics.h`: an arbitrary triangle mesh drawn through the sprite batch.
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_SpriteMeshEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub effect: CNA_Handle,
+    pub positions: *const CNA_Vector2,
+    pub colors: *const CNA_Color,
+    pub texture_coordinates: *const CNA_Vector2,
+    pub indices: *const u16,
+    pub vertex_count: u64,
+    pub index_count: u64,
+}
+
+/// `runtime_window.h`: the platform's own window, for a caller embedding CNA.
+pub type CNA_NativeWindowSystem = u32;
+pub const CNA_NATIVE_WINDOW_SYSTEM_UNKNOWN: CNA_NativeWindowSystem = 0;
+pub const CNA_NATIVE_WINDOW_SYSTEM_WIN32: CNA_NativeWindowSystem = 1;
+pub const CNA_NATIVE_WINDOW_SYSTEM_X11: CNA_NativeWindowSystem = 2;
+pub const CNA_NATIVE_WINDOW_SYSTEM_WAYLAND: CNA_NativeWindowSystem = 3;
+pub const CNA_NATIVE_WINDOW_SYSTEM_COCOA: CNA_NativeWindowSystem = 4;
+pub const CNA_NATIVE_WINDOW_SYSTEM_ANDROID: CNA_NativeWindowSystem = 5;
+pub const CNA_NATIVE_WINDOW_SYSTEM_WEB: CNA_NativeWindowSystem = 6;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_NativeWindowHandle {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub system: CNA_NativeWindowSystem,
+    pub display: *mut c_void,
+    pub window: *mut c_void,
+    pub surface: *mut c_void,
+    pub window_id: u64,
+}
+
+/// `runtime_graphics_manager.h`: how a back buffer is fitted to the window.
+pub type CNA_PresentationMode = u32;
+pub const CNA_PRESENTATION_MODE_LETTERBOX: CNA_PresentationMode = 0;
+pub const CNA_PRESENTATION_MODE_OVERSCAN: CNA_PresentationMode = 1;
+pub const CNA_PRESENTATION_MODE_STRETCH: CNA_PresentationMode = 2;
+pub const CNA_PRESENTATION_MODE_NATIVE_BACK_BUFFER: CNA_PresentationMode = 3;
+pub const CNA_PRESENTATION_MODE_FIXED_HEIGHT_DYNAMIC_WIDTH: CNA_PresentationMode = 4;
+
+pub type CNA_VertexBufferEventRegistrationHandle = CNA_Handle;
+pub type CNA_IndexBufferEventRegistrationHandle = CNA_Handle;
+pub type CNA_RenderTargetEventRegistrationHandle = CNA_Handle;
+pub type CNA_JoystickEventRegistrationHandle = CNA_Handle;
+
+pub type CNA_VertexBufferContentLostCallback =
+    Option<unsafe extern "C" fn(vertex_buffer: CNA_VertexBufferHandle, context: *mut c_void)>;
+pub type CNA_IndexBufferContentLostCallback =
+    Option<unsafe extern "C" fn(index_buffer: CNA_IndexBufferHandle, context: *mut c_void)>;
+pub type CNA_RenderTargetContentLostCallback =
+    Option<unsafe extern "C" fn(render_target: CNA_Handle, context: *mut c_void)>;
+pub type CNA_JoystickHotplugCallback =
+    Option<unsafe extern "C" fn(joystick_id: u32, context: *mut c_void)>;
+pub type CNA_PreparingDeviceSettingsCallback = Option<
+    unsafe extern "C" fn(information: *const CNA_GraphicsDeviceInformation, context: *mut c_void),
+>;
+
 /// `video.h`: what a decoded video's frames look like.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -13686,4 +13774,165 @@ pub type cna_song_set_duration_fn = unsafe extern "C" fn(CNA_SongHandle, i64) ->
 pub type cna_song_set_play_count_fn = unsafe extern "C" fn(CNA_SongHandle, i32) -> CNA_Result;
 pub type cna_song_collection_create_fn = unsafe extern "C" fn(
     CNA_Handle, *const CNA_SongHandle, u64, *mut CNA_SongCollectionHandle,
+) -> CNA_Result;
+
+pub type cna_ascii_post_process_effect_draw_fn = unsafe extern "C" fn(
+    CNA_AsciiPostProcessEffectHandle, CNA_Handle, *const CNA_Rectangle,
+) -> CNA_Result;
+pub type cna_assembly_copy_title_ext_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_assembly_set_title_ext_fn = unsafe extern "C" fn(CNA_StringView) -> CNA_Result;
+pub type cna_clipboard_get_has_text_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_game_window_get_is_borderless_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_game_window_get_native_window_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_NativeWindowHandle,
+) -> CNA_Result;
+pub type cna_game_window_minimize_ext_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_game_window_restore_ext_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_game_window_set_is_borderless_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_graphics_adapters_refresh_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_graphics_device_get_backbuffer_data_rgba8_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Color, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_device_get_backbuffer_info_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_BackBufferInfo,
+) -> CNA_Result;
+pub type cna_graphics_device_get_native_window_handle_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_NativeHandleValue,
+) -> CNA_Result;
+pub type cna_graphics_device_information_clone_fn = unsafe extern "C" fn(
+    *const CNA_GraphicsDeviceInformation, *mut CNA_GraphicsDeviceInformation,
+) -> CNA_Result;
+pub type cna_graphics_device_manager_get_graphics_device_fn = unsafe extern "C" fn(
+    CNA_GraphicsDeviceManagerHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_graphics_device_manager_get_preferred_presentation_mode_ext_fn = unsafe extern "C" fn(
+    CNA_GraphicsDeviceManagerHandle, *mut CNA_PresentationMode,
+) -> CNA_Result;
+pub type cna_graphics_device_manager_set_preferred_presentation_mode_ext_fn = unsafe extern "C" fn(
+    CNA_GraphicsDeviceManagerHandle, CNA_PresentationMode,
+) -> CNA_Result;
+pub type cna_graphics_device_manager_subscribe_preparing_device_settings_fn = unsafe extern "C" fn(
+    CNA_GraphicsDeviceManagerHandle, CNA_PreparingDeviceSettingsCallback, *mut c_void, *mut CNA_GameEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_graphics_device_set_presentation_parameters_fn = unsafe extern "C" fn(
+    CNA_Handle, *const CNA_PresentationParameters,
+) -> CNA_Result;
+pub type cna_graphics_device_set_render_target2d_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Handle,
+) -> CNA_Result;
+pub type cna_graphics_device_set_render_target_cube_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Handle, CNA_CubeMapFace,
+) -> CNA_Result;
+pub type cna_graphics_renderer_reset_selection_for_tests_ext_fn = unsafe extern "C" fn(
+) -> CNA_Result;
+pub type cna_index_buffer_subscribe_content_lost_fn = unsafe extern "C" fn(
+    CNA_IndexBufferHandle, CNA_IndexBufferContentLostCallback, *mut c_void, *mut CNA_IndexBufferEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_index_buffer_unsubscribe_content_lost_fn = unsafe extern "C" fn(
+    CNA_IndexBufferEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_input_devices_reset_for_tests_ext_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_joysticks_raise_connected_ext_fn = unsafe extern "C" fn(CNA_Handle, u32) -> CNA_Result;
+pub type cna_joysticks_raise_disconnected_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, u32,
+) -> CNA_Result;
+pub type cna_joysticks_reset_for_tests_ext_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_joysticks_subscribe_connected_ext_fn = unsafe extern "C" fn(
+    CNA_JoystickHotplugCallback, *mut c_void, *mut CNA_JoystickEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_joysticks_subscribe_disconnected_ext_fn = unsafe extern "C" fn(
+    CNA_JoystickHotplugCallback, *mut c_void, *mut CNA_JoystickEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_joysticks_unsubscribe_ext_fn = unsafe extern "C" fn(
+    CNA_JoystickEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_media_library_save_picture_from_stream_fn = unsafe extern "C" fn(
+    CNA_MediaLibraryHandle, CNA_StringView, CNA_Handle, *mut CNA_PictureHandle,
+) -> CNA_Result;
+pub type cna_media_player_detect_song_ended_by_elapsed_time_ext_fn = unsafe extern "C" fn(
+    CNA_SongHandle, i64, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_media_queue_add_fn = unsafe extern "C" fn(
+    CNA_MediaQueueHandle, CNA_SongHandle,
+) -> CNA_Result;
+pub type cna_media_queue_clear_fn = unsafe extern "C" fn(CNA_MediaQueueHandle) -> CNA_Result;
+pub type cna_picture_copy_token_ext_fn = unsafe extern "C" fn(
+    CNA_PictureHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_picture_get_token_size_ext_fn = unsafe extern "C" fn(
+    CNA_PictureHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_power_get_info_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_PowerState, *mut i32, *mut i32,
+) -> CNA_Result;
+pub type cna_presentation_parameters_clone_fn = unsafe extern "C" fn(
+    *const CNA_PresentationParameters, *mut CNA_PresentationParameters,
+) -> CNA_Result;
+pub type cna_presentation_parameters_get_bounds_fn = unsafe extern "C" fn(
+    *const CNA_PresentationParameters, *mut CNA_Rectangle,
+) -> CNA_Result;
+pub type cna_render_target_subscribe_content_lost_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_RenderTargetContentLostCallback, *mut c_void, *mut CNA_RenderTargetEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_render_target_unsubscribe_content_lost_fn = unsafe extern "C" fn(
+    CNA_RenderTargetEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_render_target_usage_preserves_contents_fn = unsafe extern "C" fn(
+    CNA_RenderTargetUsage, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_sensors_get_accelerometer_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Vector3, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_sensors_get_gyroscope_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Vector3, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_sprite_batch_draw_mesh_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *const CNA_SpriteMeshEXT,
+) -> CNA_Result;
+pub type cna_sprite_batch_submit_scaled_many_fn = unsafe extern "C" fn(
+    CNA_Handle, *const CNA_SpriteScaledCommand, u64,
+) -> CNA_Result;
+pub type cna_storage_container_get_is_disposed_fn = unsafe extern "C" fn(
+    CNA_StorageContainerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_storage_container_get_storage_device_fn = unsafe extern "C" fn(
+    CNA_StorageContainerHandle, *mut CNA_StorageDeviceHandle,
+) -> CNA_Result;
+pub type cna_storage_copy_root_ext_fn = unsafe extern "C" fn(
+    *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_storage_get_root_size_ext_fn = unsafe extern "C" fn(*mut u64) -> CNA_Result;
+pub type cna_storage_set_app_name_ext_fn = unsafe extern "C" fn(CNA_StringView) -> CNA_Result;
+pub type cna_text_input_reset_for_tests_ext_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_texture2d_get_data_rgba8_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Color, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_texture2d_set_data_rgba8_fn = unsafe extern "C" fn(
+    CNA_Handle, *const CNA_Color, u64,
+) -> CNA_Result;
+pub type cna_texture3d_set_data_bytes_fn = unsafe extern "C" fn(
+    CNA_Handle, *const CNA_Texture3DTransfer, *const u8, u64,
+) -> CNA_Result;
+pub type cna_texturecube_create_from_dds_memory_fn = unsafe extern "C" fn(
+    CNA_Handle, *const u8, u64, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_vertex_buffer_copy_declaration_elements_fn = unsafe extern "C" fn(
+    CNA_VertexBufferHandle, *mut CNA_VertexElement, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_vertex_buffer_get_data_fn = unsafe extern "C" fn(
+    CNA_VertexBufferHandle, *const CNA_VertexBufferTransfer, *mut c_void, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_vertex_buffer_subscribe_content_lost_fn = unsafe extern "C" fn(
+    CNA_VertexBufferHandle, CNA_VertexBufferContentLostCallback, *mut c_void, *mut CNA_VertexBufferEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_vertex_buffer_unsubscribe_content_lost_fn = unsafe extern "C" fn(
+    CNA_VertexBufferEventRegistrationHandle,
 ) -> CNA_Result;

@@ -307,3 +307,72 @@ impl Native {
         self.check(unsafe { (self.graphics_device_manager_destroy)(manager) })
     }
 }
+
+/// `runtime_graphics_manager.h`'s remaining manager routes.
+impl Native {
+    pub(crate) fn manager_graphics_device(
+        &self,
+        manager: sys::CNA_GraphicsDeviceManagerHandle,
+    ) -> Result<Option<sys::CNA_Handle>> {
+        let mut value = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the manager handle is live and the output is a local.
+        self.check(unsafe {
+            (self.graphics_device_manager_get_graphics_device)(manager, &mut value)
+        })?;
+        Ok((value != sys::CNA_INVALID_HANDLE).then_some(value))
+    }
+
+    pub(crate) fn manager_presentation_mode(
+        &self,
+        manager: sys::CNA_GraphicsDeviceManagerHandle,
+    ) -> Result<sys::CNA_PresentationMode> {
+        let mut value = sys::CNA_PRESENTATION_MODE_LETTERBOX;
+        // SAFETY: the manager handle is live and the output is a local.
+        self.check(unsafe {
+            (self.graphics_device_manager_get_preferred_presentation_mode_ext)(
+                manager, &mut value,
+            )
+        })?;
+        Ok(value)
+    }
+
+    pub(crate) fn set_manager_presentation_mode(
+        &self,
+        manager: sys::CNA_GraphicsDeviceManagerHandle,
+        mode: sys::CNA_PresentationMode,
+    ) -> Result<()> {
+        // SAFETY: the manager handle is live and the mode is a scalar.
+        self.check(unsafe {
+            (self.graphics_device_manager_set_preferred_presentation_mode_ext)(manager, mode)
+        })
+    }
+
+    /// Observes the candidate device settings without being able to change
+    /// them.
+    ///
+    /// The pair to `subscribe_preparing_device_settings`, which is already
+    /// bound and takes a `*mut` -- that one is
+    /// `..._preparing_device_settings_ext` and exists so a handler can *edit*
+    /// the configuration. This one takes a `*const` and cannot, which is what
+    /// makes it the right subscription for a caller that only wants to know
+    /// what was chosen.
+    pub(crate) fn observe_preparing_device_settings(
+        &self,
+        manager: sys::CNA_GraphicsDeviceManagerHandle,
+        callback: sys::CNA_PreparingDeviceSettingsCallback,
+        context: *mut c_void,
+    ) -> Result<sys::CNA_GameEventRegistrationHandle> {
+        let mut registration = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the caller keeps `context` alive until it withdraws this
+        // registration, which is the contract the safe layer upholds.
+        self.check(unsafe {
+            (self.graphics_device_manager_subscribe_preparing_device_settings)(
+                manager,
+                callback,
+                context,
+                &mut registration,
+            )
+        })?;
+        Ok(registration)
+    }
+}

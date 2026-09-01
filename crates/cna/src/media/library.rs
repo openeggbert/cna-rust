@@ -251,3 +251,41 @@ impl MediaSource {
         native.media_source_type_name(handle, index).map(Some)
     }
 }
+
+/// The `media_library.h` routes with no XNA counterpart.
+impl Picture {
+    /// The platform token this picture carries.
+    ///
+    /// The backend's own identifier for the underlying media object, and the
+    /// only way to tell two pictures with the same name apart.
+    pub fn PlatformToken(&self) -> Result<String> {
+        self.core.native().picture_token(self.core.handle()?)
+    }
+}
+
+/// The `media_library.h` route that saves a picture from a stream.
+impl MediaLibrary {
+    /// Saves a picture the caller already has open as a stream.
+    ///
+    /// XNA's `SavePicture` takes a byte array or a stream and is one of the few
+    /// media routes a game can *write* through. This is the stream form, which
+    /// is what a game that just rendered a screenshot to a storage file has in
+    /// hand.
+    pub fn SavePictureFromStream(
+        &self,
+        name: &str,
+        stream: &crate::storage::StorageStream,
+    ) -> Result<Arc<Picture>> {
+        let handle = self.core.native().save_picture_from_stream(
+            self.core.handle()?,
+            name,
+            stream.native_handle()?,
+        )?;
+        Ok(Picture::from_handle(
+            Arc::clone(self.core.native()),
+            Arc::clone(self.core.runtime()),
+            self.core.generation(),
+            handle,
+        ))
+    }
+}

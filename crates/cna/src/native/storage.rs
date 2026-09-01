@@ -532,3 +532,54 @@ impl Native {
         self.check(unsafe { (self.storage_stream_close)(stream) })
     }
 }
+
+/// The last of `storage.h`: where saves live, and what a container knows.
+///
+/// XNA's storage lands under a platform-decided per-title directory and gives a
+/// game no say in either half. `set_app_name` and the root query are CNA's: the
+/// name is what the directory is called, and the root is where it is. A tool
+/// that wants to read a game's saves has no other way to find them.
+impl Native {
+    pub(crate) fn set_storage_app_name(&self, name: &str) -> Result<()> {
+        let view = sys::CNA_StringView {
+            data: name.as_ptr().cast(),
+            byte_length: name.len() as u64,
+        };
+        // SAFETY: the name outlives the call, which is all the view borrows.
+        self.check(unsafe { (self.storage_set_app_name_ext)(view) })
+    }
+
+    pub(crate) fn storage_root(&self) -> Result<String> {
+        super::runtime::read_string(
+            |result| self.check(result),
+            // SAFETY: the output is the caller's live local.
+            |out| unsafe { (self.storage_get_root_size_ext)(out) },
+            // SAFETY: the destination has the capacity just measured.
+            |destination, capacity, written| unsafe {
+                (self.storage_copy_root_ext)(destination, capacity, written)
+            },
+        )
+    }
+
+    pub(crate) fn storage_container_is_disposed(
+        &self,
+        container: sys::CNA_StorageContainerHandle,
+    ) -> Result<bool> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the container handle is live and the output is a local.
+        self.check(unsafe { (self.storage_container_get_is_disposed)(container, &mut value) })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    pub(crate) fn storage_container_device(
+        &self,
+        container: sys::CNA_StorageContainerHandle,
+    ) -> Result<Option<sys::CNA_StorageDeviceHandle>> {
+        let mut value = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the container handle is live and the output is a local.
+        self.check(unsafe {
+            (self.storage_container_get_storage_device)(container, &mut value)
+        })?;
+        Ok((value != sys::CNA_INVALID_HANDLE).then_some(value))
+    }
+}

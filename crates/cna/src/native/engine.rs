@@ -12,6 +12,7 @@ use cna_sys as sys;
 use crate::error::Result;
 
 use super::loader::NativeSource;
+use super::Native;
 
 /// Every reviewed engine-layer route, resolved once when the tables are filled.
 #[derive(Debug)]
@@ -1953,6 +1954,31 @@ impl EngineApi {
             volumetric_fog_pass_set_density: symbol!(cna_volumetric_fog_pass_set_density, _),
             volumetric_fog_pass_set_light: symbol!(cna_volumetric_fog_pass_set_light, _),
             volumetric_fog_pass_set_range: symbol!(cna_volumetric_fog_pass_set_range, _),
+        })
+    }
+}
+
+/// The last of `graphics_ext.h`.
+impl Native {
+    /// Draws the ASCII post-process effect over a source texture.
+    ///
+    /// The destination rectangle is optional: `None` covers the whole target,
+    /// which is what a full-screen post-process wants and is why the route
+    /// takes a pointer rather than a value.
+    pub(crate) fn draw_ascii_post_process(
+        &self,
+        effect: sys::CNA_AsciiPostProcessEffectHandle,
+        source: sys::CNA_Handle,
+        destination: Option<&sys::CNA_Rectangle>,
+    ) -> Result<()> {
+        // SAFETY: both handles are live, and the rectangle -- when there is one
+        // -- is a live borrow for the duration of the call.
+        self.check(unsafe {
+            (self.ascii_post_process_effect_draw)(
+                effect,
+                source,
+                destination.map_or(core::ptr::null(), |value| value),
+            )
         })
     }
 }

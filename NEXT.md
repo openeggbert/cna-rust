@@ -1,13 +1,15 @@
 # CNA-Rust next work
 
-## 2026-09-01 — the binding-status axis, and eleven families decided end to end
+## 2026-09-01 — every route decided: UNREVIEWED reaches zero
 
 The previous milestone closed the XNA 4.0 runtime profile and admitted ABI
-0.21. This one is about the *other* question the census had never asked
-separately: not what a route is for, but **why it is not bound**.
+0.21. This one asked the *other* question the census had never asked
+separately -- not what a route is for, but **why it is not bound** -- and then
+answered it for every route CNA exports. All 4,054 now carry a binding
+decision, and the census gate passes for the first time.
 
 ```text
-CNANEXT_HEAD=e5ae0820e234152fc10ced90cbdbda4945969f9d
+CNANEXT_HEAD=c195fe8ce616048930b7d565a2fc7d9d5de26d35
 CNANEXT_AT_QUALIFICATION=35268971c826d48ec3d40939e9b34a2b0595f94b
                              # the artifacts below were built from this.
                              # cnanext has moved on since; re-measured against
@@ -23,16 +25,17 @@ LIBRARY_EXPORTS=4054
 HEADER_EXPORTS=4054
 
 CANONICAL_ROUTES=4054
-BOUND=3171                   # was 2909
-DELIBERATE_NON_BINDING=798   # was 714
+BOUND=3232                   # was 2909
+DELIBERATE_NON_BINDING=801   # was 714
 BLOCKED_UPSTREAM=15
-DEFERRED_TRACKED=6           # RUST-EXT-016, RUST-EXT-017
-UNREVIEWED=64                # was 416
+DEFERRED_TRACKED=6           # RUST-EXT-016, RUST-EXT-017 (RUST-EXT-018 is a
+                             # Rust-side defect, not a deferred binding)
+UNREVIEWED=0                 # was 416
 ACTIONABLE_LOCAL=0
 
-RUST_SYS_DECLARATIONS=3186
-SYMBOL_ACQUISITIONS=3078
-LINKED_DECLARATIONS=3186
+RUST_SYS_DECLARATIONS=3247
+SYMBOL_ACQUISITIONS=3243
+LINKED_DECLARATIONS=3247
 PROTOTYPE_MISMATCHES=0
 SYMBOL_TYPE_MISMATCHES=0
 LAYOUT_FIELD_SETS_CHECKED=187
@@ -40,9 +43,16 @@ C_RUST_MEASUREMENTS=3174
 ABI_FINDINGS=0
 UNAUDITED_DECLARATIONS=0
 
-WORKSPACE_TEST_FILES=44
-WORKSPACE_TEST_FUNCTIONS=195
-BOUND_WITHOUT_SAFE_CALL_SITE=894   # reported, not gated; RUST-CENSUS-002
+WORKSPACE_TEST_FILES=45
+WORKSPACE_TEST_FUNCTIONS=203
+BOUND_WITHOUT_SAFE_CALL_SITE=303   # reported, not gated; RUST-CENSUS-002
+                                   # was 894, then 1077 once this milestone's
+                                   # routes landed -- both wrong. The detector
+                                   # looked for a table field named outside
+                                   # native/, and most of the safe layer calls a
+                                   # wrapper that names it instead. It is
+                                   # two-hop now, and 303 is the first honest
+                                   # reading of this number.
 ```
 
 ### The census now asks two questions instead of one
@@ -80,10 +90,9 @@ currently fails on 416 undecided routes, which is the honest state.
 | `video.h` + `media.h` | 21 | 0 | the `Video`, `Song` and `SongCollection` a game *builds* rather than is handed |
 | `audio.h` + `xact.h` | 16 | 2 | the disposal facts, the renderer identity, and the float streaming path; two helpers deliberately left to Rust because CNA's arithmetic is not XNA's |
 
-Twelve headers now stand at zero undecided routes: `graphics_resource.h`,
-`input.h`, `input_keyboard.h`, `input_mouse.h`, `texture.h`, `runtime.h`,
-`content.h`, `content_readers.h`, `video.h`, `media.h`, `audio.h` and
-`xact.h`.
+| the last of the ABI | 61 | 3 | `ContentLost`, the back buffer, the window controls, the joystick hotplug hooks, the storage root, the assembly title -- the tail that took the census to zero |
+
+**Every header now stands at zero undecided routes.**
 
 ### What this milestone found
 
@@ -148,23 +157,32 @@ Two more measured facts that are not defects but were not written down:
   version a decoder understands, not the version it expects. Reading it the
   other way makes every decoder refuse every file older than itself.
 
+### The full handoff
+
+`docs/handoff-2026-09-01.md` is the thirteen-section record for this milestone:
+start state and where the reported numbers were wrong, dependency identity, the
+scoreboard, every family, the reasoning behind the 801 deliberate
+non-bindings, blockers, the eleven defects found, the mutation-style evidence,
+the qualification matrix, documentation changes, git state, the metric that
+changed meaning, and the next frontier.
+
 ### Do next
 
-1. **The remaining 64 undecided routes.** `vertex_resources.h` (7),
-   `input_joystick.h` (6), `graphics.h` (6), `storage.h` (5),
-   `runtime_window.h` (5), `runtime_graphics_manager.h` (5),
-   `render_target.h` (5), `input_devices.h` (5), `display.h` (5) and a short
-   tail of ones and twos. Each needs the same treatment the families above got: read what
+1. **`RUST-CENSUS-002`: the 303 bound routes with no safe call site.** Now a
+   number worth working, because it is finally measured correctly. Each one
+   needs either a safe caller or a stated reason; the justified list in
+   `classification.json` is where the reasons go. Each needs the same treatment the families above got: read what
    is already in Rust before deciding anything is missing. Twice in this
    milestone that inverted the plan -- `runtime_components.h` and the touch
    value operations turned out to be Rust already -- and twice it found the
    opposite: `Name` and the launch parameters were Rust-only state that CNA
    could not see.
-2. **`RUST-CENSUS-002`: 894 bound routes with no safe call site.** Reported
-   rather than gated, because declaring a whole family so a missing symbol fails
-   at load is deliberate and read-only projections legitimately leave the C
-   mutators uncalled. Working the list down is what turns that from a claim into
-   a measurement.
+2. **The three deferred families.** `RUST-EXT-016` (adoption constructors for
+   `SpriteFont` and `SoundEffect`), `RUST-EXT-017` (make the XACT disposing
+   event fire on engine teardown, then bind CNA's), `RUST-EXT-018` (make the
+   XNA-shaped `ContentLost` handlers fire by bridging them onto CNA's). All
+   three are the same shape: a Rust event that does not fire where XNA's would,
+   and a native event that does.
 3. **The standing blockers.** A wasm toolchain for `RUST-PLATFORM-003`; a
    second machine for `RUST-BEHAVIOR-012`. The GPU-backed engine artifact is no
    longer one: `cnanext/cmake-build-opengles3` is built with `CNA_CNAEXT=ON`

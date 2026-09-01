@@ -122,3 +122,38 @@ impl MediaQueue {
 }
 
 impl Drop for MediaQueue { fn drop(&mut self){self.invalidate_songs();self.core.invalidate();} }
+
+/// The `media_player.h` routes with no XNA counterpart.
+impl MediaQueue {
+    /// Appends a song to the queue.
+    ///
+    /// XNA's `MediaQueue` is read-only to a game -- it is filled by
+    /// `MediaPlayer.Play` with a collection. This and [`Clear`](Self::Clear)
+    /// are how a caller builds one itself.
+    pub fn Add(&self, song: &Song) -> Result<()> {
+        self.core
+            .native()
+            .media_queue_add(self.core.handle()?, song.core.handle()?)
+    }
+
+    /// Empties the queue.
+    pub fn Clear(&self) -> Result<()> {
+        self.core.native().media_queue_clear(self.core.handle()?)
+    }
+}
+
+/// The `media_player.h` predicate that lets a hand-driven player agree with an
+/// event-driven one.
+impl Song {
+    /// Whether CNA considers a song of this duration ended after `elapsed`.
+    ///
+    /// Some backends never raise a song-ended notification, so a player that
+    /// needs `MediaStateChanged` to fire has to watch the clock. *When* a song
+    /// counts as ended is CNA's rule, and asking it is what keeps the two
+    /// kinds of player agreeing.
+    pub fn EndedByElapsedTime(&self, elapsed: TimeSpan) -> Result<bool> {
+        self.core
+            .native()
+            .song_ended_by_elapsed(self.core.handle()?, elapsed.Ticks())
+    }
+}
