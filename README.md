@@ -218,6 +218,7 @@ python3 tools/api-compat/verify.py --leak-only
 
 python3 -m unittest discover -s tools/api-compat/tests
 python3 -m unittest discover -s tools/native-abi/tests
+python3 -m unittest discover -s tools/c-api-inventory/tests
 
 # Fails on a library or language item newer than the declared MSRV.
 python3 tools/msrv/audit.py

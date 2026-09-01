@@ -21,6 +21,9 @@ from pathlib import Path
 import re
 import sys
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import reachability  # noqa: E402  (path is set immediately above)
+
 ROOT = Path(__file__).resolve().parents[2]
 CLASSIFICATION = ROOT / "tools/c-api-inventory/classification.json"
 CNA_SYS = ROOT / "crates/cna-sys/src/lib.rs"
@@ -73,6 +76,25 @@ BINDING_STATUSES = (
 
 # A status that stops the gate is not allowed to be a bare assertion.
 NEEDS_TASK = ("BLOCKED_UPSTREAM", "DEFERRED_TRACKED")
+
+# Why a bound route legitimately has no safe caller.  A closed set, so
+# "unused" and "review later" are not available as answers.
+UNREACHABLE_OUTCOMES = (
+    # The family is acquired as one table so a library missing any of it fails
+    # at load rather than at first use, and this member is deliberately absent
+    # from the safe API.
+    "ATOMIC_TABLE_MEMBER",
+    # Safe Rust implements the behaviour itself, more faithfully than the C
+    # route does.  Must name the Rust that does it in ``rustEvidence``.
+    "IMPLEMENTED_IN_SAFE_RUST",
+    # The route mutates state XNA's object model freezes, so exposing it would
+    # contradict the semantics the projection exists to reproduce.
+    "MUTATOR_XNA_DOES_NOT_HAVE",
+    # A CNA defect stops the safe layer from calling it.  Names a finding.
+    "BLOCKED_UPSTREAM",
+    # No renderer, platform, device or asset available here can drive it.
+    "BLOCKED_ENVIRONMENT",
+)
 
 FUNCTION = re.compile(
     r"\bCNA_C_API\s+[^;{}]*?\b(cna_[A-Za-z0-9_]+)\s*\((.*?)\)\s*;", re.S
@@ -187,50 +209,17 @@ def missing_rust_evidence(rules: dict, source: str) -> list[str]:
     return missing
 
 
-def safe_layer_call_sites() -> set[str]:
-    """Every native table field the safe Rust layer can actually reach.
+def safe_layer_reachability() -> dict:
+    """Which acquired routes a safe caller can reach, from the call graph.
 
-    ``BOUND`` means the route is declared in ``cna-sys``.  That is not the same
-    as a caller being able to reach it: a route can be declared, resolved at
-    load, and still have no safe API in front of it.  The fields are named after
-    the route minus its ``cna_`` prefix, so scanning for those identifiers says
-    which bound routes a user can call.
-
-    Reachability is **two hops**, because most of the safe layer does not touch
-    a table field directly.  It calls a wrapper in ``native/`` -- ``fn
-    create_video`` -- and the wrapper calls the field.  Counting only the first
-    hop reported every route behind a wrapper as unreachable, which is how this
-    number once claimed 1,077 dead routes while every one of them had a safe
-    API in front of it.  So: a field is reachable if the safe layer names it, or
-    if the safe layer names a ``native/`` function whose body does.
+    ``BOUND`` is measured from ``cna-sys``; this answers the different question
+    of whether anything outside ``native/`` can arrive at the route.  The work
+    is in ``reachability.py``, which walks the crate rather than pattern-
+    matching names -- the first version of this check compared a route's name
+    to Rust identifiers and could not have worked, because the field holding a
+    route's pointer is not named after it.
     """
-    root = ROOT / "crates/cna/src"
-    identifier = re.compile(r"\b([a-z][a-z0-9_]{3,})\b")
-
-    outside: set[str] = set()
-    wrapper_calls: dict[str, set[str]] = {}
-    for path in root.rglob("*.rs"):
-        text = path.read_text(encoding="utf-8")
-        if "native" in path.relative_to(root).parts[:1]:
-            # Split the module into functions and record what each one names,
-            # so a wrapper can be credited with the field it calls.
-            for match in re.finditer(
-                r"\n    (?:pub(?:\([a-z()]+\))? )?fn ([a-z][a-z0-9_]*)\s*[(<]", text
-            ):
-                start = match.end()
-                nxt = re.search(r"\n    (?:pub(?:\([a-z()]+\))? )?fn ", text[start:])
-                body = text[start : start + (nxt.start() if nxt else len(text) - start)]
-                wrapper_calls.setdefault(match.group(1), set()).update(
-                    identifier.findall(body)
-                )
-            continue
-        outside |= set(identifier.findall(text))
-
-    reachable = set(outside)
-    for wrapper, called in wrapper_calls.items():
-        if wrapper in outside:
-            reachable |= called
-    return reachable
+    return reachability.analyse(ROOT / "crates/cna/src")
 
 
 def rust_sys_inventory() -> dict:
@@ -397,6 +386,7 @@ def main() -> int:
     headers = header_inventory(header_root)
     rust = rust_sys_inventory()
     rules = json.loads(CLASSIFICATION.read_text(encoding="utf-8"))
+    rust_layer = rust_source()
     for rule in rules["rules"] + list(rules["overrides"].values()):
         if rule["category"] not in CATEGORIES:
             raise ValueError(f"unknown classification category: {rule['category']}")
@@ -420,14 +410,37 @@ def main() -> int:
 
     # Bound but with no safe call site.  Each one needs a stated reason, or the
     # binding is dead weight nobody can use.
-    reachable = safe_layer_call_sites()
+    graph = safe_layer_reachability()
     justified = rules.get("bindingUnreachable", {})
     unreachable = sorted(
         name
         for name in headers["functions"]
-        if binding[name]["status"] == "BOUND"
-        and name[len("cna_"):] not in reachable
-        and name not in justified
+        if binding[name]["status"] == "BOUND" and name not in graph["reachable"]
+    )
+    unjustified = [name for name in unreachable if name not in justified]
+    # A justification is only worth having while it is still true.  One that
+    # names a route the safe layer has since started calling, a route that has
+    # stopped being bound, or a route the headers no longer declare is a claim
+    # about code that is not there any more, and saying so is the whole point
+    # of writing the reason down.
+    stale_justifications = sorted(
+        name
+        for name in justified
+        if name not in headers["functions"]
+        or binding.get(name, {}).get("status") != "BOUND"
+        or name in graph["reachable"]
+    )
+    justifications_naming_absent_rust = []
+    for name, entry in sorted(justified.items()):
+        for symbol in entry.get("rustEvidence", []):
+            if symbol not in rust_layer:
+                justifications_naming_absent_rust.append(f"{name}: {symbol}")
+    unjustified_outcomes = sorted(
+        {
+            entry.get("outcome", "")
+            for entry in justified.values()
+            if entry.get("outcome") not in UNREACHABLE_OUTCOMES
+        }
     )
     if args.list:
         wanted = args.list
@@ -470,7 +483,7 @@ def main() -> int:
         }
     )
 
-    absent_rust_evidence = missing_rust_evidence(rules, rust_source())
+    absent_rust_evidence = missing_rust_evidence(rules, rust_layer)
 
     # A defect that does not change a route's status still has to name real
     # routes, or a finding can quietly stop pointing at anything.
@@ -544,8 +557,19 @@ def main() -> int:
         "knownDefects": known_defects,
         "rulesNamingAbsentRustCode": absent_rust_evidence,
         "boundWithoutSafeCallSite": len(unreachable),
-        "boundWithoutSafeCallSiteSample": unreachable[:20],
         "boundWithoutSafeCallSiteJustified": len(justified),
+        "boundWithoutSafeCallSiteUnjustified": unjustified,
+        "boundWithoutSafeCallSiteOutcomes": {
+            outcome: sum(
+                1 for entry in justified.values() if entry.get("outcome") == outcome
+            )
+            for outcome in UNREACHABLE_OUTCOMES
+        },
+        "staleUnreachableJustifications": stale_justifications,
+        "justificationsNamingAbsentRustCode": justifications_naming_absent_rust,
+        "unknownUnreachableOutcomes": unjustified_outcomes,
+        "nativeFunctionsWalked": graph["nativeFunctions"],
+        "nativeFunctionsReached": graph["visitedNativeFunctions"],
         "unmapped": sorted(
             name
             for name, value in routes.items()
@@ -570,6 +594,15 @@ def main() -> int:
         # nobody has done.
         + binding_counts["UNREVIEWED"]
         + binding_counts["ACTIONABLE_LOCAL"]
+        # And the third, which RUST-CENSUS-002 added: a route Rust binds, keeps
+        # resolving at load, and no safe caller can reach -- with nobody
+        # willing to say why.  The raw count is *not* gated: an atomic table
+        # and a read-only projection both leave routes legitimately uncalled.
+        # What is gated is the absence of an explanation.
+        + len(unjustified)
+        + len(stale_justifications)
+        + len(justifications_naming_absent_rust)
+        + len(unjustified_outcomes)
     )
     return 0 if args.report_only or failures == 0 else 1
 

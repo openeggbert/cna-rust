@@ -72,6 +72,54 @@ The gate is what makes the census worth reading: it fails while any route is
 `UNREVIEWED` or `ACTIONABLE_LOCAL`, so "the census passes" and "every route has
 a decision somebody stands behind" are the same statement.
 
+## Bound is not the same as reachable
+
+`BOUND` says a route is declared in `cna-sys` and resolved when the library
+loads. It does not say a consumer can call it. `RUST-CENSUS-002` asks the other
+question, and `tools/c-api-inventory/reachability.py` answers it by walking the
+crate:
+
+```text
+a file outside native/  ->  a native/ wrapper  ->  ...  ->  self.table.field
+```
+
+Three measured facts make that exact rather than approximate. Every route is
+acquired at exactly one place, `field: symbol!(cna_x, ...)`, which ties the C
+route to the Rust field holding its pointer. All 3,244 field names are unique
+across the crate, so an occurrence of `.category_pause` names one route and no
+other. And the definition is not a use: the `symbol!` initialiser and the
+struct declaration are blanked before any name is collected, or the loader --
+which must name every field -- would make every route look reachable.
+
+This replaced a check that compared a route's **name** to Rust identifiers.
+That could not work here, because the field is not named after the route:
+`cna_audio_category_pause` lives in `AudioApi::category_pause`. It reported 894
+dead routes, then 1,077, then 303. The walk measures 138, and the difference is
+not a threshold that moved -- it is 165 routes that always had a safe API in
+front of them.
+
+The walk has no hop limit. Measured on this crate, 2,400 routes are named by the
+safe layer directly, 696 sit behind one wrapper and 4 behind two; a hop-limited
+check set at two would still miss `cna_error_get_last_info`, which every
+fallible call reaches through `Native::check` and `Native::last_error_category`.
+
+A bound route with no safe call site is **not** automatically a defect. The
+gate therefore does not fail on the count; it fails on an unexplained one. Each
+must appear in `classification.json`'s `bindingUnreachable` with a `reason` and
+one `outcome` from a closed set:
+
+| Outcome | Meaning |
+|---|---|
+| `ATOMIC_TABLE_MEMBER` | The family is acquired as one table so a library missing any of it fails at load rather than at first use, and this member is deliberately absent from the safe API. |
+| `IMPLEMENTED_IN_SAFE_RUST` | Rust does the same work itself, and more faithfully. Must name the Rust in `rustEvidence`, which the census greps for. |
+| `OUTSIDE_XNA_SURFACE` | The route backs something XNA's public API does not have: an explicit interface implementation, a mutator XNA throws from, or a CNA-internal seam. |
+| `BLOCKED_UPSTREAM` | A CNA defect stops the safe layer calling it. Names a finding. |
+| `BLOCKED_ENVIRONMENT` | Nothing available here -- renderer, platform, device or asset -- can drive it. |
+
+A justification is checked, not trusted. The gate fails when one names a route
+that has since acquired a safe caller, stopped being bound, or left the
+headers, and when its `rustEvidence` names Rust that is no longer there.
+
 ## Measurement
 
 ```sh
@@ -79,9 +127,18 @@ CNA_ROOT=<cnanext> python3 tools/c-api-inventory/inventory.py
 ```
 
 The gate fails on any unmapped route, any `cna-sys` declaration absent from the
-canonical headers, any rule that no longer matches anything, and any override
-naming a route that no longer exists. The last two keep the rule file from
-drifting into fiction as the ABI grows.
+canonical headers, any rule that no longer matches anything, any override
+naming a route that no longer exists, and any bound route with no safe call
+site and no justification. The middle three keep the rule file from drifting
+into fiction as the ABI grows.
+
+```sh
+python3 -m unittest discover -s tools/c-api-inventory/tests
+```
+
+The reachability walk's own mutation tests: a route three wrappers deep is
+reachable, a route whose last safe caller is deleted stops being, and a field
+named only in a comment, a string, or its own acquisition is not a call site.
 
 ## Reading a classification
 
