@@ -356,7 +356,7 @@ Re-measured against the artifacts built from cnanext `7712534d3`.
 | `RUST-UPSTREAM-025` the one owned-handle engine getter | reproduces | asserted as measured |
 | `RUST-UPSTREAM-026` `launch_parameters_add` drops a duplicate | reproduces | asserted as measured |
 | `RUST-UPSTREAM-027` sample duration/size are not XNA's | reproduces | the Rust answers stay pinned to the reference values |
-| `RUST-UPSTREAM-028` **new** — a queued packet's size is unreachable | new | see `docs/upstream-findings.md` |
+| `RUST-UPSTREAM-028` **new** — a queued packet's size is unreachable | new | `tools/reproducers/census002_packet_truncation.c`: a 5,000-byte packet into a 1,024-byte buffer is `SUCCESS` with `out_received=1024`; the reader overload delivers all 5,000 and reports 0 |
 | `RUST-UPSTREAM-029` **new** — CNA's `GamerServicesComponent` skips the base | new | source-level, from XNA's IL |
 
 ### RUST-UPSTREAM-023
@@ -495,8 +495,8 @@ scratch.
 cna-rust
   HEAD at start   f87b0e362e110605a15488900e8b6a6c9bfd6288
   HEAD at end     see `git log -1`
-  local commits   8
-  ahead           8
+  local commits   15
+  ahead           15
   pushed          NO
   working tree    clean
 
