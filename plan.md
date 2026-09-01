@@ -1,6 +1,6 @@
 # CNA-Rust plan
 
-Status date: 2026-08-31
+Status date: 2026-09-01
 
 Scope: a Rust projection of Microsoft XNA Framework 4.0 over the canonical CNA
 C ABI, plus a separately namespaced safe Rust API for CNA's own modern
@@ -156,6 +156,23 @@ justified with a reason and one outcome from a closed set. The gate fails on an 
 exposed as safe, idiomatic Rust under `cna::extensions`, never inside the
 strict XNA hierarchy, and never as raw `cna_*` calls. See
 [docs/extensions.md](docs/extensions.md).
+
+**`RUST-SURFACE-001` made that separation true rather than intended.** Three
+milestones had added CNA's own members to strict XNA types as inherent
+methods -- 109 of them, plus `TouchPanelTestBackend` re-exported through
+`Input::Touch` -- and the strict verifier reported all 110 the first time
+anything re-ran it. The decision recorded here is that a CNA-only operation on
+an XNA object is an **extension-trait method**: 30 traits under
+`cna::extensions`, no member renamed, no inherent forwarder left behind, and no
+rule added to the verifier. Which source file an `impl` block sits in never
+mattered; 28 of the 109 were already under `extensions/`.
+
+CNA's own surface now has its own gate,
+[`tools/extension-surface`](tools/extension-surface/README.md), because a
+verifier that reaches zero by removing members cannot tell one that moved from
+one that was deleted. It also measures something the strict verifier's leak
+check cannot: a public signature naming a crate type that no public path
+reaches.
 
 Two families are complete. `runtime` covers CNA's process-level identity and
 renderer selection in 35 routes: platform and desktop-OS identity, renderer

@@ -53,22 +53,29 @@ hierarchy and deliberate CNA extensions.
   claiming either gate passed.
 - XNA 4.0 Windows runtime inventory remains 257 CLR types and 2,964 members;
   all 259 expected Rust types exist.
-- Strict verification: **missing** types and members are zero, and every
-  constructor/overload/property/event mapping mismatch is zero, on both the
-  selected and the complete runtime profile. Total diagnostics are **110**, all
-  of one shape -- see the unexpected-member line below. Parameter/signature,
-  disposal, type-kind, base/trait/interface, return, generic/bound, ref/out,
-  enum/value, flags and delegate mismatches remain zero, which is what makes
-  the 110 a question about *where* CNA's own members live rather than about
-  whether XNA's are right.
+- Strict verification: **total diagnostics are zero** on both the selected and
+  the complete runtime profile, with an empty allowlist and no unmeasured
+  category. Missing and unexpected types and members, constructor, overload,
+  property, event, parameter/signature, disposal, type-kind,
+  base/trait/interface, return, generic/bound, ref/out, enum/value, flags and
+  delegate mismatches are each zero.
 - Internal type leaks, raw-handle leaks, public unsafe APIs, allowlist entries
-  and unmeasured categories are zero, re-measured 2026-09-01. **Unexpected
-  types/members are not**: the verifier reports 110 -- 109 CNA-only members
-  sitting on strict XNA types, plus `TouchPanelTestBackend`. They arrived with
-  the `RUST-EXT-015d`/`015e`/`015q` milestones and nothing re-ran the verifier
-  until `RUST-CENSUS-002` did. Whether they move behind extension traits or the
-  verifier learns to expect them is `RUST-SURFACE-001`, an open product
-  decision; this line no longer claims otherwise.
+  and unmeasured categories are zero, and so are unexpected types and members.
+  The last line said 110 and it was true: 109 CNA-only members were sitting on
+  strict XNA types and `TouchPanelTestBackend` was re-exported through
+  `Input::Touch`. They arrived with the `RUST-EXT-015d`/`015e`/`015q`
+  milestones, nothing re-ran the verifier until `RUST-CENSUS-002` did, and
+  `RUST-SURFACE-001` moved every one of them behind a `cna::extensions`
+  extension trait -- 30 traits, no member renamed, no verifier rule relaxed.
+  See [docs/extensions.md](docs/extensions.md) for the member-by-member
+  migration table.
+- CNA's own surface has its own gate. `tools/extension-surface/verify.py`
+  proves the 283 CNA-only members reachable on strict XNA types are still
+  published by a publicly reachable trait with an unchanged signature, and that
+  no public signature names a crate type no public path reaches. The strict
+  verifier cannot see either: it reaches zero by *removing* CNA's members from
+  the XNA hierarchy, so on its own it cannot tell a member that moved from one
+  that was deleted.
 - `ContentManager` and the managed XNB reader pipeline are real:
   typed cache/disposal, custom readers, existing/shared/external resources,
   primitive readers, textures, SpriteFont, Effect, all five stock effects, and
@@ -222,9 +229,13 @@ XNA_REFERENCE_PATH=/path/to/xna4/windows \
 
 python3 tools/api-compat/verify.py --leak-only
 
+# CNA's own surface: the extension traits the strict verifier cannot see.
+python3 tools/extension-surface/verify.py
+
 python3 -m unittest discover -s tools/api-compat/tests
 python3 -m unittest discover -s tools/native-abi/tests
 python3 -m unittest discover -s tools/c-api-inventory/tests
+python3 -m unittest discover -s tools/extension-surface/tests
 
 # Fails on a library or language item newer than the declared MSRV.
 python3 tools/msrv/audit.py

@@ -1,112 +1,134 @@
 # CNA-Rust next work
 
-## 2026-09-01 — the reachability milestone: every bound route says why
+## 2026-09-01 — `RUST-SURFACE-001`: CNA's members leave the strict XNA types
 
-The previous milestone gave all 4,054 routes a binding decision. This one asks
-the harder question the census had only ever *reported* on: of the routes Rust
-binds, which can a consumer actually call, and for the rest, why not?
+The reachability milestone left one open question, and it was a product
+decision rather than a bug: for three milestones CNA's own members had been
+added to strict XNA types as ordinary inherent methods, and the first run of
+the strict verifier after they landed reported **110 diagnostics** -- 109
+`UNEXPECTED_MEMBER` and one `UNEXPECTED_TYPE`.
 
-The number had been wrong four times -- 894, 1,077, 303 -- because all four
-came from matching a C route's *name* against Rust identifiers, and the field
-holding a route's pointer is not named after the route.
-`cna_audio_category_pause` lives in `AudioApi::category_pause`.
+The answer taken here is the one `extensions/mod.rs` already claimed: a
+CNA-only operation on an XNA object is an **extension-trait method**. The
+strict hierarchy contains only what Microsoft XNA declares.
 
 ```text
 CNANEXT_HEAD=7712534d3d22c7e284714e0e87afebba3f3cb472
-CNANEXT_AT_QUALIFICATION=7712534d3d22c7e284714e0e87afebba3f3cb472
-                             # both artifacts rebuilt for this milestone
 SHARP_RUNTIMENEXT_HEAD=9cc96cd57cde394940cc24d58743edf9bf63d3fb
 
 ARTIFACT_ENGINE=cnanext/cmake-build-opengles3   # CNA_CNAEXT=ON, OPENGLES3
 ARTIFACT_HEADLESS=cnanext/cmake-build-headless  # CNA_CNAEXT=OFF, HEADLESS
 LIBRARY_SHA256=94078be94dc1f1e6c8787c1cd17b08c9430d1e4bb5699947cd2b7aafee40281d
-LIBRARY_EXPORTS=4055
-HEADER_EXPORTS=4055
 
-CANONICAL_ROUTES=4055        # was 4054; CABI-49 added one
-BOUND=3236                   # was 3232: +7 bound, -3 unbound as never-acquired
-DELIBERATE_NON_BINDING=804   # was 801
-BLOCKED_UPSTREAM=15
-DEFERRED_TRACKED=0           # was 6: EXT-016, EXT-017 and EXT-018 all closed
+                          before   after
+STRICT_SELECTED_TOTAL        110       0
+STRICT_COMPLETE_TOTAL        110       0
+UNEXPECTED_MEMBER            109       0
+UNEXPECTED_TYPE                1       0
+MISSING_MEMBER                 0       0
+MISSING_TYPE                   0       0
+ALLOWLIST                      0       0
+UNMEASURED_CATEGORIES          0       0
+
+EXTENSION_TRAITS_ADDED        30
+MEMBERS_MOVED                109
+MEMBERS_RENAMED                0
+INHERENT_FORWARDERS_LEFT       0
+VERIFIER_RULES_RELAXED         0
+
+EXTENSION_SURFACE_GATE       283 members, 59 traits, 0 diagnostics
+PUBLICLY_NAMEABLE_ITEMS      987
+UNNAMEABLE_PUBLIC_TYPES        0    # was 1: PresentationMode
+
+CANONICAL_ROUTES=4055
+BOUND=3236
+BOUND_WITHOUT_SAFE_CALL_SITE=97      # unchanged by the migration
+  JUSTIFIED=97
+  UNJUSTIFIED=0
 UNREVIEWED=0
 ACTIONABLE_LOCAL=0
-
-RUST_SYS_DECLARATIONS=3251
-SYMBOL_ACQUISITIONS=3250
-LINKED_DECLARATIONS=3251
-PROTOTYPE_MISMATCHES=0
-SYMBOL_TYPE_MISMATCHES=0
-LAYOUT_FIELD_SETS_CHECKED=187
-C_RUST_MEASUREMENTS=3174
-ABI_FINDINGS=0
-UNAUDITED_DECLARATIONS=0
-
-BOUND_WITHOUT_SAFE_CALL_SITE=97      # measured; was reported as 303
-  JUSTIFIED=97
-  UNJUSTIFIED=0                      # and now gated
-  IMPLEMENTED_IN_SAFE_RUST=59
-  OUTSIDE_XNA_SURFACE=37
-  ATOMIC_TABLE_MEMBER=1
 ```
 
-### What the walk measures
+### Why the file a method lives in never mattered
 
-`tools/c-api-inventory/reachability.py` ties each route to its field through
-its own `symbol!` acquisition -- all 3,250 field names are unique across the
-crate -- and walks the call graph from every file outside `native/`, with no
-hop limit. Measured: 2,400 routes named by the safe layer directly, 696 behind
-one wrapper, 4 behind two. A two-hop rule still cannot see
-`cna_error_get_last_info`.
+Twenty-eight of the 109 were already inside `crates/cna/src/extensions/`, in
+`impl GraphicsDevice { pub fn ... }` blocks. An inherent `pub fn` is part of
+`GraphicsDevice`'s public API wherever it is written. Moving source files would
+have changed nothing; what changed is `impl Type` becoming
+`impl Trait for Type`.
 
-The gate now fails on an *unexplained* dead route rather than on the count. Four
-planted defects each fail it, including one that must *not*: deleting
-`AudioCategory::Pause` leaves `category_pause` reachable through `Resume`,
-`SetVolume` and `Stop`, and the gate is right to pass.
+### What it cost a caller
 
-### The three deferrals, closed
+An import line. A receiver method keeps its call exactly, and so does an
+associated function: `Song::FromFile(game, name, path)?` still resolves,
+because Rust searches the traits in scope for an associated item on a type as
+well as its inherent impls. 27 of the 109 are associated functions and every
+one keeps its shape. `tools/package-consumer` compiles them from outside the
+workspace with the traits imported, and compiles the same file without them,
+where the build must be refused with E0599.
 
-- **`RUST-EXT-016`** `SpriteFont::adopt` reads its tables back out of the
-  handle; `SoundEffect::adopt` is the state `FromAsset` already had. Two owned
-  handles, one asset, and the font releases before its atlas because CNA
-  requires it. Measured against MonoGame's own `Default.xnb` -- which is what
-  found `ContentReader::ReadChar` reading UTF-16 where `BinaryReader`'s reads
-  UTF-8.
-- **`RUST-EXT-017`** XNA's `AudioEngine.Dispose` calls the **public** `Dispose`
-  on every child, so each one's `Disposing` fires; this projection called the
-  private teardown. Fixed, with CNA's own notification bound in the same commit
-  as the cross-check.
-- **`RUST-EXT-018`** one native subscription per dynamic buffer, delivering into
-  the buffer's handler list in registration order. `EVENT_BRIDGE_VERIFIED`;
-  `REAL_DEVICE_LOSS_VERIFIED` is **false** and the test says so.
+The one thing that did change beyond the import: `from_native_value` on
+eighteen graphics enums and `Keys::from_key_code` were `const fn`, and a trait
+method cannot be `const` on stable Rust. The inherent conversions are still
+`const` and still what the crate decodes with; what a consumer reaches through
+the trait is not usable in a `const` context.
 
-### Two new upstream findings
+### A second gate, for the half the first one cannot see
 
-- **`RUST-UPSTREAM-028`** — no route reports a queued packet's size, and the
-  array receive truncates where XNA throws. The `PacketReader` overload also
-  reports zero bytes always, which is FNA's `uint len = 0` preserved.
-- **`RUST-UPSTREAM-029`** — CNA's `GamerServicesComponent` skips
-  `base.Initialize()` and `base.Update()` to match FNA; XNA's IL calls both.
+The strict verifier reaches zero by *removing* CNA's members from the XNA
+hierarchy, so on its own it cannot tell a member that moved behind a trait from
+one that was deleted. `tools/extension-surface/verify.py` answers that: 283
+CNA-only members reachable on strict XNA types -- the 109 moved here and 174
+that were already extension traits and had no gate at all -- each still
+declared by a publicly reachable trait with an unchanged signature, implemented
+for its strict type, and absent from that type's inherent surface.
 
-### One thing the documentation got wrong
+It measures one more thing, because this milestone found the defect: a public
+signature that names a crate type no public path reaches.
+`GraphicsDeviceManager::PreferredPresentationMode` answered with
+`PresentationMode`, which was `pub` inside a private module and re-exported
+nowhere, so a caller could invoke the method and not name what came back. The
+same defect the previous milestone fixed for `DeviceSettingsObserver` and
+`ObservedDeviceSettings`, and missed for the third type. Now zero across the
+whole public API, and gated.
 
-README's `Verified status (2026-08-23)` said the strict verifier reports zero
-unexpected types and members. It reports **110**, and has since the
-`RUST-EXT-015d`/`015e`/`015q` milestones put CNA's own members on strict XNA
-types. Nothing had re-run it. Corrected, and opened as `RUST-SURFACE-001`.
+### Six planted defects
 
-### The full handoff
+Each caught by the gate that should catch it, and by no other: a member left
+inherent (strict verifier), the test backend re-exported into `Input::Touch`
+(strict verifier), a member dropped from its trait with the body kept
+(extension gate only -- the strict verifier reports zero), the
+`PresentationMode` re-export removed again (extension gate only), the only
+trait-method caller of a native route deleted (census gate, 97 -> 98
+unreachable with one unjustified), and the trait imports removed from a
+consumer (E0599).
 
-`docs/handoff-2026-09-01-census.md` is the seventeen-section record.
+The fifth answers the question the migration raised about the call-graph walk:
+it finds a call site inside an `impl Trait for Type` body exactly as it found
+one inside an inherent impl.
+
+### One documentation defect
+
+`SkinnedEffect::VertexColorEnabled` carried a comment saying XNA declares it
+and the strict projection had missed it. The pinned
+`Microsoft.Xna.Framework.Graphics.dll` gives it to `BasicEffect` and
+`DualTextureEffect` and not to `SkinnedEffect`. It is CNA's own third, and the
+comment says so where the member now lives.
+
+### The full record
+
+`docs/extensions.md` carries the member-by-member migration table and the
+before/after call for all 109.
 
 ### Do next
 
-1. **`RUST-SURFACE-001`.** The one open question about the projection's shape:
-   do CNA's own members belong on a strict XNA type, or behind an extension
-   trait? 109 members, and the two answers give different public APIs. This is
-   a decision, not a fix.
-2. **The standing external blockers.** A wasm toolchain for
+Nothing here is locally actionable. What remains is external:
+
+1. **The standing external blockers.** A wasm toolchain for
    `RUST-PLATFORM-003`; a macOS host for `RUST-PLATFORM-002`; a second machine
    for `RUST-BEHAVIOR-012`; a real audio backend for `RUST-BEHAVIOR-008`; a
    legally redistributable video fixture for `RUST-BEHAVIOR-009`.
-3. **The ten `RUST-UPSTREAM-*` findings**, each with a reproducer that runs
+2. **The ten `RUST-UPSTREAM-*` findings**, each with a reproducer that runs
    without this repository.
+3. **`RUST-XNA-004`**, the design-time Content Pipeline: a product-boundary
+   decision, not a missing projection.

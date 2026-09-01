@@ -230,6 +230,25 @@ member and fills a `PacketReader` the same way, so a game never touches either.
 CNA has no session yet, and without these two routes the packet types would be
 a write-only sink and a permanently empty source.
 
+### `touch` — CNA's substitute touch panel
+
+XNA's touch API reads a device. CNA also publishes the panel's own state, and
+`extensions::touch::TouchPanelTestBackend` is that: whether a touch device
+exists at all, whether a mouse is reported as a finger, where a finger is, a
+gesture queued for the recogniser to hand back, and the frame boundary that
+turns queued input into a `TouchCollection`.
+
+Eight of its nine canonical routes are `CNA_EXTENSION_BACKING`; only
+`cna_touch_panel_reset_for_tests_ext` is `TOOLING_ONLY`. That is why it is
+public rather than test-only, and why it is here rather than in
+`cna::Microsoft::Xna::Framework::Input::Touch`, where it was until
+`RUST-SURFACE-001`. It still takes `TouchLocationState`, `GestureSample` and
+`Vector2`, because what it drives is XNA's `TouchPanel`; accepting an XNA type
+is not being one.
+
+No machine this crate is verified on has a touchscreen, so without it the whole
+touch projection could only ever be exercised against "no touch device".
+
 ### `window` — opaque native window identity
 
 `WindowHandle` cannot be dereferenced or forged through the safe API.
@@ -239,6 +258,270 @@ a write-only sink and a permanently empty source.
 Where upstream CNA marks an API experimental, this crate says so rather than
 presenting it as stable. The engine layer is the large case and is not yet
 bound; when it is, it will be reachable under a name that says what it is.
+
+## `RUST-SURFACE-001` -- CNA's members leave the strict types (2026-09-01)
+
+For three milestones the separation this document opens with was intended
+rather than measured. `RUST-EXT-015d`, `015e` and `015q` added CNA's own
+members to strict XNA types as ordinary inherent methods, nothing re-ran the
+strict verifier until `RUST-CENSUS-002` did, and it reported **110
+diagnostics**: 109 `UNEXPECTED_MEMBER` and one `UNEXPECTED_TYPE`.
+
+Which file a method's source lives in has nothing to do with it. Twenty-eight
+of the 109 were already inside `crates/cna/src/extensions/`, in
+`impl GraphicsDevice { pub fn ... }` blocks. An inherent `pub fn` is part of
+`GraphicsDevice`'s public API wherever it is written, and the verifier reads
+the API rather than the directory tree.
+
+### The decision
+
+CNA-only operations on an XNA object are **extension-trait methods**, not
+inherent members. The strict hierarchy contains only what Microsoft XNA
+declares; nothing was added to the verifier, no allowlist entry was made, and
+no member was renamed.
+
+Two things this milestone deliberately did not do. It did not leave deprecated
+inherent forwarders, because a deprecated inherent member is still an inherent
+member and the verifier would still report it. And it did not rename anything:
+the migration is already a source break at the import line, and stacking a
+naming change on top would have made every call site a puzzle instead of an
+import.
+
+### What moved
+
+| Domain | Members | Extension trait | Strict type(s) |
+|---|---:|---|---|
+| graphics device and manager | 9 | `DeviceCapabilityExt` in `cna::extensions::graphics_device_ext` | `GraphicsDevice` |
+| graphics device and manager | 3 | `DeviceEventExt` in `cna::extensions::graphics_device_ext` | `GraphicsDevice` |
+| graphics device and manager | 16 | `DeviceStateExt` in `cna::extensions::graphics_device_ext` | `GraphicsDevice` |
+| graphics device and manager | 4 | `GraphicsDeviceManagerExt` in `cna::extensions::graphics_device_ext` | `GraphicsDeviceManager` |
+| graphics device and manager | 2 | `OcclusionQueryExt` in `cna::extensions::graphics_device_ext` | `OcclusionQuery` |
+| effects | 1 | `DualTextureEffectExt` in `cna::extensions::effects` | `DualTextureEffect` |
+| effects | 6 | `EffectFactsExt` in `cna::extensions::effects` | `Effect` |
+| effects | 2 | `EffectMaterialExt` in `cna::extensions::effects` | `EffectMaterial` |
+| effects | 1 | `EffectPassExt` in `cna::extensions::effects` | `EffectPass` |
+| effects | 2 | `EffectTechniqueExt` in `cna::extensions::effects` | `EffectTechnique` |
+| effects | 1 | `EnvironmentMapEffectExt` in `cna::extensions::effects` | `EnvironmentMapEffect` |
+| effects | 2 | `SkinnedEffectExt` in `cna::extensions::effects` | `SkinnedEffect` |
+| graphics | 18 | `NativeEnumValue` in `cna::extensions::graphics` | `Blend`, `BlendFunction`, `CompareFunction`, `CubeMapFace`, `CullMode`, `DepthFormat`, `FillMode`, `GraphicsDeviceStatus`, `GraphicsProfile`, `IndexElementSize`, `PresentInterval`, `PrimitiveType`, `RenderTargetUsage`, `StencilOperation`, `TextureAddressMode`, `TextureFilter`, `VertexElementFormat`, `VertexElementUsage` |
+| textures | 1 | `Texture3DBytes` in `cna::extensions::texture` | `Texture3D` |
+| textures | 1 | `TextureCubeDds` in `cna::extensions::texture` | `TextureCube` |
+| media | 1 | `MediaLibraryExt` in `cna::extensions::media` | `MediaLibrary` |
+| media | 2 | `MediaQueueExt` in `cna::extensions::media` | `MediaQueue` |
+| media | 1 | `MediaSourceExt` in `cna::extensions::media` | `MediaSource` |
+| media | 1 | `PictureExt` in `cna::extensions::media` | `Picture` |
+| media | 1 | `SongCollectionExt` in `cna::extensions::media` | `SongCollection` |
+| media | 6 | `SongExt` in `cna::extensions::media` | `Song` |
+| media | 8 | `VideoExt` in `cna::extensions::media` | `Video` |
+| media | 3 | `VideoPlayerExt` in `cna::extensions::media` | `VideoPlayer` |
+| audio and XACT | 3 | `AudioEngineExt` in `cna::extensions::audio_ext` | `AudioEngine` |
+| audio and XACT | 4 | `DynamicSoundEffectInstanceExt` in `cna::extensions::audio_ext` | `DynamicSoundEffectInstance` |
+| audio and XACT | 1 | `MicrophoneExt` in `cna::extensions::audio_ext` | `Microphone` |
+| audio and XACT | 5 | `NativeDisposalState` in `cna::extensions::audio_ext` | `AudioEngine`, `SoundBank`, `SoundEffect`, `SoundEffectInstance`, `WaveBank` |
+| audio and XACT | 1 | `SoundEffectExt` in `cna::extensions::audio_ext` | `SoundEffect` |
+| storage | 2 | `StorageContainerExt` in `cna::extensions::storage_ext` | `StorageContainer` |
+| input | 1 | `KeyFromNativeCode` in `cna::extensions::keyboard` | `Keys` |
+| **total** | **109** | **30 traits** | **47 strict types** |
+
+<details><summary>Every member, with the call before and after</summary>
+
+| Strict type | Member | Before | After (with the import above the call) |
+|---|---|---|---|
+| `AudioEngine` | `NativeIsDisposed` | `value.NativeIsDisposed(..)` | `use cna::extensions::audio_ext::NativeDisposalState;` then `value.NativeIsDisposed(..)` |
+| `AudioEngine` | `RendererHashCode` | `value.RendererHashCode(..)` | `use cna::extensions::audio_ext::AudioEngineExt;` then `value.RendererHashCode(..)` |
+| `AudioEngine` | `RendererText` | `value.RendererText(..)` | `use cna::extensions::audio_ext::AudioEngineExt;` then `value.RendererText(..)` |
+| `AudioEngine` | `RenderersEqual` | `value.RenderersEqual(..)` | `use cna::extensions::audio_ext::AudioEngineExt;` then `value.RenderersEqual(..)` |
+| `DynamicSoundEffectInstance` | `ClearBuffers` | `value.ClearBuffers(..)` | `use cna::extensions::audio_ext::DynamicSoundEffectInstanceExt;` then `value.ClearBuffers(..)` |
+| `DynamicSoundEffectInstance` | `QueueInitialBuffers` | `value.QueueInitialBuffers(..)` | `use cna::extensions::audio_ext::DynamicSoundEffectInstanceExt;` then `value.QueueInitialBuffers(..)` |
+| `DynamicSoundEffectInstance` | `SubmitFloatBuffer` | `value.SubmitFloatBuffer(..)` | `use cna::extensions::audio_ext::DynamicSoundEffectInstanceExt;` then `value.SubmitFloatBuffer(..)` |
+| `DynamicSoundEffectInstance` | `Update` | `value.Update(..)` | `use cna::extensions::audio_ext::DynamicSoundEffectInstanceExt;` then `value.Update(..)` |
+| `Microphone` | `CheckAllBuffers` | `Microphone::CheckAllBuffers(..)` | `use cna::extensions::audio_ext::MicrophoneExt;` then `Microphone::CheckAllBuffers(..)` |
+| `SoundBank` | `NativeIsDisposed` | `value.NativeIsDisposed(..)` | `use cna::extensions::audio_ext::NativeDisposalState;` then `value.NativeIsDisposed(..)` |
+| `SoundEffect` | `FromAsset` | `SoundEffect::FromAsset(..)` | `use cna::extensions::audio_ext::SoundEffectExt;` then `SoundEffect::FromAsset(..)` |
+| `SoundEffect` | `NativeIsDisposed` | `value.NativeIsDisposed(..)` | `use cna::extensions::audio_ext::NativeDisposalState;` then `value.NativeIsDisposed(..)` |
+| `SoundEffectInstance` | `NativeIsDisposed` | `value.NativeIsDisposed(..)` | `use cna::extensions::audio_ext::NativeDisposalState;` then `value.NativeIsDisposed(..)` |
+| `WaveBank` | `NativeIsDisposed` | `value.NativeIsDisposed(..)` | `use cna::extensions::audio_ext::NativeDisposalState;` then `value.NativeIsDisposed(..)` |
+| `Blend` | `from_native_value` | `Blend::from_native_value(..)` | `use cna::extensions::graphics::NativeEnumValue;` then `Blend::from_native_value(..)` |
+| `BlendFunction` | `from_native_value` | `BlendFunction::from_native_value(..)` | `use cna::extensions::graphics::NativeEnumValue;` then `BlendFunction::from_native_value(..)` |
+| `CompareFunction` | `from_native_value` | `CompareFunction::from_native_value(..)` | `use cna::extensions::graphics::NativeEnumValue;` then `CompareFunction::from_native_value(..)` |
+| `CubeMapFace` | `from_native_value` | `CubeMapFace::from_native_value(..)` | `use cna::extensions::graphics::NativeEnumValue;` then `CubeMapFace::from_native_value(..)` |
+| `CullMode` | `from_native_value` | `CullMode::from_native_value(..)` | `use cna::extensions::graphics::NativeEnumValue;` then `CullMode::from_native_value(..)` |
+| `DepthFormat` | `from_native_value` | `DepthFormat::from_native_value(..)` | `use cna::extensions::graphics::NativeEnumValue;` then `DepthFormat::from_native_value(..)` |
+| `DualTextureEffect` | `native_texture_identity` | `value.native_texture_identity(..)` | `use cna::extensions::effects::DualTextureEffectExt;` then `value.native_texture_identity(..)` |
+| `Effect` | `fragment_source` | `value.fragment_source(..)` | `use cna::extensions::effects::EffectFactsExt;` then `value.fragment_source(..)` |
+| `Effect` | `graphics_device_identity` | `value.graphics_device_identity(..)` | `use cna::extensions::effects::EffectFactsExt;` then `value.graphics_device_identity(..)` |
+| `Effect` | `has_renderer` | `value.has_renderer(..)` | `use cna::extensions::effects::EffectFactsExt;` then `value.has_renderer(..)` |
+| `Effect` | `is_compiled` | `value.is_compiled(..)` | `use cna::extensions::effects::EffectFactsExt;` then `value.is_compiled(..)` |
+| `Effect` | `is_exact_stock_sprite_effect` | `value.is_exact_stock_sprite_effect(..)` | `use cna::extensions::effects::EffectFactsExt;` then `value.is_exact_stock_sprite_effect(..)` |
+| `Effect` | `vertex_source` | `value.vertex_source(..)` | `use cna::extensions::effects::EffectFactsExt;` then `value.vertex_source(..)` |
+| `EffectMaterial` | `retain_parameter_texture` | `value.retain_parameter_texture(..)` | `use cna::extensions::effects::EffectMaterialExt;` then `value.retain_parameter_texture(..)` |
+| `EffectMaterial` | `retained_parameter_texture_count` | `value.retained_parameter_texture_count(..)` | `use cna::extensions::effects::EffectMaterialExt;` then `value.retained_parameter_texture_count(..)` |
+| `EffectPass` | `index` | `value.index(..)` | `use cna::extensions::effects::EffectPassExt;` then `value.index(..)` |
+| `EffectTechnique` | `identity` | `value.identity(..)` | `use cna::extensions::effects::EffectTechniqueExt;` then `value.identity(..)` |
+| `EffectTechnique` | `index` | `value.index(..)` | `use cna::extensions::effects::EffectTechniqueExt;` then `value.index(..)` |
+| `EnvironmentMapEffect` | `native_environment_map_identity` | `value.native_environment_map_identity(..)` | `use cna::extensions::effects::EnvironmentMapEffectExt;` then `value.native_environment_map_identity(..)` |
+| `FillMode` | `from_native_value` | `FillMode::from_native_value(..)` | `use cna::extensions::graphics::NativeEnumValue;` then `FillMode::from_native_value(..)` |
+| `GraphicsDevice` | `clear_color_depth` | `value.clear_color_depth(..)` | `use cna::extensions::graphics_device_ext::DeviceStateExt;` then `value.clear_color_depth(..)` |
+| `GraphicsDevice` | `display_color_space` | `value.display_color_space(..)` | `use cna::extensions::graphics_device_ext::DeviceCapabilityExt;` then `value.display_color_space(..)` |
+| `GraphicsDevice` | `dispose_native` | `value.dispose_native(..)` | `use cna::extensions::graphics_device_ext::DeviceStateExt;` then `value.dispose_native(..)` |
+| `GraphicsDevice` | `executes_shader_effect_source` | `value.executes_shader_effect_source(..)` | `use cna::extensions::graphics_device_ext::DeviceCapabilityExt;` then `value.executes_shader_effect_source(..)` |
+| `GraphicsDevice` | `is_disposed_native` | `value.is_disposed_native(..)` | `use cna::extensions::graphics_device_ext::DeviceStateExt;` then `value.is_disposed_native(..)` |
+| `GraphicsDevice` | `max_compute_work_group_count` | `value.max_compute_work_group_count(..)` | `use cna::extensions::graphics_device_ext::DeviceCapabilityExt;` then `value.max_compute_work_group_count(..)` |
+| `GraphicsDevice` | `max_compute_work_group_invocations` | `value.max_compute_work_group_invocations(..)` | `use cna::extensions::graphics_device_ext::DeviceCapabilityExt;` then `value.max_compute_work_group_invocations(..)` |
+| `GraphicsDevice` | `max_compute_work_group_size` | `value.max_compute_work_group_size(..)` | `use cna::extensions::graphics_device_ext::DeviceCapabilityExt;` then `value.max_compute_work_group_size(..)` |
+| `GraphicsDevice` | `notify_content_lost_resources` | `value.notify_content_lost_resources(..)` | `use cna::extensions::graphics_device_ext::DeviceStateExt;` then `value.notify_content_lost_resources(..)` |
+| `GraphicsDevice` | `on_event` | `value.on_event(..)` | `use cna::extensions::graphics_device_ext::DeviceEventExt;` then `value.on_event(..)` |
+| `GraphicsDevice` | `on_resource_created` | `value.on_resource_created(..)` | `use cna::extensions::graphics_device_ext::DeviceEventExt;` then `value.on_resource_created(..)` |
+| `GraphicsDevice` | `on_resource_destroyed` | `value.on_resource_destroyed(..)` | `use cna::extensions::graphics_device_ext::DeviceEventExt;` then `value.on_resource_destroyed(..)` |
+| `GraphicsDevice` | `recreate_renderer_for_multi_sample_count` | `value.recreate_renderer_for_multi_sample_count(..)` | `use cna::extensions::graphics_device_ext::DeviceStateExt;` then `value.recreate_renderer_for_multi_sample_count(..)` |
+| `GraphicsDevice` | `set_blend_enabled` | `value.set_blend_enabled(..)` | `use cna::extensions::graphics_device_ext::DeviceStateExt;` then `value.set_blend_enabled(..)` |
+| `GraphicsDevice` | `set_context_recovery_enabled` | `value.set_context_recovery_enabled(..)` | `use cna::extensions::graphics_device_ext::DeviceStateExt;` then `value.set_context_recovery_enabled(..)` |
+| `GraphicsDevice` | `set_current_effect` | `value.set_current_effect(..)` | `use cna::extensions::graphics_device_ext::DeviceStateExt;` then `value.set_current_effect(..)` |
+| `GraphicsDevice` | `set_depth_test_enabled` | `value.set_depth_test_enabled(..)` | `use cna::extensions::graphics_device_ext::DeviceStateExt;` then `value.set_depth_test_enabled(..)` |
+| `GraphicsDevice` | `set_depth_write_enabled` | `value.set_depth_write_enabled(..)` | `use cna::extensions::graphics_device_ext::DeviceStateExt;` then `value.set_depth_write_enabled(..)` |
+| `GraphicsDevice` | `set_display_color_space` | `value.set_display_color_space(..)` | `use cna::extensions::graphics_device_ext::DeviceCapabilityExt;` then `value.set_display_color_space(..)` |
+| `GraphicsDevice` | `set_graphics_profile` | `value.set_graphics_profile(..)` | `use cna::extensions::graphics_device_ext::DeviceStateExt;` then `value.set_graphics_profile(..)` |
+| `GraphicsDevice` | `set_string_marker` | `value.set_string_marker(..)` | `use cna::extensions::graphics_device_ext::DeviceStateExt;` then `value.set_string_marker(..)` |
+| `GraphicsDevice` | `set_unsupported_3d_call_behavior` | `value.set_unsupported_3d_call_behavior(..)` | `use cna::extensions::graphics_device_ext::DeviceStateExt;` then `value.set_unsupported_3d_call_behavior(..)` |
+| `GraphicsDevice` | `supports_display_color_space` | `value.supports_display_color_space(..)` | `use cna::extensions::graphics_device_ext::DeviceCapabilityExt;` then `value.supports_display_color_space(..)` |
+| `GraphicsDevice` | `supports_image_based_lighting` | `value.supports_image_based_lighting(..)` | `use cna::extensions::graphics_device_ext::DeviceCapabilityExt;` then `value.supports_image_based_lighting(..)` |
+| `GraphicsDevice` | `supports_surface_format_as_render_target` | `value.supports_surface_format_as_render_target(..)` | `use cna::extensions::graphics_device_ext::DeviceCapabilityExt;` then `value.supports_surface_format_as_render_target(..)` |
+| `GraphicsDevice` | `tracked_resource_count` | `value.tracked_resource_count(..)` | `use cna::extensions::graphics_device_ext::DeviceStateExt;` then `value.tracked_resource_count(..)` |
+| `GraphicsDevice` | `unbind_texture` | `value.unbind_texture(..)` | `use cna::extensions::graphics_device_ext::DeviceStateExt;` then `value.unbind_texture(..)` |
+| `GraphicsDevice` | `unsupported_3d_call_behavior` | `value.unsupported_3d_call_behavior(..)` | `use cna::extensions::graphics_device_ext::DeviceStateExt;` then `value.unsupported_3d_call_behavior(..)` |
+| `GraphicsDeviceStatus` | `from_native_value` | `GraphicsDeviceStatus::from_native_value(..)` | `use cna::extensions::graphics::NativeEnumValue;` then `GraphicsDeviceStatus::from_native_value(..)` |
+| `GraphicsProfile` | `from_native_value` | `GraphicsProfile::from_native_value(..)` | `use cna::extensions::graphics::NativeEnumValue;` then `GraphicsProfile::from_native_value(..)` |
+| `IndexElementSize` | `from_native_value` | `IndexElementSize::from_native_value(..)` | `use cna::extensions::graphics::NativeEnumValue;` then `IndexElementSize::from_native_value(..)` |
+| `OcclusionQuery` | `has_renderer` | `value.has_renderer(..)` | `use cna::extensions::graphics_device_ext::OcclusionQueryExt;` then `value.has_renderer(..)` |
+| `OcclusionQuery` | `is_pixel_count_precise` | `value.is_pixel_count_precise(..)` | `use cna::extensions::graphics_device_ext::OcclusionQueryExt;` then `value.is_pixel_count_precise(..)` |
+| `PresentInterval` | `from_native_value` | `PresentInterval::from_native_value(..)` | `use cna::extensions::graphics::NativeEnumValue;` then `PresentInterval::from_native_value(..)` |
+| `PrimitiveType` | `from_native_value` | `PrimitiveType::from_native_value(..)` | `use cna::extensions::graphics::NativeEnumValue;` then `PrimitiveType::from_native_value(..)` |
+| `RenderTargetUsage` | `from_native_value` | `RenderTargetUsage::from_native_value(..)` | `use cna::extensions::graphics::NativeEnumValue;` then `RenderTargetUsage::from_native_value(..)` |
+| `SkinnedEffect` | `SetVertexColorEnabled` | `value.SetVertexColorEnabled(..)` | `use cna::extensions::effects::SkinnedEffectExt;` then `value.SetVertexColorEnabled(..)` |
+| `SkinnedEffect` | `VertexColorEnabled` | `value.VertexColorEnabled(..)` | `use cna::extensions::effects::SkinnedEffectExt;` then `value.VertexColorEnabled(..)` |
+| `StencilOperation` | `from_native_value` | `StencilOperation::from_native_value(..)` | `use cna::extensions::graphics::NativeEnumValue;` then `StencilOperation::from_native_value(..)` |
+| `Texture3D` | `SetDataBytes` | `value.SetDataBytes(..)` | `use cna::extensions::texture::Texture3DBytes;` then `value.SetDataBytes(..)` |
+| `TextureAddressMode` | `from_native_value` | `TextureAddressMode::from_native_value(..)` | `use cna::extensions::graphics::NativeEnumValue;` then `TextureAddressMode::from_native_value(..)` |
+| `TextureCube` | `FromDdsMemory` | `TextureCube::FromDdsMemory(..)` | `use cna::extensions::texture::TextureCubeDds;` then `TextureCube::FromDdsMemory(..)` |
+| `TextureFilter` | `from_native_value` | `TextureFilter::from_native_value(..)` | `use cna::extensions::graphics::NativeEnumValue;` then `TextureFilter::from_native_value(..)` |
+| `VertexElementFormat` | `from_native_value` | `VertexElementFormat::from_native_value(..)` | `use cna::extensions::graphics::NativeEnumValue;` then `VertexElementFormat::from_native_value(..)` |
+| `VertexElementUsage` | `from_native_value` | `VertexElementUsage::from_native_value(..)` | `use cna::extensions::graphics::NativeEnumValue;` then `VertexElementUsage::from_native_value(..)` |
+| `GraphicsDeviceManager` | `HasNativeGraphicsDevice` | `value.HasNativeGraphicsDevice(..)` | `use cna::extensions::graphics_device_ext::GraphicsDeviceManagerExt;` then `value.HasNativeGraphicsDevice(..)` |
+| `GraphicsDeviceManager` | `ObserveDeviceSettings` | `value.ObserveDeviceSettings(..)` | `use cna::extensions::graphics_device_ext::GraphicsDeviceManagerExt;` then `value.ObserveDeviceSettings(..)` |
+| `GraphicsDeviceManager` | `PreferredPresentationMode` | `value.PreferredPresentationMode(..)` | `use cna::extensions::graphics_device_ext::GraphicsDeviceManagerExt;` then `value.PreferredPresentationMode(..)` |
+| `GraphicsDeviceManager` | `SetPreferredPresentationMode` | `value.SetPreferredPresentationMode(..)` | `use cna::extensions::graphics_device_ext::GraphicsDeviceManagerExt;` then `value.SetPreferredPresentationMode(..)` |
+| `Keys` | `from_key_code` | `Keys::from_key_code(..)` | `use cna::extensions::keyboard::KeyFromNativeCode;` then `Keys::from_key_code(..)` |
+| `MediaLibrary` | `SavePictureFromStream` | `value.SavePictureFromStream(..)` | `use cna::extensions::media::MediaLibraryExt;` then `value.SavePictureFromStream(..)` |
+| `MediaQueue` | `Add` | `value.Add(..)` | `use cna::extensions::media::MediaQueueExt;` then `value.Add(..)` |
+| `MediaQueue` | `Clear` | `value.Clear(..)` | `use cna::extensions::media::MediaQueueExt;` then `value.Clear(..)` |
+| `MediaSource` | `TypeName` | `value.TypeName(..)` | `use cna::extensions::media::MediaSourceExt;` then `value.TypeName(..)` |
+| `Picture` | `PlatformToken` | `value.PlatformToken(..)` | `use cna::extensions::media::PictureExt;` then `value.PlatformToken(..)` |
+| `Song` | `EndedByElapsedTime` | `value.EndedByElapsedTime(..)` | `use cna::extensions::media::SongExt;` then `value.EndedByElapsedTime(..)` |
+| `Song` | `FromFile` | `Song::FromFile(..)` | `use cna::extensions::media::SongExt;` then `Song::FromFile(..)` |
+| `Song` | `FromFileWithDuration` | `Song::FromFileWithDuration(..)` | `use cna::extensions::media::SongExt;` then `Song::FromFileWithDuration(..)` |
+| `Song` | `HandleText` | `value.HandleText(..)` | `use cna::extensions::media::SongExt;` then `value.HandleText(..)` |
+| `Song` | `SetDuration` | `value.SetDuration(..)` | `use cna::extensions::media::SongExt;` then `value.SetDuration(..)` |
+| `Song` | `SetPlayCount` | `value.SetPlayCount(..)` | `use cna::extensions::media::SongExt;` then `value.SetPlayCount(..)` |
+| `SongCollection` | `FromSongs` | `SongCollection::FromSongs(..)` | `use cna::extensions::media::SongCollectionExt;` then `SongCollection::FromSongs(..)` |
+| `Video` | `DecodedInfo` | `value.DecodedInfo(..)` | `use cna::extensions::media::VideoExt;` then `value.DecodedInfo(..)` |
+| `Video` | `FileName` | `value.FileName(..)` | `use cna::extensions::media::VideoExt;` then `value.FileName(..)` |
+| `Video` | `FromFile` | `Video::FromFile(..)` | `use cna::extensions::media::VideoExt;` then `Video::FromFile(..)` |
+| `Video` | `FromUri` | `Video::FromUri(..)` | `use cna::extensions::media::VideoExt;` then `Video::FromUri(..)` |
+| `Video` | `HasGraphicsDevice` | `value.HasGraphicsDevice(..)` | `use cna::extensions::media::VideoExt;` then `value.HasGraphicsDevice(..)` |
+| `Video` | `SetAudioTrack` | `value.SetAudioTrack(..)` | `use cna::extensions::media::VideoExt;` then `value.SetAudioTrack(..)` |
+| `Video` | `SetDuration` | `value.SetDuration(..)` | `use cna::extensions::media::VideoExt;` then `value.SetDuration(..)` |
+| `Video` | `SetVideoTrack` | `value.SetVideoTrack(..)` | `use cna::extensions::media::VideoExt;` then `value.SetVideoTrack(..)` |
+| `VideoPlayer` | `HasNativeVideo` | `value.HasNativeVideo(..)` | `use cna::extensions::media::VideoPlayerExt;` then `value.HasNativeVideo(..)` |
+| `VideoPlayer` | `SetAudioTrack` | `value.SetAudioTrack(..)` | `use cna::extensions::media::VideoPlayerExt;` then `value.SetAudioTrack(..)` |
+| `VideoPlayer` | `SetVideoTrack` | `value.SetVideoTrack(..)` | `use cna::extensions::media::VideoPlayerExt;` then `value.SetVideoTrack(..)` |
+| `StorageContainer` | `HasNativeStorageDevice` | `value.HasNativeStorageDevice(..)` | `use cna::extensions::storage_ext::StorageContainerExt;` then `value.HasNativeStorageDevice(..)` |
+| `StorageContainer` | `NativeIsDisposed` | `value.NativeIsDisposed(..)` | `use cna::extensions::storage_ext::StorageContainerExt;` then `value.NativeIsDisposed(..)` |
+
+</details>
+
+30 traits for 109 members: one per strict type, except where the same question
+is asked of several types. `NativeEnumValue` covers eighteen enums because
+`from_native_value` is one conversion generated by one macro;
+`NativeDisposalState` covers five audio types because `NativeIsDisposed` is one
+question; `DeviceCapabilityExt`, `DeviceStateExt` and `DeviceEventExt` split
+`GraphicsDevice`'s twenty-eight along the boundaries its impl blocks already
+had.
+
+### Source compatibility
+
+A receiver method keeps its call exactly: `song.HandleText()?` before,
+`song.HandleText()?` after, with `use cna::extensions::media::SongExt;` above
+it. So does an associated function -- `Song::FromFile(game, name, path)?`
+still resolves, because Rust looks for an associated item on a type in the
+traits that are in scope as well as in inherent impls. 27 of the 109 are
+associated functions and every one of them keeps its call shape;
+`tools/package-consumer` compiles them from outside the workspace to prove it,
+and compiles the same file *without* the imports to prove the call is refused
+then.
+
+Two conversions changed in one way beyond the import. `from_native_value` on
+the eighteen graphics enums and `Keys::from_key_code` were `const fn`, and a
+trait method cannot be `const` on stable Rust. The inherent conversions are
+still `const` and are still what the crate's own decoding uses; what a consumer
+reaches through the trait is not usable in a `const` context. Nothing in this
+repository or its template used either in one.
+
+### Where it is enforced
+
+The strict verifier stays exactly as strict as it was:
+
+```text
+                        before   after
+TOTAL_DIAGNOSTICS          110       0
+UNEXPECTED_MEMBER          109       0
+UNEXPECTED_TYPE              1       0
+MISSING_MEMBER               0       0
+MISSING_TYPE                 0       0
+ALLOWLIST                    0       0
+```
+
+But a verifier that reaches zero by *removing* members cannot tell a member
+that moved from one that was deleted, so
+[`tools/extension-surface`](../tools/extension-surface/README.md) answers the
+other half: 283 CNA-only members reachable on strict XNA types -- the 109 this
+milestone moved and 174 that were already extension traits and had no gate at
+all -- each still declared by a publicly reachable trait with an unchanged
+signature, implemented for its strict type, and absent from that type's
+inherent surface.
+
+Six planted defects, each caught by the gate that should catch it and by no
+other:
+
+| Planted defect | Strict verifier | Extension gate | Census gate | Consumer build |
+|---|---|---|---|---|
+| `WaveBank::NativeIsDisposed` left inherent as well | `UNEXPECTED_MEMBER` 1 | `MEMBER_STILL_INHERENT` 1 | -- | -- |
+| `TouchPanelTestBackend` re-exported into `Input::Touch` | `UNEXPECTED_TYPE` 1 | `EXTENSION_TYPE_IN_STRICT_NAMESPACE` 1 | -- | -- |
+| `MediaSourceExt::TypeName` dropped from the trait, body kept | **0 -- cannot see it** | `MEMBER_MISSING_FROM_TRAIT` + `EXTENSION_TRAIT_NOT_IMPLEMENTED` | -- | -- |
+| `PresentationMode`'s re-export removed again | **0 -- cannot see it** | `UNNAMEABLE_PUBLIC_TYPE` 1 | -- | -- |
+| `DeviceStateExt::set_string_marker` deleted | -- | -- | `cna_graphics_device_set_string_marker_ext` unjustified, 97 -> 98 | -- |
+| the trait imports removed from `extensions_media_ext` | -- | -- | -- | E0599 on six calls |
+
+The third and fourth rows are why the second gate exists. The fifth is the
+answer to a question the migration raised: the reachability walk finds a call
+site inside an `impl Trait for Type` body exactly as it found one inside an
+inherent impl, and deleting the only such caller still fails the census gate.
+
+### One defect found on the way
+
+`PresentationMode` was `pub` inside the private `game::device_manager` module
+and re-exported nowhere, while `GraphicsDeviceManager::PreferredPresentationMode`
+answered with one. A consumer could call the method and had no way to name what
+came back -- the same defect the previous milestone found and fixed for
+`DeviceSettingsObserver` and `ObservedDeviceSettings`, and missed for this
+third type. It is exported from `cna::extensions::graphics_device_ext` beside
+them, and the extension gate's `UNNAMEABLE_PUBLIC_TYPE` check now measures the
+whole public API for the same shape. That measurement is zero.
+
+`SkinnedEffect::VertexColorEnabled` carried a doc comment saying XNA declares it
+and the strict projection had missed it. The pinned
+`Microsoft.Xna.Framework.Graphics.dll` says otherwise: `BasicEffect` and
+`DualTextureEffect` have it and `SkinnedEffect` does not. The comment is
+corrected where the member now lives.
 
 ## What is actually verified
 
