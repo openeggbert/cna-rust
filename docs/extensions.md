@@ -302,6 +302,79 @@ integer and by string, and Rust cannot give two methods one name, so the strict
 type keeps the metadata-selected string form and the integer operation arrives
 through a trait. Same collection, same handle, same identity rule.
 
+## The rest of the platform layer (RUST-CENSUS-002, 2026-09-01)
+
+`RUST-CENSUS-002` asked, of every route Rust binds, whether a consumer can
+reach it. Thirty-eight could not and should have been able to, and the answer
+was almost always the same: CNA publishes what a *platform* would supply, and
+this host has no platform, so a whole XNA type had no way to be reached rather
+than merely no test.
+
+**Achievements and friends.** `SignedInGamer.AwardAchievement` produces a real
+achievement, and CNA has no catalog behind it -- name, description and score all
+come back empty, so nine of `Achievement`'s ten properties could only ever be
+measured against nothing. `AchievementInjection` publishes a catalog with real
+values, and the collection `GetAchievements` would have answered.
+`FriendInjection` does the same for `GetFriends`, whose collection is real and
+empty here, so `FriendGamer`'s eight states had nothing to read.
+
+**Discovered sessions.** `NetworkSession::Find` on one machine finds nothing,
+which left `AvailableNetworkSession` -- six XNA properties -- unreachable.
+`DiscoveredSessionInjection` builds one or a whole collection;
+`DiscoveredSessionExt` reads the connect address, port and advertised session
+type that XNA never published and a host layer making its own connection
+decision needs. Its identity check calls **both** `equals` and `not_equals` and
+refuses an answer where the two disagree.
+
+With a discovered session in hand a genuinely refused join is reachable, so
+`LastJoinError` -- the value XNA carries on `NetworkSessionJoinException`, which
+cannot cross a C ABI and which CNA records per thread -- is measured reporting
+`SessionNotFound`.
+
+**Gamer facts.** `NetworkGamer.Id`, `IsHost`, `HasLeftSession`, `RoundtripTime`
+and `Machine` are what a session's transport fills in as it learns them. One
+process learns none of them, so each read its default for the life of the
+session. `NetworkGamerFacts` sets all five and builds the `NetworkMachine` and
+the `LocalNetworkGamer` that sit underneath `AddLocalGamer`.
+
+**Avatars.** XNA resolved a body type and an animation preset on the console
+and never told a game what content was behind them; there is no console here,
+so CNA names them and the game supplies the asset. `AvatarContentNames` is how
+a game asks, `AvatarAnimationClip` is how it plays a clip Microsoft never
+enumerated, and `AvatarRealRendering` points the renderer at the game's own
+`SkinnedModel` instead of the placeholder `AvatarRenderer::Draw` draws.
+
+**The Guide's other half.** CNA leaves `BeginShowMessageBox` pending because
+there is no overlay to show, and publishes a renderer for the game that has to
+put it on screen. `DrawsPendingGuide` is that renderer; drawing when nothing is
+pending is a no-op that succeeds, so a game can call it every frame.
+
+**Session properties a game can change.** XNA's
+`NetworkSession.SessionProperties` is a reference: assigning a slot changes the
+session. A `CNA_Handle` cannot carry that reference without letting a caller
+keep a pointer into session state, so CNA publishes a copy and, since
+`CABI-49`, a route that applies one back. `ApplySessionProperties` is the second
+half of XNA's assignment, and it is here rather than on the strict type because
+the two-step is not XNA's shape.
+
+**Counters that make a release measurable.** `LiveSessionCount`,
+`PendingSessionActionCount`, `FreedGamerCount` and
+`NetworkEventInjection::clear_packets` are how a test tells "Dispose returned
+`Ok`" from "Dispose released something".
+
+**Disposal, cross-checked.** `NativeDisposalNotice` reports whether CNA raised
+its own disposal notification for an XACT object. It exists because the
+XNA-shaped `Disposing` was not firing on the path where an engine tears down its
+own banks and cues, and binding CNA's event alone would have made the two
+disagree rather than fixed either; they land together, and each measures the
+other.
+
+Everything above is outside `cna::Microsoft::Xna::Framework`. A game that calls
+any of it is acting as its own platform, and the strict surface still invents
+nothing when it is not used: an unpublished roster is empty, a renderer with no
+model refuses, a search with no peer answers an empty collection, and a
+presence mode CNA does not recognise reads `None`.
+
 ## `.cnb` Model (RUST-EXT-013, 2026-08-31)
 
 A Rust consumer can now author a compiled model, encode it as a `.cnb`
