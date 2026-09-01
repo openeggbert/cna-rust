@@ -12739,4 +12739,176 @@ extern "C" {
         argument3: f32,
         argument4: *mut CNA_Bool,
     ) -> CNA_Result;
+    pub fn cna_content_manager_copy_asset_path(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_copy_manifest_native_extension(
+        argument0: CNA_Handle,
+        argument1: u64,
+        argument2: u64,
+        argument3: *mut c_char,
+        argument4: u64,
+        argument5: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_copy_manifest_relative_path(
+        argument0: CNA_Handle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_copy_manifest_xnb_reader_name(
+        argument0: CNA_Handle,
+        argument1: u64,
+        argument2: u64,
+        argument3: *mut c_char,
+        argument4: u64,
+        argument5: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_copy_normalized_key(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_copy_root_directory(
+        argument0: CNA_Handle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_copy_xnb_reader_usage_name(
+        argument0: CNA_Handle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_create_resource(
+        argument0: CNA_Handle,
+        argument1: *const CNA_ContentManagerCreateInfo,
+        argument2: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_get_asset_path_size(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_get_graphics_device(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_get_has_service_provider(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_get_manifest_entry(
+        argument0: CNA_Handle,
+        argument1: u64,
+        argument2: *mut CNA_ContentManifestEntryInfo,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_get_manifest_entry_count(
+        argument0: CNA_Handle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_get_normalized_key_size(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_get_root_directory_size(
+        argument0: CNA_Handle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_get_xnb_reader_usage(
+        argument0: CNA_Handle,
+        argument1: u64,
+        argument2: *mut CNA_ContentReaderUsageInfo,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_get_xnb_reader_usage_count(
+        argument0: CNA_Handle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_load_foreign_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut *mut c_void,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_load_texture2d(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_load_texture_cube(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_refresh_content_manifest(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_content_manager_register_builtin_loaders(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_content_manager_register_cnj_loader_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: CNA_CnjLoaderCallback,
+        argument3: *mut c_void,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_set_graphics_device(
+        argument0: CNA_Handle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_set_root_directory(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_unload(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_game_get_content_manager_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_game_set_content_manager_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_touch_panel_enqueue_gesture_ext(
+        argument0: CNA_Handle,
+        argument1: *const CNA_GestureSample,
+    ) -> CNA_Result;
+    pub fn cna_touch_panel_get_mouse_touch_emulation_enabled_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_touch_panel_get_touch_device_exists_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_touch_panel_raise_touch_event_ext(
+        argument0: CNA_Handle,
+        argument1: i32,
+        argument2: CNA_TouchLocationState,
+        argument3: f32,
+        argument4: f32,
+        argument5: f32,
+        argument6: f32,
+    ) -> CNA_Result;
+    pub fn cna_touch_panel_reset_for_tests_ext(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_touch_panel_set_finger_ext(
+        argument0: CNA_Handle,
+        argument1: i32,
+        argument2: i32,
+        argument3: CNA_Vector2,
+    ) -> CNA_Result;
+    pub fn cna_touch_panel_set_mouse_touch_emulation_enabled_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_touch_panel_set_touch_device_exists_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_touch_panel_update_ext(argument0: CNA_Handle) -> CNA_Result;
 }

@@ -386,6 +386,17 @@
   "binding": {
     "rules": [
       {
+        "id": "content-loads-need-an-adoption-path",
+        "status": "DEFERRED_TRACKED",
+        "names": [
+          "cna_content_manager_load_sprite_font",
+          "cna_content_manager_load_sound_effect"
+        ],
+        "task": "RUST-EXT-016",
+        "reason": "both answer a handle to a type this crate's projection cannot adopt. SpriteFont keeps Rust-side glyph, cropping, character and kerning tables and builds a *new* native font from them, so a loaded handle has nowhere to go; SoundEffect keeps a runtime generation its state is validated against. Binding these needs an adoption constructor on those two types, which is real work on the Rust side rather than a call -- the neighbouring texture loads went in unchanged because Texture2D and TextureCube already have one.",
+        "evidence": "crates/cna/src/graphics/sprite_font.rs's from_parts, which calls create_sprite_font; crates/cna/src/audio/sound.rs's SoundEffectState; and crates/cna/src/graphics/texture2d.rs's from_owned_handle, which is the shape the other two need"
+      },
+      {
         "id": "camera-destroy-segv",
         "status": "BLOCKED_UPSTREAM",
         "names": [
@@ -471,6 +482,54 @@
           "pub fn ToString"
         ],
         "evidence": "crates/cna/src/graphics/viewport.rs, crates/cna/src/input/gamepad.rs, crates/cna/src/input/mouse.rs, crates/cna/src/input/touch.rs, crates/cna/src/extensions/sensors.rs; each format was read off the matching cnanext ToString() rather than guessed"
+      },
+      {
+        "id": "touch-values-in-rust",
+        "status": "DELIBERATE_NON_BINDING",
+        "names": [
+          "cna_touch_state_add",
+          "cna_touch_state_clear",
+          "cna_touch_state_contains",
+          "cna_touch_state_copy_to",
+          "cna_touch_state_index_of",
+          "cna_touch_state_insert",
+          "cna_touch_state_remove",
+          "cna_touch_state_remove_at",
+          "cna_touch_state_get_is_read_only",
+          "cna_touch_state_get_is_empty_ext",
+          "cna_touch_state_init_from_locations",
+          "cna_touch_location_init_from_values",
+          "cna_touch_location_init_with_previous",
+          "cna_touch_location_init_with_previous_ext",
+          "cna_gesture_sample_init_from_values_ext",
+          "cna_touch_capabilities_init_from_values_ext",
+          "cna_touch_location_init_from_values_ext"
+        ],
+        "reason": "a TouchCollection is a list of small values, and crates/cna/src/input/touch.rs is that list: Add, Clear, Contains, CopyTo, IndexOf, Insert, RemoveAt, Count and IsReadOnly are all Rust, over a Rust Vec. The locations, the gesture samples and the capabilities are constructed the same way. What is *not* in this rule is cna_touch_panel_*, which reads and drives a device rather than a value, and is bound.",
+        "rustEvidence": [
+          "pub struct TouchCollection",
+          "pub struct TouchLocation",
+          "pub fn CopyTo",
+          "pub fn IndexOf"
+        ],
+        "evidence": "crates/cna/src/input/touch.rs, whose collection semantics the behaviour corpus measures against XNA's documented IList rules"
+      },
+      {
+        "id": "game-components-are-a-rust-object-model",
+        "status": "DELIBERATE_NON_BINDING",
+        "headers": [
+          "runtime_components.h"
+        ],
+        "reason": "crates/cna/src/game/components.rs is the whole XNA component model in Rust -- GameComponent, DrawableGameComponent, IUpdateable, IDrawable, GameComponentCollection with its added/removed events -- and it makes no native call at all: zero `sys::` references in the file. The Rust Game loop is what drives it, through GameState's initialize_all, update_all and draw_all, so a component registered through the C collection would sit in a second list nothing iterates. Binding these would not add a capability; it would add a parallel component system that never runs. GameServiceContainer is the same, in crates/cna/src/game/services.rs.",
+        "rustEvidence": [
+          "pub struct GameComponentCollection",
+          "pub trait IGameComponent",
+          "pub struct DrawableGameComponent",
+          "pub struct GameServiceContainer",
+          "fn update_all",
+          "fn draw_all"
+        ],
+        "evidence": "crates/cna/src/game/components.rs and crates/cna/src/game/state.rs, whose Update and Draw call the collection directly; the behaviour corpus measures component ordering against XNA's documented rules"
       },
       {
         "id": "value-maths-in-rust",

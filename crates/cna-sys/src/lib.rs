@@ -690,6 +690,37 @@ pub type CNA_CnbAnimationClipHandle = CNA_Handle;
 pub type CNA_CurveHandle = CNA_Handle;
 pub type CNA_SystemTrayHandle = CNA_Handle;
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_ContentManifestEntryInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub has_xnb: CNA_Bool,
+    pub has_cnj: CNA_Bool,
+    pub reserved: [u8; 6],
+    pub native_extension_count: u64,
+    pub xnb_reader_name_count: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_ContentReaderUsageInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub is_registered: CNA_Bool,
+    pub reserved: [u8; 7],
+    pub file_count: u64,
+}
+
+/// A caller's own `.cnj` loader for one type name.
+pub type CNA_CnjLoaderCallback = Option<
+    unsafe extern "C" fn(
+        context: *mut c_void,
+        cnj_json: CNA_StringView,
+        out_object: *mut *mut c_void,
+    ) -> CNA_Result,
+>;
+
 pub type CNA_GamePadButtonLabel = u32;
 
 pub const CNA_GAMEPAD_BUTTON_LABEL_UNKNOWN: CNA_GamePadButtonLabel = 0;
@@ -13036,3 +13067,115 @@ pub type cna_gamepad_set_player_index_ext_fn = unsafe extern "C" fn(
 pub type cna_gamepad_set_trigger_vibration_ext_fn = unsafe extern "C" fn(
     CNA_Handle, CNA_PlayerIndex, f32, f32, *mut CNA_Bool,
 ) -> CNA_Result;
+
+// --- RUST-EXT-015a/e: the content manager's own surface, and touch's backend
+//
+// What a content manager knows about the files it can see -- the manifest,
+// the reader usage, the root -- plus the loads the projection did not have,
+// and CNA's substitute touch panel, which is the only way a touch gesture
+// is assertable on a machine with no touchscreen.
+pub type cna_content_manager_copy_asset_path_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_content_manager_copy_manifest_native_extension_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_content_manager_copy_manifest_relative_path_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_content_manager_copy_manifest_xnb_reader_name_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_content_manager_copy_normalized_key_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_content_manager_copy_root_directory_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_content_manager_copy_xnb_reader_usage_name_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_content_manager_create_resource_fn = unsafe extern "C" fn(
+    CNA_Handle, *const CNA_ContentManagerCreateInfo, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_content_manager_get_asset_path_size_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut u64,
+) -> CNA_Result;
+pub type cna_content_manager_get_graphics_device_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_content_manager_get_has_service_provider_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_content_manager_get_manifest_entry_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, *mut CNA_ContentManifestEntryInfo,
+) -> CNA_Result;
+pub type cna_content_manager_get_manifest_entry_count_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut u64,
+) -> CNA_Result;
+pub type cna_content_manager_get_normalized_key_size_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut u64,
+) -> CNA_Result;
+pub type cna_content_manager_get_root_directory_size_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut u64,
+) -> CNA_Result;
+pub type cna_content_manager_get_xnb_reader_usage_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, *mut CNA_ContentReaderUsageInfo,
+) -> CNA_Result;
+pub type cna_content_manager_get_xnb_reader_usage_count_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut u64,
+) -> CNA_Result;
+pub type cna_content_manager_load_foreign_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut *mut c_void,
+) -> CNA_Result;
+pub type cna_content_manager_load_texture2d_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_content_manager_load_texture_cube_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_content_manager_refresh_content_manifest_fn = unsafe extern "C" fn(
+    CNA_Handle,
+) -> CNA_Result;
+pub type cna_content_manager_register_builtin_loaders_fn = unsafe extern "C" fn(
+    CNA_Handle,
+) -> CNA_Result;
+pub type cna_content_manager_register_cnj_loader_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, CNA_CnjLoaderCallback, *mut c_void,
+) -> CNA_Result;
+pub type cna_content_manager_set_graphics_device_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Handle,
+) -> CNA_Result;
+pub type cna_content_manager_set_root_directory_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView,
+) -> CNA_Result;
+pub type cna_content_manager_unload_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_game_get_content_manager_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_game_set_content_manager_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Handle,
+) -> CNA_Result;
+pub type cna_touch_panel_enqueue_gesture_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *const CNA_GestureSample,
+) -> CNA_Result;
+pub type cna_touch_panel_get_mouse_touch_emulation_enabled_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_touch_panel_get_touch_device_exists_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_touch_panel_raise_touch_event_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, i32, CNA_TouchLocationState, f32, f32, f32, f32,
+) -> CNA_Result;
+pub type cna_touch_panel_reset_for_tests_ext_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_touch_panel_set_finger_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, i32, i32, CNA_Vector2,
+) -> CNA_Result;
+pub type cna_touch_panel_set_mouse_touch_emulation_enabled_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_touch_panel_set_touch_device_exists_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_touch_panel_update_ext_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;

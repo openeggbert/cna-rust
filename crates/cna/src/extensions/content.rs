@@ -23,7 +23,8 @@ use std::sync::{Arc, Mutex, OnceLock};
 use cna_sys as sys;
 
 use crate::error::{CnaError, Result};
-use crate::graphics::{GraphicsDevice, SurfaceFormat};
+use crate::game::GameContext;
+use crate::graphics::{GraphicsDevice, SurfaceFormat, Texture2D, TextureCube};
 use crate::value::{Rectangle, Vector3};
 use crate::native::runtime::read_string;
 use crate::native::Native;
@@ -2322,4 +2323,602 @@ fn encode_document(
         .map_err(|_| CnaError::InvalidInput("encoded document is too large"))?;
     bytes.truncate(written.min(capacity));
     Ok(bytes)
+}
+
+/// What one entry of the content manifest carries.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct ManifestEntry {
+    /// The path relative to the content root, as the manifest spells it.
+    pub relative_path: String,
+    /// Whether a compiled `.xnb` exists for it.
+    pub has_xnb: bool,
+    /// Whether a `.cnj` sidecar exists for it.
+    pub has_cnj: bool,
+    /// The native source extensions beside it, such as `.png` or `.gltf`.
+    pub native_extensions: Vec<String>,
+    /// The reader names the `.xnb` declares, when it has one.
+    pub xnb_reader_names: Vec<String>,
+}
+
+/// How often one `.xnb` reader name is used across the content root.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct ReaderUsage {
+    pub name: String,
+    /// Whether this build has a reader registered under that name.
+    pub is_registered: bool,
+    /// How many files declare it.
+    pub file_count: u64,
+}
+
+/// The manager's own surface: what it can see, and what it will load.
+impl NativeContentManager {
+    /// Creates a manager that loads through CNA's *resource* path.
+    ///
+    /// The difference from [`Self::new`] is where assets come from: this one
+    /// reads the resources compiled into the application rather than a
+    /// directory on disk, which is what a single-file build ships.
+    pub fn new_resource(graphics_device: &GraphicsDevice, root_directory: &str) -> Result<Self> {
+        let native = Native::process()?;
+        let info = sys::CNA_ContentManagerCreateInfo {
+            struct_size: core::mem::size_of::<sys::CNA_ContentManagerCreateInfo>() as u32,
+            struct_version: 1,
+            root_directory: string_view(root_directory),
+            reserved: 0,
+        };
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the descriptor borrows `root_directory` for the call and CNA
+        // copies it; the output is a live local.
+        native.check(unsafe {
+            (native.runtime.content_manager_create_resource)(
+                graphics_device.handle()?,
+                &info,
+                &mut handle,
+            )
+        })?;
+        Ok(Self { native, handle })
+    }
+
+    /// The directory this manager resolves asset names against.
+    pub fn root_directory(&self) -> Result<String> {
+        let api = &self.native.runtime;
+        crate::native::runtime::read_string(
+            |value| self.native.check(value),
+            // SAFETY: owned handle, live outputs; the size-then-copy pair.
+            |bytes| unsafe { (api.content_manager_get_root_directory_size)(self.handle, bytes) },
+            |destination, capacity, written| unsafe {
+                (api.content_manager_copy_root_directory)(
+                    self.handle,
+                    destination,
+                    capacity,
+                    written,
+                )
+            },
+        )
+    }
+
+    /// Changes the directory asset names resolve against.
+    pub fn set_root_directory(&self, path: &str) -> Result<()> {
+        // SAFETY: the handle is owned and the path is borrowed for the call.
+        self.native.check(unsafe {
+            (self.native.runtime.content_manager_set_root_directory)(
+                self.handle,
+                string_view(path),
+            )
+        })
+    }
+
+    /// The file one asset name resolves to.
+    ///
+    /// Which extension wins is the manager's rule, not the caller's, so this is
+    /// the only honest way to find out what a name will actually open.
+    pub fn asset_path(&self, asset_name: &str) -> Result<String> {
+        let api = &self.native.runtime;
+        crate::native::runtime::read_string(
+            |value| self.native.check(value),
+            // SAFETY: owned handle, borrowed name, live outputs.
+            |bytes| unsafe {
+                (api.content_manager_get_asset_path_size)(
+                    self.handle,
+                    string_view(asset_name),
+                    bytes,
+                )
+            },
+            |destination, capacity, written| unsafe {
+                (api.content_manager_copy_asset_path)(
+                    self.handle,
+                    string_view(asset_name),
+                    destination,
+                    capacity,
+                    written,
+                )
+            },
+        )
+    }
+
+    /// The key an asset name is cached under.
+    ///
+    /// Two names that normalise to one key are the same asset, which is what
+    /// makes a second load a cache hit rather than a second file read.
+    ///
+    /// The normalisation is exactly two rules -- backslashes become forward
+    /// slashes, and the whole key is lowercased -- so `Textures\Hero` and
+    /// `textures/hero` are one asset. It does **not** resolve a path:
+    /// `./listed` and `listed` are two different keys and two separate cache
+    /// entries, measured rather than assumed.
+    pub fn normalized_key(&self, asset_name: &str) -> Result<String> {
+        let api = &self.native.runtime;
+        crate::native::runtime::read_string(
+            |value| self.native.check(value),
+            // SAFETY: owned handle, borrowed name, live outputs.
+            |bytes| unsafe {
+                (api.content_manager_get_normalized_key_size)(
+                    self.handle,
+                    string_view(asset_name),
+                    bytes,
+                )
+            },
+            |destination, capacity, written| unsafe {
+                (api.content_manager_copy_normalized_key)(
+                    self.handle,
+                    string_view(asset_name),
+                    destination,
+                    capacity,
+                    written,
+                )
+            },
+        )
+    }
+
+    /// Whether a service provider is attached.
+    pub fn has_service_provider(&self) -> Result<bool> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.runtime.content_manager_get_has_service_provider)(self.handle, &mut value)
+        })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    /// The identity of the device this manager loads onto.
+    pub fn graphics_device_identity(&self) -> Result<u64> {
+        let mut value = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.runtime.content_manager_get_graphics_device)(self.handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// Points the manager at a different device.
+    pub fn set_graphics_device(&self, graphics_device: &GraphicsDevice) -> Result<()> {
+        // SAFETY: both handles belong to live values.
+        self.native.check(unsafe {
+            (self.native.runtime.content_manager_set_graphics_device)(
+                self.handle,
+                graphics_device.handle()?,
+            )
+        })
+    }
+
+    /// Drops every cached asset.
+    ///
+    /// XNA's `ContentManager.Unload`. Anything still holding a loaded asset is
+    /// holding it past this point, which is the caller's business.
+    pub fn unload(&self) -> Result<()> {
+        // SAFETY: the handle is owned.
+        self.native
+            .check(unsafe { (self.native.runtime.content_manager_unload)(self.handle) })
+    }
+
+    /// Registers CNA's own loaders for the built-in asset types.
+    pub fn register_builtin_loaders(&self) -> Result<()> {
+        // SAFETY: the handle is owned.
+        self.native.check(unsafe {
+            (self.native.runtime.content_manager_register_builtin_loaders)(self.handle)
+        })
+    }
+
+    /// Re-reads the content root and rebuilds the manifest.
+    pub fn refresh_content_manifest(&self) -> Result<()> {
+        // SAFETY: the handle is owned.
+        self.native.check(unsafe {
+            (self.native.runtime.content_manager_refresh_content_manifest)(self.handle)
+        })
+    }
+
+    /// How many entries the manifest holds.
+    pub fn manifest_entry_count(&self) -> Result<u64> {
+        let mut value = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.runtime.content_manager_get_manifest_entry_count)(self.handle, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    /// One manifest entry, with its names.
+    pub fn manifest_entry(&self, index: u64) -> Result<ManifestEntry> {
+        let api = &self.native.runtime;
+        let mut info = sys::CNA_ContentManifestEntryInfo {
+            struct_size: core::mem::size_of::<sys::CNA_ContentManifestEntryInfo>() as u32,
+            struct_version: 1,
+            ..sys::CNA_ContentManifestEntryInfo::default()
+        };
+        // SAFETY: the handle is owned and the output is a live local whose size
+        // and version headers are set.
+        self.native.check(unsafe {
+            (api.content_manager_get_manifest_entry)(self.handle, index, &mut info)
+        })?;
+        // The relative path has no separate size route, so the copy route
+        // asked with a zero capacity is the size probe -- which answers
+        // `BUFFER_TOO_SMALL` rather than success, and that is the answer.
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the size.
+        accept_size_probe(&self.native, unsafe {
+            (api.content_manager_copy_manifest_relative_path)(
+                self.handle,
+                index,
+                core::ptr::null_mut(),
+                0,
+                &mut required,
+            )
+        })?;
+        let relative_path = crate::native::runtime::read_string_of_size(
+            required,
+            |value| self.native.check(value),
+            // SAFETY: owned handle, `capacity` writable bytes.
+            |destination, capacity, written| unsafe {
+                (api.content_manager_copy_manifest_relative_path)(
+                    self.handle,
+                    index,
+                    destination,
+                    capacity,
+                    written,
+                )
+            },
+        )?;
+        let native_extensions = (0..info.native_extension_count)
+            .map(|slot| self.manifest_text(index, slot, true))
+            .collect::<Result<Vec<String>>>()?;
+        let xnb_reader_names = (0..info.xnb_reader_name_count)
+            .map(|slot| self.manifest_text(index, slot, false))
+            .collect::<Result<Vec<String>>>()?;
+        Ok(ManifestEntry {
+            relative_path,
+            has_xnb: info.has_xnb != sys::CNA_FALSE,
+            has_cnj: info.has_cnj != sys::CNA_FALSE,
+            native_extensions,
+            xnb_reader_names,
+        })
+    }
+
+    fn manifest_text(&self, index: u64, slot: u64, extension: bool) -> Result<String> {
+        let api = &self.native.runtime;
+        let route = if extension {
+            api.content_manager_copy_manifest_native_extension
+        } else {
+            api.content_manager_copy_manifest_xnb_reader_name
+        };
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the size.
+        accept_size_probe(&self.native, unsafe {
+            route(self.handle, index, slot, core::ptr::null_mut(), 0, &mut required)
+        })?;
+        crate::native::runtime::read_string_of_size(
+            required,
+            |value| self.native.check(value),
+            // SAFETY: owned handle, `capacity` writable bytes.
+            |destination, capacity, written| unsafe {
+                route(self.handle, index, slot, destination, capacity, written)
+            },
+        )
+    }
+
+    /// How many distinct `.xnb` reader names the content root declares.
+    pub fn xnb_reader_usage_count(&self) -> Result<u64> {
+        let mut value = 0_u64;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.runtime.content_manager_get_xnb_reader_usage_count)(
+                self.handle,
+                &mut value,
+            )
+        })?;
+        Ok(value)
+    }
+
+    /// One reader name, and whether this build can serve it.
+    ///
+    /// The answer to "will this content load on this build" before trying it,
+    /// and the list a packaging step checks.
+    pub fn xnb_reader_usage(&self, index: u64) -> Result<ReaderUsage> {
+        let api = &self.native.runtime;
+        let mut info = sys::CNA_ContentReaderUsageInfo {
+            struct_size: core::mem::size_of::<sys::CNA_ContentReaderUsageInfo>() as u32,
+            struct_version: 1,
+            ..sys::CNA_ContentReaderUsageInfo::default()
+        };
+        // SAFETY: the handle is owned and the output is a live local whose
+        // headers are set.
+        self.native
+            .check(unsafe { (api.content_manager_get_xnb_reader_usage)(self.handle, index, &mut info) })?;
+        let mut required = 0_u64;
+        // SAFETY: a null destination with zero capacity asks for the size.
+        accept_size_probe(&self.native, unsafe {
+            (api.content_manager_copy_xnb_reader_usage_name)(
+                self.handle,
+                index,
+                core::ptr::null_mut(),
+                0,
+                &mut required,
+            )
+        })?;
+        let name = crate::native::runtime::read_string_of_size(
+            required,
+            |value| self.native.check(value),
+            // SAFETY: owned handle, `capacity` writable bytes.
+            |destination, capacity, written| unsafe {
+                (api.content_manager_copy_xnb_reader_usage_name)(
+                    self.handle,
+                    index,
+                    destination,
+                    capacity,
+                    written,
+                )
+            },
+        )?;
+        Ok(ReaderUsage {
+            name,
+            is_registered: info.is_registered != sys::CNA_FALSE,
+            file_count: info.file_count,
+        })
+    }
+}
+
+/// Loading assets CNA's own manager knows how to read.
+///
+/// The Rust content pipeline reads `.xnb` and produces Rust values; these read
+/// whatever the manager resolves a name to, which on a CNA content root
+/// includes `.cnj` and the native source formats. Both paths are real and
+/// neither replaces the other.
+impl NativeContentManager {
+    /// Loads a texture by asset name.
+    pub fn load_texture2d(
+        &self,
+        graphics_device: &GraphicsDevice,
+        asset_name: &str,
+    ) -> Result<Texture2D> {
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the manager handle is owned, the name is borrowed and copied,
+        // and the output is a live local receiving an owned handle.
+        self.native.check(unsafe {
+            (self.native.runtime.content_manager_load_texture2d)(
+                self.handle,
+                string_view(asset_name),
+                &mut handle,
+            )
+        })?;
+        Texture2D::from_owned_handle(graphics_device, handle)
+    }
+
+    /// Loads a cube map by asset name.
+    pub fn load_texture_cube(
+        &self,
+        graphics_device: &GraphicsDevice,
+        asset_name: &str,
+    ) -> Result<TextureCube> {
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: as above.
+        self.native.check(unsafe {
+            (self.native.runtime.content_manager_load_texture_cube)(
+                self.handle,
+                string_view(asset_name),
+                &mut handle,
+            )
+        })?;
+        TextureCube::from_owned_handle(graphics_device, handle)
+    }
+
+    /// Loads an asset a caller's own reader produced.
+    ///
+    /// The pointer is the caller's own: CNA never dereferences, copies or frees
+    /// it, and its lifetime is the caller's business. Raw for exactly that
+    /// reason -- a safe Rust value here would claim an ownership nobody has.
+    pub fn load_foreign(&self, asset_name: &str) -> Result<*mut core::ffi::c_void> {
+        let mut object = core::ptr::null_mut();
+        // SAFETY: the manager handle is owned, the name is borrowed for the
+        // call, and the output is a live local. The pointer is not
+        // dereferenced here.
+        self.native.check(unsafe {
+            (self.native.runtime.content_manager_load_foreign_ext)(
+                self.handle,
+                string_view(asset_name),
+                &mut object,
+            )
+        })?;
+        Ok(object)
+    }
+}
+
+/// A content manager a `Game` owns, borrowed for as long as the game lives.
+///
+/// A game owns exactly one as a value member, so this borrows rather than owns:
+/// it is the same manager every time, it cannot be destroyed on its own, and it
+/// goes when the game does. Every content-manager route accepts it, so a caller
+/// can set the root the game loads from and load through the game's own cache.
+pub struct BorrowedContentManager<'game> {
+    manager: NativeContentManager,
+    owner: core::marker::PhantomData<&'game ()>,
+}
+
+impl BorrowedContentManager<'_> {
+    /// The manager itself, for as long as this borrow lives.
+    #[must_use]
+    pub const fn manager(&self) -> &NativeContentManager {
+        &self.manager
+    }
+}
+
+impl Drop for BorrowedContentManager<'_> {
+    fn drop(&mut self) {
+        // The handle is the game's, not this value's: forget it rather than let
+        // `NativeContentManager`'s own Drop destroy a manager the game owns.
+        self.manager.handle = sys::CNA_INVALID_HANDLE;
+    }
+}
+
+/// The content manager a game owns, and replacing it.
+impl NativeContentManager {
+    /// Borrows the manager a game owns.
+    ///
+    /// The borrow is bound to the [`GameContext`] it came from, which is what
+    /// stops it outliving the game -- upstream allows that and answers an
+    /// invalid handle, and a Rust caller should not have to find out that way.
+    pub fn of_game<'game>(
+        game: &'game GameContext<'_>,
+    ) -> Result<BorrowedContentManager<'game>> {
+        let (native, game_handle) = game.native_game();
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the game handle is callback-live and the output is a live
+        // local receiving a borrowed handle.
+        native.check(unsafe {
+            (native.runtime.game_get_content_manager_ext)(game_handle, &mut handle)
+        })?;
+        Ok(BorrowedContentManager {
+            manager: Self {
+                native: Arc::clone(native),
+                handle,
+            },
+            owner: core::marker::PhantomData,
+        })
+    }
+
+    /// Makes this manager the one a game loads through.
+    ///
+    /// The game takes over the manager's lifetime, so this consumes it: keeping
+    /// a second owner would mean two values racing to destroy one manager.
+    pub fn install_into_game(self, game: &GameContext<'_>) -> Result<()> {
+        let (native, game_handle) = game.native_game();
+        let handle = self.handle;
+        // SAFETY: both handles are live, and `self` is forgotten below so its
+        // Drop cannot destroy what the game now owns.
+        let result = native
+            .check(unsafe { (native.runtime.game_set_content_manager_ext)(game_handle, handle) });
+        if result.is_ok() {
+            core::mem::forget(self);
+        }
+        result
+    }
+}
+
+/// A game's own loader for one `"type"` in a `.cnj` descriptor.
+///
+/// The `.cnj` counterpart of a registered `.xnb` reader, and what makes
+/// [`NativeContentManager::load_foreign`] reach more than compiled assets: a
+/// reader answers for an `.xnb`, this answers for a `.cnj`, and the load route
+/// does not care which produced the object.
+///
+/// CNA calls this on whatever thread performs the load, so it must be `Sync`. A
+/// panic must not cross back into C, so one is caught at the boundary and
+/// reported as a failed load rather than unwinding.
+pub trait CnjLoader: Send + Sync + 'static {
+    /// Turns one descriptor's JSON into an object.
+    ///
+    /// The pointer this answers is the caller's own: CNA never dereferences,
+    /// copies or frees it, and whoever asked for the asset receives it. Its
+    /// lifetime is the caller's business, which is why this returns a raw
+    /// pointer rather than something with a `Drop`.
+    fn load(&self, cnj_json: &str) -> Result<*mut core::ffi::c_void>;
+}
+
+/// One live `.cnj` loader registration.
+///
+/// The registration is owned by the content manager, and upstream says the
+/// context "must outlive the content manager". There is no withdraw route, so
+/// this value keeps the boxed loader alive for the whole process rather than
+/// guessing when the manager is done with it -- one small allocation per
+/// registered type, in a program that registers a handful.
+#[derive(Debug)]
+pub struct CnjLoaderRegistration {
+    type_name: String,
+}
+
+impl CnjLoaderRegistration {
+    /// The `"type"` value this registration answers for.
+    #[must_use]
+    pub fn type_name(&self) -> &str {
+        &self.type_name
+    }
+}
+
+impl NativeContentManager {
+    /// Registers a loader for one `"type"` value in a `.cnj` descriptor.
+    ///
+    /// Refused when that type name is already registered on this manager,
+    /// which is deliberate on CNA's side: silently ignoring a repeat would
+    /// hand back a live registration whose loader is never called.
+    pub fn register_cnj_loader(
+        &self,
+        type_name: &str,
+        loader: Box<dyn CnjLoader>,
+    ) -> Result<CnjLoaderRegistration> {
+        unsafe extern "C" fn trampoline(
+            context: *mut core::ffi::c_void,
+            cnj_json: sys::CNA_StringView,
+            out_object: *mut *mut core::ffi::c_void,
+        ) -> sys::CNA_Result {
+            if context.is_null() || out_object.is_null() {
+                return sys::CNA_RESULT_INVALID_ARGUMENT;
+            }
+            // SAFETY: the context is the leaked box registered below, which
+            // outlives every manager that can reach it.
+            let loader = unsafe { &*context.cast::<Box<dyn CnjLoader>>() };
+            let length = usize::try_from(cnj_json.byte_length).unwrap_or(0);
+            let text = if cnj_json.data.is_null() || length == 0 {
+                String::new()
+            } else {
+                // SAFETY: CNA documents the bytes as counted UTF-8 borrowed for
+                // this call; they are copied before it returns.
+                let bytes =
+                    unsafe { core::slice::from_raw_parts(cnj_json.data.cast::<u8>(), length) };
+                String::from_utf8_lossy(bytes).into_owned()
+            };
+            let outcome = catch_unwind(AssertUnwindSafe(|| loader.load(&text)));
+            match outcome {
+                Ok(Ok(object)) => {
+                    // SAFETY: the output is a live pointer CNA gave us.
+                    unsafe { *out_object = object };
+                    sys::CNA_RESULT_SUCCESS
+                }
+                // A failed load and a panicking loader are the same thing to
+                // the caller who asked for the asset: the asset did not load.
+                Ok(Err(_)) | Err(_) => sys::CNA_RESULT_IO,
+            }
+        }
+
+        let boxed = Box::new(loader);
+        let context = Box::into_raw(boxed).cast::<core::ffi::c_void>();
+        // SAFETY: the handle is owned, the type name is borrowed and copied,
+        // the trampoline has the audited signature, and the context is a box
+        // deliberately never freed -- see `CnjLoaderRegistration`.
+        let result = self.native.check(unsafe {
+            (self.native.runtime.content_manager_register_cnj_loader_ext)(
+                self.handle,
+                string_view(type_name),
+                Some(trampoline),
+                context,
+            )
+        });
+        if let Err(error) = result {
+            // CNA never took the pointer, so this side still owns it.
+            // SAFETY: the box was made two statements ago and handed to nobody.
+            drop(unsafe { Box::from_raw(context.cast::<Box<dyn CnjLoader>>()) });
+            return Err(error);
+        }
+        Ok(CnjLoaderRegistration {
+            type_name: type_name.to_owned(),
+        })
+    }
 }

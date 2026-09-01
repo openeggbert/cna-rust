@@ -147,6 +147,7 @@ pub mod Microsoft {
                     pub use crate::input::{
                         GestureSample, GestureType, TouchCollection, TouchCollectionEnumerator,
                         TouchLocation, TouchLocationState, TouchPanel, TouchPanelCapabilities,
+                        TouchPanelTestBackend,
                     };
                 }
             }
