@@ -2651,3 +2651,345 @@ impl Native {
         self.check(unsafe { (self.effect_pass_apply)(pass) })
     }
 }
+
+/// `graphics_resource.h` -- the XNA base every graphics resource shares.
+///
+/// These routes take any resource handle, whatever kind created it, which is
+/// why they sit on `Native` rather than in a table beside one resource family.
+///
+/// What the probe measured (`tools/reproducers/ext015i_resource_name.c`,
+/// HEADLESS artifact, a caller-created `Texture2D`):
+///
+/// * a fresh resource has an empty name, and `set_name` round-trips;
+/// * `copy_string` answers the bare type name -- `"Texture2D"` -- when the
+///   name is empty, and the name once one is set. XNA's own `ToString` falls
+///   back to `Object.ToString()`, which is the *namespace-qualified* name, so
+///   CNA's fallback is the short form of XNA's. The safe layer keeps XNA's
+///   spelling for `ToString` and publishes CNA's separately rather than
+///   quietly adopting one for the other;
+/// * `get_is_disposed` flips false to true across `dispose`, and the name
+///   still reads afterwards -- `dispose` does not release the C handle;
+/// * `get_graphics_device` answers `CNA_RESULT_INVALID_HANDLE` for a
+///   device-owned resource outside a lifecycle callback, exactly as its header
+///   documents, so it is only useful from inside one.
+impl Native {
+    pub(crate) fn graphics_resource_name(&self, handle: sys::CNA_Handle) -> Result<String> {
+        self.copy_effect_text(
+            handle,
+            self.graphics_resource_get_name_byte_count,
+            self.graphics_resource_copy_name,
+        )
+    }
+
+    pub(crate) fn set_graphics_resource_name(
+        &self,
+        handle: sys::CNA_Handle,
+        value: &str,
+    ) -> Result<()> {
+        let view = sys::CNA_StringView {
+            data: value.as_ptr().cast(),
+            byte_length: value.len() as u64,
+        };
+        // SAFETY: the string outlives the call, which is all the view borrows.
+        self.check(unsafe { (self.graphics_resource_set_name)(handle, view) })
+    }
+
+    /// CNA's own `ToString`: the name when set, the bare type name otherwise.
+    pub(crate) fn graphics_resource_string(&self, handle: sys::CNA_Handle) -> Result<String> {
+        self.copy_effect_text(
+            handle,
+            self.graphics_resource_get_string_byte_count,
+            self.graphics_resource_copy_string,
+        )
+    }
+
+    pub(crate) fn graphics_resource_is_disposed(&self, handle: sys::CNA_Handle) -> Result<bool> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the output is a live local.
+        self.check(unsafe { (self.graphics_resource_get_is_disposed)(handle, &mut value) })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    pub(crate) fn graphics_resource_tag(
+        &self,
+        handle: sys::CNA_Handle,
+    ) -> Result<sys::CNA_GraphicsResourceTag> {
+        let mut value = 0;
+        // SAFETY: the output is a live local.
+        self.check(unsafe { (self.graphics_resource_get_tag)(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn set_graphics_resource_tag(
+        &self,
+        handle: sys::CNA_Handle,
+        tag: sys::CNA_GraphicsResourceTag,
+    ) -> Result<()> {
+        // SAFETY: the tag is an opaque scalar; CNA never dereferences it.
+        self.check(unsafe { (self.graphics_resource_set_tag)(handle, tag) })
+    }
+
+    /// Disposes in place. The C handle stays valid and must still be destroyed.
+    pub(crate) fn dispose_graphics_resource(&self, handle: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: the handle is live; repeated disposal is a documented no-op.
+        self.check(unsafe { (self.graphics_resource_dispose)(handle) })
+    }
+
+    /// The owning device, borrowed for a lifecycle callback only.
+    ///
+    /// Answers `Ok(None)` for a standalone resource, which is the documented
+    /// success-with-invalid-handle case.
+    pub(crate) fn graphics_resource_device(
+        &self,
+        handle: sys::CNA_Handle,
+    ) -> Result<Option<sys::CNA_Handle>> {
+        let mut value = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the output is a live local.
+        self.check(unsafe { (self.graphics_resource_get_graphics_device)(handle, &mut value) })?;
+        Ok((value != sys::CNA_INVALID_HANDLE).then_some(value))
+    }
+
+    pub(crate) fn subscribe_graphics_resource_disposing(
+        &self,
+        handle: sys::CNA_Handle,
+        callback: sys::CNA_GraphicsResourceDisposingCallback,
+        context: *mut core::ffi::c_void,
+    ) -> Result<sys::CNA_GraphicsResourceEventRegistrationHandle> {
+        let mut registration = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the caller keeps `context` alive until it withdraws this
+        // registration, which is the contract the safe layer upholds.
+        self.check(unsafe {
+            (self.graphics_resource_subscribe_disposing)(
+                handle,
+                callback,
+                context,
+                &mut registration,
+            )
+        })?;
+        Ok(registration)
+    }
+
+    pub(crate) fn unsubscribe_graphics_resource_disposing(
+        &self,
+        registration: sys::CNA_GraphicsResourceEventRegistrationHandle,
+    ) -> Result<()> {
+        // SAFETY: the registration was published by the subscribe above and is
+        // withdrawn exactly once.
+        self.check(unsafe { (self.graphics_resource_unsubscribe_disposing)(registration) })
+    }
+}
+
+/// `texture.h`'s format arithmetic, the device-free textures, and the direct
+/// file paths.
+///
+/// Two groups, and they are different in kind.
+///
+/// The format routes are CNA's canonical answers about a `SurfaceFormat`: how
+/// many bytes a block or texel takes, how many texels a compression block
+/// covers, what pixel-store alignment the format wants, and whether an element
+/// size divides a format unit evenly. Every one of them is arithmetic a caller
+/// *could* restate, and restating it is how the two sides drift apart -- the
+/// morph-target stride list (RUST-UPSTREAM-024) is exactly that mistake made
+/// upstream. So they are called rather than reimplemented.
+///
+/// The creation routes make textures with **no graphics device**: a standalone
+/// default, a CPU-only one from pixels, and one decoded from an image file.
+/// They are what lets a tool, a test or a headless pipeline hold an image
+/// without a renderer at all.
+impl Native {
+    /// The format and mip-level facts shared by every texture kind.
+    ///
+    /// Distinct from `texture_info`, which fills a `CNA_Texture2DInfo` for a
+    /// `Texture2D` alone: this one accepts a `Texture3D`, a `TextureCube` or a
+    /// render target too, and answers only what all of them have.
+    pub(crate) fn texture_common_info(
+        &self,
+        handle: sys::CNA_Handle,
+    ) -> Result<sys::CNA_TextureInfo> {
+        let mut info = sys::CNA_TextureInfo {
+            struct_size: core::mem::size_of::<sys::CNA_TextureInfo>() as u32,
+            struct_version: 1,
+            ..sys::CNA_TextureInfo::default()
+        };
+        // SAFETY: the output is a complete versioned local.
+        self.check(unsafe { (self.texture_get_info)(handle, &mut info) })?;
+        Ok(info)
+    }
+
+    pub(crate) fn texture_block_size_squared(
+        &self,
+        format: sys::CNA_SurfaceFormat,
+    ) -> Result<i32> {
+        let mut value = 0;
+        // SAFETY: the output is a live local.
+        self.check(unsafe { (self.texture_get_block_size_squared)(format, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn texture_format_size(&self, format: sys::CNA_SurfaceFormat) -> Result<i32> {
+        let mut value = 0;
+        // SAFETY: the output is a live local.
+        self.check(unsafe { (self.texture_get_format_size)(format, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn texture_pixel_store_alignment(
+        &self,
+        format: sys::CNA_SurfaceFormat,
+    ) -> Result<i32> {
+        let mut value = 0;
+        // SAFETY: the output is a live local.
+        self.check(unsafe { (self.texture_get_pixel_store_alignment)(format, &mut value) })?;
+        Ok(value)
+    }
+
+    pub(crate) fn validate_texture_get_data_format(
+        &self,
+        format: sys::CNA_SurfaceFormat,
+        element_size: i32,
+    ) -> Result<()> {
+        // SAFETY: both arguments are scalars.
+        self.check(unsafe { (self.texture_validate_get_data_format)(format, element_size) })
+    }
+
+    pub(crate) fn validate_texture_format(
+        &self,
+        format: sys::CNA_SurfaceFormat,
+    ) -> Result<()> {
+        // SAFETY: the argument is a scalar.
+        self.check(unsafe { (self.texture_validate_format)(format) })
+    }
+
+    pub(crate) fn create_standalone_texture2d(&self) -> Result<sys::CNA_Handle> {
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the output is a live local.
+        self.check(unsafe { (self.texture2d_create_standalone)(&mut handle) })?;
+        Ok(handle)
+    }
+
+    pub(crate) fn create_texture2d_from_file(&self, path: &str) -> Result<sys::CNA_Handle> {
+        let view = sys::CNA_StringView {
+            data: path.as_ptr().cast(),
+            byte_length: path.len() as u64,
+        };
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the path outlives the call, which is all the view borrows.
+        self.check(unsafe { (self.texture2d_create_from_file)(view, &mut handle) })?;
+        Ok(handle)
+    }
+
+    pub(crate) fn create_texture2d_from_file_with_device(
+        &self,
+        device: sys::CNA_Handle,
+        path: &str,
+    ) -> Result<sys::CNA_Handle> {
+        let view = sys::CNA_StringView {
+            data: path.as_ptr().cast(),
+            byte_length: path.len() as u64,
+        };
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the device handle is live and the path outlives the call.
+        self.check(unsafe {
+            (self.texture2d_create_from_file_with_device)(device, view, &mut handle)
+        })?;
+        Ok(handle)
+    }
+
+    pub(crate) fn create_texture2d_from_rgba8(
+        &self,
+        device: sys::CNA_Handle,
+        width: u32,
+        height: u32,
+        pixels: &[sys::CNA_Color],
+    ) -> Result<sys::CNA_Handle> {
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the slice outlives the call and its length is passed exactly.
+        self.check(unsafe {
+            (self.texture2d_create_from_rgba8)(
+                device,
+                width,
+                height,
+                pixels.as_ptr(),
+                pixels.len() as u64,
+                &mut handle,
+            )
+        })?;
+        Ok(handle)
+    }
+
+    pub(crate) fn create_cpu_only_texture2d(
+        &self,
+        width: u32,
+        height: u32,
+        format: sys::CNA_SurfaceFormat,
+        pixels: &[sys::CNA_Color],
+    ) -> Result<sys::CNA_Handle> {
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the slice outlives the call and its length is passed exactly.
+        self.check(unsafe {
+            (self.texture2d_create_cpu_only_rgba8)(
+                width,
+                height,
+                format,
+                pixels.as_ptr(),
+                pixels.len() as u64,
+                &mut handle,
+            )
+        })?;
+        Ok(handle)
+    }
+
+    pub(crate) fn set_texture2d_rgba8_bytes(
+        &self,
+        handle: sys::CNA_Handle,
+        bytes: &[u8],
+    ) -> Result<()> {
+        // The route takes a *pixel* count, not a byte count, and four bytes
+        // make a pixel. Getting that wrong would hand CNA four times the
+        // length it expects, so the division is checked rather than assumed.
+        if bytes.len() % 4 != 0 {
+            return Err(CnaError::InvalidInput(
+                "RGBA8 bytes must be a whole number of four-byte pixels",
+            ));
+        }
+        // SAFETY: the slice outlives the call and the pixel count matches it.
+        self.check(unsafe {
+            (self.texture2d_set_data_rgba8_bytes)(
+                handle,
+                bytes.as_ptr(),
+                (bytes.len() / 4) as u64,
+            )
+        })
+    }
+
+    pub(crate) fn texture2d_storage(
+        &self,
+        handle: sys::CNA_Handle,
+    ) -> Result<(bool, bool)> {
+        let mut info = sys::CNA_Texture2DStorageInfo {
+            struct_size: core::mem::size_of::<sys::CNA_Texture2DStorageInfo>() as u32,
+            struct_version: 1,
+            ..sys::CNA_Texture2DStorageInfo::default()
+        };
+        // SAFETY: the output is a complete versioned local.
+        self.check(unsafe { (self.texture2d_get_storage_info)(handle, &mut info) })?;
+        Ok((
+            info.has_renderer != sys::CNA_FALSE,
+            info.has_cpu_shadow != sys::CNA_FALSE,
+        ))
+    }
+
+    pub(crate) fn save_texture2d_file(
+        &self,
+        handle: sys::CNA_Handle,
+        image_format: sys::CNA_TextureImageFormat,
+        path: &str,
+    ) -> Result<()> {
+        let view = sys::CNA_StringView {
+            data: path.as_ptr().cast(),
+            byte_length: path.len() as u64,
+        };
+        // SAFETY: the path outlives the call, which is all the view borrows.
+        self.check(unsafe { (self.texture2d_save_file)(handle, image_format, view) })
+    }
+}

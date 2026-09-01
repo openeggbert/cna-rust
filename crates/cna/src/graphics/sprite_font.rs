@@ -327,3 +327,10 @@ impl Drop for SpriteFont {
         let _ = self.state.dispose_native();
     }
 }
+
+
+impl crate::extensions::graphics_resource::HasResourceState for SpriteFont {
+    fn resource_state(&self) -> &super::resource::ResourceState {
+        &self.state
+    }
+}

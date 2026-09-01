@@ -43,7 +43,7 @@ pub(crate) trait BorrowedHandle: Send + Sync {
     fn validate(&self) -> Result<()>;
 }
 
-pub(super) struct ResourceState {
+pub(crate) struct ResourceState {
     device: GraphicsDevice,
     handle: Mutex<sys::CNA_Handle>,
     kind: ResourceKind,
@@ -217,7 +217,7 @@ impl ResourceState {
         *handle = sys::CNA_INVALID_HANDLE;
     }
 
-    pub(super) fn require_handle(&self) -> Result<sys::CNA_Handle> {
+    pub(crate) fn require_handle(&self) -> Result<sys::CNA_Handle> {
         self.device.state.ensure_alive()?;
         if let Some(owner) = &self.borrowed {
             owner.validate()?;
@@ -226,7 +226,7 @@ impl ResourceState {
             .ok_or(CnaError::InvalidInput("graphics resource is disposed"))
     }
 
-    pub(super) fn device(&self) -> &GraphicsDevice {
+    pub(crate) fn device(&self) -> &GraphicsDevice {
         &self.device
     }
 
@@ -244,7 +244,25 @@ impl ResourceState {
             .unwrap_or_else(std::sync::PoisonError::into_inner) = value;
     }
 
+    /// The resource's name, read from CNA while the handle is live.
+    ///
+    /// The `Mutex` is a mirror, not the record. Before `graphics_resource.h`
+    /// was bound this field *was* the record, and a name set through Rust was
+    /// invisible to CNA -- including to `GraphicsDevice::OnResourceDestroyed`,
+    /// which reports the name a resource had when it went. Now the native side
+    /// holds it and the mirror answers only once the handle is gone, because
+    /// XNA lets a disposed resource still report its name and this signature
+    /// has nowhere to put a failure.
     pub(super) fn name(&self) -> String {
+        if let Some(handle) = self.handle() {
+            if let Ok(name) = self.device.state.native().graphics_resource_name(handle) {
+                *self
+                    .name
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner) = name.clone();
+                return name;
+            }
+        }
         self.name
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -252,11 +270,86 @@ impl ResourceState {
     }
 
     pub(super) fn set_name(&self, value: &str) {
+        if let Some(handle) = self.handle() {
+            let _ = self
+                .device
+                .state
+                .native()
+                .set_graphics_resource_name(handle, value);
+        }
         *self
             .name
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = value.to_owned();
     }
+
+    /// CNA's own `ToString` for this resource.
+    ///
+    /// Not the same string as [`GraphicsResource::ToString`]. XNA falls back to
+    /// `Object.ToString()`, the namespace-qualified type name; CNA falls back
+    /// to the bare one, so an unnamed `Texture2D` is
+    /// `"Microsoft.Xna.Framework.Graphics.Texture2D"` to XNA and `"Texture2D"`
+    /// here. Both are published rather than one being made to stand for the
+    /// other.
+    pub(crate) fn native_string(&self) -> Result<String> {
+        let handle = self.require_handle()?;
+        self.device.state.native().graphics_resource_string(handle)
+    }
+
+    /// What CNA thinks of this resource's disposal, independent of Rust's own
+    /// record of whether the handle was released.
+    pub(crate) fn native_is_disposed(&self) -> Result<bool> {
+        let handle = self.require_handle()?;
+        self.device
+            .state
+            .native()
+            .graphics_resource_is_disposed(handle)
+    }
+
+    /// The opaque token CNA carries on the resource and reports back through
+    /// the device's `ResourceDestroyed` event.
+    ///
+    /// Unrelated to XNA's `Tag`, which is an arbitrary managed object and is
+    /// modelled here as `Arc<dyn Any>`; a Rust object cannot cross into C, so
+    /// the two are different properties and both are kept.
+    pub(crate) fn native_tag(&self) -> Result<u64> {
+        let handle = self.require_handle()?;
+        self.device.state.native().graphics_resource_tag(handle)
+    }
+
+    pub(crate) fn set_native_tag(&self, tag: u64) -> Result<()> {
+        let handle = self.require_handle()?;
+        self.device
+            .state
+            .native()
+            .set_graphics_resource_tag(handle, tag)
+    }
+
+    /// Disposes the native object while keeping the C handle.
+    ///
+    /// Distinct from [`Self::dispose_native`], which destroys the handle.
+    /// After this the resource still answers its name and reports itself
+    /// disposed, which is what XNA's `Dispose()` does and what the handle
+    /// destroy does not leave observable.
+    pub(crate) fn dispose_in_place(&self) -> Result<()> {
+        let handle = self.require_handle()?;
+        self.device
+            .state
+            .native()
+            .dispose_graphics_resource(handle)
+    }
+
+    /// The owning device as CNA reports it, borrowed for the current callback.
+    ///
+    /// `Ok(None)` for a standalone resource. Outside a lifecycle callback a
+    /// device-owned resource answers `CNA_RESULT_INVALID_HANDLE`, which its
+    /// header documents and which this passes through: "there is no device"
+    /// and "the device is not borrowable right now" are different facts.
+    pub(crate) fn native_device_handle(&self) -> Result<Option<sys::CNA_Handle>> {
+        let handle = self.require_handle()?;
+        self.device.state.native().graphics_resource_device(handle)
+    }
+
 
     pub(super) fn tag(&self) -> Option<Arc<dyn Any + Send + Sync>> {
         self.tag

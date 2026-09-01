@@ -723,3 +723,10 @@ impl Drop for SpriteBatch {
         let _ = self.state.dispose_native();
     }
 }
+
+
+impl crate::extensions::graphics_resource::HasResourceState for SpriteBatch {
+    fn resource_state(&self) -> &super::resource::ResourceState {
+        &self.state
+    }
+}

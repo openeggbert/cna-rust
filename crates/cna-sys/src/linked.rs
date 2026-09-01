@@ -12911,4 +12911,289 @@ extern "C" {
         argument1: CNA_Bool,
     ) -> CNA_Result;
     pub fn cna_touch_panel_update_ext(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_graphics_resource_get_graphics_device(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_graphics_resource_get_is_disposed(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_graphics_resource_get_name_byte_count(
+        argument0: CNA_Handle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_graphics_resource_copy_name(
+        argument0: CNA_Handle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_graphics_resource_set_name(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_graphics_resource_get_string_byte_count(
+        argument0: CNA_Handle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_graphics_resource_copy_string(
+        argument0: CNA_Handle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_graphics_resource_get_tag(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_GraphicsResourceTag,
+    ) -> CNA_Result;
+    pub fn cna_graphics_resource_set_tag(
+        argument0: CNA_Handle,
+        argument1: CNA_GraphicsResourceTag,
+    ) -> CNA_Result;
+    pub fn cna_graphics_resource_dispose(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_graphics_resource_subscribe_disposing(
+        argument0: CNA_Handle,
+        argument1: CNA_GraphicsResourceDisposingCallback,
+        argument2: *mut c_void,
+        argument3: *mut CNA_GraphicsResourceEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_graphics_resource_unsubscribe_disposing(
+        argument0: CNA_GraphicsResourceEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_keyboard_state_get_string_size(
+        argument0: *const CNA_KeyboardState,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_keyboard_state_copy_string(
+        argument0: *const CNA_KeyboardState,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_keyboard_get_key_from_scancode_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_Key,
+        argument2: *mut CNA_Key,
+    ) -> CNA_Result;
+    pub fn cna_keyboard_get_mod_state_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_KeyModifiers,
+    ) -> CNA_Result;
+    pub fn cna_keyboard_get_scancode_name_size_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_Key,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_keyboard_copy_scancode_name_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_Key,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_keyboard_get_scancode_from_name_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_Key,
+    ) -> CNA_Result;
+    pub fn cna_keyboard_get_key_name_size_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_Key,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_keyboard_copy_key_name_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_Key,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_keyboard_get_key_from_name_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_Key,
+    ) -> CNA_Result;
+    pub fn cna_mouse_get_is_relative_mouse_mode_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_mouse_set_is_relative_mouse_mode_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_mouse_set_capture_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_Bool,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_mouse_get_global_position_ext(
+        argument0: CNA_Handle,
+        argument1: *mut i32,
+        argument2: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_mouse_warp_global_ext(
+        argument0: CNA_Handle,
+        argument1: i32,
+        argument2: i32,
+        argument3: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_mouse_subscribe_clicked_ext(
+        argument0: CNA_MouseClickedCallback,
+        argument1: *mut c_void,
+        argument2: *mut CNA_MouseEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_mouse_unsubscribe_clicked_ext(
+        argument0: CNA_MouseEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_mouse_raise_clicked_ext(argument0: CNA_Handle, argument1: i32) -> CNA_Result;
+    pub fn cna_mouse_reset_for_tests_ext(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_gamepad_apply_dead_zone(
+        argument0: CNA_GamePadDeadZone,
+        argument1: *const CNA_GamePadAnalogState,
+        argument2: *mut CNA_GamePadAnalogState,
+    ) -> CNA_Result;
+    pub fn cna_texture_get_info(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_TextureInfo,
+    ) -> CNA_Result;
+    pub fn cna_texture_get_block_size_squared(
+        argument0: CNA_SurfaceFormat,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_texture_get_format_size(
+        argument0: CNA_SurfaceFormat,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_texture_get_pixel_store_alignment(
+        argument0: CNA_SurfaceFormat,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_texture_validate_get_data_format(
+        argument0: CNA_SurfaceFormat,
+        argument1: i32,
+    ) -> CNA_Result;
+    pub fn cna_texture_validate_format(argument0: CNA_SurfaceFormat) -> CNA_Result;
+    pub fn cna_texture2d_create_standalone(argument0: *mut CNA_Handle) -> CNA_Result;
+    pub fn cna_texture2d_create_from_file(
+        argument0: CNA_StringView,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_texture2d_create_from_file_with_device(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_texture2d_create_from_rgba8(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: u32,
+        argument3: *const CNA_Color,
+        argument4: u64,
+        argument5: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_texture2d_create_cpu_only_rgba8(
+        argument0: u32,
+        argument1: u32,
+        argument2: CNA_SurfaceFormat,
+        argument3: *const CNA_Color,
+        argument4: u64,
+        argument5: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_texture2d_set_data_rgba8_bytes(
+        argument0: CNA_Handle,
+        argument1: *const u8,
+        argument2: u64,
+    ) -> CNA_Result;
+    pub fn cna_texture2d_get_storage_info(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Texture2DStorageInfo,
+    ) -> CNA_Result;
+    pub fn cna_texture2d_save_file(
+        argument0: CNA_Handle,
+        argument1: CNA_TextureImageFormat,
+        argument2: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_game_clear(argument0: CNA_Handle, argument1: CNA_Color) -> CNA_Result;
+    pub fn cna_game_get_target_fps_ext(argument0: CNA_Handle, argument1: *mut f64) -> CNA_Result;
+    pub fn cna_game_get_target_ms_frame_time_ext(
+        argument0: CNA_Handle,
+        argument1: *mut f64,
+    ) -> CNA_Result;
+    pub fn cna_game_fps_to_milliseconds_per_frame_ext(
+        argument0: i32,
+        argument1: *mut f64,
+    ) -> CNA_Result;
+    pub fn cna_game_get_run_application_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_game_set_run_application_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_game_launch_parameters_get_count(
+        argument0: CNA_Handle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_game_launch_parameters_contains_key(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_game_launch_parameters_get_value_size(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_game_launch_parameters_copy_value(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_game_launch_parameters_get_key_size(
+        argument0: CNA_Handle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_game_launch_parameters_copy_key(
+        argument0: CNA_Handle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_game_launch_parameters_add(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_game_launch_parameters_parse_ext(
+        argument0: CNA_Handle,
+        argument1: *const CNA_StringView,
+        argument2: u64,
+    ) -> CNA_Result;
+    pub fn cna_title_location_get_path_size(
+        argument0: CNA_Handle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_title_location_copy_path(
+        argument0: CNA_Handle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_title_location_set_path_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_title_container_read_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut u8,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
 }

@@ -126,3 +126,10 @@ impl GraphicsResource for OcclusionQuery {
 impl Drop for OcclusionQuery {
     fn drop(&mut self) {}
 }
+
+
+impl crate::extensions::graphics_resource::HasResourceState for OcclusionQuery {
+    fn resource_state(&self) -> &super::resource::ResourceState {
+        &self.state
+    }
+}

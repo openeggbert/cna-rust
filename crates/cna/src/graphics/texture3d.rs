@@ -454,3 +454,10 @@ impl ContentLoadable for Texture3D {
         Some(Arc::clone(value) as Arc<dyn ContentDisposable>)
     }
 }
+
+
+impl crate::extensions::graphics_resource::HasResourceState for Texture3D {
+    fn resource_state(&self) -> &super::resource::ResourceState {
+        &self.state
+    }
+}

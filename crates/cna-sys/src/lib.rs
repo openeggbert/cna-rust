@@ -750,6 +750,13 @@ pub struct CNA_GamePadTouchpadFinger {
 }
 pub type CNA_GraphicsDeviceEventRegistrationHandle = CNA_Handle;
 
+/// `graphics_resource.h`: an opaque caller token carried on a resource and
+/// reported back by the device's ResourceDestroyed event.
+pub type CNA_GraphicsResourceTag = u64;
+pub type CNA_GraphicsResourceEventRegistrationHandle = CNA_Handle;
+pub type CNA_GraphicsResourceDisposingCallback =
+    Option<unsafe extern "C" fn(resource: CNA_Handle, context: *mut c_void)>;
+
 pub type CNA_GraphicsDeviceEvent = u32;
 
 pub const CNA_GRAPHICS_DEVICE_EVENT_DISPOSING: CNA_GraphicsDeviceEvent = 0;
@@ -2226,9 +2233,28 @@ pub type CNA_DepthStencilStatePreset = u32;
 pub type CNA_RasterizerStatePreset = u32;
 pub type CNA_SamplerStatePreset = u32;
 pub type CNA_Key = u32;
+
+/// `input_keyboard.h`: a bit set of `CNA_KEY_MODIFIER_*`.
+pub type CNA_KeyModifiers = u32;
+
+pub const CNA_KEY_MODIFIER_NONE: CNA_KeyModifiers = 0x0000_0000;
+pub const CNA_KEY_MODIFIER_SHIFT: CNA_KeyModifiers = 0x0000_0001;
+pub const CNA_KEY_MODIFIER_CTRL: CNA_KeyModifiers = 0x0000_0002;
+pub const CNA_KEY_MODIFIER_ALT: CNA_KeyModifiers = 0x0000_0004;
+pub const CNA_KEY_MODIFIER_GUI: CNA_KeyModifiers = 0x0000_0008;
+pub const CNA_KEY_MODIFIER_CAPS: CNA_KeyModifiers = 0x0000_0010;
+pub const CNA_KEY_MODIFIER_NUM: CNA_KeyModifiers = 0x0000_0020;
+pub const CNA_KEY_MODIFIER_SCROLL: CNA_KeyModifiers = 0x0000_0040;
+pub const CNA_KEY_MODIFIER_MODE: CNA_KeyModifiers = 0x0000_0080;
+pub const CNA_KEY_MODIFIER_ALL: CNA_KeyModifiers = 0x0000_00FF;
 pub type CNA_MouseButtonFlags = u32;
 pub type CNA_PlayerIndex = u32;
 pub type CNA_GamePadDeadZone = u32;
+
+/// `input_mouse.h`: an owned registration on the process-wide clicked event.
+pub type CNA_MouseEventRegistrationHandle = CNA_Handle;
+pub type CNA_MouseClickedCallback =
+    Option<unsafe extern "C" fn(button: i32, context: *mut c_void)>;
 pub type CNA_GamePadButtonFlags = u32;
 pub type CNA_GamePadType = u32;
 pub type CNA_TouchLocationState = u32;
@@ -3133,6 +3159,25 @@ pub struct CNA_VideoFrameEXT {
     pub presentation_time: f64,
     pub available: CNA_Bool,
     pub reserved: [u8; 3],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_TextureInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub level_count: u32,
+    pub format: CNA_SurfaceFormat,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_Texture2DStorageInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub has_renderer: CNA_Bool,
+    pub has_cpu_shadow: CNA_Bool,
+    pub reserved: [u8; 6],
 }
 
 #[repr(C)]
@@ -13179,3 +13224,186 @@ pub type cna_touch_panel_set_touch_device_exists_ext_fn = unsafe extern "C" fn(
     CNA_Handle, CNA_Bool,
 ) -> CNA_Result;
 pub type cna_touch_panel_update_ext_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+
+pub type cna_graphics_resource_get_graphics_device_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_graphics_resource_get_is_disposed_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_graphics_resource_get_name_byte_count_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_resource_copy_name_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_resource_set_name_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView,
+) -> CNA_Result;
+pub type cna_graphics_resource_get_string_byte_count_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_resource_copy_string_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_graphics_resource_get_tag_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_GraphicsResourceTag,
+) -> CNA_Result;
+pub type cna_graphics_resource_set_tag_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_GraphicsResourceTag,
+) -> CNA_Result;
+pub type cna_graphics_resource_dispose_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_graphics_resource_subscribe_disposing_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_GraphicsResourceDisposingCallback, *mut c_void, *mut CNA_GraphicsResourceEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_graphics_resource_unsubscribe_disposing_fn = unsafe extern "C" fn(
+    CNA_GraphicsResourceEventRegistrationHandle,
+) -> CNA_Result;
+
+pub type cna_keyboard_state_get_string_size_fn = unsafe extern "C" fn(
+    *const CNA_KeyboardState, *mut u64,
+) -> CNA_Result;
+pub type cna_keyboard_state_copy_string_fn = unsafe extern "C" fn(
+    *const CNA_KeyboardState, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_keyboard_get_key_from_scancode_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Key, *mut CNA_Key,
+) -> CNA_Result;
+pub type cna_keyboard_get_mod_state_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_KeyModifiers,
+) -> CNA_Result;
+pub type cna_keyboard_get_scancode_name_size_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Key, *mut u64,
+) -> CNA_Result;
+pub type cna_keyboard_copy_scancode_name_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Key, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_keyboard_get_scancode_from_name_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_Key,
+) -> CNA_Result;
+pub type cna_keyboard_get_key_name_size_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Key, *mut u64,
+) -> CNA_Result;
+pub type cna_keyboard_copy_key_name_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Key, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_keyboard_get_key_from_name_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_Key,
+) -> CNA_Result;
+
+pub type cna_mouse_get_is_relative_mouse_mode_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_mouse_set_is_relative_mouse_mode_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_mouse_set_capture_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Bool, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_mouse_get_global_position_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut i32, *mut i32,
+) -> CNA_Result;
+pub type cna_mouse_warp_global_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, i32, i32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_mouse_subscribe_clicked_ext_fn = unsafe extern "C" fn(
+    CNA_MouseClickedCallback, *mut c_void, *mut CNA_MouseEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_mouse_unsubscribe_clicked_ext_fn = unsafe extern "C" fn(
+    CNA_MouseEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_mouse_raise_clicked_ext_fn = unsafe extern "C" fn(CNA_Handle, i32) -> CNA_Result;
+pub type cna_mouse_reset_for_tests_ext_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_gamepad_apply_dead_zone_fn = unsafe extern "C" fn(
+    CNA_GamePadDeadZone, *const CNA_GamePadAnalogState, *mut CNA_GamePadAnalogState,
+) -> CNA_Result;
+
+pub type cna_texture_get_info_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_TextureInfo,
+) -> CNA_Result;
+pub type cna_texture_get_block_size_squared_fn = unsafe extern "C" fn(
+    CNA_SurfaceFormat, *mut i32,
+) -> CNA_Result;
+pub type cna_texture_get_format_size_fn = unsafe extern "C" fn(
+    CNA_SurfaceFormat, *mut i32,
+) -> CNA_Result;
+pub type cna_texture_get_pixel_store_alignment_fn = unsafe extern "C" fn(
+    CNA_SurfaceFormat, *mut i32,
+) -> CNA_Result;
+pub type cna_texture_validate_get_data_format_fn = unsafe extern "C" fn(
+    CNA_SurfaceFormat, i32,
+) -> CNA_Result;
+pub type cna_texture_validate_format_fn = unsafe extern "C" fn(CNA_SurfaceFormat) -> CNA_Result;
+pub type cna_texture2d_create_standalone_fn = unsafe extern "C" fn(*mut CNA_Handle) -> CNA_Result;
+pub type cna_texture2d_create_from_file_fn = unsafe extern "C" fn(
+    CNA_StringView, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_texture2d_create_from_file_with_device_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_texture2d_create_from_rgba8_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, u32, *const CNA_Color, u64, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_texture2d_create_cpu_only_rgba8_fn = unsafe extern "C" fn(
+    u32, u32, CNA_SurfaceFormat, *const CNA_Color, u64, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_texture2d_set_data_rgba8_bytes_fn = unsafe extern "C" fn(
+    CNA_Handle, *const u8, u64,
+) -> CNA_Result;
+pub type cna_texture2d_get_storage_info_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Texture2DStorageInfo,
+) -> CNA_Result;
+pub type cna_texture2d_save_file_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_TextureImageFormat, CNA_StringView,
+) -> CNA_Result;
+
+pub type cna_game_clear_fn = unsafe extern "C" fn(CNA_Handle, CNA_Color) -> CNA_Result;
+pub type cna_game_get_target_fps_ext_fn = unsafe extern "C" fn(CNA_Handle, *mut f64) -> CNA_Result;
+pub type cna_game_get_target_ms_frame_time_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut f64,
+) -> CNA_Result;
+pub type cna_game_fps_to_milliseconds_per_frame_ext_fn = unsafe extern "C" fn(
+    i32, *mut f64,
+) -> CNA_Result;
+pub type cna_game_get_run_application_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_game_set_run_application_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_game_launch_parameters_get_count_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut u64,
+) -> CNA_Result;
+pub type cna_game_launch_parameters_contains_key_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_game_launch_parameters_get_value_size_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut u64,
+) -> CNA_Result;
+pub type cna_game_launch_parameters_copy_value_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_game_launch_parameters_get_key_size_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_game_launch_parameters_copy_key_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_game_launch_parameters_add_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, CNA_StringView,
+) -> CNA_Result;
+pub type cna_game_launch_parameters_parse_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *const CNA_StringView, u64,
+) -> CNA_Result;
+pub type cna_title_location_get_path_size_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut u64,
+) -> CNA_Result;
+pub type cna_title_location_copy_path_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_title_location_set_path_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView,
+) -> CNA_Result;
+pub type cna_title_container_read_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut u8, u64, *mut u64,
+) -> CNA_Result;

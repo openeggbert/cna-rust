@@ -1809,3 +1809,10 @@ fn texture_handle(texture: &dyn Texture, device: &GraphicsDevice) -> Result<sys:
         ))
     }
 }
+
+
+impl crate::extensions::graphics_resource::HasResourceState for Effect {
+    fn resource_state(&self) -> &super::resource::ResourceState {
+        &self.state
+    }
+}

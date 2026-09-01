@@ -613,3 +613,10 @@ impl Drop for Texture2D {
         let _ = self.state.dispose_native();
     }
 }
+
+
+impl crate::extensions::graphics_resource::HasResourceState for Texture2D {
+    fn resource_state(&self) -> &super::resource::ResourceState {
+        &self.state
+    }
+}

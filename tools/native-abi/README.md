@@ -1,8 +1,7 @@
 # CNA native ABI verification
 
 `bindings.json` inventories the reviewed declarations used by the implemented
-Rust projection in `cna-rust-sys`, including the qualified Framework device
-management, Touch, Storage, Audio/XACT, and Media/Video routes. The verifier uses canonical
+Rust projection in `cna-rust-sys`. The verifier uses canonical
 CNA headers plus Clang's AST as the C prototype authority and compares every
 reviewed function with its Rust function-pointer alias. It checks return and
 parameter types, count, scalar width/signedness, pointer depth/constness where
@@ -23,22 +22,27 @@ python3 tools/native-abi/verify.py \
 Current reviewed ABI-0.21 evidence is:
 
 ```text
-reviewed functions                  1326
-prototype functions checked         1326
-prototype type measurements         4574
-layout types                          98
-callback signatures                   19
-constants                            665
-all C/Rust measurements             1845
-symbol acquisitions                 1119
+reviewed functions                  3072
+prototype functions checked         3072
+prototype type measurements        10961
+layout types                         187
+callback signatures                   39
+constants                            902
+all C/Rust measurements             3174
+symbol acquisitions                 3078
 symbol type mismatches                 0
 mismatches                             0
+unaudited declarations                 0
 ```
 
-The 1,326-function slice is intentionally smaller than CNA's 4,054 exported C
+Measured 2026-09-01 against `cnanext/cmake-build-opengles3`, built from cnanext
+`35268971c826d48ec3d40939e9b34a2b0595f94b`.
+
+The 3,072-function slice is intentionally smaller than CNA's 4,054 exported C
 functions. It is a reviewed foundation, not a completeness claim; every
 canonical route outside it carries an explicit classification in
-`tools/c-api-inventory/classification.json`. Every new safe native facade route
+`tools/c-api-inventory/classification.json`, and the census gates on there
+being no route without one. Every new safe native facade route
 must add its raw declaration and enter this manifest. The version gate follows
 CNA's own `0.x` policy from `docs/c-api/ABI_VERSIONING.md`: the checked library
 must report exactly minor 21, because a `0.x` minor bump is a breaking change

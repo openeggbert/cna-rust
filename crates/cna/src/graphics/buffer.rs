@@ -1528,3 +1528,16 @@ fn validate_index_transfer(
     }
     Ok(range)
 }
+
+
+impl crate::extensions::graphics_resource::HasResourceState for IndexBuffer {
+    fn resource_state(&self) -> &super::resource::ResourceState {
+        &self.state
+    }
+}
+
+impl crate::extensions::graphics_resource::HasResourceState for VertexBuffer {
+    fn resource_state(&self) -> &super::resource::ResourceState {
+        &self.state
+    }
+}

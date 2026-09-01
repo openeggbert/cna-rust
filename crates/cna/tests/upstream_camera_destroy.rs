@@ -21,7 +21,7 @@ use std::process::Command;
 
 use cna::extensions::devices::Camera;
 use cna::Microsoft::Xna::Framework::{Game, GameContext};
-use cna::{run_for_frames, GameState, GameStateAccess, Result};
+use cna::{run_for_frames, CnaError, ErrorCategory, GameState, GameStateAccess, Result};
 
 /// The env var that tells the child which half of the sequence to run.
 const STAGE: &str = "CNA_RUST_CAMERA_REPRO_STAGE";
@@ -41,7 +41,18 @@ impl Game for CameraGame {
         let stage = std::env::var(STAGE).unwrap_or_default();
         // Baseline: a test-backend camera, used and then destroyed, with
         // nothing consulting the platform list afterwards.
-        let camera = Camera::with_test_backend(game)?;
+        // An artifact built without CNA_DEVICES has no camera layer at all.
+        // Say so and stop: there is nothing here to measure, and reporting it
+        // as a dangling override would be a lie about a build that cannot
+        // dangle anything.
+        let camera = match Camera::with_test_backend(game) {
+            Ok(camera) => camera,
+            Err(CnaError::Native { category: ErrorCategory::NotSupported, ref message, .. }) => {
+                println!("REPRO: no device layer -- {message}");
+                return Ok(());
+            }
+            Err(error) => return Err(error),
+        };
         camera.set_test_state(cna::extensions::devices::CameraState::Ready)?;
         println!("REPRO: created, state={:?}", camera.state()?);
         camera.release()?;
@@ -104,6 +115,17 @@ fn a_destroyed_test_camera_leaves_the_platform_override_dangling() {
     }
 
     let (_, baseline_status, baseline_text) = &outcomes[0];
+    if baseline_text.contains("REPRO: no device layer") {
+        println!(
+            "this artifact was built without the extended device layer, so there is no \
+             camera to destroy; RUST-UPSTREAM-020 is measured on an artifact that has one"
+        );
+        assert!(
+            baseline_status.success(),
+            "an artifact without the device layer must still refuse cleanly: {baseline_status:?}"
+        );
+        return;
+    }
     assert!(
         baseline_text.contains("REPRO: destroyed"),
         "the baseline created and destroyed a test-backend camera"

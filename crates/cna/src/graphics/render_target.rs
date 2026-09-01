@@ -587,3 +587,16 @@ macro_rules! render_target_traits {
 
 render_target_traits!(RenderTarget2D, Texture2DBase);
 render_target_traits!(RenderTargetCube, TextureCubeBase);
+
+
+impl crate::extensions::graphics_resource::HasResourceState for RenderTarget2D {
+    fn resource_state(&self) -> &super::resource::ResourceState {
+        &self.state
+    }
+}
+
+impl crate::extensions::graphics_resource::HasResourceState for RenderTargetCube {
+    fn resource_state(&self) -> &super::resource::ResourceState {
+        &self.state
+    }
+}

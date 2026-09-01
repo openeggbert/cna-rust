@@ -36,6 +36,18 @@ macro_rules! xna_keys {
         const XNA_KEYS: &[(Keys, i32)] = &[$((Keys::$name, $value)),+];
 
         impl Keys {
+            /// The key a `CNA_Key` names, or `None` when it is outside XNA's set.
+            ///
+            /// `Keys::None` is a real member of the enum -- XNA gives it the
+            /// value 0 -- so it is returned as `Some(Keys::None)` here, not
+            /// folded into `None`. The layout routes that use CNA's canonical
+            /// none value as "there is no such key" do that folding themselves,
+            /// because it is their contract rather than this conversion's.
+            #[must_use]
+            pub fn from_key_code(code: cna_sys::CNA_Key) -> Option<Self> {
+                i32::try_from(code).ok().and_then(Self::from_code)
+            }
+
             fn from_code(code: i32) -> Option<Self> {
                 match code {
                     $($value => Some(Self::$name),)+
@@ -246,6 +258,18 @@ impl KeyboardState {
     const fn empty() -> Self {
         Self {
             pressed_key_words: [0; 4],
+        }
+    }
+
+    /// The native snapshot this value stands for.
+    ///
+    /// `input_keyboard.h`'s value routes take the struct rather than a handle,
+    /// so a Rust-built state can be handed to them directly.
+    pub(crate) fn to_native(self) -> sys::CNA_KeyboardState {
+        sys::CNA_KeyboardState {
+            struct_size: size_of::<sys::CNA_KeyboardState>() as u32,
+            struct_version: 1,
+            pressed_key_words: self.pressed_key_words,
         }
     }
 

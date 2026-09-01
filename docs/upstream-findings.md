@@ -615,3 +615,95 @@ on its own. The doc comment states the anomaly rather than smoothing it over,
 because a caller who reaches past the binding needs to know. The measurement
 above is asserted, so a change of behaviour upstream fails the test rather than
 passing silently.
+
+---
+
+## RUST-UPSTREAM-026 — `cna_game_launch_parameters_add` neither adds-or-replaces nor refuses
+
+| | |
+|---|---|
+| Symbols | `cna_game_launch_parameters_add` |
+| Dependency | cnanext `35268971c826d48ec3d40939e9b34a2b0595f94b`, ABI 0.21.0 |
+| Artifact | Renderer-independent; measured on `cmake-build-headless` |
+| Severity | Contract mismatch that loses a caller's write silently and reports success |
+| Blocks | Nothing. The binding reports the behaviour as measured |
+| Last measured | 2026-09-01, reproduces |
+
+### Three answers to one question
+
+The header says:
+
+> `@brief` Adds **or replaces** one launch parameter.
+
+The implementation does not replace. `cna_game_launch_parameters_add` calls
+`LaunchParameters::Add`, which is:
+
+```cpp
+void LaunchParameters::Add(const std::string& key, const std::string& value)
+{
+    // FNA's Dictionary<string,string>.Add throws on duplicate key; emplace silently ignores it.
+    // Parse always guards with ContainsKey first, so this deviation is safe in practice.
+    emplace(key, value);
+}
+```
+
+`emplace` keeps the value already there. And XNA, which both are modelled on,
+does a third thing: `Dictionary<string, string>.Add` throws
+`ArgumentException` on a duplicate key.
+
+So the same operation has three different contracts:
+
+| | duplicate key |
+|---|---|
+| XNA / FNA | throws |
+| CNA's C++ `LaunchParameters::Add` | keeps the first, silently |
+| CNA's C header | says it replaces |
+
+Measured from Rust — add `difficulty=hard`, then add `difficulty=easy`:
+
+```text
+CNA_RESULT_SUCCESS both times; the value afterwards is "hard"
+```
+
+The second call reports success and does nothing. A C caller has no way to
+overwrite a parameter, and no way to learn that their write was dropped.
+
+### The comment's own reasoning does not cover this route
+
+The deviation is deliberate and annotated, and the annotation's argument is
+that `Parse` guards with `ContainsKey` first, so `emplace` and a throwing `Add`
+behave identically *there*. That is true of `Parse`. It is not true of
+`cna_game_launch_parameters_add`, which is a public C entry point reaching the
+same method with no guard in front of it — and the header in front of *it*
+promises the opposite behaviour again.
+
+### Why this is CNA rather than the binding
+
+The header text, the C entry point and the C++ method are all CNA's, and they
+disagree with each other. A binding can only report one of them.
+
+### What a fix looks like
+
+Pick one and make the other two agree:
+
+- **Replace**, as the header says: use `insert_or_assign` in the C entry point
+  or in `Add`. This is the most useful for a C caller, and the header already
+  documents it.
+- **Or refuse**, as XNA does: answer `CNA_RESULT_INVALID_STATE` for a key
+  already present, and say so in the header. This keeps FNA parity and still
+  lets a caller find out.
+
+Either way the current combination — succeed, do nothing, say nothing — is the
+one answer that gives the caller no signal at all.
+
+### Status in the binding
+
+`NativeLaunchParameters::add` documents the measured behaviour, not the
+header's. `crates/cna/tests/extensions_game_runtime.rs` asserts that a second
+add keeps the first value, so a fix upstream fails the test and says so.
+
+The XNA-shaped Rust dictionary in `crates/cna/src/game/services.rs` is
+unaffected and keeps XNA's refusal: `LaunchParametersExt::Add` returns an error
+for a duplicate key, which is the third behaviour and the correct one for that
+type. The two dictionaries are separate objects and this finding is about
+CNA's.

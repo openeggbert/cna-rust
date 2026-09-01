@@ -21,7 +21,7 @@ use cna::extensions::graphics_device_ext::{
 use cna::Microsoft::Xna::Framework::Graphics::{
     GraphicsDevice, GraphicsProfile, PresentationParameters, PrimitiveType, SurfaceFormat,
 };
-use cna::Microsoft::Xna::Framework::{Color, GraphicsDeviceInformation};
+use cna::Microsoft::Xna::Framework::GraphicsDeviceInformation;
 use cna::{CnaError, ErrorCategory};
 
 fn device() -> Option<GraphicsDevice> {

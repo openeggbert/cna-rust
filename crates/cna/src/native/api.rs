@@ -189,6 +189,21 @@ pub(crate) struct Native {
     pub(super) texture2d_get_encoded_byte_count: sys::cna_texture2d_get_encoded_byte_count_fn,
     pub(super) texture2d_copy_encoded: sys::cna_texture2d_copy_encoded_fn,
     pub(super) texture2d_destroy: sys::cna_texture2d_destroy_fn,
+    // `graphics_resource.h`: the XNA base every graphics resource shares.
+    // Kept on Native rather than in a table of its own because these routes
+    // accept any resource handle, whatever kind made it.
+    pub(super) graphics_resource_get_graphics_device: sys::cna_graphics_resource_get_graphics_device_fn,
+    pub(super) graphics_resource_get_is_disposed: sys::cna_graphics_resource_get_is_disposed_fn,
+    pub(super) graphics_resource_get_name_byte_count: sys::cna_graphics_resource_get_name_byte_count_fn,
+    pub(super) graphics_resource_copy_name: sys::cna_graphics_resource_copy_name_fn,
+    pub(super) graphics_resource_set_name: sys::cna_graphics_resource_set_name_fn,
+    pub(super) graphics_resource_get_string_byte_count: sys::cna_graphics_resource_get_string_byte_count_fn,
+    pub(super) graphics_resource_copy_string: sys::cna_graphics_resource_copy_string_fn,
+    pub(super) graphics_resource_get_tag: sys::cna_graphics_resource_get_tag_fn,
+    pub(super) graphics_resource_set_tag: sys::cna_graphics_resource_set_tag_fn,
+    pub(super) graphics_resource_dispose: sys::cna_graphics_resource_dispose_fn,
+    pub(super) graphics_resource_subscribe_disposing: sys::cna_graphics_resource_subscribe_disposing_fn,
+    pub(super) graphics_resource_unsubscribe_disposing: sys::cna_graphics_resource_unsubscribe_disposing_fn,
     pub(super) texture3d_create: sys::cna_texture3d_create_fn,
     pub(super) texture3d_destroy: sys::cna_texture3d_destroy_fn,
     pub(super) texture3d_get_info: sys::cna_texture3d_get_info_fn,
@@ -584,6 +599,58 @@ pub(crate) struct Native {
     pub(super) effect_technique_collection_find: sys::cna_effect_technique_collection_find_fn,
     pub(super) keyboard_get_state: sys::cna_keyboard_get_state_fn,
     pub(super) keyboard_get_state_for_player: sys::cna_keyboard_get_state_for_player_fn,
+    pub(super) keyboard_state_get_string_size: sys::cna_keyboard_state_get_string_size_fn,
+    pub(super) keyboard_state_copy_string: sys::cna_keyboard_state_copy_string_fn,
+    pub(super) keyboard_get_key_from_scancode_ext: sys::cna_keyboard_get_key_from_scancode_ext_fn,
+    pub(super) keyboard_get_mod_state_ext: sys::cna_keyboard_get_mod_state_ext_fn,
+    pub(super) keyboard_get_scancode_name_size_ext: sys::cna_keyboard_get_scancode_name_size_ext_fn,
+    pub(super) keyboard_copy_scancode_name_ext: sys::cna_keyboard_copy_scancode_name_ext_fn,
+    pub(super) keyboard_get_scancode_from_name_ext: sys::cna_keyboard_get_scancode_from_name_ext_fn,
+    pub(super) keyboard_get_key_name_size_ext: sys::cna_keyboard_get_key_name_size_ext_fn,
+    pub(super) keyboard_copy_key_name_ext: sys::cna_keyboard_copy_key_name_ext_fn,
+    pub(super) keyboard_get_key_from_name_ext: sys::cna_keyboard_get_key_from_name_ext_fn,
+    pub(super) mouse_get_is_relative_mouse_mode_ext: sys::cna_mouse_get_is_relative_mouse_mode_ext_fn,
+    pub(super) mouse_set_is_relative_mouse_mode_ext: sys::cna_mouse_set_is_relative_mouse_mode_ext_fn,
+    pub(super) mouse_set_capture_ext: sys::cna_mouse_set_capture_ext_fn,
+    pub(super) mouse_get_global_position_ext: sys::cna_mouse_get_global_position_ext_fn,
+    pub(super) mouse_warp_global_ext: sys::cna_mouse_warp_global_ext_fn,
+    pub(super) mouse_subscribe_clicked_ext: sys::cna_mouse_subscribe_clicked_ext_fn,
+    pub(super) mouse_unsubscribe_clicked_ext: sys::cna_mouse_unsubscribe_clicked_ext_fn,
+    pub(super) mouse_raise_clicked_ext: sys::cna_mouse_raise_clicked_ext_fn,
+    pub(super) mouse_reset_for_tests_ext: sys::cna_mouse_reset_for_tests_ext_fn,
+    pub(super) gamepad_apply_dead_zone: sys::cna_gamepad_apply_dead_zone_fn,
+    pub(super) texture_get_info: sys::cna_texture_get_info_fn,
+    pub(super) texture_get_block_size_squared: sys::cna_texture_get_block_size_squared_fn,
+    pub(super) texture_get_format_size: sys::cna_texture_get_format_size_fn,
+    pub(super) texture_get_pixel_store_alignment: sys::cna_texture_get_pixel_store_alignment_fn,
+    pub(super) texture_validate_get_data_format: sys::cna_texture_validate_get_data_format_fn,
+    pub(super) texture_validate_format: sys::cna_texture_validate_format_fn,
+    pub(super) texture2d_create_standalone: sys::cna_texture2d_create_standalone_fn,
+    pub(super) texture2d_create_from_file: sys::cna_texture2d_create_from_file_fn,
+    pub(super) texture2d_create_from_file_with_device: sys::cna_texture2d_create_from_file_with_device_fn,
+    pub(super) texture2d_create_from_rgba8: sys::cna_texture2d_create_from_rgba8_fn,
+    pub(super) texture2d_create_cpu_only_rgba8: sys::cna_texture2d_create_cpu_only_rgba8_fn,
+    pub(super) texture2d_set_data_rgba8_bytes: sys::cna_texture2d_set_data_rgba8_bytes_fn,
+    pub(super) texture2d_get_storage_info: sys::cna_texture2d_get_storage_info_fn,
+    pub(super) texture2d_save_file: sys::cna_texture2d_save_file_fn,
+    pub(super) game_clear: sys::cna_game_clear_fn,
+    pub(super) game_get_target_fps_ext: sys::cna_game_get_target_fps_ext_fn,
+    pub(super) game_get_target_ms_frame_time_ext: sys::cna_game_get_target_ms_frame_time_ext_fn,
+    pub(super) game_fps_to_milliseconds_per_frame_ext: sys::cna_game_fps_to_milliseconds_per_frame_ext_fn,
+    pub(super) game_get_run_application_ext: sys::cna_game_get_run_application_ext_fn,
+    pub(super) game_set_run_application_ext: sys::cna_game_set_run_application_ext_fn,
+    pub(super) game_launch_parameters_get_count: sys::cna_game_launch_parameters_get_count_fn,
+    pub(super) game_launch_parameters_contains_key: sys::cna_game_launch_parameters_contains_key_fn,
+    pub(super) game_launch_parameters_get_value_size: sys::cna_game_launch_parameters_get_value_size_fn,
+    pub(super) game_launch_parameters_copy_value: sys::cna_game_launch_parameters_copy_value_fn,
+    pub(super) game_launch_parameters_get_key_size: sys::cna_game_launch_parameters_get_key_size_fn,
+    pub(super) game_launch_parameters_copy_key: sys::cna_game_launch_parameters_copy_key_fn,
+    pub(super) game_launch_parameters_add: sys::cna_game_launch_parameters_add_fn,
+    pub(super) game_launch_parameters_parse_ext: sys::cna_game_launch_parameters_parse_ext_fn,
+    pub(super) title_location_get_path_size: sys::cna_title_location_get_path_size_fn,
+    pub(super) title_location_copy_path: sys::cna_title_location_copy_path_fn,
+    pub(super) title_location_set_path_ext: sys::cna_title_location_set_path_ext_fn,
+    pub(super) title_container_read_ext: sys::cna_title_container_read_ext_fn,
     pub(super) mouse_get_state: sys::cna_mouse_get_state_fn,
     pub(super) mouse_get_window_handle: sys::cna_mouse_get_window_handle_fn,
     pub(super) mouse_set_window_handle: sys::cna_mouse_set_window_handle_fn,
@@ -1128,6 +1195,42 @@ impl Native {
                 sys::cna_texture2d_copy_encoded_fn
             ),
             texture2d_destroy: symbol!(cna_texture2d_destroy, sys::cna_texture2d_destroy_fn),
+            graphics_resource_get_graphics_device: symbol!(cna_graphics_resource_get_graphics_device,
+                sys::cna_graphics_resource_get_graphics_device_fn
+            ),
+            graphics_resource_get_is_disposed: symbol!(cna_graphics_resource_get_is_disposed,
+                sys::cna_graphics_resource_get_is_disposed_fn
+            ),
+            graphics_resource_get_name_byte_count: symbol!(cna_graphics_resource_get_name_byte_count,
+                sys::cna_graphics_resource_get_name_byte_count_fn
+            ),
+            graphics_resource_copy_name: symbol!(cna_graphics_resource_copy_name,
+                sys::cna_graphics_resource_copy_name_fn
+            ),
+            graphics_resource_set_name: symbol!(cna_graphics_resource_set_name,
+                sys::cna_graphics_resource_set_name_fn
+            ),
+            graphics_resource_get_string_byte_count: symbol!(cna_graphics_resource_get_string_byte_count,
+                sys::cna_graphics_resource_get_string_byte_count_fn
+            ),
+            graphics_resource_copy_string: symbol!(cna_graphics_resource_copy_string,
+                sys::cna_graphics_resource_copy_string_fn
+            ),
+            graphics_resource_get_tag: symbol!(cna_graphics_resource_get_tag,
+                sys::cna_graphics_resource_get_tag_fn
+            ),
+            graphics_resource_set_tag: symbol!(cna_graphics_resource_set_tag,
+                sys::cna_graphics_resource_set_tag_fn
+            ),
+            graphics_resource_dispose: symbol!(cna_graphics_resource_dispose,
+                sys::cna_graphics_resource_dispose_fn
+            ),
+            graphics_resource_subscribe_disposing: symbol!(cna_graphics_resource_subscribe_disposing,
+                sys::cna_graphics_resource_subscribe_disposing_fn
+            ),
+            graphics_resource_unsubscribe_disposing: symbol!(cna_graphics_resource_unsubscribe_disposing,
+                sys::cna_graphics_resource_unsubscribe_disposing_fn
+            ),
             texture3d_create: symbol!(cna_texture3d_create, sys::cna_texture3d_create_fn),
             texture3d_destroy: symbol!(cna_texture3d_destroy, sys::cna_texture3d_destroy_fn),
             texture3d_get_info: symbol!(cna_texture3d_get_info, sys::cna_texture3d_get_info_fn),
@@ -1898,6 +2001,162 @@ impl Native {
             keyboard_get_state: symbol!(cna_keyboard_get_state, sys::cna_keyboard_get_state_fn),
             keyboard_get_state_for_player: symbol!(cna_keyboard_get_state_for_player,
                 sys::cna_keyboard_get_state_for_player_fn
+            ),
+            keyboard_state_get_string_size: symbol!(cna_keyboard_state_get_string_size,
+                sys::cna_keyboard_state_get_string_size_fn
+            ),
+            keyboard_state_copy_string: symbol!(cna_keyboard_state_copy_string,
+                sys::cna_keyboard_state_copy_string_fn
+            ),
+            keyboard_get_key_from_scancode_ext: symbol!(cna_keyboard_get_key_from_scancode_ext,
+                sys::cna_keyboard_get_key_from_scancode_ext_fn
+            ),
+            keyboard_get_mod_state_ext: symbol!(cna_keyboard_get_mod_state_ext,
+                sys::cna_keyboard_get_mod_state_ext_fn
+            ),
+            keyboard_get_scancode_name_size_ext: symbol!(cna_keyboard_get_scancode_name_size_ext,
+                sys::cna_keyboard_get_scancode_name_size_ext_fn
+            ),
+            keyboard_copy_scancode_name_ext: symbol!(cna_keyboard_copy_scancode_name_ext,
+                sys::cna_keyboard_copy_scancode_name_ext_fn
+            ),
+            keyboard_get_scancode_from_name_ext: symbol!(cna_keyboard_get_scancode_from_name_ext,
+                sys::cna_keyboard_get_scancode_from_name_ext_fn
+            ),
+            keyboard_get_key_name_size_ext: symbol!(cna_keyboard_get_key_name_size_ext,
+                sys::cna_keyboard_get_key_name_size_ext_fn
+            ),
+            keyboard_copy_key_name_ext: symbol!(cna_keyboard_copy_key_name_ext,
+                sys::cna_keyboard_copy_key_name_ext_fn
+            ),
+            keyboard_get_key_from_name_ext: symbol!(cna_keyboard_get_key_from_name_ext,
+                sys::cna_keyboard_get_key_from_name_ext_fn
+            ),
+            mouse_get_is_relative_mouse_mode_ext: symbol!(cna_mouse_get_is_relative_mouse_mode_ext,
+                sys::cna_mouse_get_is_relative_mouse_mode_ext_fn
+            ),
+            mouse_set_is_relative_mouse_mode_ext: symbol!(cna_mouse_set_is_relative_mouse_mode_ext,
+                sys::cna_mouse_set_is_relative_mouse_mode_ext_fn
+            ),
+            mouse_set_capture_ext: symbol!(cna_mouse_set_capture_ext,
+                sys::cna_mouse_set_capture_ext_fn
+            ),
+            mouse_get_global_position_ext: symbol!(cna_mouse_get_global_position_ext,
+                sys::cna_mouse_get_global_position_ext_fn
+            ),
+            mouse_warp_global_ext: symbol!(cna_mouse_warp_global_ext,
+                sys::cna_mouse_warp_global_ext_fn
+            ),
+            mouse_subscribe_clicked_ext: symbol!(cna_mouse_subscribe_clicked_ext,
+                sys::cna_mouse_subscribe_clicked_ext_fn
+            ),
+            mouse_unsubscribe_clicked_ext: symbol!(cna_mouse_unsubscribe_clicked_ext,
+                sys::cna_mouse_unsubscribe_clicked_ext_fn
+            ),
+            mouse_raise_clicked_ext: symbol!(cna_mouse_raise_clicked_ext,
+                sys::cna_mouse_raise_clicked_ext_fn
+            ),
+            mouse_reset_for_tests_ext: symbol!(cna_mouse_reset_for_tests_ext,
+                sys::cna_mouse_reset_for_tests_ext_fn
+            ),
+            gamepad_apply_dead_zone: symbol!(cna_gamepad_apply_dead_zone,
+                sys::cna_gamepad_apply_dead_zone_fn
+            ),
+            texture_get_info: symbol!(cna_texture_get_info,
+                sys::cna_texture_get_info_fn
+            ),
+            texture_get_block_size_squared: symbol!(cna_texture_get_block_size_squared,
+                sys::cna_texture_get_block_size_squared_fn
+            ),
+            texture_get_format_size: symbol!(cna_texture_get_format_size,
+                sys::cna_texture_get_format_size_fn
+            ),
+            texture_get_pixel_store_alignment: symbol!(cna_texture_get_pixel_store_alignment,
+                sys::cna_texture_get_pixel_store_alignment_fn
+            ),
+            texture_validate_get_data_format: symbol!(cna_texture_validate_get_data_format,
+                sys::cna_texture_validate_get_data_format_fn
+            ),
+            texture_validate_format: symbol!(cna_texture_validate_format,
+                sys::cna_texture_validate_format_fn
+            ),
+            texture2d_create_standalone: symbol!(cna_texture2d_create_standalone,
+                sys::cna_texture2d_create_standalone_fn
+            ),
+            texture2d_create_from_file: symbol!(cna_texture2d_create_from_file,
+                sys::cna_texture2d_create_from_file_fn
+            ),
+            texture2d_create_from_file_with_device: symbol!(cna_texture2d_create_from_file_with_device,
+                sys::cna_texture2d_create_from_file_with_device_fn
+            ),
+            texture2d_create_from_rgba8: symbol!(cna_texture2d_create_from_rgba8,
+                sys::cna_texture2d_create_from_rgba8_fn
+            ),
+            texture2d_create_cpu_only_rgba8: symbol!(cna_texture2d_create_cpu_only_rgba8,
+                sys::cna_texture2d_create_cpu_only_rgba8_fn
+            ),
+            texture2d_set_data_rgba8_bytes: symbol!(cna_texture2d_set_data_rgba8_bytes,
+                sys::cna_texture2d_set_data_rgba8_bytes_fn
+            ),
+            texture2d_get_storage_info: symbol!(cna_texture2d_get_storage_info,
+                sys::cna_texture2d_get_storage_info_fn
+            ),
+            texture2d_save_file: symbol!(cna_texture2d_save_file,
+                sys::cna_texture2d_save_file_fn
+            ),
+            game_clear: symbol!(cna_game_clear,
+                sys::cna_game_clear_fn
+            ),
+            game_get_target_fps_ext: symbol!(cna_game_get_target_fps_ext,
+                sys::cna_game_get_target_fps_ext_fn
+            ),
+            game_get_target_ms_frame_time_ext: symbol!(cna_game_get_target_ms_frame_time_ext,
+                sys::cna_game_get_target_ms_frame_time_ext_fn
+            ),
+            game_fps_to_milliseconds_per_frame_ext: symbol!(cna_game_fps_to_milliseconds_per_frame_ext,
+                sys::cna_game_fps_to_milliseconds_per_frame_ext_fn
+            ),
+            game_get_run_application_ext: symbol!(cna_game_get_run_application_ext,
+                sys::cna_game_get_run_application_ext_fn
+            ),
+            game_set_run_application_ext: symbol!(cna_game_set_run_application_ext,
+                sys::cna_game_set_run_application_ext_fn
+            ),
+            game_launch_parameters_get_count: symbol!(cna_game_launch_parameters_get_count,
+                sys::cna_game_launch_parameters_get_count_fn
+            ),
+            game_launch_parameters_contains_key: symbol!(cna_game_launch_parameters_contains_key,
+                sys::cna_game_launch_parameters_contains_key_fn
+            ),
+            game_launch_parameters_get_value_size: symbol!(cna_game_launch_parameters_get_value_size,
+                sys::cna_game_launch_parameters_get_value_size_fn
+            ),
+            game_launch_parameters_copy_value: symbol!(cna_game_launch_parameters_copy_value,
+                sys::cna_game_launch_parameters_copy_value_fn
+            ),
+            game_launch_parameters_get_key_size: symbol!(cna_game_launch_parameters_get_key_size,
+                sys::cna_game_launch_parameters_get_key_size_fn
+            ),
+            game_launch_parameters_copy_key: symbol!(cna_game_launch_parameters_copy_key,
+                sys::cna_game_launch_parameters_copy_key_fn
+            ),
+            game_launch_parameters_add: symbol!(cna_game_launch_parameters_add,
+                sys::cna_game_launch_parameters_add_fn
+            ),
+            game_launch_parameters_parse_ext: symbol!(cna_game_launch_parameters_parse_ext,
+                sys::cna_game_launch_parameters_parse_ext_fn
+            ),
+            title_location_get_path_size: symbol!(cna_title_location_get_path_size,
+                sys::cna_title_location_get_path_size_fn
+            ),
+            title_location_copy_path: symbol!(cna_title_location_copy_path,
+                sys::cna_title_location_copy_path_fn
+            ),
+            title_location_set_path_ext: symbol!(cna_title_location_set_path_ext,
+                sys::cna_title_location_set_path_ext_fn
+            ),
+            title_container_read_ext: symbol!(cna_title_container_read_ext,
+                sys::cna_title_container_read_ext_fn
             ),
             mouse_get_state: symbol!(cna_mouse_get_state, sys::cna_mouse_get_state_fn),
             mouse_get_window_handle: symbol!(cna_mouse_get_window_handle,

@@ -311,14 +311,6 @@
     }
   ],
   "overrides": {
-    "cna_game_get_content_manager_ext": {
-      "category": "STRICT_XNA_BACKING",
-      "rationale": "backs XNA Game.Content"
-    },
-    "cna_game_set_content_manager_ext": {
-      "category": "STRICT_XNA_BACKING",
-      "rationale": "backs XNA Game.Content"
-    },
     "cna_game_services_contains_ext": {
       "category": "STRICT_XNA_BACKING",
       "rationale": "backs XNA GameServiceContainer lookup"
@@ -326,34 +318,6 @@
     "cna_game_services_remove_ext": {
       "category": "STRICT_XNA_BACKING",
       "rationale": "backs XNA GameServiceContainer.RemoveService"
-    },
-    "cna_model_get_content_tag_dictionary_ext": {
-      "category": "STRICT_XNA_BACKING",
-      "rationale": "backs XNA Model.Tag written by a content processor"
-    },
-    "cna_model_get_content_tag_foreign_object_ext": {
-      "category": "STRICT_XNA_BACKING",
-      "rationale": "backs XNA Model.Tag written by a content processor"
-    },
-    "cna_title_container_read_ext": {
-      "category": "STRICT_XNA_BACKING",
-      "rationale": "backs XNA TitleContainer.OpenStream"
-    },
-    "cna_object_dictionary_ext_get_runtime_type_name_size": {
-      "category": "CNA_EXTENSION_BACKING",
-      "rationale": "not reflection: the retained managed identity of a processor-written Model.Tag, which upstream contrasts with the diagnostic C++ spelling and which a reader must branch on"
-    },
-    "cna_object_dictionary_ext_copy_runtime_type_name": {
-      "category": "CNA_EXTENSION_BACKING",
-      "rationale": "not reflection: the retained managed identity of a processor-written Model.Tag, which upstream contrasts with the diagnostic C++ spelling and which a reader must branch on"
-    },
-    "cna_cnb_cnj_result_get_asset_type_name_size": {
-      "category": "CNA_EXTENSION_BACKING",
-      "rationale": "not reflection: the compiled asset type a .cnj compile produced, which is result data"
-    },
-    "cna_cnb_cnj_result_copy_asset_type_name": {
-      "category": "CNA_EXTENSION_BACKING",
-      "rationale": "not reflection: the compiled asset type a .cnj compile produced, which is result data"
     },
     "cna_content_type_reader_get_target_type_name_size": {
       "category": "CNA_EXTENSION_BACKING",
@@ -685,6 +649,58 @@
           "Microsoft.Xna.Framework.Content."
         ],
         "evidence": "cnanext modules/*/src/Xna/*.cpp -- every GetTypeName() is a constant; crates/cna/src/content/reader.rs, which names the canonical readers directly"
+      },
+      {
+        "id": "keyboard-snapshot-is-a-rust-value",
+        "status": "DELIBERATE_NON_BINDING",
+        "names": [
+          "cna_keyboard_state_init_from_keys",
+          "cna_keyboard_state_get_key_state"
+        ],
+        "reason": "a KeyboardState is a 256-bit set, and crates/cna/src/input/mod.rs is that set: KeyboardState::new builds one from a slice of Keys and Item answers a slot, both over the same bit words CNA uses, with a to_native that hands the identical struct back for the routes that do need CNA. Binding these two would round-trip a value through C to compute what the bits already say. What is *not* in this rule is every _ext route in the same header: those ask the platform's live layout which key a scancode produces and what each is called, which no Rust code can answer, and they are bound. Nor is cna_keyboard_state_copy_string, which is CNA's ToString and is bound because the string is CNA's choice rather than the bit set's.",
+        "rustEvidence": [
+          "pub struct KeyboardState",
+          "pub fn IsKeyDown",
+          "pub fn Item",
+          "pub(crate) fn to_native"
+        ],
+        "evidence": "crates/cna/tests/extensions_keyboard_layout.rs measures the bound half against the live library, including that a snapshot Rust built is one CNA's own value routes accept"
+      },
+      {
+        "id": "input-snapshot-queries-in-rust",
+        "status": "DELIBERATE_NON_BINDING",
+        "names": [
+          "cna_keyboard_state_is_key_up",
+          "cna_keyboard_state_get_pressed_key_count",
+          "cna_keyboard_state_copy_pressed_keys",
+          "cna_gamepad_state_is_button_down",
+          "cna_gamepad_state_is_button_up",
+          "cna_touch_state_find_by_id",
+          "cna_touch_location_try_get_previous"
+        ],
+        "reason": "each of these asks a snapshot a question the snapshot already answers in Rust: KeyboardState::IsKeyUp and GetPressedKeys over the same 256 bits CNA sets, GamePadState::IsButtonDown/IsButtonUp over the same button mask, TouchCollection::FindById and TouchLocation::TryGetPreviousLocation over the collection this side owns. The snapshots are read from CNA -- cna_keyboard_get_state, cna_gamepad_get_state, cna_touch_panel_get_state are all bound -- so the values are CNA's; only the querying is Rust's, and routing a query back through C would cost a call to learn what the bits in hand already say. What is *not* in this rule is cna_gamepad_apply_dead_zone, which is CNA's canonical clamping algorithm over raw values rather than a question about a snapshot, and is bound.",
+        "rustEvidence": [
+          "pub fn IsKeyUp",
+          "pub fn GetPressedKeys",
+          "pub const fn IsButtonDown",
+          "pub const fn IsButtonUp",
+          "pub fn FindById",
+          "pub fn TryGetPreviousLocation"
+        ],
+        "evidence": "crates/cna/src/input/mod.rs, gamepad.rs and touch.rs; the behaviour corpus measures each against XNA's documented answers"
+      },
+      {
+        "id": "mouse-snapshot-is-a-rust-value",
+        "status": "DELIBERATE_NON_BINDING",
+        "names": [
+          "cna_mouse_state_init_from_values_ext"
+        ],
+        "reason": "a MouseState is five integers and five button flags, and crates/cna/src/input/mouse.rs already constructs one from exactly those values. The snapshots a game reads come from CNA through the bound cna_mouse_get_state; this route only builds a value, and building it in Rust costs nothing and loses nothing. Every _ext route in the same header that reads or drives the actual device -- relative mode, capture, the desktop position, the warp, the clicked event and its test hooks -- is bound.",
+        "rustEvidence": [
+          "pub struct MouseState",
+          "pub fn ToString"
+        ],
+        "evidence": "crates/cna/src/input/mouse.rs; crates/cna/tests/extensions_mouse_desktop.rs qualifies the bound half against the live library"
       }
     ],
     "overrides": {}
