@@ -1,5 +1,80 @@
 # CNA-Rust next work
 
+## 2026-09-01 — `RUST-BEHAVIOR-008`: the audio backend stopped being a blocker
+
+The surface milestone left the repository locally exhausted, with six external
+conditions standing between it and more work. One of them moved.
+
+```text
+CNANEXT_HEAD=7712534d3d22c7e284714e0e87afebba3f3cb472   # unchanged
+SHARP_RUNTIMENEXT_HEAD=9cc96cd57cde394940cc24d58743edf9bf63d3fb   # unchanged
+
+SDL_DRIVER            dummy  ->  pulseaudio
+PLAYBACK_DEVICES          0  ->  4
+DEVICE_OPEN_MS            -      7, 7, 12, 8, 8    (five runs)
+BUFFER_DRAIN          never  ->  96000 bytes in 343 ms
+
+                                silence   1 kHz   4 kHz
+PEAK_BIN                              -      12      46
+EXPECTED_BIN round(hz*512/44100)      -      12      46
+LOUD_BINS (within a tenth)            0       4       4
+PEAK_SAMPLE (0.8 authored @ vol 0.15) 0  0.119994  0.119994
+```
+
+Ten upstream findings, two dependencies, and five other external blockers were
+checked and none of them moved; nothing was re-run against byte-identical code.
+
+### What the blocker actually was
+
+`RUST-BEHAVIOR-008` said the visualization spectrum could not be qualified
+because this host's PulseAudio route could not wake its mainloop. The route is
+open now, so the spectrum was measured against a real device — and measuring it
+showed the recorded diagnosis had been half wrong.
+
+SDL's `dummy` driver returns **the same three rows**. Its device still consumes
+its buffer on a callback thread at the real-time rate, so CNA's `OnPostMix` tap
+runs and the 512-point FFT is computed exactly as on real hardware. The tap and
+the transform were never blocked.
+
+What produced every earlier all-zero reading was the fixture: the ownership
+stress plays 160 samples of **pure silence**, and a correct spectrum of silence
+is zero. The blocker was recorded against the backend and belonged, in part, to
+the WAV.
+
+So `crates/cna/tests/audio_backend_real.rs` runs both drivers and requires them
+to agree. That keeps it meaningful on a host with no audio device, and it would
+catch a regression that made the two diverge. What the real driver does carry,
+and dummy cannot, is that the samples reach a physical device — which is what
+lifts `BACKEND_BLOCKED`, not what makes the spectrum correct.
+
+### Why the numbers are falsifiable
+
+A spectrum that is merely non-zero proves nothing. Three properties pin it to
+this signal: a silent authored fixture must still read as all zeros; a tone must
+peak in the bin its own frequency selects, which is fixed because CNA's mixer
+always requests 44,100 Hz whatever the device offers; and the captured peak must
+be the authored amplitude scaled by `MediaPlayer.Volume`, because the tap sits
+after the mix. Four planted defects, each caught by one of those and by nothing
+else — including a synthesised decaying spectrum, the defect that would make a
+dead backend look alive, which only the silent control rejects.
+
+### Do next
+
+Nothing here is locally actionable. What remains is external:
+
+1. **Microphone capture** is newly *reachable* — three real capture devices
+   answer on `pulseaudio` — but qualifying it means recording real audio on the
+   host, which is the operator's call to authorise. `HARDWARE_PENDING`.
+2. **The other five standing blockers.** A wasm toolchain for
+   `RUST-PLATFORM-003` — re-measured, and now not even `core` exists for any
+   wasm target, with no `rustup` and no wasm sysroot anywhere on the filesystem;
+   a macOS host for `RUST-PLATFORM-002`; a second machine for
+   `RUST-BEHAVIOR-012`; a legally redistributable video fixture for
+   `RUST-BEHAVIOR-009`; publication order for `RUST-PACKAGE-003`.
+3. **The ten `RUST-UPSTREAM-*` findings**, all against unchanged cnanext code.
+4. **`RUST-XNA-004`**, the design-time Content Pipeline: a decided product
+   boundary, not a missing projection.
+
 ## 2026-09-01 — `RUST-SURFACE-001`: CNA's members leave the strict XNA types
 
 The reachability milestone left one open question, and it was a product

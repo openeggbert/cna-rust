@@ -157,9 +157,16 @@ and teardown discards that stale event before the next Game.
 
 VisualizationData owns two exact 256-float arrays. The measured C/Rust layout
 is 2,056 bytes with alignment 4 and structure version 1. Both enabled and
-disabled GetVisualizationData calls reach CNA. The dummy audio backend does
-not provide a qualified real-playback spectrum, so no samples or frequencies
-are synthesized and output qualification remains `BACKEND_BLOCKED`.
+disabled GetVisualizationData calls reach CNA. The spectrum's *content* is now
+qualified too: `RUST-BEHAVIOR-008` lifted the audio `BACKEND_BLOCKED` when SDL
+began selecting `pulseaudio` on this host, and a project-authored 1 kHz tone
+peaks in bin 12 and a 4 kHz tone in bin 46 -- `round(hz * 512 / 44100)` for
+CNA's fixed mixer rate -- with the captured peak equal to the authored
+amplitude times MediaPlayer's volume. Nothing is synthesized: a silent authored
+fixture is still required to read as an all-zero spectrum, which is what the
+earlier readings were measuring. See
+[docs/audio-xact-evidence.md](audio-xact-evidence.md#the-real-host-audio-backend).
+Video output is a separate backend and remains blocked below.
 
 ## Video and VideoPlayer
 

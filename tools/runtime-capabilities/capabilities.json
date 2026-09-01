@@ -166,10 +166,9 @@
       "capability": "Host audio backend",
       "strictComplete": true,
       "statuses": [
-        "VERIFIED_NATIVE",
-        "BACKEND_BLOCKED"
+        "VERIFIED_NATIVE"
       ],
-      "evidence": "The qualified artifact is stable with SDL's dummy driver. This sandbox's default PulseAudio route cannot wake its mainloop and is not used as playback evidence."
+      "evidence": "Re-measured for RUST-BEHAVIOR-008. SDL now selects pulseaudio on this host, enumerates its four playback devices, opens the default one in under 15 ms and drains a queued buffer at the real-time rate; five consecutive probe runs agree. The earlier reading, that the default PulseAudio route could not wake its mainloop, no longer holds, so playback evidence no longer rests on SDL's dummy driver. crates/cna/tests/audio_backend_real.rs runs the same qualification under both drivers and requires them to agree."
     },
     {
       "capability": "Album/Artist/Genre relationship graph",
@@ -267,10 +266,9 @@
       "strictComplete": true,
       "statuses": [
         "VERIFIED_MANAGED",
-        "VERIFIED_NATIVE",
-        "BACKEND_BLOCKED"
+        "VERIFIED_NATIVE"
       ],
-      "evidence": "Both fixed 256-float read-only views and the exact 2,056-byte ABI layout are verified; enabled and disabled native fill routes run on the dummy backend, which supplies no qualified real playback spectrum."
+      "evidence": "Both fixed 256-float read-only views and the exact 2,056-byte ABI layout are verified, and the spectrum itself is now measured against a real device rather than only for shape. A project-authored 1 kHz tone peaks in bin 12 and a 4 kHz tone in bin 46 -- exactly round(hz * 512 / 44100) for CNA's fixed mixer rate -- with four bins within a tenth of the peak, and the captured sample peak is 0.119994 against the 0.8 authored amplitude at volume 0.15, so the tap is measurably post-mix. The identical answer arrives on the dummy driver: SDL's dummy device still consumes its buffer on a callback thread, so OnPostMix and the 512-point FFT always ran. What the earlier all-zero readings measured was the ownership stress's 160-sample silent fixture, and a silent authored fixture is still required to read as an all-zero spectrum."
     },
     {
       "capability": "Video",
