@@ -27,7 +27,12 @@ Three rules hold throughout:
 - **Idiomatic.** These are Rust APIs, not transliterated C. The strict XNA
   hierarchy keeps XNA's PascalCase identifiers because recognizability is its
   whole point; `cna::extensions` uses ordinary Rust naming, except where an
-  existing member mirrors an XNA-shaped call.
+  existing member mirrors an XNA-shaped call. That exception is larger than it
+  reads. `RUST-SURFACE-001` moved 47 PascalCase members here from strict types
+  -- `Song::FromFile`, `Video::FromUri`, `AudioEngine::RendererText` and the
+  rest -- and kept every spelling, because renaming them would have made a
+  migration that costs one import line cost a rewrite at every call site
+  instead. New surface still gets Rust naming.
 
 ## Modules
 
@@ -438,6 +443,10 @@ import.
 | `StorageContainer` | `NativeIsDisposed` | `value.NativeIsDisposed(..)` | `use cna::extensions::storage_ext::StorageContainerExt;` then `value.NativeIsDisposed(..)` |
 
 </details>
+
+The split the census predicted held exactly: **62 snake_case methods** added by
+`extensions/`, and **47 PascalCase members** added directly to strict types by
+the media and audio milestone.
 
 30 traits for 109 members: one per strict type, except where the same question
 is asked of several types. `NativeEnumValue` covers eighteen enums because
