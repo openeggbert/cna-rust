@@ -1,0 +1,3670 @@
+{
+  "documentation": "Every CNA-only member reachable on a strict XNA type, and the extension trait that publishes it. The 109 marked movedBy RUST-SURFACE-001 were inherent members of the strict type until that milestone, and the strict verifier reported each as UNEXPECTED_MEMBER; the rest were already extension traits and are gated the same way, so that a member dropped from a trait, or quietly returned to an inherent impl, fails a build.",
+  "members": [
+    {
+      "member": "NativeIsDisposed",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Audio::AudioEngine",
+      "trait": "cna::extensions::audio_ext::NativeDisposalState"
+    },
+    {
+      "member": "RendererHashCode",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "index"
+        ],
+        "receiver": "self",
+        "returns": "Result<i32>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Audio::AudioEngine",
+      "trait": "cna::extensions::audio_ext::AudioEngineExt"
+    },
+    {
+      "member": "RendererText",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "index"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Audio::AudioEngine",
+      "trait": "cna::extensions::audio_ext::AudioEngineExt"
+    },
+    {
+      "member": "RenderersEqual",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "left",
+          "right"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Audio::AudioEngine",
+      "trait": "cna::extensions::audio_ext::AudioEngineExt"
+    },
+    {
+      "member": "cna_raised_disposing",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "bool"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Audio::AudioEngine",
+      "trait": "cna::extensions::audio_ext::NativeDisposalNotice"
+    },
+    {
+      "member": "cna_raised_disposing",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "bool"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Audio::Cue",
+      "trait": "cna::extensions::audio_ext::NativeDisposalNotice"
+    },
+    {
+      "member": "ClearBuffers",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Audio::DynamicSoundEffectInstance",
+      "trait": "cna::extensions::audio_ext::DynamicSoundEffectInstanceExt"
+    },
+    {
+      "member": "QueueInitialBuffers",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Audio::DynamicSoundEffectInstance",
+      "trait": "cna::extensions::audio_ext::DynamicSoundEffectInstanceExt"
+    },
+    {
+      "member": "SubmitFloatBuffer",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "buffer",
+          "offset",
+          "count"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Audio::DynamicSoundEffectInstance",
+      "trait": "cna::extensions::audio_ext::DynamicSoundEffectInstanceExt"
+    },
+    {
+      "member": "Update",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Audio::DynamicSoundEffectInstance",
+      "trait": "cna::extensions::audio_ext::DynamicSoundEffectInstanceExt"
+    },
+    {
+      "member": "CheckAllBuffers",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "game"
+        ],
+        "receiver": "associated",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Audio::Microphone",
+      "trait": "cna::extensions::audio_ext::MicrophoneExt"
+    },
+    {
+      "member": "NativeIsDisposed",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Audio::SoundBank",
+      "trait": "cna::extensions::audio_ext::NativeDisposalState"
+    },
+    {
+      "member": "cna_raised_disposing",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "bool"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Audio::SoundBank",
+      "trait": "cna::extensions::audio_ext::NativeDisposalNotice"
+    },
+    {
+      "member": "FromAsset",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "game",
+          "assetName"
+        ],
+        "receiver": "associated",
+        "returns": "Result<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Audio::SoundEffect",
+      "trait": "cna::extensions::audio_ext::SoundEffectExt"
+    },
+    {
+      "member": "NativeIsDisposed",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Audio::SoundEffect",
+      "trait": "cna::extensions::audio_ext::NativeDisposalState"
+    },
+    {
+      "member": "NativeIsDisposed",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Audio::SoundEffectInstance",
+      "trait": "cna::extensions::audio_ext::NativeDisposalState"
+    },
+    {
+      "member": "NativeIsDisposed",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Audio::WaveBank",
+      "trait": "cna::extensions::audio_ext::NativeDisposalState"
+    },
+    {
+      "member": "cna_raised_disposing",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "bool"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Audio::WaveBank",
+      "trait": "cna::extensions::audio_ext::NativeDisposalNotice"
+    },
+    {
+      "member": "equals",
+      "shape": {
+        "parameters": [
+          "self",
+          "other"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::GamerServices::Achievement",
+      "trait": "cna::extensions::gamer_services::AchievementExt"
+    },
+    {
+      "member": "item_at",
+      "shape": {
+        "parameters": [
+          "self",
+          "index"
+        ],
+        "receiver": "self",
+        "returns": "Result<Achievement>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::GamerServices::AchievementCollection",
+      "trait": "cna::extensions::gamer_services::AchievementCollectionExt"
+    },
+    {
+      "member": "clip_name",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::GamerServices::AvatarAnimation",
+      "trait": "cna::extensions::gamer_services::AvatarAnimationClip"
+    },
+    {
+      "member": "set_clip_name",
+      "shape": {
+        "parameters": [
+          "self",
+          "value"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::GamerServices::AvatarAnimation",
+      "trait": "cna::extensions::gamer_services::AvatarAnimationClip"
+    },
+    {
+      "member": "content_name",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::GamerServices::AvatarAnimationPreset",
+      "trait": "cna::extensions::gamer_services::AvatarContentNames"
+    },
+    {
+      "member": "content_name",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::GamerServices::AvatarBodyType",
+      "trait": "cna::extensions::gamer_services::AvatarContentNames"
+    },
+    {
+      "member": "draw_clip",
+      "shape": {
+        "parameters": [
+          "self",
+          "clipName",
+          "position",
+          "loop"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::GamerServices::AvatarRenderer",
+      "trait": "cna::extensions::gamer_services::AvatarRealRendering"
+    },
+    {
+      "member": "set_appearance",
+      "shape": {
+        "parameters": [
+          "self",
+          "appearance"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::GamerServices::AvatarRenderer",
+      "trait": "cna::extensions::gamer_services::AvatarRealRendering"
+    },
+    {
+      "member": "use_model",
+      "shape": {
+        "parameters": [
+          "self",
+          "device",
+          "model"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::GamerServices::AvatarRenderer",
+      "trait": "cna::extensions::gamer_services::AvatarRealRendering"
+    },
+    {
+      "member": "native_texture_identity",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<u64>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::AlphaTestEffect",
+      "trait": "cna::extensions::effects::StockEffectTextures"
+    },
+    {
+      "member": "native_texture_identity",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<u64>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::BasicEffect",
+      "trait": "cna::extensions::effects::StockEffectTextures"
+    },
+    {
+      "member": "from_native_value",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "value"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Blend",
+      "trait": "cna::extensions::graphics::NativeEnumValue"
+    },
+    {
+      "member": "from_native_value",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "value"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::BlendFunction",
+      "trait": "cna::extensions::graphics::NativeEnumValue"
+    },
+    {
+      "member": "from_native_value",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "value"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::CompareFunction",
+      "trait": "cna::extensions::graphics::NativeEnumValue"
+    },
+    {
+      "member": "from_native_value",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "value"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::CubeMapFace",
+      "trait": "cna::extensions::graphics::NativeEnumValue"
+    },
+    {
+      "member": "from_native_value",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "value"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::CullMode",
+      "trait": "cna::extensions::graphics::NativeEnumValue"
+    },
+    {
+      "member": "from_native_value",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "value"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::DepthFormat",
+      "trait": "cna::extensions::graphics::NativeEnumValue"
+    },
+    {
+      "member": "native_texture_identity",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "layer"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<u64>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::DualTextureEffect",
+      "trait": "cna::extensions::effects::DualTextureEffectExt"
+    },
+    {
+      "member": "device_in_callback",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<&GraphicsDevice>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::DynamicIndexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "dispose_in_place",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::DynamicIndexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_is_disposed",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::DynamicIndexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_tag",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u64>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::DynamicIndexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_to_string",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::DynamicIndexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "on_content_lost",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<ContentLostSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::DynamicIndexBuffer",
+      "trait": "cna::extensions::resource_events::NotifiesContentLost"
+    },
+    {
+      "member": "on_native_disposing",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<ResourceDisposingSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::DynamicIndexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "set_native_tag",
+      "shape": {
+        "parameters": [
+          "self",
+          "tag"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::DynamicIndexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "device_in_callback",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<&GraphicsDevice>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::DynamicVertexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "dispose_in_place",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::DynamicVertexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_is_disposed",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::DynamicVertexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_tag",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u64>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::DynamicVertexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_to_string",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::DynamicVertexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "on_content_lost",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<ContentLostSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::DynamicVertexBuffer",
+      "trait": "cna::extensions::resource_events::NotifiesContentLost"
+    },
+    {
+      "member": "on_native_disposing",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<ResourceDisposingSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::DynamicVertexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "set_native_tag",
+      "shape": {
+        "parameters": [
+          "self",
+          "tag"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::DynamicVertexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "curvature",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<f32>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics::CrtEffectExt"
+    },
+    {
+      "member": "depth_mode",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<DepthEffectMode>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics::DepthEffectExt"
+    },
+    {
+      "member": "device_in_callback",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<&GraphicsDevice>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "dispose_in_place",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "dither_mode",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<DitherMode>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics::DepthEffectExt"
+    },
+    {
+      "member": "fragment_source",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::effects::EffectFactsExt"
+    },
+    {
+      "member": "graphics_device_identity",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u64>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::effects::EffectFactsExt"
+    },
+    {
+      "member": "has_renderer",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::effects::EffectFactsExt"
+    },
+    {
+      "member": "is_compiled",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::effects::EffectFactsExt"
+    },
+    {
+      "member": "is_exact_stock_sprite_effect",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::effects::EffectFactsExt"
+    },
+    {
+      "member": "mask_intensity",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<f32>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics::CrtEffectExt"
+    },
+    {
+      "member": "mask_type",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<CrtMaskType>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics::CrtEffectExt"
+    },
+    {
+      "member": "native_is_disposed",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_tag",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u64>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_to_string",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "on_native_disposing",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<ResourceDisposingSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "scanline_intensity",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<f32>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics::CrtEffectExt"
+    },
+    {
+      "member": "set_curvature",
+      "shape": {
+        "parameters": [
+          "self",
+          "value"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics::CrtEffectExt"
+    },
+    {
+      "member": "set_depth_mode",
+      "shape": {
+        "parameters": [
+          "self",
+          "value"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics::DepthEffectExt"
+    },
+    {
+      "member": "set_dither_mode",
+      "shape": {
+        "parameters": [
+          "self",
+          "value"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics::DepthEffectExt"
+    },
+    {
+      "member": "set_mask_intensity",
+      "shape": {
+        "parameters": [
+          "self",
+          "value"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics::CrtEffectExt"
+    },
+    {
+      "member": "set_mask_type",
+      "shape": {
+        "parameters": [
+          "self",
+          "value"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics::CrtEffectExt"
+    },
+    {
+      "member": "set_native_tag",
+      "shape": {
+        "parameters": [
+          "self",
+          "tag"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "set_scanline_intensity",
+      "shape": {
+        "parameters": [
+          "self",
+          "value"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics::CrtEffectExt"
+    },
+    {
+      "member": "set_vignette_intensity",
+      "shape": {
+        "parameters": [
+          "self",
+          "value"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics::CrtEffectExt"
+    },
+    {
+      "member": "vertex_source",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::effects::EffectFactsExt"
+    },
+    {
+      "member": "vignette_intensity",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<f32>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Effect",
+      "trait": "cna::extensions::graphics::CrtEffectExt"
+    },
+    {
+      "member": "item_at",
+      "shape": {
+        "parameters": [
+          "self",
+          "index"
+        ],
+        "receiver": "self",
+        "returns": "Result<Arc<EffectAnnotation>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::EffectAnnotationCollection",
+      "trait": "cna::extensions::graphics::EffectAnnotationCollectionExt"
+    },
+    {
+      "member": "retain_parameter_texture",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "texture_type",
+          "texture"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::EffectMaterial",
+      "trait": "cna::extensions::effects::EffectMaterialExt"
+    },
+    {
+      "member": "retained_parameter_texture_count",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u64>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::EffectMaterial",
+      "trait": "cna::extensions::effects::EffectMaterialExt"
+    },
+    {
+      "member": "item_at",
+      "shape": {
+        "parameters": [
+          "self",
+          "index"
+        ],
+        "receiver": "self",
+        "returns": "Result<Arc<EffectParameter>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::EffectParameterCollection",
+      "trait": "cna::extensions::graphics::EffectParameterCollectionExt"
+    },
+    {
+      "member": "index",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u32>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::EffectPass",
+      "trait": "cna::extensions::effects::EffectPassExt"
+    },
+    {
+      "member": "item_at",
+      "shape": {
+        "parameters": [
+          "self",
+          "index"
+        ],
+        "receiver": "self",
+        "returns": "Result<Arc<EffectPass>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::EffectPassCollection",
+      "trait": "cna::extensions::graphics::EffectPassCollectionExt"
+    },
+    {
+      "member": "identity",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u64>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::EffectTechnique",
+      "trait": "cna::extensions::effects::EffectTechniqueExt"
+    },
+    {
+      "member": "index",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u32>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::EffectTechnique",
+      "trait": "cna::extensions::effects::EffectTechniqueExt"
+    },
+    {
+      "member": "item_at",
+      "shape": {
+        "parameters": [
+          "self",
+          "index"
+        ],
+        "receiver": "self",
+        "returns": "Result<Arc<EffectTechnique>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::EffectTechniqueCollection",
+      "trait": "cna::extensions::graphics::EffectTechniqueCollectionExt"
+    },
+    {
+      "member": "native_environment_map_identity",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<u64>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::EnvironmentMapEffect",
+      "trait": "cna::extensions::effects::EnvironmentMapEffectExt"
+    },
+    {
+      "member": "native_texture_identity",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<u64>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::EnvironmentMapEffect",
+      "trait": "cna::extensions::effects::StockEffectTextures"
+    },
+    {
+      "member": "from_native_value",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "value"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::FillMode",
+      "trait": "cna::extensions::graphics::NativeEnumValue"
+    },
+    {
+      "member": "apply_presentation_parameters",
+      "shape": {
+        "parameters": [
+          "self",
+          "parameters"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::device_surface::DeviceSurface"
+    },
+    {
+      "member": "back_buffer_info",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<BackBufferInfo>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::device_surface::DeviceSurface"
+    },
+    {
+      "member": "capability_report",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics::RendererCapabilityExt"
+    },
+    {
+      "member": "clear_color_channels",
+      "shape": {
+        "parameters": [
+          "self",
+          "rgba"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics::FloatClearExt"
+    },
+    {
+      "member": "clear_color_depth",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "color",
+          "depth"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceStateExt"
+    },
+    {
+      "member": "create_crt_effect",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Effect>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics::ExtendedEffectExt"
+    },
+    {
+      "member": "create_depth_effect",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Effect>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics::ExtendedEffectExt"
+    },
+    {
+      "member": "create_empty_effect",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Effect>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics::EffectFactoryExt"
+    },
+    {
+      "member": "create_reflection_effect",
+      "shape": {
+        "parameters": [
+          "self",
+          "parameters",
+          "techniques"
+        ],
+        "receiver": "self",
+        "returns": "Result<Effect>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics::EffectFactoryExt"
+    },
+    {
+      "member": "display_color_space",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u32>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceCapabilityExt"
+    },
+    {
+      "member": "dispose_native",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceStateExt"
+    },
+    {
+      "member": "draw_pending_keyboard_input",
+      "shape": {
+        "parameters": [
+          "self",
+          "batch",
+          "font",
+          "whitePixel"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::gamer_services::DrawsPendingGuide"
+    },
+    {
+      "member": "draw_pending_message_box",
+      "shape": {
+        "parameters": [
+          "self",
+          "batch",
+          "font",
+          "whitePixel"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::gamer_services::DrawsPendingGuide"
+    },
+    {
+      "member": "executes_shader_effect_source",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceCapabilityExt"
+    },
+    {
+      "member": "feature_support",
+      "shape": {
+        "parameters": [
+          "self",
+          "feature"
+        ],
+        "receiver": "self",
+        "returns": "Result<FeatureSupport>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics::RendererCapabilityExt"
+    },
+    {
+      "member": "format_support",
+      "shape": {
+        "parameters": [
+          "self",
+          "format"
+        ],
+        "receiver": "self",
+        "returns": "Result<FormatSupport>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics::RendererCapabilityExt"
+    },
+    {
+      "member": "is_disposed_native",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceStateExt"
+    },
+    {
+      "member": "limit",
+      "shape": {
+        "parameters": [
+          "self",
+          "limit"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<u64>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics::RendererCapabilityExt"
+    },
+    {
+      "member": "max_compute_work_group_count",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "axis"
+        ],
+        "receiver": "self",
+        "returns": "Result<i32>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceCapabilityExt"
+    },
+    {
+      "member": "max_compute_work_group_invocations",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<i32>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceCapabilityExt"
+    },
+    {
+      "member": "max_compute_work_group_size",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "axis"
+        ],
+        "receiver": "self",
+        "returns": "Result<i32>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceCapabilityExt"
+    },
+    {
+      "member": "notify_content_lost_resources",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceStateExt"
+    },
+    {
+      "member": "on_event",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "event",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<DeviceSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceEventExt"
+    },
+    {
+      "member": "on_resource_created",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<DeviceSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceEventExt"
+    },
+    {
+      "member": "on_resource_destroyed",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<DeviceSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceEventExt"
+    },
+    {
+      "member": "read_back_buffer",
+      "shape": {
+        "parameters": [
+          "self",
+          "pixels"
+        ],
+        "receiver": "self",
+        "returns": "Result<usize>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::device_surface::DeviceSurface"
+    },
+    {
+      "member": "recreate_renderer_for_multi_sample_count",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "count"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceStateExt"
+    },
+    {
+      "member": "refresh_adapters",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::device_surface::DeviceSurface"
+    },
+    {
+      "member": "renderer_info",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<RendererInfo>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics::RendererInfoExt"
+    },
+    {
+      "member": "set_blend_enabled",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "enabled"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceStateExt"
+    },
+    {
+      "member": "set_context_recovery_enabled",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "enabled"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceStateExt"
+    },
+    {
+      "member": "set_current_effect",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "effect"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceStateExt"
+    },
+    {
+      "member": "set_depth_test_enabled",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "enabled"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceStateExt"
+    },
+    {
+      "member": "set_depth_write_enabled",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "enabled"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceStateExt"
+    },
+    {
+      "member": "set_display_color_space",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "color_space"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceCapabilityExt"
+    },
+    {
+      "member": "set_graphics_profile",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "profile"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceStateExt"
+    },
+    {
+      "member": "set_render_target",
+      "shape": {
+        "parameters": [
+          "self",
+          "target"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::device_surface::DeviceSurface"
+    },
+    {
+      "member": "set_render_target_face",
+      "shape": {
+        "parameters": [
+          "self",
+          "target",
+          "face"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::device_surface::DeviceSurface"
+    },
+    {
+      "member": "set_string_marker",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "text"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceStateExt"
+    },
+    {
+      "member": "set_unsupported_3d_call_behavior",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "behavior"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceStateExt"
+    },
+    {
+      "member": "shader_dialect",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<ShaderDialect>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics::RendererCapabilityExt"
+    },
+    {
+      "member": "supports_display_color_space",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "color_space"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceCapabilityExt"
+    },
+    {
+      "member": "supports_image_based_lighting",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceCapabilityExt"
+    },
+    {
+      "member": "supports_surface_format_as_render_target",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "format"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceCapabilityExt"
+    },
+    {
+      "member": "tracked_resource_count",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u64>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceStateExt"
+    },
+    {
+      "member": "unbind_texture",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "texture"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceStateExt"
+    },
+    {
+      "member": "unsupported_3d_call_behavior",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Unsupported3DCallBehavior>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDevice",
+      "trait": "cna::extensions::graphics_device_ext::DeviceStateExt"
+    },
+    {
+      "member": "from_native_value",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "value"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsDeviceStatus",
+      "trait": "cna::extensions::graphics::NativeEnumValue"
+    },
+    {
+      "member": "from_native_value",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "value"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::GraphicsProfile",
+      "trait": "cna::extensions::graphics::NativeEnumValue"
+    },
+    {
+      "member": "device_in_callback",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<&GraphicsDevice>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::IndexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "dispose_in_place",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::IndexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_is_disposed",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::IndexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_tag",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u64>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::IndexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_to_string",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::IndexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "on_native_disposing",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<ResourceDisposingSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::IndexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "set_native_tag",
+      "shape": {
+        "parameters": [
+          "self",
+          "tag"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::IndexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "from_native_value",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "value"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::IndexElementSize",
+      "trait": "cna::extensions::graphics::NativeEnumValue"
+    },
+    {
+      "member": "Count",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<i32>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::ModelBoneCollection",
+      "trait": "cna::extensions::graphics::ModelCollectionExt"
+    },
+    {
+      "member": "ItemAt",
+      "shape": {
+        "parameters": [
+          "self",
+          "index"
+        ],
+        "receiver": "self",
+        "returns": "Result<Arc<T>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::ModelBoneCollection",
+      "trait": "cna::extensions::graphics::ModelCollectionExt"
+    },
+    {
+      "member": "Count",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<i32>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::ModelEffectCollection",
+      "trait": "cna::extensions::graphics::ModelCollectionExt"
+    },
+    {
+      "member": "ItemAt",
+      "shape": {
+        "parameters": [
+          "self",
+          "index"
+        ],
+        "receiver": "self",
+        "returns": "Result<Arc<T>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::ModelEffectCollection",
+      "trait": "cna::extensions::graphics::ModelCollectionExt"
+    },
+    {
+      "member": "Count",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<i32>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::ModelMeshCollection",
+      "trait": "cna::extensions::graphics::ModelCollectionExt"
+    },
+    {
+      "member": "ItemAt",
+      "shape": {
+        "parameters": [
+          "self",
+          "index"
+        ],
+        "receiver": "self",
+        "returns": "Result<Arc<T>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::ModelMeshCollection",
+      "trait": "cna::extensions::graphics::ModelCollectionExt"
+    },
+    {
+      "member": "Count",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<i32>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::ModelMeshPartCollection",
+      "trait": "cna::extensions::graphics::ModelCollectionExt"
+    },
+    {
+      "member": "ItemAt",
+      "shape": {
+        "parameters": [
+          "self",
+          "index"
+        ],
+        "receiver": "self",
+        "returns": "Result<Arc<T>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::ModelMeshPartCollection",
+      "trait": "cna::extensions::graphics::ModelCollectionExt"
+    },
+    {
+      "member": "device_in_callback",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<&GraphicsDevice>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::OcclusionQuery",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "dispose_in_place",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::OcclusionQuery",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "has_renderer",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::OcclusionQuery",
+      "trait": "cna::extensions::graphics_device_ext::OcclusionQueryExt"
+    },
+    {
+      "member": "is_pixel_count_precise",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::OcclusionQuery",
+      "trait": "cna::extensions::graphics_device_ext::OcclusionQueryExt"
+    },
+    {
+      "member": "native_is_disposed",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::OcclusionQuery",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_tag",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u64>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::OcclusionQuery",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_to_string",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::OcclusionQuery",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "on_native_disposing",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<ResourceDisposingSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::OcclusionQuery",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "set_native_tag",
+      "shape": {
+        "parameters": [
+          "self",
+          "tag"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::OcclusionQuery",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "from_native_value",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "value"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::PresentInterval",
+      "trait": "cna::extensions::graphics::NativeEnumValue"
+    },
+    {
+      "member": "from_native_value",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "value"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::PrimitiveType",
+      "trait": "cna::extensions::graphics::NativeEnumValue"
+    },
+    {
+      "member": "device_in_callback",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<&GraphicsDevice>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::RenderTarget2D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "dispose_in_place",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::RenderTarget2D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_is_disposed",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::RenderTarget2D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_tag",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u64>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::RenderTarget2D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_to_string",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::RenderTarget2D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "on_content_lost",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<ContentLostSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::RenderTarget2D",
+      "trait": "cna::extensions::resource_events::NotifiesContentLost"
+    },
+    {
+      "member": "on_native_disposing",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<ResourceDisposingSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::RenderTarget2D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "set_native_tag",
+      "shape": {
+        "parameters": [
+          "self",
+          "tag"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::RenderTarget2D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "device_in_callback",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<&GraphicsDevice>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::RenderTargetCube",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "dispose_in_place",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::RenderTargetCube",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_is_disposed",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::RenderTargetCube",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_tag",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u64>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::RenderTargetCube",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_to_string",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::RenderTargetCube",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "on_content_lost",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<ContentLostSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::RenderTargetCube",
+      "trait": "cna::extensions::resource_events::NotifiesContentLost"
+    },
+    {
+      "member": "on_native_disposing",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<ResourceDisposingSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::RenderTargetCube",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "set_native_tag",
+      "shape": {
+        "parameters": [
+          "self",
+          "tag"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::RenderTargetCube",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "from_native_value",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "value"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::RenderTargetUsage",
+      "trait": "cna::extensions::graphics::NativeEnumValue"
+    },
+    {
+      "member": "SetVertexColorEnabled",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "value"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SkinnedEffect",
+      "trait": "cna::extensions::effects::SkinnedEffectExt"
+    },
+    {
+      "member": "VertexColorEnabled",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SkinnedEffect",
+      "trait": "cna::extensions::effects::SkinnedEffectExt"
+    },
+    {
+      "member": "native_texture_identity",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<u64>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SkinnedEffect",
+      "trait": "cna::extensions::effects::StockEffectTextures"
+    },
+    {
+      "member": "device_in_callback",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<&GraphicsDevice>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SpriteBatch",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "dispose_in_place",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SpriteBatch",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "draw_mesh",
+      "shape": {
+        "parameters": [
+          "self",
+          "positions",
+          "colors",
+          "texture_coordinates",
+          "indices"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SpriteBatch",
+      "trait": "cna::extensions::device_surface::BatchedSprites"
+    },
+    {
+      "member": "native_is_disposed",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SpriteBatch",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_tag",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u64>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SpriteBatch",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_to_string",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SpriteBatch",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "on_native_disposing",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<ResourceDisposingSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SpriteBatch",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "set_native_tag",
+      "shape": {
+        "parameters": [
+          "self",
+          "tag"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SpriteBatch",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "submit_scaled",
+      "shape": {
+        "parameters": [
+          "self",
+          "sprites"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SpriteBatch",
+      "trait": "cna::extensions::device_surface::BatchedSprites"
+    },
+    {
+      "member": "device_in_callback",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<&GraphicsDevice>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SpriteFont",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "dispose_in_place",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SpriteFont",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_is_disposed",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SpriteFont",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_tag",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u64>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SpriteFont",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_to_string",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SpriteFont",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "on_native_disposing",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<ResourceDisposingSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SpriteFont",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "set_native_tag",
+      "shape": {
+        "parameters": [
+          "self",
+          "tag"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::SpriteFont",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "from_native_value",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "value"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::StencilOperation",
+      "trait": "cna::extensions::graphics::NativeEnumValue"
+    },
+    {
+      "member": "device_in_callback",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<&GraphicsDevice>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture2D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "dispose_in_place",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture2D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "facts",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<TextureFacts>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture2D",
+      "trait": "cna::extensions::texture::Texture2DFile"
+    },
+    {
+      "member": "from_file",
+      "shape": {
+        "parameters": [
+          "device",
+          "path"
+        ],
+        "receiver": "associated",
+        "returns": "Result<Texture2D>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture2D",
+      "trait": "cna::extensions::texture::Texture2DFile"
+    },
+    {
+      "member": "from_pixels",
+      "shape": {
+        "parameters": [
+          "device",
+          "width",
+          "height",
+          "pixels"
+        ],
+        "receiver": "associated",
+        "returns": "Result<Texture2D>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture2D",
+      "trait": "cna::extensions::texture::Texture2DFile"
+    },
+    {
+      "member": "native_is_disposed",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture2D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_tag",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u64>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture2D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_to_string",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture2D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "on_native_disposing",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<ResourceDisposingSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture2D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "read_rgba8",
+      "shape": {
+        "parameters": [
+          "self",
+          "pixels"
+        ],
+        "receiver": "self",
+        "returns": "Result<usize>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture2D",
+      "trait": "cna::extensions::device_surface::Rgba8Data"
+    },
+    {
+      "member": "save_to_file",
+      "shape": {
+        "parameters": [
+          "self",
+          "format",
+          "path"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture2D",
+      "trait": "cna::extensions::texture::Texture2DFile"
+    },
+    {
+      "member": "set_native_tag",
+      "shape": {
+        "parameters": [
+          "self",
+          "tag"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture2D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "set_rgba8",
+      "shape": {
+        "parameters": [
+          "self",
+          "pixels"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture2D",
+      "trait": "cna::extensions::device_surface::Rgba8Data"
+    },
+    {
+      "member": "set_rgba8_bytes",
+      "shape": {
+        "parameters": [
+          "self",
+          "bytes"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture2D",
+      "trait": "cna::extensions::texture::Texture2DFile"
+    },
+    {
+      "member": "storage",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<StorageInfo>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture2D",
+      "trait": "cna::extensions::texture::Texture2DFile"
+    },
+    {
+      "member": "SetDataBytes",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "level",
+          "left",
+          "top",
+          "right",
+          "bottom",
+          "front",
+          "back",
+          "bytes"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture3D",
+      "trait": "cna::extensions::texture::Texture3DBytes"
+    },
+    {
+      "member": "device_in_callback",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<&GraphicsDevice>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture3D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "dispose_in_place",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture3D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_is_disposed",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture3D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_tag",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u64>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture3D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_to_string",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture3D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "on_native_disposing",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<ResourceDisposingSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture3D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "set_native_tag",
+      "shape": {
+        "parameters": [
+          "self",
+          "tag"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::Texture3D",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "from_native_value",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "value"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::TextureAddressMode",
+      "trait": "cna::extensions::graphics::NativeEnumValue"
+    },
+    {
+      "member": "FromDdsMemory",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "graphicsDevice",
+          "bytes"
+        ],
+        "receiver": "associated",
+        "returns": "Result<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::TextureCube",
+      "trait": "cna::extensions::texture::TextureCubeDds"
+    },
+    {
+      "member": "device_in_callback",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<&GraphicsDevice>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::TextureCube",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "dispose_in_place",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::TextureCube",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_is_disposed",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::TextureCube",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_tag",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u64>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::TextureCube",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_to_string",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::TextureCube",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "on_native_disposing",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<ResourceDisposingSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::TextureCube",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "set_native_tag",
+      "shape": {
+        "parameters": [
+          "self",
+          "tag"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::TextureCube",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "from_native_value",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "value"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::TextureFilter",
+      "trait": "cna::extensions::graphics::NativeEnumValue"
+    },
+    {
+      "member": "device_in_callback",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<&GraphicsDevice>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::VertexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "dispose_in_place",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::VertexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_elements",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<Vec<VertexElement>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::VertexBuffer",
+      "trait": "cna::extensions::device_surface::ReadsVertexLayout"
+    },
+    {
+      "member": "native_is_disposed",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::VertexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_stride",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<i32>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::VertexBuffer",
+      "trait": "cna::extensions::device_surface::ReadsVertexLayout"
+    },
+    {
+      "member": "native_tag",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u64>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::VertexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "native_to_string",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::VertexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "on_native_disposing",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<ResourceDisposingSubscription>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::VertexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "set_native_tag",
+      "shape": {
+        "parameters": [
+          "self",
+          "tag"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::VertexBuffer",
+      "trait": "cna::extensions::graphics_resource::NativeGraphicsResource"
+    },
+    {
+      "member": "from_native_value",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "value"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::VertexElementFormat",
+      "trait": "cna::extensions::graphics::NativeEnumValue"
+    },
+    {
+      "member": "from_native_value",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "value"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Graphics::VertexElementUsage",
+      "trait": "cna::extensions::graphics::NativeEnumValue"
+    },
+    {
+      "member": "HasNativeGraphicsDevice",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::GraphicsDeviceManager",
+      "trait": "cna::extensions::graphics_device_ext::GraphicsDeviceManagerExt"
+    },
+    {
+      "member": "ObserveDeviceSettings",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "callback"
+        ],
+        "receiver": "self",
+        "returns": "Result<DeviceSettingsObserver>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::GraphicsDeviceManager",
+      "trait": "cna::extensions::graphics_device_ext::GraphicsDeviceManagerExt"
+    },
+    {
+      "member": "PreferredPresentationMode",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<PresentationMode>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::GraphicsDeviceManager",
+      "trait": "cna::extensions::graphics_device_ext::GraphicsDeviceManagerExt"
+    },
+    {
+      "member": "SetPreferredPresentationMode",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "value"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::GraphicsDeviceManager",
+      "trait": "cna::extensions::graphics_device_ext::GraphicsDeviceManagerExt"
+    },
+    {
+      "member": "native_to_string",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Input::KeyboardState",
+      "trait": "cna::extensions::keyboard::KeyboardStateText"
+    },
+    {
+      "member": "from_key_code",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "code"
+        ],
+        "receiver": "associated",
+        "returns": "Option<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Input::Keys",
+      "trait": "cna::extensions::keyboard::KeyFromNativeCode"
+    },
+    {
+      "member": "SavePictureFromStream",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "name",
+          "stream"
+        ],
+        "receiver": "self",
+        "returns": "Result<Arc<Picture>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::MediaLibrary",
+      "trait": "cna::extensions::media::MediaLibraryExt"
+    },
+    {
+      "member": "Add",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "song"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::MediaQueue",
+      "trait": "cna::extensions::media::MediaQueueExt"
+    },
+    {
+      "member": "Clear",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::MediaQueue",
+      "trait": "cna::extensions::media::MediaQueueExt"
+    },
+    {
+      "member": "TypeName",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "game"
+        ],
+        "receiver": "self",
+        "returns": "Result<Option<String>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::MediaSource",
+      "trait": "cna::extensions::media::MediaSourceExt"
+    },
+    {
+      "member": "PlatformToken",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::Picture",
+      "trait": "cna::extensions::media::PictureExt"
+    },
+    {
+      "member": "EndedByElapsedTime",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "elapsed"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::Song",
+      "trait": "cna::extensions::media::SongExt"
+    },
+    {
+      "member": "FromFile",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "game",
+          "name",
+          "fileName"
+        ],
+        "receiver": "associated",
+        "returns": "Result<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::Song",
+      "trait": "cna::extensions::media::SongExt"
+    },
+    {
+      "member": "FromFileWithDuration",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "game",
+          "name",
+          "fileName",
+          "durationMilliseconds"
+        ],
+        "receiver": "associated",
+        "returns": "Result<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::Song",
+      "trait": "cna::extensions::media::SongExt"
+    },
+    {
+      "member": "HandleText",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::Song",
+      "trait": "cna::extensions::media::SongExt"
+    },
+    {
+      "member": "SetDuration",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "value"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::Song",
+      "trait": "cna::extensions::media::SongExt"
+    },
+    {
+      "member": "SetPlayCount",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "value"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::Song",
+      "trait": "cna::extensions::media::SongExt"
+    },
+    {
+      "member": "FromSongs",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "game",
+          "songs"
+        ],
+        "receiver": "associated",
+        "returns": "Result<Arc<Self>>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::SongCollection",
+      "trait": "cna::extensions::media::SongCollectionExt"
+    },
+    {
+      "member": "DecodedInfo",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<(i32,i32,f64)>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::Video",
+      "trait": "cna::extensions::media::VideoExt"
+    },
+    {
+      "member": "FileName",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::Video",
+      "trait": "cna::extensions::media::VideoExt"
+    },
+    {
+      "member": "FromFile",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "game",
+          "fileName"
+        ],
+        "receiver": "associated",
+        "returns": "Result<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::Video",
+      "trait": "cna::extensions::media::VideoExt"
+    },
+    {
+      "member": "FromUri",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "game",
+          "uri"
+        ],
+        "receiver": "associated",
+        "returns": "Result<Self>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::Video",
+      "trait": "cna::extensions::media::VideoExt"
+    },
+    {
+      "member": "HasGraphicsDevice",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::Video",
+      "trait": "cna::extensions::media::VideoExt"
+    },
+    {
+      "member": "SetAudioTrack",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "track"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::Video",
+      "trait": "cna::extensions::media::VideoExt"
+    },
+    {
+      "member": "SetDuration",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "value"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::Video",
+      "trait": "cna::extensions::media::VideoExt"
+    },
+    {
+      "member": "SetVideoTrack",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "track"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::Video",
+      "trait": "cna::extensions::media::VideoExt"
+    },
+    {
+      "member": "HasNativeVideo",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::VideoPlayer",
+      "trait": "cna::extensions::media::VideoPlayerExt"
+    },
+    {
+      "member": "SetAudioTrack",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "track"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::VideoPlayer",
+      "trait": "cna::extensions::media::VideoPlayerExt"
+    },
+    {
+      "member": "SetVideoTrack",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self",
+          "track"
+        ],
+        "receiver": "self",
+        "returns": "Result<()>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Media::VideoPlayer",
+      "trait": "cna::extensions::media::VideoPlayerExt"
+    },
+    {
+      "member": "advertised_session_type",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<NetworkSessionType>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Net::AvailableNetworkSession",
+      "trait": "cna::extensions::net::DiscoveredSessionExt"
+    },
+    {
+      "member": "connect_address",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<String>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Net::AvailableNetworkSession",
+      "trait": "cna::extensions::net::DiscoveredSessionExt"
+    },
+    {
+      "member": "connect_port",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<u16>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Net::AvailableNetworkSession",
+      "trait": "cna::extensions::net::DiscoveredSessionExt"
+    },
+    {
+      "member": "is_same_session",
+      "shape": {
+        "parameters": [
+          "self",
+          "other"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Net::AvailableNetworkSession",
+      "trait": "cna::extensions::net::DiscoveredSessionExt"
+    },
+    {
+      "member": "HasNativeStorageDevice",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Storage::StorageContainer",
+      "trait": "cna::extensions::storage_ext::StorageContainerExt"
+    },
+    {
+      "member": "NativeIsDisposed",
+      "movedBy": "RUST-SURFACE-001",
+      "shape": {
+        "parameters": [
+          "self"
+        ],
+        "receiver": "self",
+        "returns": "Result<bool>"
+      },
+      "strictType": "cna::Microsoft::Xna::Framework::Storage::StorageContainer",
+      "trait": "cna::extensions::storage_ext::StorageContainerExt"
+    }
+  ],
+  "schemaVersion": 1,
+  "types": [
+    {
+      "absentFrom": [
+        "cna::Microsoft::Xna::Framework::Input::Touch::TouchPanelTestBackend"
+      ],
+      "extensionPath": "cna::extensions::touch::TouchPanelTestBackend",
+      "movedBy": "RUST-SURFACE-001"
+    }
+  ]
+}
