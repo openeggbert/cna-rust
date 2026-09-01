@@ -466,6 +466,18 @@ still `const` and are still what the crate's own decoding uses; what a consumer
 reaches through the trait is not usable in a `const` context. Nothing in this
 repository or its template used either in one.
 
+### The feature set both gates measure
+
+`cargo rustdoc -p cna-rust --lib` compiles the crate's default features,
+`["dynamic-loading"]`. That is not a reduced surface: the two non-default
+features are `direct-link`, which swaps how the audited function tables are
+filled, and `native-fault-injection`, which adds test-only bridge fault points
+that stay inert without an environment variable. Neither gates a public item,
+and it is measured rather than asserted -- the set of publicly nameable paths is
+**1,030 under default features and the same 1,030 under `--all-features`**, with
+an empty difference in both directions, and both gates report zero on both
+rustdoc runs.
+
 ### Where it is enforced
 
 The strict verifier stays exactly as strict as it was:

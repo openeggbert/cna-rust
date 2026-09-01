@@ -117,6 +117,7 @@ comment says so where the member now lives.
 
 ### The full record
 
+`docs/handoff-2026-09-01-surface.md` is the seventeen-section record.
 `docs/extensions.md` carries the member-by-member migration table and the
 before/after call for all 109.
 
