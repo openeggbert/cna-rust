@@ -144,6 +144,130 @@ impl SpriteFont {
         })
     }
 
+    /// Takes over a font handle CNA created, and the atlas it draws from.
+    ///
+    /// `from_parts` goes the other way: it takes Rust's tables and *builds* a
+    /// native font from them. A font the content pipeline loaded already
+    /// exists, so there is nothing to build -- and the tables this type keeps
+    /// for `Characters`, `MeasureString` and the glyph accessors have to come
+    /// back out of it. CNA publishes exactly what is needed:
+    /// `cna_sprite_font_get_info` for the layout properties and the character
+    /// count, `cna_sprite_font_copy_characters` for the map, and
+    /// `cna_sprite_font_copy_glyphs` for the bounds, cropping and kerning.
+    ///
+    /// # Ownership
+    ///
+    /// Exactly one owner, and the order matters. This value owns the font
+    /// handle; the `Arc<Texture2D>` owns the atlas. CNA refuses
+    /// `cna_texture2d_destroy` while a font still uses the atlas, so the font
+    /// has to go first -- which it does, because `state` is declared before
+    /// `_texture` and Rust drops fields in declaration order. The same rule
+    /// already governs a caller-built font, so a loaded one needs no special
+    /// case.
+    ///
+    /// # Errors
+    ///
+    /// Returns the exact error CNA reports, or the refusal for a font whose
+    /// tables disagree with the count it reports.
+    pub(crate) fn adopt(texture: Arc<Texture2D>, handle: sys::CNA_Handle) -> Result<Self> {
+        let Some(device) = texture.GraphicsDevice().cloned() else {
+            // Nothing else owns the handle yet, so this is the one place it
+            // can be released without stranding it -- and with no device there
+            // is nothing to release it *through*, which is the refusal.
+            return Err(CnaError::InvalidInput(
+                "SpriteFont atlas has no graphics device",
+            ));
+        };
+        let adopted = Self::read_back(&device, texture, handle);
+        if adopted.is_err() {
+            let _ = device.state.native().destroy_sprite_font(handle);
+        }
+        adopted
+    }
+
+    fn read_back(
+        device: &super::GraphicsDevice,
+        texture: Arc<Texture2D>,
+        handle: sys::CNA_Handle,
+    ) -> Result<Self> {
+        let mut info = sys::CNA_SpriteFontInfo {
+            struct_size: size_of::<sys::CNA_SpriteFontInfo>() as u32,
+            struct_version: 1,
+            ..sys::CNA_SpriteFontInfo::default()
+        };
+        device.state.native().sprite_font_info(handle, &mut info)?;
+        let count = usize::try_from(info.character_count)
+            .map_err(|_| CnaError::InvalidInput("native SpriteFont reports too many characters"))?;
+        if count == 0 {
+            return Err(CnaError::InvalidInput(
+                "a SpriteFont with no characters cannot draw anything",
+            ));
+        }
+
+        let mut native_characters = vec![0; count];
+        let mut copied = 0;
+        device.state.native().copy_sprite_font_characters(
+            handle,
+            &mut native_characters,
+            &mut copied,
+        )?;
+        let mut native_glyphs = vec![sys::CNA_SpriteFontGlyph::default(); count];
+        let mut glyph_count = 0;
+        device
+            .state
+            .native()
+            .copy_sprite_font_glyphs(handle, &mut native_glyphs, &mut glyph_count)?;
+        if copied != info.character_count || glyph_count != info.character_count {
+            return Err(CnaError::InvalidInput(
+                "native SpriteFont tables disagree with the count it reports",
+            ));
+        }
+
+        let characters = native_characters
+            .iter()
+            .map(|value| {
+                char::from_u32(u32::from(*value)).ok_or(CnaError::InvalidInput(
+                    "native SpriteFont character is not a Unicode scalar value",
+                ))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let default_character = if info.has_default_character == sys::CNA_FALSE {
+            None
+        } else {
+            Some(
+                char::from_u32(u32::from(info.default_character)).ok_or(CnaError::InvalidInput(
+                    "native SpriteFont default character is not a Unicode scalar value",
+                ))?,
+            )
+        };
+        let glyphs = native_glyphs
+            .iter()
+            .map(|glyph| rust_rectangle(glyph.glyph_bounds))
+            .collect();
+        let cropping = native_glyphs
+            .iter()
+            .map(|glyph| rust_rectangle(glyph.cropping))
+            .collect();
+        let kerning = native_glyphs
+            .iter()
+            .map(|glyph| Vector3::from_x_and_y_and_z(glyph.kerning.x, glyph.kerning.y, glyph.kerning.z))
+            .collect();
+
+        Ok(Self {
+            state: ResourceState::new(device, handle, ResourceKind::SpriteFont),
+            _texture: texture,
+            characters,
+            _glyphs: glyphs,
+            _cropping: cropping,
+            _kerning: kerning,
+            properties: Mutex::new(FontProperties {
+                line_spacing: info.line_spacing,
+                spacing: info.spacing,
+                default_character,
+            }),
+        })
+    }
+
     pub(crate) fn handle(&self) -> Result<sys::CNA_Handle> {
         self.state.require_handle()
     }
@@ -299,6 +423,10 @@ fn char16(value: char) -> Result<sys::CNA_Char16> {
     u16::try_from(u32::from(value)).map_err(|_| {
         CnaError::InvalidInput("SpriteFont characters must fit XNA's UTF-16 char representation")
     })
+}
+
+const fn rust_rectangle(value: sys::CNA_Rectangle) -> Rectangle {
+    Rectangle::new(value.x, value.y, value.width, value.height)
 }
 
 const fn native_rectangle(value: Rectangle) -> sys::CNA_Rectangle {

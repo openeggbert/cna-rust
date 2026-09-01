@@ -12843,6 +12843,17 @@ extern "C" {
         argument1: CNA_StringView,
         argument2: *mut *mut c_void,
     ) -> CNA_Result;
+    pub fn cna_content_manager_load_sound_effect(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_load_sprite_font(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_Handle,
+        argument3: *mut CNA_Handle,
+    ) -> CNA_Result;
     pub fn cna_content_manager_load_texture2d(
         argument0: CNA_Handle,
         argument1: CNA_StringView,

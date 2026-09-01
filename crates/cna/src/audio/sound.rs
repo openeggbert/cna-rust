@@ -181,6 +181,50 @@ impl SoundEffect {
     /// and is passed through rather than turned into a refusal -- a silent
     /// effect is a usable thing and a caller that wants the refusal can check
     /// the path itself.
+    /// Takes over a sound-effect handle CNA created.
+    ///
+    /// Every one of this type's other constructors *makes* the native object:
+    /// `new` from PCM frames, `FromStream` from encoded bytes, `FromAsset`
+    /// from CNA's own decoder. A sound effect the content pipeline loaded
+    /// already exists, and the only thing missing on this side is the state
+    /// that wraps it -- the audio runtime, the generation its validity is
+    /// checked against, and the duration, which is read from the handle rather
+    /// than remembered from the buffer that was never here.
+    ///
+    /// # Ownership
+    ///
+    /// Exactly one owner. `cna_content_manager_load_sound_effect` transfers
+    /// the handle -- it does not cache, so a second load answers a second,
+    /// independently owned effect -- and this value releases it exactly once,
+    /// through the same disposal path every other constructor's does.
+    ///
+    /// # Errors
+    ///
+    /// Returns the exact error CNA reports. A handle whose duration cannot be
+    /// read is released here rather than stranded.
+    pub(crate) fn adopt(game: &GameContext<'_>, handle: sys::CNA_Handle) -> Result<Self> {
+        let runtime = Arc::clone(game.audio_runtime());
+        let active = runtime.active()?;
+        let duration = match active.native.sound_effect_duration(handle) {
+            Ok(ticks) => TimeSpan::from_ticks(ticks),
+            Err(error) => {
+                let _ = active.native.destroy_sound_effect(handle);
+                return Err(error);
+            }
+        };
+        let state = Arc::new(SoundEffectState {
+            runtime: Arc::clone(&runtime),
+            native: active.native,
+            generation: active.generation,
+            handle: Mutex::new(handle),
+            duration,
+            name: Mutex::new(String::new()),
+            children: Mutex::new(Vec::new()),
+        });
+        runtime.register(&state);
+        Ok(Self { state })
+    }
+
     pub fn FromAsset(game: &GameContext<'_>, assetName: &str) -> Result<Self> {
         let runtime = Arc::clone(game.audio_runtime());
         let active = runtime.active()?;

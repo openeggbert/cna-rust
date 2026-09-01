@@ -3034,6 +3034,8 @@
     "cna_content_manager_get_xnb_reader_usage": 3,
     "cna_content_manager_get_xnb_reader_usage_count": 2,
     "cna_content_manager_load_foreign_ext": 3,
+    "cna_content_manager_load_sound_effect": 3,
+    "cna_content_manager_load_sprite_font": 4,
     "cna_content_manager_load_texture2d": 3,
     "cna_content_manager_load_texture_cube": 3,
     "cna_content_manager_refresh_content_manifest": 1,

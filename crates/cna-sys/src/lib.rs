@@ -13336,6 +13336,12 @@ pub type cna_content_manager_get_xnb_reader_usage_count_fn = unsafe extern "C" f
 pub type cna_content_manager_load_foreign_ext_fn = unsafe extern "C" fn(
     CNA_Handle, CNA_StringView, *mut *mut c_void,
 ) -> CNA_Result;
+pub type cna_content_manager_load_sound_effect_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_content_manager_load_sprite_font_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_Handle, *mut CNA_Handle,
+) -> CNA_Result;
 pub type cna_content_manager_load_texture2d_fn = unsafe extern "C" fn(
     CNA_Handle, CNA_StringView, *mut CNA_Handle,
 ) -> CNA_Result;

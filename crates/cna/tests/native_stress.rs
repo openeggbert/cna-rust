@@ -2014,7 +2014,7 @@ fn sprite_font_xnb() -> Vec<u8> {
     write_rectangle(&mut payload, Rectangle::new(0, 0, 1, 1));
     payload.push(4); // Character list.
     payload.extend_from_slice(&1_i32.to_le_bytes());
-    payload.extend_from_slice(&u16::from(b'?').to_le_bytes());
+    payload.push(b'?'); // One UTF-8 byte: `BinaryReader.ReadChar` is not UTF-16.
     payload.extend_from_slice(&2_i32.to_le_bytes()); // Line spacing.
     payload.extend_from_slice(&0_f32.to_le_bytes()); // Extra spacing.
     payload.push(5); // Kerning Vector3 list.
@@ -2023,7 +2023,7 @@ fn sprite_font_xnb() -> Vec<u8> {
     payload.extend_from_slice(&1_f32.to_le_bytes());
     payload.extend_from_slice(&0_f32.to_le_bytes());
     payload.push(1); // Has default character.
-    payload.extend_from_slice(&u16::from(b'?').to_le_bytes());
+    payload.push(b'?');
 
     let mut bytes = b"XNBw\x05\x00".to_vec();
     bytes.extend_from_slice(

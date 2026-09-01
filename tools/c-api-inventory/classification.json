@@ -342,17 +342,6 @@
   "binding": {
     "rules": [
       {
-        "id": "content-loads-need-an-adoption-path",
-        "status": "DEFERRED_TRACKED",
-        "names": [
-          "cna_content_manager_load_sprite_font",
-          "cna_content_manager_load_sound_effect"
-        ],
-        "task": "RUST-EXT-016",
-        "reason": "both answer a handle to a type this crate's projection cannot adopt. SpriteFont keeps Rust-side glyph, cropping, character and kerning tables and builds a *new* native font from them, so a loaded handle has nowhere to go; SoundEffect keeps a runtime generation its state is validated against. Binding these needs an adoption constructor on those two types, which is real work on the Rust side rather than a call -- the neighbouring texture loads went in unchanged because Texture2D and TextureCube already have one.",
-        "evidence": "crates/cna/src/graphics/sprite_font.rs's from_parts, which calls create_sprite_font; crates/cna/src/audio/sound.rs's SoundEffectState; and crates/cna/src/graphics/texture2d.rs's from_owned_handle, which is the shape the other two need"
-      },
-      {
         "id": "camera-destroy-segv",
         "status": "BLOCKED_UPSTREAM",
         "names": [

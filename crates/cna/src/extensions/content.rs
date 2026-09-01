@@ -2684,6 +2684,86 @@ impl NativeContentManager {
 /// includes `.cnj` and the native source formats. Both paths are real and
 /// neither replaces the other.
 impl NativeContentManager {
+    /// Loads a `SpriteFont` and the atlas it draws from.
+    ///
+    /// XNA's `ContentManager.Load::<SpriteFont>` reads an `.xnb` font
+    /// container, and the Rust content pipeline does exactly that. This reads
+    /// whatever CNA's manager resolves the name to, which on a CNA content
+    /// root also includes its own `.cnj` font descriptor -- a format the Rust
+    /// reader does not parse and does not intend to.
+    ///
+    /// # Ownership
+    ///
+    /// Two owned handles, one asset. The returned `SpriteFont` owns the font;
+    /// the `Arc<Texture2D>` it holds owns the atlas, and the same one is
+    /// returned so a caller that places glyphs itself can reach it. CNA
+    /// refuses to destroy the atlas while the font uses it, so the font is
+    /// released first -- which the `SpriteFont`'s own field order guarantees.
+    ///
+    /// # Errors
+    ///
+    /// Returns the exact error CNA reports. On any failure nothing is created
+    /// and neither handle leaks.
+    pub fn load_sprite_font(
+        &self,
+        graphics_device: &GraphicsDevice,
+        asset_name: &str,
+    ) -> Result<(crate::graphics::SpriteFont, Arc<Texture2D>)> {
+        let mut font = sys::CNA_INVALID_HANDLE;
+        let mut atlas = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the manager handle is owned, the name is borrowed and copied,
+        // and both outputs are live locals receiving owned handles.
+        self.native.check(unsafe {
+            (self.native.runtime.content_manager_load_sprite_font)(
+                self.handle,
+                string_view(asset_name),
+                &mut font,
+                &mut atlas,
+            )
+        })?;
+        let texture = match Texture2D::from_owned_handle(graphics_device, atlas) {
+            Ok(texture) => Arc::new(texture),
+            Err(error) => {
+                // The font references the atlas, so it goes first. Neither
+                // handle has an owner yet, which is why this is the one place
+                // both can be released.
+                let _ = self.native.destroy_sprite_font(font);
+                let _ = self.native.destroy_texture(atlas);
+                return Err(error);
+            }
+        };
+        let adopted = crate::graphics::SpriteFont::adopt(Arc::clone(&texture), font)?;
+        Ok((adopted, texture))
+    }
+
+    /// Loads a `SoundEffect` by asset name.
+    ///
+    /// CNA's loader deliberately does not cache: a second load of the same
+    /// name answers a second, independently owned effect, which is what XNA's
+    /// own `Load::<SoundEffect>` specialization does.
+    ///
+    /// # Errors
+    ///
+    /// Returns the exact error CNA reports, including the refusal when no
+    /// audio device is available.
+    pub fn load_sound_effect(
+        &self,
+        game: &GameContext<'_>,
+        asset_name: &str,
+    ) -> Result<crate::audio::SoundEffect> {
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the manager handle is owned, the name is borrowed and copied,
+        // and the output is a live local receiving an owned handle.
+        self.native.check(unsafe {
+            (self.native.runtime.content_manager_load_sound_effect)(
+                self.handle,
+                string_view(asset_name),
+                &mut handle,
+            )
+        })?;
+        crate::audio::SoundEffect::adopt(game, handle)
+    }
+
     /// Loads a texture by asset name.
     pub fn load_texture2d(
         &self,

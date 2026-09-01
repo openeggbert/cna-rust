@@ -903,9 +903,50 @@ impl ContentReaderExt for ContentReader {
         self.read_u64()
     }
 
+    /// XNA `ContentReader.ReadChar`, which is `BinaryReader`'s.
+    ///
+    /// **UTF-8, not UTF-16.** `ContentReader` is constructed as
+    /// `new BinaryReader(stream)`, and that overload's encoding is UTF-8 with
+    /// no BOM, so one `char` is one to three bytes rather than a little-endian
+    /// code unit. A real XNA `SpriteFont` says so plainly: MonoGame's own
+    /// `Default.xnb` stores its 95 characters as `20 21 22 23 ...`, one byte
+    /// each, where a UTF-16 reader sees 47 characters of mojibake and then
+    /// runs a byte late for the rest of the file.
+    ///
+    /// A four-byte sequence is refused. .NET's `char` is a UTF-16 code unit
+    /// and `BinaryReader.ReadChar` throws `ArgumentException` rather than
+    /// returning half a surrogate pair; Rust's `char` could hold the scalar,
+    /// and holding it would be the projection inventing a value XNA cannot
+    /// produce.
     fn ReadChar(&self) -> Result<char> {
-        char::from_u32(u32::from(self.read_u16()?))
-            .ok_or_else(|| xnb_error(&self.asset_name, "content character is invalid"))
+        let lead = self.read_u8()?;
+        let length = match lead {
+            0x00..=0x7f => 1,
+            0xc2..=0xdf => 2,
+            0xe0..=0xef => 3,
+            0xf0..=0xf4 => 4,
+            _ => {
+                return Err(xnb_error(
+                    &self.asset_name,
+                    "content character does not start a UTF-8 sequence",
+                ))
+            }
+        };
+        let mut bytes = vec![lead];
+        bytes.extend_from_slice(&self.read_bytes(length - 1)?);
+        let text = core::str::from_utf8(&bytes)
+            .map_err(|_| xnb_error(&self.asset_name, "content character is not valid UTF-8"))?;
+        let value = text
+            .chars()
+            .next()
+            .ok_or_else(|| xnb_error(&self.asset_name, "content character is empty"))?;
+        if u32::from(value) > u32::from(u16::MAX) {
+            return Err(xnb_error(
+                &self.asset_name,
+                "content character is outside the basic multilingual plane, which XNA's char cannot hold",
+            ));
+        }
+        Ok(value)
     }
 
     fn ReadString(&self) -> Result<String> {
