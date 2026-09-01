@@ -1661,6 +1661,7 @@ pub type CNA_SensorEventRegistrationHandle = CNA_Handle;
 pub type CNA_AccelerometerHandle = CNA_Handle;
 pub type CNA_CompassHandle = CNA_Handle;
 pub type CNA_GyroscopeHandle = CNA_Handle;
+pub type CNA_MotionHandle = CNA_Handle;
 pub type CNA_SensorType = u32;
 pub type CNA_SensorState = u32;
 
@@ -1709,6 +1710,57 @@ pub struct CNA_GyroscopeReading {
     pub timestamp: CNA_DateTimeOffset,
     pub rotation_rate: CNA_Vector3,
 }
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_AttitudeReading {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub timestamp: CNA_DateTimeOffset,
+    pub pitch: f32,
+    pub roll: f32,
+    pub yaw: f32,
+    pub quaternion: CNA_Quaternion,
+    pub rotation_matrix: CNA_Matrix,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_MotionReading {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub timestamp: CNA_DateTimeOffset,
+    pub attitude: CNA_AttitudeReading,
+    pub device_acceleration: CNA_Vector3,
+    pub device_rotation_rate: CNA_Vector3,
+    pub gravity: CNA_Vector3,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_AccelerometerReadingEventInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub timestamp: CNA_DateTimeOffset,
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}
+
+// The sensor event callbacks. `Option` so a null callback is expressible: the
+// C side accepts one, and a `fn` pointer in Rust cannot be null.
+pub type CNA_SensorEventCallback = Option<unsafe extern "C" fn(context: *mut c_void)>;
+pub type CNA_AccelerometerReadingCallback =
+    Option<unsafe extern "C" fn(reading: *const CNA_AccelerometerReading, context: *mut c_void)>;
+pub type CNA_AccelerometerReadingEventCallback = Option<
+    unsafe extern "C" fn(info: *const CNA_AccelerometerReadingEventInfo, context: *mut c_void),
+>;
+pub type CNA_CompassReadingCallback =
+    Option<unsafe extern "C" fn(reading: *const CNA_CompassReading, context: *mut c_void)>;
+pub type CNA_GyroscopeReadingCallback =
+    Option<unsafe extern "C" fn(reading: *const CNA_GyroscopeReading, context: *mut c_void)>;
+pub type CNA_MotionReadingCallback =
+    Option<unsafe extern "C" fn(reading: *const CNA_MotionReading, context: *mut c_void)>;
 
 pub type CNA_InputDeviceEventRegistrationHandle = CNA_Handle;
 pub type CNA_MouseCursorHandle = CNA_Handle;
@@ -11391,4 +11443,154 @@ pub type cna_model_set_gltf_import_report_ext_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_model_set_material_variant_ext_fn = unsafe extern "C" fn(
     CNA_ModelHandle, i32,
+) -> CNA_Result;
+
+// --- RUST-EXT-015h: the motion sensor, sensor events, and the test backends -
+//
+// The accelerometer and gyroscope have no `set_test_backend_ext`; their
+// deterministic backend is the `_for_tests_ext` set instead. Those routes are
+// bound for the same reason the compass's test backend is: without them there
+// is no sensor on any verification machine and no way to reach a single line
+// past the unsupported refusal.
+pub type cna_accelerometer_copy_last_dispatch_exception_message_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_accelerometer_dispatch_to_instances_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *const CNA_AccelerometerHandle, u64, f32, f32, f32,
+) -> CNA_Result;
+pub type cna_accelerometer_get_dispatch_exception_count_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut i32,
+) -> CNA_Result;
+pub type cna_accelerometer_get_last_dispatch_exception_message_size_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut u64,
+) -> CNA_Result;
+pub type cna_accelerometer_get_subsystem_held_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_AccelerometerHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_accelerometer_is_sensor_connected_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, i64, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_accelerometer_register_started_instance_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_AccelerometerHandle,
+) -> CNA_Result;
+pub type cna_accelerometer_set_disposal_cleanup_hook_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_AccelerometerHandle, CNA_SensorEventCallback, *mut c_void,
+) -> CNA_Result;
+pub type cna_accelerometer_set_event_watch_registration_failure_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_accelerometer_set_started_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_AccelerometerHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_accelerometer_set_supported_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_AccelerometerHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_accelerometer_subscribe_current_value_changed_fn = unsafe extern "C" fn(
+    CNA_AccelerometerHandle, CNA_AccelerometerReadingCallback, *mut c_void, *mut CNA_SensorEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_accelerometer_subscribe_reading_changed_fn = unsafe extern "C" fn(
+    CNA_AccelerometerHandle, CNA_AccelerometerReadingEventCallback, *mut c_void, *mut CNA_SensorEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_accelerometer_unregister_started_instance_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_AccelerometerHandle,
+) -> CNA_Result;
+pub type cna_compass_inject_calibration_request_ext_fn = unsafe extern "C" fn(
+    CNA_CompassHandle,
+) -> CNA_Result;
+pub type cna_compass_set_test_backend_ext_fn = unsafe extern "C" fn(
+    CNA_CompassHandle, CNA_Bool, CNA_Bool,
+) -> CNA_Result;
+pub type cna_compass_subscribe_calibrate_fn = unsafe extern "C" fn(
+    CNA_CompassHandle, CNA_SensorEventCallback, *mut c_void, *mut CNA_SensorEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_compass_subscribe_current_value_changed_fn = unsafe extern "C" fn(
+    CNA_CompassHandle, CNA_CompassReadingCallback, *mut c_void, *mut CNA_SensorEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_gyroscope_copy_last_dispatch_exception_message_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_gyroscope_dispatch_to_instances_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *const CNA_GyroscopeHandle, u64, f32, f32, f32,
+) -> CNA_Result;
+pub type cna_gyroscope_get_dispatch_exception_count_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut i32,
+) -> CNA_Result;
+pub type cna_gyroscope_get_last_dispatch_exception_message_size_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut u64,
+) -> CNA_Result;
+pub type cna_gyroscope_get_subsystem_held_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_GyroscopeHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_gyroscope_is_sensor_connected_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, i64, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_gyroscope_register_started_instance_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_GyroscopeHandle,
+) -> CNA_Result;
+pub type cna_gyroscope_set_disposal_cleanup_hook_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_GyroscopeHandle, CNA_SensorEventCallback, *mut c_void,
+) -> CNA_Result;
+pub type cna_gyroscope_set_event_watch_registration_failure_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_gyroscope_set_started_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_GyroscopeHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_gyroscope_set_supported_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_GyroscopeHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_gyroscope_subscribe_current_value_changed_fn = unsafe extern "C" fn(
+    CNA_GyroscopeHandle, CNA_GyroscopeReadingCallback, *mut c_void, *mut CNA_SensorEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_gyroscope_unregister_started_instance_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_GyroscopeHandle,
+) -> CNA_Result;
+pub type cna_motion_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_MotionHandle,
+) -> CNA_Result;
+pub type cna_motion_destroy_fn = unsafe extern "C" fn(CNA_MotionHandle) -> CNA_Result;
+pub type cna_motion_dispose_fn = unsafe extern "C" fn(CNA_MotionHandle) -> CNA_Result;
+pub type cna_motion_get_current_value_fn = unsafe extern "C" fn(
+    CNA_MotionHandle, *mut CNA_MotionReading,
+) -> CNA_Result;
+pub type cna_motion_get_is_attitude_north_referenced_ext_fn = unsafe extern "C" fn(
+    CNA_MotionHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_motion_get_is_data_valid_fn = unsafe extern "C" fn(
+    CNA_MotionHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_motion_get_is_supported_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_motion_get_state_fn = unsafe extern "C" fn(
+    CNA_MotionHandle, *mut CNA_SensorState,
+) -> CNA_Result;
+pub type cna_motion_get_time_between_updates_ticks_fn = unsafe extern "C" fn(
+    CNA_MotionHandle, *mut i64,
+) -> CNA_Result;
+pub type cna_motion_inject_calibration_request_ext_fn = unsafe extern "C" fn(
+    CNA_MotionHandle,
+) -> CNA_Result;
+pub type cna_motion_inject_synthetic_update_ext_fn = unsafe extern "C" fn(
+    CNA_MotionHandle, *const CNA_MotionReading,
+) -> CNA_Result;
+pub type cna_motion_set_test_backend_ext_fn = unsafe extern "C" fn(
+    CNA_MotionHandle, CNA_Bool, CNA_Bool, CNA_Bool,
+) -> CNA_Result;
+pub type cna_motion_set_time_between_updates_ticks_fn = unsafe extern "C" fn(
+    CNA_MotionHandle, i64,
+) -> CNA_Result;
+pub type cna_motion_start_fn = unsafe extern "C" fn(CNA_MotionHandle) -> CNA_Result;
+pub type cna_motion_stop_fn = unsafe extern "C" fn(CNA_MotionHandle) -> CNA_Result;
+pub type cna_motion_subscribe_calibrate_fn = unsafe extern "C" fn(
+    CNA_MotionHandle, CNA_SensorEventCallback, *mut c_void, *mut CNA_SensorEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_motion_subscribe_current_value_changed_fn = unsafe extern "C" fn(
+    CNA_MotionHandle, CNA_MotionReadingCallback, *mut c_void, *mut CNA_SensorEventRegistrationHandle,
+) -> CNA_Result;
+pub type cna_sensors_get_last_error_id_ext_fn = unsafe extern "C" fn(
+    *mut i32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_sensor_unsubscribe_ext_fn = unsafe extern "C" fn(
+    CNA_SensorEventRegistrationHandle,
 ) -> CNA_Result;

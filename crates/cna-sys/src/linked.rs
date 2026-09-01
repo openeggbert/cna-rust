@@ -10774,4 +10774,209 @@ extern "C" {
         argument0: CNA_ModelHandle,
         argument1: i32,
     ) -> CNA_Result;
+    pub fn cna_accelerometer_copy_last_dispatch_exception_message_for_tests_ext(
+        argument0: CNA_Handle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_dispatch_to_instances_for_tests_ext(
+        argument0: CNA_Handle,
+        argument1: *const CNA_AccelerometerHandle,
+        argument2: u64,
+        argument3: f32,
+        argument4: f32,
+        argument5: f32,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_get_dispatch_exception_count_for_tests_ext(
+        argument0: CNA_Handle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_get_last_dispatch_exception_message_size_for_tests_ext(
+        argument0: CNA_Handle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_get_subsystem_held_for_tests_ext(
+        argument0: CNA_AccelerometerHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_is_sensor_connected_for_tests_ext(
+        argument0: CNA_Handle,
+        argument1: i64,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_register_started_instance_for_tests_ext(
+        argument0: CNA_AccelerometerHandle,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_set_disposal_cleanup_hook_for_tests_ext(
+        argument0: CNA_AccelerometerHandle,
+        argument1: CNA_SensorEventCallback,
+        argument2: *mut c_void,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_set_event_watch_registration_failure_for_tests_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_set_started_for_tests_ext(
+        argument0: CNA_AccelerometerHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_set_supported_for_tests_ext(
+        argument0: CNA_AccelerometerHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_subscribe_current_value_changed(
+        argument0: CNA_AccelerometerHandle,
+        argument1: CNA_AccelerometerReadingCallback,
+        argument2: *mut c_void,
+        argument3: *mut CNA_SensorEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_subscribe_reading_changed(
+        argument0: CNA_AccelerometerHandle,
+        argument1: CNA_AccelerometerReadingEventCallback,
+        argument2: *mut c_void,
+        argument3: *mut CNA_SensorEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_accelerometer_unregister_started_instance_for_tests_ext(
+        argument0: CNA_AccelerometerHandle,
+    ) -> CNA_Result;
+    pub fn cna_compass_inject_calibration_request_ext(argument0: CNA_CompassHandle) -> CNA_Result;
+    pub fn cna_compass_set_test_backend_ext(
+        argument0: CNA_CompassHandle,
+        argument1: CNA_Bool,
+        argument2: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_compass_subscribe_calibrate(
+        argument0: CNA_CompassHandle,
+        argument1: CNA_SensorEventCallback,
+        argument2: *mut c_void,
+        argument3: *mut CNA_SensorEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_compass_subscribe_current_value_changed(
+        argument0: CNA_CompassHandle,
+        argument1: CNA_CompassReadingCallback,
+        argument2: *mut c_void,
+        argument3: *mut CNA_SensorEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_copy_last_dispatch_exception_message_for_tests_ext(
+        argument0: CNA_Handle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_dispatch_to_instances_for_tests_ext(
+        argument0: CNA_Handle,
+        argument1: *const CNA_GyroscopeHandle,
+        argument2: u64,
+        argument3: f32,
+        argument4: f32,
+        argument5: f32,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_get_dispatch_exception_count_for_tests_ext(
+        argument0: CNA_Handle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_get_last_dispatch_exception_message_size_for_tests_ext(
+        argument0: CNA_Handle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_get_subsystem_held_for_tests_ext(
+        argument0: CNA_GyroscopeHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_is_sensor_connected_for_tests_ext(
+        argument0: CNA_Handle,
+        argument1: i64,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_register_started_instance_for_tests_ext(
+        argument0: CNA_GyroscopeHandle,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_set_disposal_cleanup_hook_for_tests_ext(
+        argument0: CNA_GyroscopeHandle,
+        argument1: CNA_SensorEventCallback,
+        argument2: *mut c_void,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_set_event_watch_registration_failure_for_tests_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_set_started_for_tests_ext(
+        argument0: CNA_GyroscopeHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_set_supported_for_tests_ext(
+        argument0: CNA_GyroscopeHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_subscribe_current_value_changed(
+        argument0: CNA_GyroscopeHandle,
+        argument1: CNA_GyroscopeReadingCallback,
+        argument2: *mut c_void,
+        argument3: *mut CNA_SensorEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_gyroscope_unregister_started_instance_for_tests_ext(
+        argument0: CNA_GyroscopeHandle,
+    ) -> CNA_Result;
+    pub fn cna_motion_create(argument0: CNA_Handle, argument1: *mut CNA_MotionHandle) -> CNA_Result;
+    pub fn cna_motion_destroy(argument0: CNA_MotionHandle) -> CNA_Result;
+    pub fn cna_motion_dispose(argument0: CNA_MotionHandle) -> CNA_Result;
+    pub fn cna_motion_get_current_value(
+        argument0: CNA_MotionHandle,
+        argument1: *mut CNA_MotionReading,
+    ) -> CNA_Result;
+    pub fn cna_motion_get_is_attitude_north_referenced_ext(
+        argument0: CNA_MotionHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_motion_get_is_data_valid(
+        argument0: CNA_MotionHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_motion_get_is_supported(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_motion_get_state(
+        argument0: CNA_MotionHandle,
+        argument1: *mut CNA_SensorState,
+    ) -> CNA_Result;
+    pub fn cna_motion_get_time_between_updates_ticks(
+        argument0: CNA_MotionHandle,
+        argument1: *mut i64,
+    ) -> CNA_Result;
+    pub fn cna_motion_inject_calibration_request_ext(argument0: CNA_MotionHandle) -> CNA_Result;
+    pub fn cna_motion_inject_synthetic_update_ext(
+        argument0: CNA_MotionHandle,
+        argument1: *const CNA_MotionReading,
+    ) -> CNA_Result;
+    pub fn cna_motion_set_test_backend_ext(
+        argument0: CNA_MotionHandle,
+        argument1: CNA_Bool,
+        argument2: CNA_Bool,
+        argument3: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_motion_set_time_between_updates_ticks(
+        argument0: CNA_MotionHandle,
+        argument1: i64,
+    ) -> CNA_Result;
+    pub fn cna_motion_start(argument0: CNA_MotionHandle) -> CNA_Result;
+    pub fn cna_motion_stop(argument0: CNA_MotionHandle) -> CNA_Result;
+    pub fn cna_motion_subscribe_calibrate(
+        argument0: CNA_MotionHandle,
+        argument1: CNA_SensorEventCallback,
+        argument2: *mut c_void,
+        argument3: *mut CNA_SensorEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_motion_subscribe_current_value_changed(
+        argument0: CNA_MotionHandle,
+        argument1: CNA_MotionReadingCallback,
+        argument2: *mut c_void,
+        argument3: *mut CNA_SensorEventRegistrationHandle,
+    ) -> CNA_Result;
+    pub fn cna_sensor_unsubscribe_ext(argument0: CNA_SensorEventRegistrationHandle) -> CNA_Result;
+    pub fn cna_sensors_get_last_error_id_ext(
+        argument0: *mut i32,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
 }

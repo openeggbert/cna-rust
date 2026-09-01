@@ -463,13 +463,25 @@
           "cna_mouse_state_copy_string",
           "cna_mouse_state_get_string_size",
           "cna_touch_location_copy_string",
-          "cna_touch_location_get_string_size"
+          "cna_touch_location_get_string_size",
+          "cna_accelerometer_reading_copy_string",
+          "cna_accelerometer_reading_get_string_size",
+          "cna_accelerometer_reading_event_info_copy_string",
+          "cna_accelerometer_reading_event_info_get_string_size",
+          "cna_compass_reading_copy_string",
+          "cna_compass_reading_get_string_size",
+          "cna_gyroscope_reading_copy_string",
+          "cna_gyroscope_reading_get_string_size",
+          "cna_attitude_reading_copy_string",
+          "cna_attitude_reading_get_string_size",
+          "cna_motion_reading_copy_string",
+          "cna_motion_reading_get_string_size"
         ],
-        "reason": "XNA's ToString() formats, which Rust implements for each of these types with the same layout: Viewport::ToString, GamePadState::ToString, MouseState::ToString and TouchLocation::ToString. Named one by one rather than by suffix on purpose -- the same routes exist for types Rust has no ToString for yet, and a wildcard here would quietly claim a fidelity this crate does not have.",
+        "reason": "XNA's ToString() formats, which Rust implements for each of these types with the same layout: Viewport::ToString, GamePadState::ToString, MouseState::ToString, TouchLocation::ToString, and the five sensor readings plus the legacy AccelerometerReadingEvent. Named one by one rather than by suffix on purpose -- the same routes exist for types Rust has no ToString for yet, and a wildcard here would quietly claim a fidelity this crate does not have.",
         "rustEvidence": [
           "pub fn ToString"
         ],
-        "evidence": "crates/cna/src/graphics/viewport.rs, crates/cna/src/input/gamepad.rs, crates/cna/src/input/mouse.rs, crates/cna/src/input/touch.rs"
+        "evidence": "crates/cna/src/graphics/viewport.rs, crates/cna/src/input/gamepad.rs, crates/cna/src/input/mouse.rs, crates/cna/src/input/touch.rs, crates/cna/src/extensions/sensors.rs; each format was read off the matching cnanext ToString() rather than guessed"
       },
       {
         "id": "value-maths-in-rust",
