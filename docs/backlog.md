@@ -4,7 +4,8 @@ Durable task list. Each entry records the exact identity, its authority, the
 current state, the target, any blocker, the qualification, and status.
 
 Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
-`BLOCKED_PLATFORM`, `BLOCKED_HARDWARE`, `BLOCKED_ASSET`.
+`BLOCKED_PLATFORM`, `BLOCKED_HARDWARE`, `BLOCKED_ASSET`,
+`PRODUCT_DECISION_REQUIRED`.
 
 ## ABI
 
