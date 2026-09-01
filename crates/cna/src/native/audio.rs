@@ -503,7 +503,12 @@ impl Native {
             .map_err(|_| CnaError::InvalidInput("a sample offset cannot be negative"))?;
         let length = usize::try_from(count)
             .map_err(|_| CnaError::InvalidInput("a sample count cannot be negative"))?;
-        if start.checked_add(length).is_none_or(|end| end > samples.len()) {
+        // `map_or(true, ..)` rather than `is_none_or`, which is 1.82 and this
+        // crate's declared MSRV is 1.74.
+        if start
+            .checked_add(length)
+            .map_or(true, |end| end > samples.len())
+        {
             return Err(CnaError::InvalidInput(
                 "the submitted range must lie inside the sample buffer",
             ));
