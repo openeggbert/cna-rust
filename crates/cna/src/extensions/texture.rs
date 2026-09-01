@@ -361,6 +361,7 @@ fn to_native_color(color: Color) -> sys::CNA_Color {
 /// use cna::extensions::texture::TextureCubeDds;
 /// let cube = TextureCube::FromDdsMemory(&device, &blob)?;
 /// ```
+#[allow(non_snake_case)]
 pub trait TextureCubeDds: Sized {
     /// Decodes a DDS cube map already in memory.
     ///
@@ -378,6 +379,7 @@ pub trait TextureCubeDds: Sized {
 /// trip through a typed slice to hand them over.
 ///
 /// A CNA extension: import it to call this.
+#[allow(non_snake_case)]
 pub trait Texture3DBytes {
     /// Uploads tightly packed bytes into a sub-volume.
     ///

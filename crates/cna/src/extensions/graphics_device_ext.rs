@@ -890,6 +890,7 @@ pub use crate::game::{DeviceSettingsObserver, ObservedDeviceSettings, Presentati
 /// use cna::extensions::graphics_device_ext::GraphicsDeviceManagerExt;
 /// let observer = manager.ObserveDeviceSettings(|settings| { /* ... */ })?;
 /// ```
+#[allow(non_snake_case)]
 pub trait GraphicsDeviceManagerExt {
     /// The device CNA currently has for this manager, if any.
     ///

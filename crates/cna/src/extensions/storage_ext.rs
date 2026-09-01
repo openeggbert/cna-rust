@@ -36,6 +36,7 @@ pub fn root() -> Result<String> {
 /// use cna::extensions::storage_ext::StorageContainerExt;
 /// if container.NativeIsDisposed()? { /* the device went away */ }
 /// ```
+#[allow(non_snake_case)]
 pub trait StorageContainerExt {
     /// Whether CNA considers the container disposed.
     ///

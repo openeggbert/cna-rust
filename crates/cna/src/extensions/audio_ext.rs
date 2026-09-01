@@ -121,6 +121,7 @@ pub trait NativeDisposalState {
 /// use cna::extensions::audio_ext::DynamicSoundEffectInstanceExt;
 /// instance.SubmitFloatBuffer(&samples, 0, samples.len() as i32)?;
 /// ```
+#[allow(non_snake_case)]
 pub trait DynamicSoundEffectInstanceExt {
     /// Submits a range of 32-bit float samples, which CNA copies during the
     /// call.
@@ -158,6 +159,7 @@ pub trait DynamicSoundEffectInstanceExt {
 /// use cna::extensions::audio_ext::MicrophoneExt;
 /// Microphone::CheckAllBuffers(game)?;
 /// ```
+#[allow(non_snake_case)]
 pub trait MicrophoneExt {
     /// Checks every microphone's capture buffer and raises what is due.
     ///
@@ -182,6 +184,7 @@ pub trait MicrophoneExt {
 /// use cna::extensions::audio_ext::AudioEngineExt;
 /// let text = engine.RendererText(0)?;
 /// ```
+#[allow(non_snake_case)]
 pub trait AudioEngineExt {
     /// The renderer descriptor at an index, as CNA formats it.
     ///

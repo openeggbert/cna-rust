@@ -10,6 +10,14 @@ against the result from outside the workspace.
 
 A file the crate needs but does not package fails the build here rather than on
 a user's machine.
+
+It also answers the question `RUST-SURFACE-001` created. CNA's own members no
+longer sit on strict XNA types; they are extension-trait methods, so the call
+that used to compile against a bare `use cna::...::Song` must now fail and the
+same call with `use cna::extensions::media::SongExt` must succeed. Both are
+built here, from the packaged sources, outside the workspace -- the positive one
+because a trait a consumer cannot import is not published, and the negative one
+because a gate that only ever compiles proves nothing.
 """
 
 from __future__ import annotations
@@ -28,6 +36,100 @@ DEFAULT_BUILD = ROOT / "build-consumer"
 # Cargo generates these into the archive; they are not crate sources and a
 # staged tree must not carry the workspace's own resolved lock file.
 GENERATED = {"Cargo.toml.orig", ".cargo_vcs_info.json", "Cargo.lock"}
+
+
+
+# The call shapes a consumer writes against the migrated surface. Nothing here
+# runs a native route: the point is that the names resolve.
+EXTENSION_CALLS = """\
+#[allow(dead_code, unused_variables)]
+fn extension_call_shapes(
+    game: &GameContext<'_>,
+    device: &GraphicsDevice,
+    manager: &GraphicsDeviceManager,
+    song: &Song,
+) {
+    // An associated function on a trait, resolved through the strict type.
+    let _ = Song::FromFile(game, "theme", "theme.ogg");
+    // Ordinary receiver methods.
+    let _ = song.HandleText();
+    let _ = device.set_string_marker("frame");
+    let _ = manager.HasNativeGraphicsDevice();
+}
+"""
+
+CONSUMER_PREAMBLE = """\
+//! Compiles the packaged binding source and touches both halves of it.
+use cna::extensions::graphics::NativeEnumValue;
+use cna::Microsoft::Xna::Framework::Graphics::{Blend, GraphicsDevice};
+use cna::Microsoft::Xna::Framework::Media::Song;
+use cna::Microsoft::Xna::Framework::{GameContext, GraphicsDeviceManager, TimeSpan, Vector3};
+"""
+
+CONSUMER_IMPORTS = """\
+use cna::extensions::graphics_device_ext::{DeviceStateExt, GraphicsDeviceManagerExt};
+use cna::extensions::media::SongExt;
+"""
+
+CONSUMER_BODY = """\
+fn main() {
+    // Strict XNA: exact managed value behaviour, no native library needed.
+    assert_eq!(Vector3::Forward.Z, -1.0);
+    assert_eq!(TimeSpan::FromSeconds(1.5).Ticks(), 15_000_000);
+    // A CNA extension that is pure arithmetic, so it runs without a library.
+    assert_eq!(Blend::from_native_value(1), Some(Blend::Zero));
+    assert_eq!(Blend::from_native_value(9_999), None);
+    println!("cna-packaged-source-consumer: packaged sources build and run");
+}
+"""
+
+CONSUMER_MAIN = CONSUMER_PREAMBLE + CONSUMER_IMPORTS + "\n" + CONSUMER_BODY + "\n" + EXTENSION_CALLS
+
+
+def extension_calls_resolve(build: Path, staged: Path, jobs: str) -> dict[str, bool]:
+    """Builds the same extension calls with the traits imported, and without.
+
+    Without them the call must not resolve. A consumer that compiles either way
+    would mean the members are still inherent on the strict XNA types, which is
+    the state `RUST-SURFACE-001` existed to end.
+    """
+    outcomes = {}
+    for label, imports in (("with", CONSUMER_IMPORTS), ("without", "")):
+        project = build / f"extension-{label}"
+        if project.exists():
+            shutil.rmtree(project)
+        (project / "src").mkdir(parents=True)
+        (project / "Cargo.toml").write_text(
+            "[workspace]\n\n"
+            "[package]\n"
+            f'name = "cna-extension-{label}-import"\n'
+            'version = "0.0.0"\n'
+            'edition = "2021"\n\n'
+            "[dependencies]\n"
+            f'cna = {{ package = "cna-rust", path = "{staged / "cna"}" }}\n',
+            encoding="utf-8",
+        )
+        (project / "src/main.rs").write_text(
+            CONSUMER_PREAMBLE + imports + "\nfn main() {}\n\n" + EXTENSION_CALLS,
+            encoding="utf-8",
+        )
+        environment = dict(os.environ)
+        environment["CARGO_TARGET_DIR"] = str(build / "target")
+        completed = subprocess.run(
+            ["cargo", "build", "--quiet", "-j", jobs],
+            cwd=project, env=environment, text=True, capture_output=True,
+        )
+        if label == "with":
+            if completed.returncode != 0:
+                print(completed.stderr, file=sys.stderr)
+            outcomes["with"] = completed.returncode == 0
+        else:
+            # E0599 is "no method named ..."; anything else means the build
+            # broke for an unrelated reason and proves nothing.
+            outcomes["without"] = completed.returncode != 0 and "E0599" in completed.stderr
+            if not outcomes["without"]:
+                print(completed.stderr, file=sys.stderr)
+    return outcomes
 
 
 def arguments() -> argparse.Namespace:
@@ -108,20 +210,7 @@ def main() -> int:
         'cna = { package = "cna-rust", path = "../staged/cna" }\n',
         encoding="utf-8",
     )
-    (consumer / "src/main.rs").write_text(
-        "//! Compiles the packaged binding source and touches both halves of it.\n"
-        "use cna::extensions::runtime::RendererType;\n"
-        "use cna::Microsoft::Xna::Framework::{Vector3, TimeSpan};\n\n"
-        "fn main() {\n"
-        "    // Strict XNA: exact managed value behaviour, no native library needed.\n"
-        "    assert_eq!(Vector3::Forward.Z, -1.0);\n"
-        "    assert_eq!(TimeSpan::FromSeconds(1.5).Ticks(), 15_000_000);\n"
-        "    // CNA extensions: an identity value, again without a library.\n"
-        "    assert_eq!(RendererType::VULKAN.value(), 8);\n"
-        "    println!(\"cna-packaged-source-consumer: packaged sources build and run\");\n"
-        "}\n",
-        encoding="utf-8",
-    )
+    (consumer / "src/main.rs").write_text(CONSUMER_MAIN, encoding="utf-8")
 
     environment = dict(os.environ)
     environment["CARGO_TARGET_DIR"] = str(build / "target")
@@ -136,13 +225,20 @@ def main() -> int:
         for path in staged.rglob("*")
         if path.is_file() and str(ROOT) in path.read_text(encoding="utf-8", errors="ignore")
     ]
+    resolves = extension_calls_resolve(build, staged, args.jobs)
+    print(f"PACKAGE_CONSUMER_EXTENSION_WITH_IMPORT={'PASS' if resolves['with'] else 'FAIL'}")
+    print(
+        "PACKAGE_CONSUMER_EXTENSION_WITHOUT_IMPORT="
+        + ("REFUSED" if resolves["without"] else "COMPILED")
+    )
     print(f"PACKAGE_CONSUMER_SYS_FILES={sys_count}")
     print(f"PACKAGE_CONSUMER_CNA_FILES={cna_count}")
     print(f"PACKAGE_CONSUMER_WORKSPACE_PATH_LEAKS={len(leaks)}")
     for leak in leaks:
         print(f"  leak: {leak}")
-    print("PACKAGE_CONSUMER_STATUS=" + ("FAIL" if leaks else "PASS"))
-    return 1 if leaks else 0
+    failed = bool(leaks) or not resolves["with"] or not resolves["without"]
+    print("PACKAGE_CONSUMER_STATUS=" + ("FAIL" if failed else "PASS"))
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
