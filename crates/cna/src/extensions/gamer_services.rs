@@ -31,7 +31,7 @@ use crate::gamer_services::{
     Achievement, AchievementCollection, AvatarAnimation, AvatarAnimationPreset, AvatarBodyType,
     AvatarRenderer, FriendCollection, SignedInGamer,
 };
-use crate::graphics::GraphicsDevice;
+use crate::graphics::{GraphicsDevice, SpriteBatch, SpriteFont, Texture2D};
 use crate::value::Color;
 use crate::input::PlayerIndex;
 
@@ -919,6 +919,91 @@ impl AvatarRealRendering for AvatarRenderer {
                 view.value,
                 position.Ticks(),
                 u8::from(r#loop).into(),
+            )
+        })
+    }
+}
+
+/// Drawing the Guide screens CNA leaves pending.
+///
+/// XNA's `Guide` was the console's own overlay: `BeginShowMessageBox` put a
+/// system UI on screen and the game did nothing. There is no such overlay
+/// outside Xbox Live, so CNA leaves the request *pending* and answers `End*`
+/// with "no answer yet" -- which [`PendingGuideRequest`] publishes, and which
+/// is how a host resolves one deterministically.
+///
+/// That leaves the other half: something has to *draw* it. CNA can, given a
+/// device, a sprite batch, a font and a single white pixel, and this is that
+/// route. A game with its own UI should still draw its own; this is for a game
+/// that called `BeginShowMessageBox` and expects something to appear.
+///
+/// Drawing when nothing is pending is a successful no-op, so a game can call
+/// it every frame without asking first.
+pub trait DrawsPendingGuide {
+    /// Draws the pending message box, if there is one.
+    ///
+    /// # Errors
+    ///
+    /// Returns the exact error CNA reports.
+    fn draw_pending_message_box(
+        &self,
+        batch: &SpriteBatch,
+        font: &SpriteFont,
+        whitePixel: &Texture2D,
+    ) -> Result<()>;
+
+    /// Draws the pending keyboard input, if there is one.
+    ///
+    /// # Errors
+    ///
+    /// Returns the exact error CNA reports.
+    fn draw_pending_keyboard_input(
+        &self,
+        batch: &SpriteBatch,
+        font: &SpriteFont,
+        whitePixel: &Texture2D,
+    ) -> Result<()>;
+}
+
+impl DrawsPendingGuide for GraphicsDevice {
+    fn draw_pending_message_box(
+        &self,
+        batch: &SpriteBatch,
+        font: &SpriteFont,
+        whitePixel: &Texture2D,
+    ) -> Result<()> {
+        let runtime = crate::gamer_services::open_runtime()?;
+        // SAFETY: all four handles are live for the call.
+        runtime.check(unsafe {
+            (runtime
+                .native()
+                .gamer_services
+                .guide_render_pending_message_box_ext)(
+                self.handle()?,
+                batch.handle()?,
+                font.handle()?,
+                whitePixel.handle()?,
+            )
+        })
+    }
+
+    fn draw_pending_keyboard_input(
+        &self,
+        batch: &SpriteBatch,
+        font: &SpriteFont,
+        whitePixel: &Texture2D,
+    ) -> Result<()> {
+        let runtime = crate::gamer_services::open_runtime()?;
+        // SAFETY: all four handles are live for the call.
+        runtime.check(unsafe {
+            (runtime
+                .native()
+                .gamer_services
+                .guide_render_pending_keyboard_input_ext)(
+                self.handle()?,
+                batch.handle()?,
+                font.handle()?,
+                whitePixel.handle()?,
             )
         })
     }

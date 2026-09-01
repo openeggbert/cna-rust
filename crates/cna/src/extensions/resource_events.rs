@@ -12,14 +12,17 @@
 //! than for every buffer with a handle -- an implementation that always refused
 //! would be a worse projection than none.
 //!
-//! Nothing in Rust could raise this: only CNA knows the device was reset.
+//! Nothing in Rust could raise this on its own: only CNA knows the device was
+//! reset. That is why `DynamicVertexBuffer::AddContentLostHandler` and its
+//! index counterpart used to **never fire** -- they were added, removed, and
+//! emitted nowhere, so a caller that registered one waited forever.
 //!
-//! Which is why `DynamicVertexBuffer::AddContentLostHandler` and its index
-//! counterpart **never fire**. Measured: `crates/cna/src/graphics/buffer.rs`
-//! adds and removes those handlers and emits them nowhere, so a caller that
-//! registers one waits forever. `RUST-EXT-018` tracks bridging the XNA-shaped
-//! event onto this native one; until then [`NotifiesContentLost`] is the route
-//! that works, and this note is here so nobody reaches for the other.
+//! `RUST-EXT-018` closed that. Each dynamic buffer now installs **one** of
+//! these subscriptions, on its first XNA-shaped handler, and the trampoline
+//! delivers into the buffer's own handler list in registration order. So both
+//! routes work and they are the same event: this one for a caller who wants
+//! the subscription's lifetime in hand, `AddContentLostHandler` for a caller
+//! writing XNA.
 //!
 //! All three follow one shape, so they share one subscription type. It
 //! withdraws itself on drop, in the only order that is safe: the registration

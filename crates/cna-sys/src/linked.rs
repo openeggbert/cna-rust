@@ -2050,6 +2050,30 @@ extern "C" {
         argument2: *mut c_void,
         argument3: *mut CNA_AudioEventRegistrationHandle,
     ) -> CNA_Result;
+    pub fn cna_audio_engine_subscribe_disposing_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_AudioEventCallback,
+        argument2: *mut c_void,
+        argument3: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_wave_bank_subscribe_disposing_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_AudioEventCallback,
+        argument2: *mut c_void,
+        argument3: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_sound_bank_subscribe_disposing_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_AudioEventCallback,
+        argument2: *mut c_void,
+        argument3: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_cue_subscribe_disposing_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_AudioEventCallback,
+        argument2: *mut c_void,
+        argument3: *mut CNA_Handle,
+    ) -> CNA_Result;
     pub fn cna_audio_unsubscribe_ext(argument0: CNA_AudioEventRegistrationHandle) -> CNA_Result;
     pub fn cna_microphone_get_count(argument0: CNA_Handle, argument1: *mut u64) -> CNA_Result;
     pub fn cna_microphone_get_default_index_ext(

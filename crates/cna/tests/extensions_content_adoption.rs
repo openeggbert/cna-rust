@@ -199,6 +199,7 @@ impl Game for AdoptionGame {
         sprite_font(&manager, &device);
         sound_effect(&manager, game)?;
         a_real_xna_font(self, &manager, &device);
+        the_guide_draws_what_it_left_pending(&manager, &device);
         manager.unload()?;
         println!("OK: adoption");
         Ok(())
@@ -428,4 +429,36 @@ fn a_real_xna_font(game: &AdoptionGame, manager: &NativeContentManager, device: 
             println!("this crate's XNB reader does not decode the fixture's atlas: {text}");
         }
     }
+}
+
+/// The other half of a pending Guide screen: something has to draw it.
+///
+/// CNA leaves `BeginShowMessageBox` pending because there is no console
+/// overlay outside Xbox Live, and publishes a renderer for a game that has to
+/// put it on screen itself. It needs a font, which is why it lives with the
+/// adoption case: a loaded `SpriteFont` is the only one this test has.
+fn the_guide_draws_what_it_left_pending(manager: &NativeContentManager, device: &GraphicsDevice) {
+    use cna::extensions::gamer_services::{DrawsPendingGuide, PendingGuideRequest};
+    use cna::Microsoft::Xna::Framework::Color;
+    use cna::Microsoft::Xna::Framework::Graphics::{SpriteBatch, Texture2D};
+
+    let Ok((font, _atlas)) = manager.load_sprite_font(device, "font") else {
+        println!("no font on this artifact, so the guide renderer has nothing to draw with");
+        return;
+    };
+    let batch = SpriteBatch::new(device).expect("a sprite batch");
+    let white = Texture2D::new(device, 1, 1).expect("a single white pixel");
+    white
+        .SetData(&[Color::White])
+        .expect("fill the pixel");
+
+    // Nothing is pending, and CNA documents that as a successful no-op -- so a
+    // game can call this every frame without asking first.
+    assert!(!PendingGuideRequest::has_message_box().expect("pending state"));
+    device
+        .draw_pending_message_box(&batch, &font, &white)
+        .expect("drawing nothing is a no-op that succeeds");
+    device
+        .draw_pending_keyboard_input(&batch, &font, &white)
+        .expect("the same for keyboard input");
 }

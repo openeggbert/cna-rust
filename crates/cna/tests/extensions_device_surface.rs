@@ -14,11 +14,13 @@ use cna::extensions::device_surface::{
     clone_presentation_parameters, presentation_bounds, usage_preserves_contents, BatchedSprites,
     DeviceSurface, ReadsVertexLayout, Rgba8Data, ScaledSprite,
 };
+use cna::extensions::events::EventArgs;
 use cna::extensions::resource_events::NotifiesContentLost;
 use cna::Microsoft::Xna::Framework::Graphics::{
     BufferUsage, GraphicsDevice, GraphicsProfile, PresentationParameters, RenderTargetUsage,
     SpriteEffects, SurfaceFormat, Texture2D, VertexBuffer, VertexElement, VertexElementFormat,
-    VertexElementUsage, VertexDeclaration, DynamicVertexBuffer,
+    VertexElementUsage, VertexDeclaration, DynamicIndexBuffer, DynamicVertexBuffer,
+    IndexElementSize,
 };
 use cna::Microsoft::Xna::Framework::{Color, GraphicsDeviceInformation, Rectangle, Vector2};
 use cna::{CnaError, ErrorCategory};
@@ -167,6 +169,167 @@ fn content_lost_can_be_subscribed_and_withdrawn() {
     subscription.unsubscribe().expect("withdraw");
     subscription.unsubscribe().expect("withdrawing twice is a no-op");
     drop(subscription);
+    drop(buffer);
+}
+
+fn position_declaration() -> VertexDeclaration {
+    VertexDeclaration::from_vertex_stride_and_elements(
+        12,
+        &[VertexElement::new(
+            0,
+            VertexElementFormat::Vector3,
+            VertexElementUsage::Position,
+            0,
+        )],
+    )
+    .expect("a position-only declaration")
+}
+
+#[test]
+fn the_xna_content_lost_handlers_fire_when_cna_says_the_content_is_gone() {
+    let Some(device) = device_or_skip() else { return };
+    let declaration = position_declaration();
+
+    // `RUST-EXT-018`. These handlers existed and were emitted nowhere: nothing
+    // in Rust knows a device was reset, so a game that registered one waited
+    // forever. They now sit behind one native subscription per buffer.
+    let vertices = DynamicVertexBuffer::new(&device, &declaration, 3, BufferUsage::None)
+        .expect("a dynamic vertex buffer");
+    let indices = DynamicIndexBuffer::new(&device, IndexElementSize::SixteenBits, 3, BufferUsage::None)
+        .expect("a dynamic index buffer");
+
+    let order = Arc::new(std::sync::Mutex::new(Vec::<u8>::new()));
+    let sender_was_the_buffer = Arc::new(AtomicBool::new(false));
+    let index_fired = Arc::new(AtomicUsize::new(0));
+
+    let first = Arc::clone(&order);
+    vertices.AddContentLostHandler(Box::new(move |_: &dyn std::any::Any, _: EventArgs| {
+        first.lock().expect("order").push(1);
+    }));
+    let second = Arc::clone(&order);
+    let seen = Arc::clone(&sender_was_the_buffer);
+    vertices.AddContentLostHandler(Box::new(move |sender: &dyn std::any::Any, _: EventArgs| {
+        second.lock().expect("order").push(2);
+        seen.store(
+            sender.downcast_ref::<DynamicVertexBuffer>().is_some(),
+            Ordering::SeqCst,
+        );
+    }));
+    let third = Arc::clone(&order);
+    let removed = vertices.AddContentLostHandler(Box::new(move |_: &dyn std::any::Any, _: EventArgs| {
+        third.lock().expect("order").push(3);
+    }));
+    assert!(vertices.RemoveContentLostHandler(removed));
+
+    let counter = Arc::clone(&index_fired);
+    indices.AddContentLostHandler(Box::new(move |_: &dyn std::any::Any, _: EventArgs| {
+        counter.fetch_add(1, Ordering::SeqCst);
+    }));
+
+    assert!(order.lock().expect("order").is_empty(), "nothing has been lost yet");
+
+    // EVENT_BRIDGE_VERIFIED. This is CNA's own deterministic notification, not
+    // a real device loss: `notify_content_lost_resources` is what a content
+    // manager calls when it unloads. A genuine reset is measured separately
+    // below, and the two are not the same claim.
+    device
+        .notify_content_lost_resources()
+        .expect("CNA tells its resources their content is gone");
+
+    assert_eq!(
+        *order.lock().expect("order"),
+        vec![1_u8, 2],
+        "both surviving handlers fire, in registration order, and the removed one does not"
+    );
+    assert!(
+        sender_was_the_buffer.load(Ordering::SeqCst),
+        "the sender is the buffer, as XNA passes `this`"
+    );
+    assert_eq!(index_fired.load(Ordering::SeqCst), 1, "and the index buffer's fires too");
+
+    // `ContentLost` is not a one-shot, unlike `Disposing`: a second loss
+    // reaches the same list again. This is the assertion that caught the first
+    // version of the bridge, where the temporary sender shared the buffer's
+    // subscription and its drop cancelled it after the first delivery.
+    device.notify_content_lost_resources().expect("a second notification");
+    assert_eq!(
+        *order.lock().expect("order"),
+        vec![1_u8, 2, 1, 2],
+        "a second loss reaches the same handlers again, in the same order"
+    );
+
+    // Disposal safety, on a buffer of its own so the counts above stay
+    // readable. Two things have to hold, and only one of them is about the
+    // event: a disposed buffer's handlers are not called, and everything the
+    // bridge holds is released.
+    //
+    // The `witness` measures the second. A handler's captures live inside the
+    // closure CNA holds a pointer to, which is freed only when the
+    // subscription is withdrawn -- so a bridge that outlived its buffer would
+    // keep them alive silently, and the count here would still be two.
+    let after_disposal = Arc::new(AtomicUsize::new(0));
+    let witness = Arc::new(());
+    {
+        let counter = Arc::clone(&after_disposal);
+        let held = Arc::clone(&witness);
+        let mut doomed = DynamicVertexBuffer::new(&device, &declaration, 3, BufferUsage::None)
+            .expect("a second dynamic vertex buffer");
+        doomed.AddContentLostHandler(Box::new(move |_: &dyn std::any::Any, _: EventArgs| {
+            let _ = &held;
+            counter.fetch_add(1, Ordering::SeqCst);
+        }));
+        use cna::Microsoft::Xna::Framework::Graphics::GraphicsResource as _;
+        doomed.Dispose(true).expect("dispose the buffer");
+        device
+            .notify_content_lost_resources()
+            .expect("a notification after disposal is still a legal call");
+    }
+    assert_eq!(
+        after_disposal.load(Ordering::SeqCst),
+        0,
+        "a disposed buffer's handlers must not be called"
+    );
+    assert_eq!(
+        Arc::strong_count(&witness),
+        1,
+        "the bridge and everything the handler captured are released, not leaked in a cycle"
+    );
+
+    drop(vertices);
+    drop(indices);
+}
+
+#[test]
+fn a_device_reset_is_measured_separately_from_the_bridge() {
+    let Some(device) = device_or_skip() else { return };
+    let declaration = position_declaration();
+    let buffer = DynamicVertexBuffer::new(&device, &declaration, 3, BufferUsage::None)
+        .expect("a dynamic vertex buffer");
+    let fired = Arc::new(AtomicUsize::new(0));
+    let counter = Arc::clone(&fired);
+    buffer.AddContentLostHandler(Box::new(move |_: &dyn std::any::Any, _: EventArgs| {
+        counter.fetch_add(1, Ordering::SeqCst);
+    }));
+
+    // REAL_DEVICE_LOSS_VERIFIED is a *different* claim from the bridge working,
+    // and this is where it is measured rather than assumed. A renderer that
+    // refuses the reset says so; what is asserted either way is that no loss is
+    // fabricated -- the count moves only if the reset really raised the event.
+    match device.Reset() {
+        Ok(()) => println!(
+            "MEASURED: reset succeeded; ContentLost handlers fired {} time(s)",
+            fired.load(Ordering::SeqCst)
+        ),
+        Err(error) => println!("MEASURED: this renderer refuses a device reset: {error:?}"),
+    }
+    // Whatever the renderer did, no loss is invented: the count moved only if
+    // the reset really raised the event. On HEADLESS it does not, which is why
+    // `EVENT_BRIDGE_VERIFIED` and `REAL_DEVICE_LOSS_VERIFIED` are separate
+    // claims and only the first is made above.
+    println!(
+        "MEASURED: REAL_DEVICE_LOSS_VERIFIED={}",
+        fired.load(Ordering::SeqCst) > 0
+    );
     drop(buffer);
 }
 

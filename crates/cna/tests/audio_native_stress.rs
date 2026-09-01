@@ -14,6 +14,7 @@ use std::process::Command;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 
+use cna::extensions::audio_ext::NativeDisposalNotice;
 use cna::extensions::events::EventArgs;
 use cna::Microsoft::Xna::Framework::Audio::{
     AudioChannels, AudioEmitter, AudioEngine, AudioListener, AudioStopOptions,
@@ -360,6 +361,141 @@ impl Drop for XactFixtures {
     fn drop(&mut self) { let _ = fs::remove_dir_all(&self.root); }
 }
 
+/// `RUST-EXT-017`: where XNA's `Disposing` fires, and where it does not.
+///
+/// XNA's `AudioEngine.Dispose` calls `NotifyDestroyedEngine`, which invokes the
+/// **public** `Dispose()` on every cue, sound bank and wave bank of that engine
+/// -- so each one's `Disposing` fires. This projection called the private
+/// teardown instead: the handle went away and the handler waited forever. The
+/// finalizer path is the other half of the contract and must stay silent, which
+/// is what `Drop` and `Dispose(false)` are here.
+struct DisposingGame {
+    state: Arc<GameState>,
+    xgs: PathBuf,
+    bad_xwb: PathBuf,
+    bad_xsb: PathBuf,
+    wave_events: Arc<AtomicUsize>,
+    sound_events: Arc<AtomicUsize>,
+    engine_events: Arc<AtomicUsize>,
+    quiet_events: Arc<AtomicUsize>,
+    sender_was_wave_bank: Arc<AtomicBool>,
+}
+
+impl GameStateAccess for DisposingGame {
+    fn game_state(&self) -> &Arc<GameState> { &self.state }
+}
+
+fn counting_handler(counter: &Arc<AtomicUsize>) -> Box<dyn cna::extensions::events::EventHandler> {
+    let counter = Arc::clone(counter);
+    Box::new(move |_: &dyn Any, _: EventArgs| {
+        counter.fetch_add(1, Ordering::SeqCst);
+    })
+}
+
+impl Game for DisposingGame {
+    fn Initialize(&mut self, game: &mut GameContext<'_>) -> Result<()> {
+        // 1. An explicit Dispose raises once, and a second Dispose raises
+        //    nothing -- XNA's `_isDisposed` guard.
+        {
+            let mut engine = AudioEngine::new(game, path(&self.xgs))?;
+            let mut bank = WaveBank::new(&engine, path(&self.bad_xwb))?;
+            bank.AddDisposingHandler(counting_handler(&self.wave_events));
+            bank.Dispose()?;
+            assert_eq!(self.wave_events.load(Ordering::SeqCst), 1, "explicit Dispose raises once");
+            assert!(bank.cna_raised_disposing(), "CNA raised its own notification too");
+            bank.Dispose()?;
+            assert_eq!(self.wave_events.load(Ordering::SeqCst), 1, "and only once");
+            engine.Dispose()?;
+        }
+
+        // 2. The path this milestone fixed: the engine tears its children down
+        //    and each one's Disposing fires, with the public object as sender.
+        {
+            let mut engine = AudioEngine::new(game, path(&self.xgs))?;
+            let wave = WaveBank::new(&engine, path(&self.bad_xwb))?;
+            let sound = SoundBank::new(&engine, path(&self.bad_xsb))?;
+            wave.AddDisposingHandler(counting_handler(&self.wave_events));
+            sound.AddDisposingHandler(counting_handler(&self.sound_events));
+            engine.AddDisposingHandler(counting_handler(&self.engine_events));
+            let sender_seen = Arc::clone(&self.sender_was_wave_bank);
+            wave.AddDisposingHandler(Box::new(move |sender: &dyn Any, _: EventArgs| {
+                sender_seen.store(sender.downcast_ref::<WaveBank>().is_some(), Ordering::SeqCst);
+            }));
+
+            engine.Dispose()?;
+            assert_eq!(
+                self.wave_events.load(Ordering::SeqCst), 2,
+                "the engine's teardown raises the wave bank's Disposing"
+            );
+            assert_eq!(
+                self.sound_events.load(Ordering::SeqCst), 1,
+                "and the sound bank's"
+            );
+            assert_eq!(self.engine_events.load(Ordering::SeqCst), 1, "and its own, once");
+            assert!(
+                self.sender_was_wave_bank.load(Ordering::SeqCst),
+                "the sender is the WaveBank, as XNA passes `this`"
+            );
+            // The native cross-check: CNA raised the same three.
+            assert!(wave.cna_raised_disposing());
+            assert!(sound.cna_raised_disposing());
+            assert!(engine.cna_raised_disposing());
+            assert!(wave.IsDisposed() && sound.IsDisposed() && engine.IsDisposed());
+        }
+
+        // 3. The finalizer path stays silent, which is the other half of XNA's
+        //    contract: `Dispose(bool)` raises only when `disposing` is true.
+        {
+            let mut engine = AudioEngine::new(game, path(&self.xgs))?;
+            {
+                let mut explicit = WaveBank::new(&engine, path(&self.bad_xwb))?;
+                explicit.AddDisposingHandler(counting_handler(&self.quiet_events));
+                explicit.DisposeWithDisposing(false)?;
+                assert_eq!(
+                    self.quiet_events.load(Ordering::SeqCst), 0,
+                    "Dispose(false) is the finalizer and raises nothing"
+                );
+            }
+            {
+                let dropped = WaveBank::new(&engine, path(&self.bad_xwb))?;
+                dropped.AddDisposingHandler(counting_handler(&self.quiet_events));
+                drop(dropped);
+            }
+            assert_eq!(
+                self.quiet_events.load(Ordering::SeqCst), 0,
+                "and neither does Drop, which is what a finalizer is here"
+            );
+            engine.Dispose()?;
+        }
+
+        // 4. A removed handler stops receiving, and a panicking one is
+        //    contained rather than crossing C.
+        {
+            let mut engine = AudioEngine::new(game, path(&self.xgs))?;
+            let mut removed = WaveBank::new(&engine, path(&self.bad_xwb))?;
+            let registration = removed.AddDisposingHandler(counting_handler(&self.quiet_events));
+            assert!(removed.RemoveDisposingHandler(registration));
+            removed.Dispose()?;
+            assert_eq!(
+                self.quiet_events.load(Ordering::SeqCst), 0,
+                "a removed handler receives nothing"
+            );
+
+            let mut panicking = WaveBank::new(&engine, path(&self.bad_xwb))?;
+            panicking.AddDisposingHandler(Box::new(|_: &dyn Any, _: EventArgs| {
+                panic!("intentional WaveBank disposing panic");
+            }));
+            assert!(
+                matches!(panicking.Dispose(), Err(CnaError::Callback(_))),
+                "a panicking handler is reported, not propagated across C"
+            );
+            assert!(panicking.IsDisposed(), "and the object is still disposed");
+            engine.Dispose()?;
+        }
+        Ok(())
+    }
+}
+
 struct XactStressGame {
     state: Arc<GameState>,
     xgs: PathBuf,
@@ -444,7 +580,13 @@ fn audio_native_stress_isolated() {
         run_child_case(&case);
         return;
     }
-    for case in ["sound-dynamic-microphone", "callback-panic", "xact", "global-state"] {
+    for case in [
+        "sound-dynamic-microphone",
+        "callback-panic",
+        "xact",
+        "xact-disposing",
+        "global-state",
+    ] {
         let status = Command::new(std::env::current_exe().expect("current test executable"))
             .args(["--exact", "audio_native_stress_isolated"])
             .env(CHILD_CASE, case)
@@ -497,6 +639,24 @@ fn run_child_case(case: &str) {
             assert!(later.load(Ordering::SeqCst) >= 1);
             run_for_frames(SoundStressGame::default(), 1)
                 .expect("new Game after contained Audio callback panic");
+        }
+        "xact-disposing" => {
+            let fixtures = XactFixtures::new();
+            run_for_frames(
+                DisposingGame {
+                    state: Arc::new(GameState::new()),
+                    xgs: fixtures.xgs.clone(),
+                    bad_xwb: fixtures.bad_xwb.clone(),
+                    bad_xsb: fixtures.bad_xsb.clone(),
+                    wave_events: Arc::new(AtomicUsize::new(0)),
+                    sound_events: Arc::new(AtomicUsize::new(0)),
+                    engine_events: Arc::new(AtomicUsize::new(0)),
+                    quiet_events: Arc::new(AtomicUsize::new(0)),
+                    sender_was_wave_bank: Arc::new(AtomicBool::new(false)),
+                },
+                1,
+            )
+            .expect("XACT disposing events on every path XNA raises them");
         }
         "xact" => {
             let fixtures = XactFixtures::new();

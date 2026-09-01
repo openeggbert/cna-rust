@@ -698,23 +698,6 @@
         "evidence": "docs/upstream-findings.md RUST-UPSTREAM-027; the decompiled XNA AudioFormat.DurationFromSize and SizeFromDuration are the arbiter; tools/reproducers/ext015q_sample_math.c prints CNA's answers and crates/cna/tests/extensions_audio_ext.rs pins the Rust ones to the reference values"
       },
       {
-        "id": "xact-disposing-events-need-the-rust-event-fixed-first",
-        "status": "DEFERRED_TRACKED",
-        "names": [
-          "cna_audio_engine_subscribe_disposing_ext",
-          "cna_wave_bank_subscribe_disposing_ext",
-          "cna_sound_bank_subscribe_disposing_ext",
-          "cna_cue_subscribe_disposing_ext"
-        ],
-        "reason": "RUST-EXT-017. These are worth binding and are not yet, because binding them alone would paper over a defect in the Rust projection rather than expose it. Measured: WaveBankState::dispose_xact_child and SoundBankState's equivalent call the low-level dispose, which destroys the handle without emitting the Rust `disposing` event -- so a handler registered through WaveBank::AddDisposingHandler does NOT fire when the engine that owns the bank is disposed, which is exactly when XNA's own Disposing fires. CNA raises its event on that path. Binding the native subscription would make the two disagree visibly, which is better than the silence there is now, but the fix is to make the Rust event fire and bind the native one as the cross-check in the same slice.",
-        "rustEvidence": [
-          "fn dispose_xact_child",
-          "pub fn AddDisposingHandler"
-        ],
-        "evidence": "crates/cna/src/audio/xact.rs: the `disposing.emit` calls are on the public Dispose paths (lines 136, 218) and not on the XactChild teardown path the engine drives",
-        "task": "RUST-EXT-017"
-      },
-      {
         "id": "a-vertex-declaration-is-a-rust-value",
         "status": "DELIBERATE_NON_BINDING",
         "names": [

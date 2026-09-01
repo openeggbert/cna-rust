@@ -11,6 +11,10 @@ pub use dynamic::DynamicSoundEffectInstance;
 pub use microphone::Microphone;
 pub use sound::{SoundEffect, SoundEffectInstance, SoundEffectInstanceBase};
 pub use xact::{AudioCategory, AudioEngine, Cue, SoundBank, WaveBank};
+pub(crate) use xact::{
+    cue_cna_raised_disposing, engine_cna_raised_disposing, sound_bank_cna_raised_disposing,
+    wave_bank_cna_raised_disposing,
+};
 
 use core::any::Any;
 use core::fmt;

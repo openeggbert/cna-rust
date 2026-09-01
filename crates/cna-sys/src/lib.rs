@@ -4979,6 +4979,18 @@ pub type cna_dynamic_sound_effect_instance_subscribe_buffer_needed_fn = unsafe e
     *mut c_void,
     *mut CNA_AudioEventRegistrationHandle,
 ) -> CNA_Result;
+pub type cna_audio_engine_subscribe_disposing_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_AudioEventCallback, *mut c_void, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_wave_bank_subscribe_disposing_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_AudioEventCallback, *mut c_void, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_sound_bank_subscribe_disposing_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_AudioEventCallback, *mut c_void, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_cue_subscribe_disposing_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_AudioEventCallback, *mut c_void, *mut CNA_Handle,
+) -> CNA_Result;
 pub type cna_audio_unsubscribe_ext_fn =
     unsafe extern "C" fn(CNA_AudioEventRegistrationHandle) -> CNA_Result;
 pub type cna_microphone_get_count_fn =

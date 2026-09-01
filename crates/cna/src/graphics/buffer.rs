@@ -8,7 +8,7 @@
 use core::any::{Any, TypeId};
 use core::mem::size_of;
 use core::ops::{Deref, DerefMut};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use cna_sys as sys;
 
@@ -633,10 +633,70 @@ impl GraphicsResource for VertexBuffer {
     }
 }
 
+/// The one native subscription a dynamic buffer keeps so XNA's `ContentLost`
+/// can fire.
+///
+/// XNA raises `ContentLost` from inside the framework's device reset. Nothing
+/// on this side knows a device was reset -- only CNA does -- so for as long as
+/// this projection existed, `AddContentLostHandler` registered a handler that
+/// waited forever. `RUST-EXT-018` is the bridge:
+///
+/// ```text
+/// CNA's device reset -> one native subscription -> this trampoline
+///                    -> the buffer's own handler list, in registration order
+/// ```
+///
+/// **One subscription per buffer, not per handler.** A second handler joins
+/// the same list; installing a second native registration would double CNA's
+/// per-reset work and put the two lists' orderings at the mercy of CNA's.
+/// It is installed lazily, on the first handler, so a buffer nobody listens to
+/// costs nothing native, and it is withdrawn when the buffer is disposed or
+/// dropped -- before the handle it names goes away.
+struct ContentLostBridge {
+    subscription: Mutex<Option<crate::extensions::resource_events::ContentLostSubscription>>,
+}
+
+impl ContentLostBridge {
+    fn new() -> Self {
+        Self {
+            subscription: Mutex::new(None),
+        }
+    }
+
+    fn installed(&self) -> bool {
+        self.subscription
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_some()
+    }
+
+    fn install(&self, subscription: crate::extensions::resource_events::ContentLostSubscription) {
+        let mut slot = self
+            .subscription
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if slot.is_none() {
+            *slot = Some(subscription);
+        }
+    }
+
+    /// Withdraws the subscription, which must happen before the handle it
+    /// names is released or CNA is left calling into a freed closure.
+    fn withdraw(&self) {
+        let taken = self
+            .subscription
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take();
+        drop(taken);
+    }
+}
+
 /// Owned dynamic vertex buffer. CNA represents it with the same owned handle kind.
 pub struct DynamicVertexBuffer {
     inner: VertexBuffer,
-    content_lost: EventHandlers<EventArgs>,
+    content_lost: Arc<EventHandlers<EventArgs>>,
+    bridge: Arc<ContentLostBridge>,
 }
 
 #[allow(non_snake_case)]
@@ -668,7 +728,8 @@ impl DynamicVertexBuffer {
     ) -> Result<Self> {
         Ok(Self {
             inner: VertexBuffer::create(graphics_device, declaration, count, usage, true)?,
-            content_lost: EventHandlers::new(),
+            content_lost: Arc::new(EventHandlers::new()),
+            bridge: Arc::new(ContentLostBridge::new()),
         })
     }
 
@@ -725,16 +786,58 @@ impl DynamicVertexBuffer {
         Ok(info.is_content_lost != sys::CNA_FALSE)
     }
 
+    /// XNA `DynamicVertexBuffer.ContentLost += handler`.
+    ///
+    /// The first handler installs the buffer's one native subscription, so a
+    /// buffer nobody listens to subscribes to nothing. A failure to subscribe
+    /// is not reported here -- XNA's `+=` cannot fail -- and leaves the
+    /// handler registered against a bridge that will not deliver; the
+    /// [`crate::extensions::resource_events::NotifiesContentLost`] route
+    /// reports the same refusal for a caller that wants it.
     pub fn AddContentLostHandler(&self, handler: Box<dyn EventHandler>) -> u64 {
-        // RUST-EXT-018: these handlers are never emitted. Nothing in Rust
-        // knows the device was reset, so nothing here can raise ContentLost --
-        // `crates/cna/src/extensions/resource_events.rs` is the route that
-        // works, over CNA's own event. This registration is kept so the XNA
-        // shape is present and so the bridge has somewhere to deliver to.
+        self.install_bridge();
         self.content_lost.add(handler)
     }
+
     pub fn RemoveContentLostHandler(&self, registration: u64) -> bool {
         self.content_lost.remove(registration)
+    }
+
+    fn install_bridge(&self) {
+        use crate::extensions::resource_events::NotifiesContentLost as _;
+        if self.bridge.installed() {
+            return;
+        }
+        let handlers = Arc::clone(&self.content_lost);
+        let state = Arc::clone(&self.inner.state);
+        let declaration = Arc::clone(&self.inner.declaration);
+        let (vertex_count, usage) = (self.inner.vertex_count, self.inner.usage);
+        let subscribed = self.on_content_lost(move || {
+            // XNA's sender is the buffer. CNA's callback carries a handle and
+            // no Rust object, so the sender is rebuilt here from the parts the
+            // buffer shares: the same handle, the same handler list. Both
+            // `Drop`s are empty, so the temporary owns nothing.
+            let sender = Self {
+                inner: VertexBuffer {
+                    state: Arc::clone(&state),
+                    declaration: Arc::clone(&declaration),
+                    vertex_count,
+                    usage,
+                    dynamic: true,
+                },
+                content_lost: Arc::clone(&handlers),
+                // A bridge of its own, deliberately. Sharing the buffer's put
+                // the live subscription inside a value that is dropped at the
+                // end of this closure, and `Drop` withdraws -- so the first
+                // delivery cancelled the second. An empty bridge withdraws
+                // nothing.
+                bridge: Arc::new(ContentLostBridge::new()),
+            };
+            handlers.emit(&sender, EventArgs);
+        });
+        if let Ok(subscription) = subscribed {
+            self.bridge.install(subscription);
+        }
     }
 }
 
@@ -753,7 +856,14 @@ impl DerefMut for DynamicVertexBuffer {
 
 impl VertexBufferBase for DynamicVertexBuffer {}
 impl Drop for DynamicVertexBuffer {
-    fn drop(&mut self) {}
+    fn drop(&mut self) {
+        // Dropping the last `Arc<ContentLostBridge>` would withdraw anyway.
+        // This makes the order explicit rather than a consequence of nobody
+        // else holding one -- the trampoline's captures were audited to make
+        // sure that stays true, and a future capture of the bridge would
+        // otherwise turn into a silent leak.
+        self.bridge.withdraw();
+    }
 }
 impl GraphicsResource for DynamicVertexBuffer {
     fn GraphicsDevice(&self) -> Option<&GraphicsDevice> {
@@ -780,7 +890,14 @@ impl GraphicsResource for DynamicVertexBuffer {
     fn RemoveDisposingHandler(&self, registration: u64) -> bool {
         self.inner.RemoveDisposingHandler(registration)
     }
+    /// Withdraws the `ContentLost` bridge before the handle it names goes.
+    ///
+    /// CNA also stops tracking a destroyed resource, so this is not the only
+    /// thing standing between a disposed buffer and a callback -- it is the
+    /// ordering guarantee on this side, and it is what keeps the subscription
+    /// from naming a handle that is already gone.
     fn Dispose(&mut self, value: bool) -> Result<()> {
+        self.bridge.withdraw();
         self.inner.Dispose(value)
     }
 }
@@ -1228,7 +1345,8 @@ impl ContentLoadable for IndexBuffer {
 /// Owned dynamic index buffer.
 pub struct DynamicIndexBuffer {
     inner: IndexBuffer,
-    content_lost: EventHandlers<EventArgs>,
+    content_lost: Arc<EventHandlers<EventArgs>>,
+    bridge: Arc<ContentLostBridge>,
 }
 
 #[allow(non_snake_case)]
@@ -1268,7 +1386,8 @@ impl DynamicIndexBuffer {
     ) -> Result<Self> {
         Ok(Self {
             inner: IndexBuffer::create(device, size, count, usage, true)?,
-            content_lost: EventHandlers::new(),
+            content_lost: Arc::new(EventHandlers::new()),
+            bridge: Arc::new(ContentLostBridge::new()),
         })
     }
 
@@ -1310,16 +1429,45 @@ impl DynamicIndexBuffer {
         Ok(info.is_content_lost != sys::CNA_FALSE)
     }
 
+    /// XNA `DynamicIndexBuffer.ContentLost += handler`. See the vertex
+    /// buffer's, which this mirrors exactly.
     pub fn AddContentLostHandler(&self, handler: Box<dyn EventHandler>) -> u64 {
-        // RUST-EXT-018: these handlers are never emitted. Nothing in Rust
-        // knows the device was reset, so nothing here can raise ContentLost --
-        // `crates/cna/src/extensions/resource_events.rs` is the route that
-        // works, over CNA's own event. This registration is kept so the XNA
-        // shape is present and so the bridge has somewhere to deliver to.
+        self.install_bridge();
         self.content_lost.add(handler)
     }
+
     pub fn RemoveContentLostHandler(&self, registration: u64) -> bool {
         self.content_lost.remove(registration)
+    }
+
+    fn install_bridge(&self) {
+        use crate::extensions::resource_events::NotifiesContentLost as _;
+        if self.bridge.installed() {
+            return;
+        }
+        let handlers = Arc::clone(&self.content_lost);
+        let state = Arc::clone(&self.inner.state);
+        let (index_count, element_size, usage) =
+            (self.inner.index_count, self.inner.element_size, self.inner.usage);
+        let subscribed = self.on_content_lost(move || {
+            let sender = Self {
+                inner: IndexBuffer {
+                    state: Arc::clone(&state),
+                    index_count,
+                    element_size,
+                    usage,
+                    dynamic: true,
+                },
+                content_lost: Arc::clone(&handlers),
+                // As the vertex buffer's: a bridge of its own, so the sender's
+                // drop cannot withdraw the live subscription.
+                bridge: Arc::new(ContentLostBridge::new()),
+            };
+            handlers.emit(&sender, EventArgs);
+        });
+        if let Ok(subscription) = subscribed {
+            self.bridge.install(subscription);
+        }
     }
 }
 
@@ -1336,7 +1484,10 @@ impl DerefMut for DynamicIndexBuffer {
 }
 impl IndexBufferBase for DynamicIndexBuffer {}
 impl Drop for DynamicIndexBuffer {
-    fn drop(&mut self) {}
+    fn drop(&mut self) {
+        // As the vertex buffer's.
+        self.bridge.withdraw();
+    }
 }
 impl GraphicsResource for DynamicIndexBuffer {
     fn GraphicsDevice(&self) -> Option<&GraphicsDevice> {
@@ -1363,7 +1514,9 @@ impl GraphicsResource for DynamicIndexBuffer {
     fn RemoveDisposingHandler(&self, registration: u64) -> bool {
         self.inner.RemoveDisposingHandler(registration)
     }
+    /// As the vertex buffer's: the bridge goes before the handle.
     fn Dispose(&mut self, value: bool) -> Result<()> {
+        self.bridge.withdraw();
         self.inner.Dispose(value)
     }
 }

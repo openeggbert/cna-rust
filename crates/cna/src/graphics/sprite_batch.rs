@@ -28,6 +28,11 @@ pub struct SpriteBatch {
 
 #[allow(non_snake_case)]
 impl SpriteBatch {
+    /// The live handle, for the guide renderer that draws through this batch.
+    pub(crate) fn handle(&self) -> Result<sys::CNA_Handle> {
+        self.state.require_handle()
+    }
+
     pub fn new(graphicsDevice: &GraphicsDevice) -> Result<Self> {
         let mut handle = sys::CNA_INVALID_HANDLE;
         graphicsDevice

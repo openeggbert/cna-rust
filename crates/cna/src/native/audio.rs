@@ -50,6 +50,10 @@ pub(super) struct AudioApi {
     dynamic_duration: sys::cna_dynamic_sound_effect_instance_get_sample_duration_ticks_fn,
     dynamic_size: sys::cna_dynamic_sound_effect_instance_get_sample_size_in_bytes_fn,
     dynamic_subscribe: sys::cna_dynamic_sound_effect_instance_subscribe_buffer_needed_fn,
+    engine_subscribe_disposing: sys::cna_audio_engine_subscribe_disposing_ext_fn,
+    wave_bank_subscribe_disposing: sys::cna_wave_bank_subscribe_disposing_ext_fn,
+    sound_bank_subscribe_disposing: sys::cna_sound_bank_subscribe_disposing_ext_fn,
+    cue_subscribe_disposing: sys::cna_cue_subscribe_disposing_ext_fn,
     audio_unsubscribe: sys::cna_audio_unsubscribe_ext_fn,
     microphone_count: sys::cna_microphone_get_count_fn,
     microphone_default: sys::cna_microphone_get_default_index_ext_fn,
@@ -157,6 +161,14 @@ impl AudioApi {
             dynamic_duration: symbol!(cna_dynamic_sound_effect_instance_get_sample_duration_ticks, sys::cna_dynamic_sound_effect_instance_get_sample_duration_ticks_fn),
             dynamic_size: symbol!(cna_dynamic_sound_effect_instance_get_sample_size_in_bytes, sys::cna_dynamic_sound_effect_instance_get_sample_size_in_bytes_fn),
             dynamic_subscribe: symbol!(cna_dynamic_sound_effect_instance_subscribe_buffer_needed, sys::cna_dynamic_sound_effect_instance_subscribe_buffer_needed_fn),
+            engine_subscribe_disposing: symbol!(cna_audio_engine_subscribe_disposing_ext,
+                sys::cna_audio_engine_subscribe_disposing_ext_fn),
+            wave_bank_subscribe_disposing: symbol!(cna_wave_bank_subscribe_disposing_ext,
+                sys::cna_wave_bank_subscribe_disposing_ext_fn),
+            sound_bank_subscribe_disposing: symbol!(cna_sound_bank_subscribe_disposing_ext,
+                sys::cna_sound_bank_subscribe_disposing_ext_fn),
+            cue_subscribe_disposing: symbol!(cna_cue_subscribe_disposing_ext,
+                sys::cna_cue_subscribe_disposing_ext_fn),
             audio_unsubscribe: symbol!(cna_audio_unsubscribe_ext, sys::cna_audio_unsubscribe_ext_fn),
             microphone_count: symbol!(cna_microphone_get_count, sys::cna_microphone_get_count_fn),
             microphone_default: symbol!(cna_microphone_get_default_index_ext, sys::cna_microphone_get_default_index_ext_fn),
@@ -280,6 +292,27 @@ impl Native {
     pub(crate) fn dynamic_duration(&self, handle: sys::CNA_Handle, bytes: i32) -> Result<i64> { let mut ticks = 0; self.check(unsafe { (self.audio.dynamic_duration)(handle, bytes, &mut ticks) })?; Ok(ticks) }
     pub(crate) fn dynamic_size(&self, handle: sys::CNA_Handle, ticks: i64) -> Result<i32> { let mut bytes = 0; self.check(unsafe { (self.audio.dynamic_size)(handle, ticks, &mut bytes) })?; Ok(bytes) }
     pub(crate) fn subscribe_dynamic(&self, handle: sys::CNA_Handle, callback: sys::CNA_AudioEventCallback, context: *mut c_void) -> Result<sys::CNA_Handle> { let mut out = sys::CNA_INVALID_HANDLE; self.check(unsafe { (self.audio.dynamic_subscribe)(handle, callback, context, &mut out) })?; Ok(out) }
+    /// Subscribes to CNA's own disposal notification for one XACT object.
+    ///
+    /// `kind` picks the route: 0 engine, 1 wave bank, 2 sound bank, 3 cue.
+    /// They differ only in which handle they accept, so one wrapper keeps the
+    /// four call sites from repeating the same six lines.
+    pub(crate) fn subscribe_xact_disposing(&self, kind: u8, handle: sys::CNA_Handle, callback: sys::CNA_AudioEventCallback, context: *mut c_void) -> Result<sys::CNA_Handle> {
+        let mut out = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is live, the callback is a real `extern "C"` fn,
+        // and the context outlives the subscription.
+        let result = unsafe {
+            match kind {
+                0 => (self.audio.engine_subscribe_disposing)(handle, callback, context, &mut out),
+                1 => (self.audio.wave_bank_subscribe_disposing)(handle, callback, context, &mut out),
+                2 => (self.audio.sound_bank_subscribe_disposing)(handle, callback, context, &mut out),
+                _ => (self.audio.cue_subscribe_disposing)(handle, callback, context, &mut out),
+            }
+        };
+        self.check(result)?;
+        Ok(out)
+    }
+
     pub(crate) fn unsubscribe_audio(&self, registration: sys::CNA_Handle) -> Result<()> { self.check(unsafe { (self.audio.audio_unsubscribe)(registration) }) }
 
     pub(crate) fn microphone_count(&self, game: sys::CNA_Handle) -> Result<u64> { let mut count = 0; self.check(unsafe { (self.audio.microphone_count)(game, &mut count) })?; Ok(count) }
