@@ -172,6 +172,41 @@ impl SoundEffect {
         Ok(Self { state })
     }
 
+    /// Decodes an audio file from disk.
+    ///
+    /// `audio.h`'s own constructor, and the only one that takes a path: XNA's
+    /// `SoundEffect` is loaded through content, and [`FromStream`](Self::FromStream)
+    /// needs the bytes already in hand. An **empty path creates a silent
+    /// effect** rather than failing, which is upstream's documented behaviour
+    /// and is passed through rather than turned into a refusal -- a silent
+    /// effect is a usable thing and a caller that wants the refusal can check
+    /// the path itself.
+    pub fn FromAsset(game: &GameContext<'_>, assetName: &str) -> Result<Self> {
+        let runtime = Arc::clone(game.audio_runtime());
+        let active = runtime.active()?;
+        let handle = active
+            .native
+            .create_sound_effect_from_asset(active.handle, assetName)?;
+        let duration = match active.native.sound_effect_duration(handle) {
+            Ok(ticks) => TimeSpan::from_ticks(ticks),
+            Err(error) => {
+                let _ = active.native.destroy_sound_effect(handle);
+                return Err(error);
+            }
+        };
+        let state = Arc::new(SoundEffectState {
+            runtime: Arc::clone(&runtime),
+            native: active.native,
+            generation: active.generation,
+            handle: Mutex::new(handle),
+            duration,
+            name: Mutex::new(String::new()),
+            children: Mutex::new(Vec::new()),
+        });
+        runtime.register(&state);
+        Ok(Self { state })
+    }
+
     pub fn FromStream<R: Read>(game: &GameContext<'_>, stream: &mut R) -> Result<Self> {
         let mut bytes = Vec::new();
         stream.read_to_end(&mut bytes).map_err(|error| CnaError::Io(format!("failed to read audio stream: {error}")))?;
@@ -435,3 +470,32 @@ impl SoundEffectInstance {
 }
 
 impl Drop for SoundEffectInstance { fn drop(&mut self) { let _ = self.state.dispose(); } }
+
+/// The `audio.h` routes with no XNA counterpart.
+///
+/// `SampleDuration` and `SampleSizeInBytes` are XNA's own static helpers --
+/// how long a buffer of a given size lasts, and how many bytes a given
+/// duration needs. They are pure arithmetic over a rate and a channel count,
+/// and they are called rather than restated so a change to CNA's rounding
+/// changes here with it.
+impl SoundEffect {
+    /// Whether CNA considers the sound effect disposed.
+    ///
+    /// A different question from [`IsDisposed`](Self::IsDisposed), which asks
+    /// whether Rust released the handle.
+    pub fn NativeIsDisposed(&self) -> Result<bool> {
+        self.state
+            .native
+            .sound_effect_is_disposed(self.state.require_handle()?)
+    }
+
+}
+
+impl SoundEffectInstance {
+    /// Whether CNA considers the instance disposed.
+    pub fn NativeIsDisposed(&self) -> Result<bool> {
+        self.state
+            .native
+            .sound_effect_instance_is_disposed(self.state.require_handle()?)
+    }
+}

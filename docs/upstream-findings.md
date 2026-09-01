@@ -707,3 +707,138 @@ unaffected and keeps XNA's refusal: `LaunchParametersExt::Add` returns an error
 for a duplicate key, which is the third behaviour and the correct one for that
 type. The two dictionaries are separate objects and this finding is about
 CNA's.
+
+---
+
+## RUST-UPSTREAM-027 — the sample-duration and sample-size helpers are not XNA's
+
+| | |
+|---|---|
+| Symbols | `cna_sound_effect_get_sample_duration_ticks`, `cna_sound_effect_get_sample_size_in_bytes` |
+| Dependency | cnanext `35268971c826d48ec3d40939e9b34a2b0595f94b`, ABI 0.21.0 |
+| Artifact | Renderer-independent; measured on `cmake-build-headless` |
+| Severity | Wrong values, silently. No refusal, no fault |
+| Blocks | Nothing. The binding does not use these routes and keeps its own XNA-faithful arithmetic |
+| Last measured | 2026-09-01, reproduces |
+
+### How this was found
+
+Not by reading either implementation. `crates/cna/src/audio.rs` already
+reproduces XNA's two static helpers, carefully, with a comment about XNA's
+mixed binary32/double precision being observable at 44.1 kHz. CNA has routes
+for the same two questions. Comparing the two across a grid of rates, sizes and
+channel counts is what turned up the disagreement, and the decompiled XNA
+assemblies settled which side was right.
+
+### `GetSampleDuration` truncates where XNA rounds
+
+XNA, decompiled (`AudioFormat.DurationFromSize`):
+
+```csharp
+int num = sizeInBytes / BlockAlign;
+return TimeSpan.FromMilliseconds((float)num * 1000f / (float)SampleRate);
+```
+
+`TimeSpan.FromMilliseconds` is `Interval(value, TicksPerMillisecond)`, which
+adds ±0.5 before truncating — it **rounds to the nearest millisecond**.
+
+CNA, `modules/audio/src/Xna/SoundEffect.cpp:637`:
+
+```cpp
+// Matches FNA: truncate to whole milliseconds. 16-bit PCM => 2 bytes per sample.
+const int samples = sizeInBytes / 2;
+const int ms = static_cast<int>((samples / ch) / (sampleRate / 1000.0f));
+return System::TimeSpan::FromMilliseconds(ms);
+```
+
+The rounding is thrown away *before* `FromMilliseconds` is reached, so the
+runtime's own correct `Interval` never sees a fractional value. The comment
+says the truncation is deliberate and matches FNA; XNA is what this ABI
+reproduces, and XNA rounds.
+
+Measured — CNA's answer against XNA's, in 100-nanosecond ticks:
+
+| bytes | rate | channels | XNA | CNA |
+|---|---|---|---|---|
+| 100 | 44100 | 2 | 10000 (1 ms) | **0** |
+| 100 | 48000 | 2 | 10000 (1 ms) | **0** |
+| 100 | 11025 | 1 | 50000 | 40000 |
+| 4096 | 22050 | 1 | 930000 | 920000 |
+| 88198 | 44100 | 1 | 10000000 | 9990000 |
+
+Nineteen of the ninety cases probed disagree, every one of them by exactly one
+millisecond short — and two of them report **zero duration for a buffer that
+has one**, which is the case most likely to turn into a division by zero or a
+skipped playback in a caller.
+
+### `GetSampleSizeInBytes` drops XNA's frame alignment
+
+XNA (`AudioFormat.SizeFromDuration`):
+
+```csharp
+int num = (int)(duration.TotalMilliseconds * (double)((float)SampleRate / 1000f));
+return (num + unchecked(num % Channels)) * BlockAlign;
+```
+
+Two things happen there and neither happens in CNA: the rate division is done
+in **binary32** and only then promoted, and the frame count is aligned with
+`num + num % Channels`.
+
+CNA (`SoundEffect.cpp:645`):
+
+```cpp
+return static_cast<intcs>(duration.getTotalSecondsProperty() * sampleRate *
+                          static_cast<int>(channels) * 2);
+```
+
+Pure double throughout, and no alignment. Measured:
+
+| duration | rate | channels | XNA | CNA |
+|---|---|---|---|---|
+| 1 s | 44100 | 1 | **88198** | 88200 |
+| 1 s | 22050 | 1 | 44098 | 44100 |
+| 1 ms | 11025 | 2 | 48 | 44 |
+| 0.5 s | 11025 | 2 | 22048 | 22050 |
+
+Fifteen of the fifty cases probed disagree. 88,198 rather than 88,200 for one
+mono second at 44.1 kHz is the exact number `crates/cna/src/audio.rs` already
+calls out as the observable consequence of XNA's mixed precision, which is what
+makes the reference decompilation the arbiter here rather than either
+implementation's intent.
+
+### Reproducer
+
+`tools/reproducers/ext015q_sample_math.c` prints CNA's answers over the grid.
+A model of CNA's own arithmetic reproduces every measured value exactly, which
+is what says the source above was read correctly rather than guessed at.
+
+### Why this is CNA rather than the binding
+
+The decompiled XNA assemblies are the specification this ABI reproduces, and
+they are unambiguous on both counts. CNA's own `sharp-runtimenext`
+`TimeSpan::FromMilliseconds` even has the correct rounding; the audio layer
+truncates before calling it.
+
+### What a fix looks like
+
+For the duration: pass the fractional millisecond value to
+`TimeSpan::FromMilliseconds` instead of truncating first, which is a one-line
+change and uses the rounding the runtime already implements. For the size:
+compute frames from `TotalMilliseconds` with the binary32 rate division, and
+apply the `num + num % Channels` alignment before multiplying by the block
+align.
+
+If FNA parity is genuinely wanted over XNA parity, that is a decision worth
+stating in the header, because a caller reading "SoundEffect.GetSampleDuration"
+has no way to know which of the two it is getting.
+
+### Status in the binding
+
+**Deliberate non-binding.** `SoundEffect::GetSampleDuration` and
+`GetSampleSizeInBytes` already exist in Rust and are XNA-faithful; calling
+these routes would replace a correct answer with a divergent one, which is the
+one thing a binding must not do to make a coverage number go up. The
+classification rule `sample-arithmetic-is-xna-faithful-in-rust` records that
+with this finding as its evidence, and
+`crates/cna/tests/extensions_audio_ext.rs` pins the Rust answers to the values
+the decompiled reference gives, including 88,198.

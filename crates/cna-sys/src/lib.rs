@@ -756,6 +756,28 @@ pub type CNA_GraphicsResourceTag = u64;
 
 /// `content_readers.h`: the XNB reader and the process-wide reader registry.
 pub type CNA_ContentReaderHandle = CNA_Handle;
+
+/// `video.h`: what a decoded video's frames look like.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_VideoInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub width: i32,
+    pub height: i32,
+    pub fps: f64,
+}
+
+/// `audio.h`: what the process can currently do with sound.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_AudioCapabilities {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub is_playback_available: CNA_Bool,
+    pub reserved0: [u8; 3],
+    pub reserved1: u32,
+}
 pub type CNA_ContentTypeReaderHandle = CNA_Handle;
 
 /// Why a placeholder reader refuses. Only one reason exists at ABI 0.21.
@@ -13560,4 +13582,108 @@ pub type cna_content_type_reader_read_untyped_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_content_type_reader_destroy_fn = unsafe extern "C" fn(
     CNA_ContentTypeReaderHandle,
+) -> CNA_Result;
+
+pub type cna_video_create_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_VideoHandle,
+) -> CNA_Result;
+pub type cna_video_create_from_uri_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_VideoHandle,
+) -> CNA_Result;
+pub type cna_video_get_info_fn = unsafe extern "C" fn(
+    CNA_VideoHandle, *mut CNA_VideoInfo,
+) -> CNA_Result;
+pub type cna_video_set_duration_fn = unsafe extern "C" fn(CNA_VideoHandle, i64) -> CNA_Result;
+pub type cna_video_set_audio_track_ext_fn = unsafe extern "C" fn(
+    CNA_VideoHandle, i32,
+) -> CNA_Result;
+pub type cna_video_set_video_track_ext_fn = unsafe extern "C" fn(
+    CNA_VideoHandle, i32,
+) -> CNA_Result;
+pub type cna_video_get_file_name_size_fn = unsafe extern "C" fn(
+    CNA_VideoHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_video_copy_file_name_fn = unsafe extern "C" fn(
+    CNA_VideoHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_video_get_has_graphics_device_fn = unsafe extern "C" fn(
+    CNA_VideoHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_video_player_get_video_fn = unsafe extern "C" fn(
+    CNA_VideoPlayerHandle, *mut CNA_VideoHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_video_player_set_audio_track_ext_fn = unsafe extern "C" fn(
+    CNA_VideoPlayerHandle, i32,
+) -> CNA_Result;
+pub type cna_video_player_set_video_track_ext_fn = unsafe extern "C" fn(
+    CNA_VideoPlayerHandle, i32,
+) -> CNA_Result;
+pub type cna_audio_engine_get_is_disposed_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_audio_engine_get_renderer_text_size_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_audio_engine_copy_renderer_text_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_audio_engine_get_renderer_hash_code_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, *mut i32,
+) -> CNA_Result;
+pub type cna_audio_engine_renderers_equal_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, u64, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_wave_bank_get_is_disposed_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_sound_bank_get_is_disposed_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_audio_get_capabilities_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_AudioCapabilities,
+) -> CNA_Result;
+pub type cna_sound_effect_create_from_asset_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_sound_effect_get_is_disposed_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_sound_effect_instance_get_is_disposed_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_dynamic_sound_effect_instance_submit_float_buffer_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *const f32, u64, i32, i32,
+) -> CNA_Result;
+pub type cna_dynamic_sound_effect_instance_queue_initial_buffers_ext_fn = unsafe extern "C" fn(
+    CNA_Handle,
+) -> CNA_Result;
+pub type cna_dynamic_sound_effect_instance_clear_buffers_ext_fn = unsafe extern "C" fn(
+    CNA_Handle,
+) -> CNA_Result;
+pub type cna_dynamic_sound_effect_instance_update_ext_fn = unsafe extern "C" fn(
+    CNA_Handle,
+) -> CNA_Result;
+pub type cna_microphone_check_all_buffers_ext_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
+pub type cna_media_source_get_type_name_size_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut u64,
+) -> CNA_Result;
+pub type cna_media_source_copy_type_name_at_fn = unsafe extern "C" fn(
+    CNA_Handle, u32, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_song_create_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, CNA_StringView, *mut CNA_SongHandle,
+) -> CNA_Result;
+pub type cna_song_create_with_duration_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, CNA_StringView, i32, *mut CNA_SongHandle,
+) -> CNA_Result;
+pub type cna_song_get_handle_text_size_ext_fn = unsafe extern "C" fn(
+    CNA_SongHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_song_copy_handle_text_ext_fn = unsafe extern "C" fn(
+    CNA_SongHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_song_set_duration_fn = unsafe extern "C" fn(CNA_SongHandle, i64) -> CNA_Result;
+pub type cna_song_set_play_count_fn = unsafe extern "C" fn(CNA_SongHandle, i32) -> CNA_Result;
+pub type cna_song_collection_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *const CNA_SongHandle, u64, *mut CNA_SongCollectionHandle,
 ) -> CNA_Result;

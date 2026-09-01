@@ -164,3 +164,55 @@ impl SoundEffectInstanceBase for DynamicSoundEffectInstance {
 impl Drop for DynamicSoundEffectInstance {
     fn drop(&mut self) { if self.owns_drop { let _ = self.state.dispose(); } }
 }
+
+/// The `audio.h` streaming routes with no XNA counterpart.
+///
+/// XNA's `DynamicSoundEffectInstance` takes 16-bit PCM bytes and nothing else.
+/// These are the paths CNA adds around that: float samples rather than packed
+/// bytes, the initial queue that primes playback before the first
+/// `BufferNeeded`, an explicit clear, and the pump that retires finished
+/// buffers.
+///
+/// [`Update`](Self::Update) is the one worth reading twice. XNA's instance
+/// raises `BufferNeeded` from the audio engine's own servicing; a caller that
+/// drives playback itself -- a test, or a game with its own mixer cadence --
+/// has no way to make that happen. `Update` is that way.
+impl DynamicSoundEffectInstance {
+    /// Submits a range of 32-bit float samples, which CNA copies during the
+    /// call.
+    ///
+    /// The whole slice is passed alongside the range, so the offset and count
+    /// are checked against it here: an out-of-range pair would otherwise be a
+    /// read past the buffer.
+    pub fn SubmitFloatBuffer(&self, buffer: &[f32], offset: i32, count: i32) -> Result<()> {
+        let handle = self.state.instance.require_handle()?;
+        self.state
+            .instance
+            .native()
+            .submit_dynamic_float_buffer(handle, buffer, offset, count)
+    }
+
+    /// Queues the buffers playback starts with.
+    pub fn QueueInitialBuffers(&self) -> Result<()> {
+        let handle = self.state.instance.require_handle()?;
+        self.state
+            .instance
+            .native()
+            .queue_dynamic_initial_buffers(handle)
+    }
+
+    /// Drops every queued buffer without playing it.
+    pub fn ClearBuffers(&self) -> Result<()> {
+        let handle = self.state.instance.require_handle()?;
+        self.state.instance.native().clear_dynamic_buffers(handle)
+    }
+
+    /// Retires finished buffers and raises `BufferNeeded` for what that frees.
+    ///
+    /// Servicing the instance by hand, for a caller driving playback on its own
+    /// cadence rather than the audio engine's.
+    pub fn Update(&self) -> Result<()> {
+        let handle = self.state.instance.require_handle()?;
+        self.state.instance.native().update_dynamic_instance(handle)
+    }
+}

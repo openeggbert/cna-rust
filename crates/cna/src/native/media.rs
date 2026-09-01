@@ -5,6 +5,7 @@ use cna_sys as sys;
 use crate::error::Result;
 
 use super::loader::NativeSource;
+use super::Native;
 
 /// Every reviewed Media/Video route, resolved once when the tables are filled.
 ///
@@ -441,4 +442,266 @@ impl MediaApi {
             video_player_destroy: symbol!(cna_video_player_destroy, _),
         })
     }
+}
+
+/// `video.h` and `media.h`: constructing a `Video` or a `Song`, and the facts
+/// they carry that no other route reports.
+///
+/// The construction routes are what let a game hold media it built rather than
+/// media the library enumerated. XNA's `Video` and `Song` are content types
+/// with no public constructor; CNA gives them one, and a Rust caller that has a
+/// file path or a URI has nowhere else to go.
+///
+/// The track selectors exist twice on purpose -- once on the video and once on
+/// the player -- and they are not the same operation: setting a track on the
+/// *video* changes what any player will use for it, and setting one on the
+/// *player* changes only that player's current playback.
+impl Native {
+    pub(crate) fn create_video(
+        &self,
+        game: sys::CNA_Handle,
+        file_name: &str,
+    ) -> Result<sys::CNA_VideoHandle> {
+        let mut handle = 0;
+        // SAFETY: the game handle is live and the name outlives the call.
+        self.check(unsafe {
+            (self.video_create)(game, media_view(file_name), &mut handle)
+        })?;
+        Ok(handle)
+    }
+
+    pub(crate) fn create_video_from_uri(
+        &self,
+        game: sys::CNA_Handle,
+        uri: &str,
+    ) -> Result<sys::CNA_VideoHandle> {
+        let mut handle = 0;
+        // SAFETY: the game handle is live and the URI outlives the call.
+        self.check(unsafe {
+            (self.video_create_from_uri_ext)(game, media_view(uri), &mut handle)
+        })?;
+        Ok(handle)
+    }
+
+    /// Width, height and frame rate, from the decoded stream.
+    pub(crate) fn video_info(
+        &self,
+        handle: sys::CNA_VideoHandle,
+    ) -> Result<(i32, i32, f64)> {
+        let mut info = sys::CNA_VideoInfo {
+            struct_size: core::mem::size_of::<sys::CNA_VideoInfo>() as u32,
+            struct_version: 1,
+            ..sys::CNA_VideoInfo::default()
+        };
+        // SAFETY: the output is a complete versioned local.
+        self.check(unsafe { (self.video_get_info)(handle, &mut info) })?;
+        Ok((info.width, info.height, info.fps))
+    }
+
+    pub(crate) fn set_video_duration(
+        &self,
+        handle: sys::CNA_VideoHandle,
+        ticks: i64,
+    ) -> Result<()> {
+        // SAFETY: the handle is live and the duration is a scalar.
+        self.check(unsafe { (self.video_set_duration)(handle, ticks) })
+    }
+
+    pub(crate) fn set_video_audio_track(
+        &self,
+        handle: sys::CNA_VideoHandle,
+        track: i32,
+    ) -> Result<()> {
+        // SAFETY: the handle is live and the track is a scalar.
+        self.check(unsafe { (self.video_set_audio_track_ext)(handle, track) })
+    }
+
+    pub(crate) fn set_video_video_track(
+        &self,
+        handle: sys::CNA_VideoHandle,
+        track: i32,
+    ) -> Result<()> {
+        // SAFETY: the handle is live and the track is a scalar.
+        self.check(unsafe { (self.video_set_video_track_ext)(handle, track) })
+    }
+
+    pub(crate) fn video_file_name(&self, handle: sys::CNA_VideoHandle) -> Result<String> {
+        media_text(
+            |result| self.check(result),
+            // SAFETY: the handle is live and the output is the caller's local.
+            |out| unsafe { (self.video_get_file_name_size)(handle, out) },
+            // SAFETY: the destination has the capacity just measured.
+            |destination, capacity, written| unsafe {
+                (self.video_copy_file_name)(handle, destination, capacity, written)
+            },
+        )
+    }
+
+    pub(crate) fn video_has_graphics_device(
+        &self,
+        handle: sys::CNA_VideoHandle,
+    ) -> Result<bool> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the handle is live and the output is a local.
+        self.check(unsafe { (self.video_get_has_graphics_device)(handle, &mut value) })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    /// The video a player is currently bound to, if any.
+    pub(crate) fn video_player_video(
+        &self,
+        handle: sys::CNA_VideoPlayerHandle,
+    ) -> Result<Option<sys::CNA_VideoHandle>> {
+        let mut video = 0;
+        let mut present = sys::CNA_FALSE;
+        // SAFETY: the handle is live and both outputs are locals.
+        self.check(unsafe { (self.video_player_get_video)(handle, &mut video, &mut present) })?;
+        Ok((present != sys::CNA_FALSE).then_some(video))
+    }
+
+    pub(crate) fn set_player_audio_track(
+        &self,
+        handle: sys::CNA_VideoPlayerHandle,
+        track: i32,
+    ) -> Result<()> {
+        // SAFETY: the handle is live and the track is a scalar.
+        self.check(unsafe { (self.video_player_set_audio_track_ext)(handle, track) })
+    }
+
+    pub(crate) fn set_player_video_track(
+        &self,
+        handle: sys::CNA_VideoPlayerHandle,
+        track: i32,
+    ) -> Result<()> {
+        // SAFETY: the handle is live and the track is a scalar.
+        self.check(unsafe { (self.video_player_set_video_track_ext)(handle, track) })
+    }
+
+    pub(crate) fn media_source_type_name(
+        &self,
+        game: sys::CNA_Handle,
+        index: u32,
+    ) -> Result<String> {
+        media_text(
+            |result| self.check(result),
+            // SAFETY: the game handle is live and the output is a local.
+            |out| unsafe { (self.media_source_get_type_name_size_at)(game, index, out) },
+            // SAFETY: the destination has the capacity just measured.
+            |destination, capacity, written| unsafe {
+                (self.media_source_copy_type_name_at)(
+                    game, index, destination, capacity, written,
+                )
+            },
+        )
+    }
+
+    /// Builds a song from a file path and a display name.
+    ///
+    /// The C route takes the **file name first** and the display name second,
+    /// which is the opposite of how the Rust signature reads. Getting it the
+    /// wrong way round is silent -- both are strings and either can be empty --
+    /// so the order is stated here rather than left to the argument names.
+    pub(crate) fn create_song(
+        &self,
+        game: sys::CNA_Handle,
+        name: &str,
+        file_name: &str,
+    ) -> Result<sys::CNA_SongHandle> {
+        let mut handle = 0;
+        // SAFETY: the game handle is live and both strings outlive the call.
+        self.check(unsafe {
+            (self.song_create)(game, media_view(file_name), media_view(name), &mut handle)
+        })?;
+        Ok(handle)
+    }
+
+    pub(crate) fn create_song_with_duration(
+        &self,
+        game: sys::CNA_Handle,
+        name: &str,
+        file_name: &str,
+        duration_milliseconds: i32,
+    ) -> Result<sys::CNA_SongHandle> {
+        let mut handle = 0;
+        // SAFETY: the game handle is live and both strings outlive the call.
+        self.check(unsafe {
+            (self.song_create_with_duration)(
+                game,
+                media_view(file_name),
+                media_view(name),
+                duration_milliseconds,
+                &mut handle,
+            )
+        })?;
+        Ok(handle)
+    }
+
+    /// The platform handle text a song carries, for diagnostics.
+    pub(crate) fn song_handle_text(&self, handle: sys::CNA_SongHandle) -> Result<String> {
+        media_text(
+            |result| self.check(result),
+            // SAFETY: the handle is live and the output is a local.
+            |out| unsafe { (self.song_get_handle_text_size_ext)(handle, out) },
+            // SAFETY: the destination has the capacity just measured.
+            |destination, capacity, written| unsafe {
+                (self.song_copy_handle_text_ext)(handle, destination, capacity, written)
+            },
+        )
+    }
+
+    pub(crate) fn set_song_duration(
+        &self,
+        handle: sys::CNA_SongHandle,
+        ticks: i64,
+    ) -> Result<()> {
+        // SAFETY: the handle is live and the duration is a scalar.
+        self.check(unsafe { (self.song_set_duration)(handle, ticks) })
+    }
+
+    pub(crate) fn set_song_play_count(
+        &self,
+        handle: sys::CNA_SongHandle,
+        count: i32,
+    ) -> Result<()> {
+        // SAFETY: the handle is live and the count is a scalar.
+        self.check(unsafe { (self.song_set_play_count)(handle, count) })
+    }
+
+    pub(crate) fn create_song_collection(
+        &self,
+        game: sys::CNA_Handle,
+        songs: &[sys::CNA_SongHandle],
+    ) -> Result<sys::CNA_SongCollectionHandle> {
+        let mut handle = 0;
+        // SAFETY: the slice outlives the call and its length is passed exactly;
+        // a null pointer is only passed with a zero count.
+        self.check(unsafe {
+            (self.song_collection_create)(
+                game,
+                if songs.is_empty() {
+                    core::ptr::null()
+                } else {
+                    songs.as_ptr()
+                },
+                songs.len() as u64,
+                &mut handle,
+            )
+        })?;
+        Ok(handle)
+    }
+}
+
+fn media_view(value: &str) -> sys::CNA_StringView {
+    sys::CNA_StringView {
+        data: value.as_ptr().cast(),
+        byte_length: value.len() as u64,
+    }
+}
+
+fn media_text(
+    check: impl Fn(sys::CNA_Result) -> Result<()>,
+    size: impl Fn(*mut u64) -> sys::CNA_Result,
+    copy: impl Fn(*mut core::ffi::c_char, u64, *mut u64) -> sys::CNA_Result,
+) -> Result<String> {
+    super::runtime::read_string(check, size, copy)
 }

@@ -13330,4 +13330,156 @@ extern "C" {
         argument2: *mut CNA_Bool,
     ) -> CNA_Result;
     pub fn cna_content_type_reader_destroy(argument0: CNA_ContentTypeReaderHandle) -> CNA_Result;
+    pub fn cna_video_create(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_VideoHandle,
+    ) -> CNA_Result;
+    pub fn cna_video_create_from_uri_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_VideoHandle,
+    ) -> CNA_Result;
+    pub fn cna_video_get_info(
+        argument0: CNA_VideoHandle,
+        argument1: *mut CNA_VideoInfo,
+    ) -> CNA_Result;
+    pub fn cna_video_set_duration(argument0: CNA_VideoHandle, argument1: i64) -> CNA_Result;
+    pub fn cna_video_set_audio_track_ext(argument0: CNA_VideoHandle, argument1: i32) -> CNA_Result;
+    pub fn cna_video_set_video_track_ext(argument0: CNA_VideoHandle, argument1: i32) -> CNA_Result;
+    pub fn cna_video_get_file_name_size(
+        argument0: CNA_VideoHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_video_copy_file_name(
+        argument0: CNA_VideoHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_video_get_has_graphics_device(
+        argument0: CNA_VideoHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_video_player_get_video(
+        argument0: CNA_VideoPlayerHandle,
+        argument1: *mut CNA_VideoHandle,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_video_player_set_audio_track_ext(
+        argument0: CNA_VideoPlayerHandle,
+        argument1: i32,
+    ) -> CNA_Result;
+    pub fn cna_video_player_set_video_track_ext(
+        argument0: CNA_VideoPlayerHandle,
+        argument1: i32,
+    ) -> CNA_Result;
+    pub fn cna_audio_engine_get_is_disposed(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_audio_engine_get_renderer_text_size(
+        argument0: CNA_Handle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_audio_engine_copy_renderer_text(
+        argument0: CNA_Handle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_audio_engine_get_renderer_hash_code(
+        argument0: CNA_Handle,
+        argument1: u64,
+        argument2: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_audio_engine_renderers_equal(
+        argument0: CNA_Handle,
+        argument1: u64,
+        argument2: u64,
+        argument3: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_wave_bank_get_is_disposed(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_sound_bank_get_is_disposed(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_audio_get_capabilities(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_AudioCapabilities,
+    ) -> CNA_Result;
+    pub fn cna_sound_effect_create_from_asset_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_sound_effect_get_is_disposed(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_sound_effect_instance_get_is_disposed(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_dynamic_sound_effect_instance_submit_float_buffer_ext(
+        argument0: CNA_Handle,
+        argument1: *const f32,
+        argument2: u64,
+        argument3: i32,
+        argument4: i32,
+    ) -> CNA_Result;
+    pub fn cna_dynamic_sound_effect_instance_queue_initial_buffers_ext(
+        argument0: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_dynamic_sound_effect_instance_clear_buffers_ext(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_dynamic_sound_effect_instance_update_ext(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_microphone_check_all_buffers_ext(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_media_source_get_type_name_size_at(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_media_source_copy_type_name_at(
+        argument0: CNA_Handle,
+        argument1: u32,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_song_create(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: CNA_StringView,
+        argument3: *mut CNA_SongHandle,
+    ) -> CNA_Result;
+    pub fn cna_song_create_with_duration(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: CNA_StringView,
+        argument3: i32,
+        argument4: *mut CNA_SongHandle,
+    ) -> CNA_Result;
+    pub fn cna_song_get_handle_text_size_ext(
+        argument0: CNA_SongHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_song_copy_handle_text_ext(
+        argument0: CNA_SongHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_song_set_duration(argument0: CNA_SongHandle, argument1: i64) -> CNA_Result;
+    pub fn cna_song_set_play_count(argument0: CNA_SongHandle, argument1: i32) -> CNA_Result;
+    pub fn cna_song_collection_create(
+        argument0: CNA_Handle,
+        argument1: *const CNA_SongHandle,
+        argument2: u64,
+        argument3: *mut CNA_SongCollectionHandle,
+    ) -> CNA_Result;
 }

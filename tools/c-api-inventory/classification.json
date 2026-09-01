@@ -693,6 +693,37 @@
           "pub fn ToString"
         ],
         "evidence": "crates/cna/src/input/mouse.rs; crates/cna/tests/extensions_mouse_desktop.rs qualifies the bound half against the live library"
+      },
+      {
+        "id": "sample-arithmetic-is-xna-faithful-in-rust",
+        "status": "DELIBERATE_NON_BINDING",
+        "names": [
+          "cna_sound_effect_get_sample_duration_ticks",
+          "cna_sound_effect_get_sample_size_in_bytes"
+        ],
+        "reason": "RUST-UPSTREAM-027. crates/cna/src/audio.rs already implements XNA's two static helpers and does it faithfully, down to the mixed binary32/double precision that makes one mono second at 44.1 kHz 88,198 bytes rather than 88,200. CNA's routes for the same two questions do not agree with XNA: the duration truncates where XNA's TimeSpan.FromMilliseconds rounds -- up to a millisecond short, and zero for a 100-byte stereo buffer at 44.1 kHz that XNA says lasts one -- and the size drops XNA's `num + num % Channels` frame alignment and does the rate division in double rather than binary32. Nineteen of ninety duration cases and fifteen of fifty size cases disagree. Binding these would replace a correct answer with a wrong one, which is the one thing a coverage number is not worth.",
+        "rustEvidence": [
+          "pub(crate) fn sample_duration",
+          "pub(crate) fn sample_size"
+        ],
+        "evidence": "docs/upstream-findings.md RUST-UPSTREAM-027; the decompiled XNA AudioFormat.DurationFromSize and SizeFromDuration are the arbiter; tools/reproducers/ext015q_sample_math.c prints CNA's answers and crates/cna/tests/extensions_audio_ext.rs pins the Rust ones to the reference values"
+      },
+      {
+        "id": "xact-disposing-events-need-the-rust-event-fixed-first",
+        "status": "DEFERRED_TRACKED",
+        "names": [
+          "cna_audio_engine_subscribe_disposing_ext",
+          "cna_wave_bank_subscribe_disposing_ext",
+          "cna_sound_bank_subscribe_disposing_ext",
+          "cna_cue_subscribe_disposing_ext"
+        ],
+        "reason": "RUST-EXT-017. These are worth binding and are not yet, because binding them alone would paper over a defect in the Rust projection rather than expose it. Measured: WaveBankState::dispose_xact_child and SoundBankState's equivalent call the low-level dispose, which destroys the handle without emitting the Rust `disposing` event -- so a handler registered through WaveBank::AddDisposingHandler does NOT fire when the engine that owns the bank is disposed, which is exactly when XNA's own Disposing fires. CNA raises its event on that path. Binding the native subscription would make the two disagree visibly, which is better than the silence there is now, but the fix is to make the Rust event fire and bind the native one as the cross-check in the same slice.",
+        "rustEvidence": [
+          "fn dispose_xact_child",
+          "pub fn AddDisposingHandler"
+        ],
+        "evidence": "crates/cna/src/audio/xact.rs: the `disposing.emit` calls are on the public Dispose paths (lines 136, 218) and not on the XactChild teardown path the engine drives",
+        "task": "RUST-EXT-017"
       }
     ],
     "overrides": {}

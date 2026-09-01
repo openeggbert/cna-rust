@@ -230,3 +230,96 @@ collection_element!(Playlist,Playlist::from_handle,|value:&Playlist|value.core.i
 collection_element!(Song,Song::from_handle,|value:&Song|value.core.invalidate());
 collection_element!(Picture,Picture::from_handle,|value:&Picture|value.core.invalidate());
 collection_element!(PictureAlbum,PictureAlbum::from_handle,|value:&PictureAlbum|value.core.invalidate());
+
+/// The `media.h` routes that build a `Song` or a `SongCollection`.
+///
+/// XNA's `Song` has one public constructor -- `Song.FromUri` -- and no way to
+/// name a file directly, and `SongCollection` has none at all: a game gets one
+/// from the media library. CNA gives both, so a Rust caller with a file on
+/// disk or a list of songs in hand can build what XNA would only have handed
+/// out.
+///
+/// `SetDuration` and `SetPlayCount` are writers for properties XNA exposes
+/// read-only. They exist because the library a song came from may not know
+/// either, and the values are the game's to correct.
+impl Song {
+    /// Builds a song from a name and a file the platform can decode.
+    pub fn FromFile(game: &GameContext<'_>, name: &str, fileName: &str) -> Result<Self> {
+        Self::adopt_created(game, game.native.create_song(game.handle, name, fileName)?)
+    }
+
+    /// Builds a song that reports the duration it was given.
+    pub fn FromFileWithDuration(
+        game: &GameContext<'_>,
+        name: &str,
+        fileName: &str,
+        durationMilliseconds: i32,
+    ) -> Result<Self> {
+        Self::adopt_created(
+            game,
+            game.native.create_song_with_duration(
+                game.handle,
+                name,
+                fileName,
+                durationMilliseconds,
+            )?,
+        )
+    }
+
+    fn adopt_created(game: &GameContext<'_>, handle: sys::CNA_SongHandle) -> Result<Self> {
+        let (native, _) = game.native_game();
+        let runtime = Arc::clone(game.media_runtime());
+        let generation = game.media_generation();
+        Arc::try_unwrap(Self::from_handle(
+            Arc::clone(native),
+            runtime,
+            generation,
+            handle,
+        ))
+        .map_err(|_| CnaError::InvalidInput("new Song identity was unexpectedly shared"))
+    }
+
+    /// The platform handle text this song carries.
+    ///
+    /// A diagnostic string rather than a property: what the backend calls the
+    /// underlying media object. It is the only way to tell two songs with the
+    /// same name apart when a library has produced both.
+    pub fn HandleText(&self) -> Result<String> {
+        self.core.native().song_handle_text(self.core.handle()?)
+    }
+
+    /// Overrides the duration this song reports.
+    pub fn SetDuration(&self, value: TimeSpan) -> Result<()> {
+        self.core
+            .native()
+            .set_song_duration(self.core.handle()?, value.Ticks())
+    }
+
+    /// Overrides the play count this song reports.
+    pub fn SetPlayCount(&self, value: i32) -> Result<()> {
+        self.core
+            .native()
+            .set_song_play_count(self.core.handle()?, value)
+    }
+}
+
+impl SongCollection {
+    /// Builds a collection over songs the caller already holds.
+    ///
+    /// The songs are read during the call; the collection does not borrow them
+    /// afterwards, so they may be dropped independently of it.
+    pub fn FromSongs(game: &GameContext<'_>, songs: &[&Song]) -> Result<Arc<Self>> {
+        let (native, _) = game.native_game();
+        let handles = songs
+            .iter()
+            .map(|song| song.core.handle())
+            .collect::<Result<Vec<_>>>()?;
+        let handle = native.create_song_collection(game.handle, &handles)?;
+        Ok(Self::from_handle(
+            Arc::clone(native),
+            Arc::clone(game.media_runtime()),
+            game.media_generation(),
+            handle,
+        ))
+    }
+}

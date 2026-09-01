@@ -686,6 +686,43 @@ pub(crate) struct Native {
     pub(super) content_type_reader_initialize: sys::cna_content_type_reader_initialize_fn,
     pub(super) content_type_reader_read_untyped: sys::cna_content_type_reader_read_untyped_fn,
     pub(super) content_type_reader_destroy: sys::cna_content_type_reader_destroy_fn,
+    pub(super) video_create: sys::cna_video_create_fn,
+    pub(super) video_create_from_uri_ext: sys::cna_video_create_from_uri_ext_fn,
+    pub(super) video_get_info: sys::cna_video_get_info_fn,
+    pub(super) video_set_duration: sys::cna_video_set_duration_fn,
+    pub(super) video_set_audio_track_ext: sys::cna_video_set_audio_track_ext_fn,
+    pub(super) video_set_video_track_ext: sys::cna_video_set_video_track_ext_fn,
+    pub(super) video_get_file_name_size: sys::cna_video_get_file_name_size_fn,
+    pub(super) video_copy_file_name: sys::cna_video_copy_file_name_fn,
+    pub(super) video_get_has_graphics_device: sys::cna_video_get_has_graphics_device_fn,
+    pub(super) video_player_get_video: sys::cna_video_player_get_video_fn,
+    pub(super) video_player_set_audio_track_ext: sys::cna_video_player_set_audio_track_ext_fn,
+    pub(super) video_player_set_video_track_ext: sys::cna_video_player_set_video_track_ext_fn,
+    pub(super) audio_engine_get_is_disposed: sys::cna_audio_engine_get_is_disposed_fn,
+    pub(super) audio_engine_get_renderer_text_size: sys::cna_audio_engine_get_renderer_text_size_fn,
+    pub(super) audio_engine_copy_renderer_text: sys::cna_audio_engine_copy_renderer_text_fn,
+    pub(super) audio_engine_get_renderer_hash_code: sys::cna_audio_engine_get_renderer_hash_code_fn,
+    pub(super) audio_engine_renderers_equal: sys::cna_audio_engine_renderers_equal_fn,
+    pub(super) wave_bank_get_is_disposed: sys::cna_wave_bank_get_is_disposed_fn,
+    pub(super) sound_bank_get_is_disposed: sys::cna_sound_bank_get_is_disposed_fn,
+    pub(super) audio_get_capabilities: sys::cna_audio_get_capabilities_fn,
+    pub(super) sound_effect_create_from_asset_ext: sys::cna_sound_effect_create_from_asset_ext_fn,
+    pub(super) sound_effect_get_is_disposed: sys::cna_sound_effect_get_is_disposed_fn,
+    pub(super) sound_effect_instance_get_is_disposed: sys::cna_sound_effect_instance_get_is_disposed_fn,
+    pub(super) dynamic_sound_effect_instance_submit_float_buffer_ext: sys::cna_dynamic_sound_effect_instance_submit_float_buffer_ext_fn,
+    pub(super) dynamic_sound_effect_instance_queue_initial_buffers_ext: sys::cna_dynamic_sound_effect_instance_queue_initial_buffers_ext_fn,
+    pub(super) dynamic_sound_effect_instance_clear_buffers_ext: sys::cna_dynamic_sound_effect_instance_clear_buffers_ext_fn,
+    pub(super) dynamic_sound_effect_instance_update_ext: sys::cna_dynamic_sound_effect_instance_update_ext_fn,
+    pub(super) microphone_check_all_buffers_ext: sys::cna_microphone_check_all_buffers_ext_fn,
+    pub(super) media_source_get_type_name_size_at: sys::cna_media_source_get_type_name_size_at_fn,
+    pub(super) media_source_copy_type_name_at: sys::cna_media_source_copy_type_name_at_fn,
+    pub(super) song_create: sys::cna_song_create_fn,
+    pub(super) song_create_with_duration: sys::cna_song_create_with_duration_fn,
+    pub(super) song_get_handle_text_size_ext: sys::cna_song_get_handle_text_size_ext_fn,
+    pub(super) song_copy_handle_text_ext: sys::cna_song_copy_handle_text_ext_fn,
+    pub(super) song_set_duration: sys::cna_song_set_duration_fn,
+    pub(super) song_set_play_count: sys::cna_song_set_play_count_fn,
+    pub(super) song_collection_create: sys::cna_song_collection_create_fn,
     pub(super) mouse_get_state: sys::cna_mouse_get_state_fn,
     pub(super) mouse_get_window_handle: sys::cna_mouse_get_window_handle_fn,
     pub(super) mouse_set_window_handle: sys::cna_mouse_set_window_handle_fn,
@@ -2297,6 +2334,117 @@ impl Native {
             ),
             content_type_reader_destroy: symbol!(cna_content_type_reader_destroy,
                 sys::cna_content_type_reader_destroy_fn
+            ),
+            video_create: symbol!(cna_video_create,
+                sys::cna_video_create_fn
+            ),
+            video_create_from_uri_ext: symbol!(cna_video_create_from_uri_ext,
+                sys::cna_video_create_from_uri_ext_fn
+            ),
+            video_get_info: symbol!(cna_video_get_info,
+                sys::cna_video_get_info_fn
+            ),
+            video_set_duration: symbol!(cna_video_set_duration,
+                sys::cna_video_set_duration_fn
+            ),
+            video_set_audio_track_ext: symbol!(cna_video_set_audio_track_ext,
+                sys::cna_video_set_audio_track_ext_fn
+            ),
+            video_set_video_track_ext: symbol!(cna_video_set_video_track_ext,
+                sys::cna_video_set_video_track_ext_fn
+            ),
+            video_get_file_name_size: symbol!(cna_video_get_file_name_size,
+                sys::cna_video_get_file_name_size_fn
+            ),
+            video_copy_file_name: symbol!(cna_video_copy_file_name,
+                sys::cna_video_copy_file_name_fn
+            ),
+            video_get_has_graphics_device: symbol!(cna_video_get_has_graphics_device,
+                sys::cna_video_get_has_graphics_device_fn
+            ),
+            video_player_get_video: symbol!(cna_video_player_get_video,
+                sys::cna_video_player_get_video_fn
+            ),
+            video_player_set_audio_track_ext: symbol!(cna_video_player_set_audio_track_ext,
+                sys::cna_video_player_set_audio_track_ext_fn
+            ),
+            video_player_set_video_track_ext: symbol!(cna_video_player_set_video_track_ext,
+                sys::cna_video_player_set_video_track_ext_fn
+            ),
+            audio_engine_get_is_disposed: symbol!(cna_audio_engine_get_is_disposed,
+                sys::cna_audio_engine_get_is_disposed_fn
+            ),
+            audio_engine_get_renderer_text_size: symbol!(cna_audio_engine_get_renderer_text_size,
+                sys::cna_audio_engine_get_renderer_text_size_fn
+            ),
+            audio_engine_copy_renderer_text: symbol!(cna_audio_engine_copy_renderer_text,
+                sys::cna_audio_engine_copy_renderer_text_fn
+            ),
+            audio_engine_get_renderer_hash_code: symbol!(cna_audio_engine_get_renderer_hash_code,
+                sys::cna_audio_engine_get_renderer_hash_code_fn
+            ),
+            audio_engine_renderers_equal: symbol!(cna_audio_engine_renderers_equal,
+                sys::cna_audio_engine_renderers_equal_fn
+            ),
+            wave_bank_get_is_disposed: symbol!(cna_wave_bank_get_is_disposed,
+                sys::cna_wave_bank_get_is_disposed_fn
+            ),
+            sound_bank_get_is_disposed: symbol!(cna_sound_bank_get_is_disposed,
+                sys::cna_sound_bank_get_is_disposed_fn
+            ),
+            audio_get_capabilities: symbol!(cna_audio_get_capabilities,
+                sys::cna_audio_get_capabilities_fn
+            ),
+            sound_effect_create_from_asset_ext: symbol!(cna_sound_effect_create_from_asset_ext,
+                sys::cna_sound_effect_create_from_asset_ext_fn
+            ),
+            sound_effect_get_is_disposed: symbol!(cna_sound_effect_get_is_disposed,
+                sys::cna_sound_effect_get_is_disposed_fn
+            ),
+            sound_effect_instance_get_is_disposed: symbol!(cna_sound_effect_instance_get_is_disposed,
+                sys::cna_sound_effect_instance_get_is_disposed_fn
+            ),
+            dynamic_sound_effect_instance_submit_float_buffer_ext: symbol!(cna_dynamic_sound_effect_instance_submit_float_buffer_ext,
+                sys::cna_dynamic_sound_effect_instance_submit_float_buffer_ext_fn
+            ),
+            dynamic_sound_effect_instance_queue_initial_buffers_ext: symbol!(cna_dynamic_sound_effect_instance_queue_initial_buffers_ext,
+                sys::cna_dynamic_sound_effect_instance_queue_initial_buffers_ext_fn
+            ),
+            dynamic_sound_effect_instance_clear_buffers_ext: symbol!(cna_dynamic_sound_effect_instance_clear_buffers_ext,
+                sys::cna_dynamic_sound_effect_instance_clear_buffers_ext_fn
+            ),
+            dynamic_sound_effect_instance_update_ext: symbol!(cna_dynamic_sound_effect_instance_update_ext,
+                sys::cna_dynamic_sound_effect_instance_update_ext_fn
+            ),
+            microphone_check_all_buffers_ext: symbol!(cna_microphone_check_all_buffers_ext,
+                sys::cna_microphone_check_all_buffers_ext_fn
+            ),
+            media_source_get_type_name_size_at: symbol!(cna_media_source_get_type_name_size_at,
+                sys::cna_media_source_get_type_name_size_at_fn
+            ),
+            media_source_copy_type_name_at: symbol!(cna_media_source_copy_type_name_at,
+                sys::cna_media_source_copy_type_name_at_fn
+            ),
+            song_create: symbol!(cna_song_create,
+                sys::cna_song_create_fn
+            ),
+            song_create_with_duration: symbol!(cna_song_create_with_duration,
+                sys::cna_song_create_with_duration_fn
+            ),
+            song_get_handle_text_size_ext: symbol!(cna_song_get_handle_text_size_ext,
+                sys::cna_song_get_handle_text_size_ext_fn
+            ),
+            song_copy_handle_text_ext: symbol!(cna_song_copy_handle_text_ext,
+                sys::cna_song_copy_handle_text_ext_fn
+            ),
+            song_set_duration: symbol!(cna_song_set_duration,
+                sys::cna_song_set_duration_fn
+            ),
+            song_set_play_count: symbol!(cna_song_set_play_count,
+                sys::cna_song_set_play_count_fn
+            ),
+            song_collection_create: symbol!(cna_song_collection_create,
+                sys::cna_song_collection_create_fn
             ),
             mouse_get_state: symbol!(cna_mouse_get_state, sys::cna_mouse_get_state_fn),
             mouse_get_window_handle: symbol!(cna_mouse_get_window_handle,

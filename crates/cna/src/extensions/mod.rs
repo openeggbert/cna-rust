@@ -5,6 +5,7 @@
 //! measures the XNA hierarchy alone. Each submodule stays close to one
 //! canonical CNA family so a route's authority is obvious from where it lands.
 
+pub mod audio_ext;
 pub mod content;
 pub mod content_reader;
 pub mod devices;

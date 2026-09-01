@@ -5,7 +5,7 @@ use core::mem::size_of;
 
 use cna_sys as sys;
 
-use crate::error::{CnaError, Result};
+use crate::error::{CnaError, ErrorCategory, Result};
 
 use super::loader::NativeSource;
 use super::Native;
@@ -328,4 +328,209 @@ impl Native {
     fn copy_string(&self, handle: sys::CNA_Handle, size: unsafe extern "C" fn(sys::CNA_Handle, *mut u64) -> sys::CNA_Result, copy: unsafe extern "C" fn(sys::CNA_Handle, *mut core::ffi::c_char, u64, *mut u64) -> sys::CNA_Result) -> Result<String> { let mut required = 0; self.check(unsafe { size(handle, &mut required) })?; let capacity = usize::try_from(required).map_err(|_| CnaError::InvalidInput("native string is too large"))?; let mut bytes = vec![0_u8; capacity]; let mut copied = 0; self.check(unsafe { copy(handle, bytes.as_mut_ptr().cast(), required, &mut copied) })?; bytes.truncate(usize::try_from(copied).map_err(|_| CnaError::InvalidInput("native string is too large"))?); String::from_utf8(bytes).map_err(|_| CnaError::InvalidInput("native string is not UTF-8")) }
     fn copy_indexed_string(&self, handle: sys::CNA_Handle, index: u64, size: unsafe extern "C" fn(sys::CNA_Handle, u64, *mut u64) -> sys::CNA_Result, copy: unsafe extern "C" fn(sys::CNA_Handle, u64, *mut core::ffi::c_char, u64, *mut u64) -> sys::CNA_Result) -> Result<String> { let mut required = 0; self.check(unsafe { size(handle, index, &mut required) })?; let capacity = usize::try_from(required).map_err(|_| CnaError::InvalidInput("native string is too large"))?; let mut bytes = vec![0_u8; capacity]; let mut copied = 0; self.check(unsafe { copy(handle, index, bytes.as_mut_ptr().cast(), required, &mut copied) })?; bytes.truncate(usize::try_from(copied).map_err(|_| CnaError::InvalidInput("native string is too large"))?); String::from_utf8(bytes).map_err(|_| CnaError::InvalidInput("native string is not UTF-8")) }
     fn copy_renderer_string(&self, handle: sys::CNA_Handle, index: u64, size: unsafe extern "C" fn(sys::CNA_Handle, u64, *mut u64) -> sys::CNA_Result, copy: unsafe extern "C" fn(sys::CNA_Handle, u64, *mut core::ffi::c_char, u64, *mut u64) -> sys::CNA_Result) -> Result<String> { self.copy_indexed_string(handle, index, size, copy) }
+}
+
+/// `audio.h` and `xact.h`: the disposal facts, the engine's renderer identity,
+/// and the buffer paths a dynamic instance needs.
+///
+/// Three groups worth telling apart.
+///
+/// Every XACT object gets a `get_is_disposed` and a `subscribe_disposing_ext`.
+/// The safe layer already tracks disposal on the Rust side, so the *reading*
+/// route mostly agrees with what Rust knows -- but the *event* does not have a
+/// Rust counterpart at all: it fires when CNA disposes the object, including
+/// disposals a Rust caller did not initiate, such as an engine taking its
+/// children down with it.
+///
+/// `cna_audio_engine_renderers_equal` and the renderer hash are the identity
+/// half of `RendererDetail`. XNA compares renderer descriptors by value; these
+/// are CNA's own answers for the same question, and comparing in Rust instead
+/// would be restating an equality this ABI already defines.
+///
+/// The dynamic-instance routes are the submission path: a float buffer rather
+/// than the PCM one already bound, the initial queue, a clear, and the pump
+/// that moves finished buffers off the queue.
+impl Native {
+    pub(crate) fn audio_capabilities(&self, game: sys::CNA_Handle) -> Result<bool> {
+        let mut info = sys::CNA_AudioCapabilities {
+            struct_size: core::mem::size_of::<sys::CNA_AudioCapabilities>() as u32,
+            struct_version: 1,
+            ..sys::CNA_AudioCapabilities::default()
+        };
+        // SAFETY: the output is a complete versioned local.
+        self.check(unsafe { (self.audio_get_capabilities)(game, &mut info) })?;
+        Ok(info.is_playback_available != sys::CNA_FALSE)
+    }
+
+    pub(crate) fn audio_engine_is_disposed(&self, handle: sys::CNA_Handle) -> Result<bool> {
+        self.read_disposed(handle, self.audio_engine_get_is_disposed)
+    }
+
+    pub(crate) fn wave_bank_is_disposed(&self, handle: sys::CNA_Handle) -> Result<bool> {
+        self.read_disposed(handle, self.wave_bank_get_is_disposed)
+    }
+
+    pub(crate) fn sound_bank_is_disposed(&self, handle: sys::CNA_Handle) -> Result<bool> {
+        self.read_disposed(handle, self.sound_bank_get_is_disposed)
+    }
+
+    pub(crate) fn sound_effect_is_disposed(&self, handle: sys::CNA_Handle) -> Result<bool> {
+        self.read_disposed(handle, self.sound_effect_get_is_disposed)
+    }
+
+    pub(crate) fn sound_effect_instance_is_disposed(
+        &self,
+        handle: sys::CNA_Handle,
+    ) -> Result<bool> {
+        self.read_disposed(handle, self.sound_effect_instance_get_is_disposed)
+    }
+
+    fn read_disposed(
+        &self,
+        handle: sys::CNA_Handle,
+        route: unsafe extern "C" fn(sys::CNA_Handle, *mut sys::CNA_Bool) -> sys::CNA_Result,
+    ) -> Result<bool> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the handle is live and the output is a local.
+        self.check(unsafe { route(handle, &mut value) })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    pub(crate) fn audio_engine_renderer_text(
+        &self,
+        handle: sys::CNA_Handle,
+        index: u64,
+    ) -> Result<String> {
+        let mut count = 0_u64;
+        // SAFETY: the handle is live and the output is a local.
+        self.check(unsafe {
+            (self.audio_engine_get_renderer_text_size)(handle, index, &mut count)
+        })?;
+        let capacity = usize::try_from(count).unwrap_or(0);
+        let mut bytes = vec![0_u8; capacity];
+        let mut written = count;
+        // SAFETY: the destination has exactly `count` writable bytes.
+        self.check(unsafe {
+            (self.audio_engine_copy_renderer_text)(
+                handle,
+                index,
+                bytes.as_mut_ptr().cast(),
+                count,
+                &mut written,
+            )
+        })?;
+        bytes.truncate(usize::try_from(written).unwrap_or(0).min(capacity));
+        String::from_utf8(bytes).map_err(|_| CnaError::Native {
+            code: sys::CNA_RESULT_ENCODING,
+            category: ErrorCategory::None,
+            message: "CNA returned invalid UTF-8 renderer text".to_owned(),
+        })
+    }
+
+    pub(crate) fn audio_engine_renderer_hash(
+        &self,
+        handle: sys::CNA_Handle,
+        index: u64,
+    ) -> Result<i32> {
+        let mut value = 0;
+        // SAFETY: the handle is live and the output is a local.
+        self.check(unsafe {
+            (self.audio_engine_get_renderer_hash_code)(handle, index, &mut value)
+        })?;
+        Ok(value)
+    }
+
+    pub(crate) fn audio_engine_renderers_equal(
+        &self,
+        handle: sys::CNA_Handle,
+        left: u64,
+        right: u64,
+    ) -> Result<bool> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the handle is live and the output is a local.
+        self.check(unsafe {
+            (self.audio_engine_renderers_equal)(handle, left, right, &mut value)
+        })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    /// Submits a range of a float buffer, which CNA copies during the call.
+    ///
+    /// The route takes the whole slice *and* an offset and count into it, so
+    /// the range is validated here before either reaches C: an offset or count
+    /// past the end would otherwise be a read past the slice.
+    pub(crate) fn submit_dynamic_float_buffer(
+        &self,
+        handle: sys::CNA_Handle,
+        samples: &[f32],
+        offset: i32,
+        count: i32,
+    ) -> Result<()> {
+        let start = usize::try_from(offset)
+            .map_err(|_| CnaError::InvalidInput("a sample offset cannot be negative"))?;
+        let length = usize::try_from(count)
+            .map_err(|_| CnaError::InvalidInput("a sample count cannot be negative"))?;
+        if start.checked_add(length).is_none_or(|end| end > samples.len()) {
+            return Err(CnaError::InvalidInput(
+                "the submitted range must lie inside the sample buffer",
+            ));
+        }
+        // SAFETY: the slice outlives the call, its length is passed exactly,
+        // and the range was just checked to lie inside it.
+        self.check(unsafe {
+            (self.dynamic_sound_effect_instance_submit_float_buffer_ext)(
+                handle,
+                samples.as_ptr(),
+                samples.len() as u64,
+                offset,
+                count,
+            )
+        })
+    }
+
+    pub(crate) fn queue_dynamic_initial_buffers(
+        &self,
+        handle: sys::CNA_Handle,
+    ) -> Result<()> {
+        // SAFETY: the handle is live.
+        self.check(unsafe {
+            (self.dynamic_sound_effect_instance_queue_initial_buffers_ext)(handle)
+        })
+    }
+
+    pub(crate) fn clear_dynamic_buffers(&self, handle: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: the handle is live.
+        self.check(unsafe { (self.dynamic_sound_effect_instance_clear_buffers_ext)(handle) })
+    }
+
+    pub(crate) fn update_dynamic_instance(&self, handle: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: the handle is live.
+        self.check(unsafe { (self.dynamic_sound_effect_instance_update_ext)(handle) })
+    }
+
+    pub(crate) fn check_all_microphone_buffers(&self, game: sys::CNA_Handle) -> Result<()> {
+        // SAFETY: the game handle is live for the call.
+        self.check(unsafe { (self.microphone_check_all_buffers_ext)(game) })
+    }
+}
+
+/// `audio.h`'s file-decoding constructor and the process capability query.
+impl Native {
+    pub(crate) fn create_sound_effect_from_asset(
+        &self,
+        game: sys::CNA_Handle,
+        asset_name: &str,
+    ) -> Result<sys::CNA_Handle> {
+        let view = sys::CNA_StringView {
+            data: asset_name.as_ptr().cast(),
+            byte_length: asset_name.len() as u64,
+        };
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the game handle is live, the path outlives the call, and the
+        // output is a live local.
+        self.check(unsafe {
+            (self.sound_effect_create_from_asset_ext)(game, view, &mut handle)
+        })?;
+        Ok(handle)
+    }
 }

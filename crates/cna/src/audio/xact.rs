@@ -354,3 +354,72 @@ impl Cue {
     }
 }
 impl Drop for Cue { fn drop(&mut self) { let _ = self.state.dispose(); } }
+
+/// The `xact.h` routes with no XNA counterpart: CNA's own disposal facts and
+/// its renderer identity.
+///
+/// Every XACT object here already tracks disposal on the Rust side, and
+/// `IsDisposed` answers from that. These ask CNA instead, which is a different
+/// question with a different answer in exactly one case that matters: when an
+/// engine disposes and takes its banks and cues down with it, the Rust values
+/// still exist and CNA's objects do not. `NativeIsDisposed` is what sees that.
+impl AudioEngine {
+    /// Whether CNA considers the engine disposed.
+    pub fn NativeIsDisposed(&self) -> Result<bool> {
+        self.state
+            .native
+            .audio_engine_is_disposed(self.state.require_handle()?)
+    }
+
+    /// The renderer descriptor at an index, as CNA formats it.
+    ///
+    /// [`RendererDetails`](Self::RendererDetails) already reports the friendly
+    /// name and identifier separately; this is CNA's single-string spelling of
+    /// the same renderer, and it is what the hash and the equality below are
+    /// computed over.
+    pub fn RendererText(&self, index: u64) -> Result<String> {
+        self.state
+            .native
+            .audio_engine_renderer_text(self.state.require_handle()?, index)
+    }
+
+    /// CNA's hash for the renderer at an index.
+    pub fn RendererHashCode(&self, index: u64) -> Result<i32> {
+        self.state
+            .native
+            .audio_engine_renderer_hash(self.state.require_handle()?, index)
+    }
+
+    /// Whether CNA considers two renderers the same.
+    ///
+    /// Asked of CNA rather than answered by comparing the descriptors here:
+    /// XNA compares renderer descriptors by value, and which fields take part
+    /// is this ABI's decision, not the binding's.
+    pub fn RenderersEqual(&self, left: u64, right: u64) -> Result<bool> {
+        self.state.native.audio_engine_renderers_equal(
+            self.state.require_handle()?,
+            left,
+            right,
+        )
+    }
+}
+
+impl WaveBank {
+    /// Whether CNA considers the wave bank disposed.
+    pub fn NativeIsDisposed(&self) -> Result<bool> {
+        self.state
+            .engine
+            .native
+            .wave_bank_is_disposed(self.state.require_handle()?)
+    }
+}
+
+impl SoundBank {
+    /// Whether CNA considers the sound bank disposed.
+    pub fn NativeIsDisposed(&self) -> Result<bool> {
+        self.state
+            .engine
+            .native
+            .sound_bank_is_disposed(self.state.require_handle()?)
+    }
+}

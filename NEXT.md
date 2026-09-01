@@ -23,16 +23,16 @@ LIBRARY_EXPORTS=4054
 HEADER_EXPORTS=4054
 
 CANONICAL_ROUTES=4054
-BOUND=3134                   # was 2909
-DELIBERATE_NON_BINDING=796   # was 714
+BOUND=3171                   # was 2909
+DELIBERATE_NON_BINDING=798   # was 714
 BLOCKED_UPSTREAM=15
-DEFERRED_TRACKED=2           # RUST-EXT-016
-UNREVIEWED=107               # was 416
+DEFERRED_TRACKED=6           # RUST-EXT-016, RUST-EXT-017
+UNREVIEWED=64                # was 416
 ACTIONABLE_LOCAL=0
 
-RUST_SYS_DECLARATIONS=3149
+RUST_SYS_DECLARATIONS=3186
 SYMBOL_ACQUISITIONS=3078
-LINKED_DECLARATIONS=3149
+LINKED_DECLARATIONS=3186
 PROTOTYPE_MISMATCHES=0
 SYMBOL_TYPE_MISMATCHES=0
 LAYOUT_FIELD_SETS_CHECKED=187
@@ -40,8 +40,8 @@ C_RUST_MEASUREMENTS=3174
 ABI_FINDINGS=0
 UNAUDITED_DECLARATIONS=0
 
-WORKSPACE_TEST_FILES=42
-WORKSPACE_TEST_FUNCTIONS=192
+WORKSPACE_TEST_FILES=44
+WORKSPACE_TEST_FUNCTIONS=195
 BOUND_WITHOUT_SAFE_CALL_SITE=894   # reported, not gated; RUST-CENSUS-002
 ```
 
@@ -77,10 +77,13 @@ currently fails on 416 undecided routes, which is the honest state.
 | `input_mouse.h` | 9 | 1 | the desktop cursor, pointer lock, capture, and the clicked event with its test hooks |
 | `texture.h` | 14 | 0 | CNA's format arithmetic, and textures held with no graphics device at all |
 | `runtime.h` | 18 | 0 | the frame budget three ways, CNA's own launch parameters, and the title container |
+| `video.h` + `media.h` | 21 | 0 | the `Video`, `Song` and `SongCollection` a game *builds* rather than is handed |
+| `audio.h` + `xact.h` | 16 | 2 | the disposal facts, the renderer identity, and the float streaming path; two helpers deliberately left to Rust because CNA's arithmetic is not XNA's |
 
-Eight headers now stand at zero undecided routes: `graphics_resource.h`,
+Twelve headers now stand at zero undecided routes: `graphics_resource.h`,
 `input.h`, `input_keyboard.h`, `input_mouse.h`, `texture.h`, `runtime.h`,
-`content.h` and `content_readers.h`.
+`content.h`, `content_readers.h`, `video.h`, `media.h`, `audio.h` and
+`xact.h`.
 
 ### What this milestone found
 
@@ -92,6 +95,14 @@ Three defects in CNA, each with a reproducer that runs without this repository:
   not avoid it; the registry runs the same destructor at exit.
 - **`RUST-UPSTREAM-022`** — a content-loaded skin's skeleton is unreachable,
   with a refusal the header does not document.
+- **`RUST-UPSTREAM-027`** — CNA's sample-duration and sample-size helpers are
+  not XNA's. The duration truncates where `TimeSpan.FromMilliseconds` rounds,
+  and answers *zero* for a buffer XNA says lasts a millisecond; the size drops
+  XNA's frame alignment and does the rate division in the wrong precision. The
+  Rust projection already implements both faithfully, so the C routes are a
+  deliberate non-binding: binding them would have replaced a correct answer
+  with a wrong one.
+
 - **`RUST-UPSTREAM-026`** — `cna_game_launch_parameters_add` has three
   contracts and honours none of them. The header says "adds or replaces", the
   implementation's `emplace` keeps the value already there, and XNA's own
@@ -139,9 +150,11 @@ Two more measured facts that are not defects but were not written down:
 
 ### Do next
 
-1. **The remaining 107 undecided routes.** `video.h` (12), `xact.h` (11),
-   `audio.h` (11), `media.h` (9), `vertex_resources.h` (7),
-   `input_joystick.h` (6), `graphics.h` (6) and a long tail. Each needs the same treatment the families above got: read what
+1. **The remaining 64 undecided routes.** `vertex_resources.h` (7),
+   `input_joystick.h` (6), `graphics.h` (6), `storage.h` (5),
+   `runtime_window.h` (5), `runtime_graphics_manager.h` (5),
+   `render_target.h` (5), `input_devices.h` (5), `display.h` (5) and a short
+   tail of ones and twos. Each needs the same treatment the families above got: read what
    is already in Rust before deciding anything is missing. Twice in this
    milestone that inverted the plan -- `runtime_components.h` and the touch
    value operations turned out to be Rust already -- and twice it found the

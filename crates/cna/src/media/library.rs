@@ -222,3 +222,32 @@ impl MediaLibrary {
 }
 
 impl Drop for MediaLibrary { fn drop(&mut self){self.invalidate_children();self.core.invalidate();} }
+
+/// The `media.h` route that names a source's *type*.
+impl MediaSource {
+    /// The runtime type name CNA reports for this source.
+    ///
+    /// Measured, and narrower than the name suggests: it is the .NET *class*
+    /// name -- `"Microsoft.Xna.Framework.Media.MediaSource"` -- and not a
+    /// spelling of which kind of source this is. `MediaSourceType` is what
+    /// answers that, and `Name` is what the source itself is called.
+    ///
+    /// It is bound because it is the only route that reports the type name at
+    /// all, and a caller writing a diagnostic wants what CNA would print; it is
+    /// documented this way so nobody reaches for it expecting the kind.
+    ///
+    /// Answers `None` for a source this process did not enumerate, which is
+    /// the state a source has after its game generation ended.
+    pub fn TypeName(&self, game: &GameContext<'_>) -> Result<Option<String>> {
+        let Some(index) = self.index else {
+            return Ok(None);
+        };
+        if !self.runtime.is_generation_active(self.generation) {
+            return Err(CnaError::InvalidInput(
+                "MediaSource belongs to a dead Game generation",
+            ));
+        }
+        let (native, handle) = game.native_game();
+        native.media_source_type_name(handle, index).map(Some)
+    }
+}

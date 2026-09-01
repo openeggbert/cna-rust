@@ -153,6 +153,15 @@ def header_inventory(header_root: Path) -> dict:
     }
 
 
+def backlog_text():
+    """The backlog, for checking that a named task is actually written down."""
+    path = Path(__file__).resolve().parents[2] / "docs" / "backlog.md"
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+
+
 def rust_source() -> str:
     """The whole safe Rust layer as one string, for evidence checks."""
     return "\n".join(
@@ -426,6 +435,18 @@ def main() -> int:
         if name not in headers["functions"] or name in rust["functions"]
     )
 
+    # A deferral names a task so the route has an owner, and the census already
+    # refuses a rule that names none. That is half the promise: a task nobody
+    # wrote down owns nothing. RUST-EXT-016 was in exactly that state -- named
+    # by a rule, absent from the backlog -- so the check is now both halves.
+    undocumented_tasks = sorted(
+        {
+            value["task"]
+            for value in binding.values()
+            if value.get("task") and value["task"] not in backlog_text()
+        }
+    )
+
     absent_rust_evidence = missing_rust_evidence(rules, rust_source())
 
     # A defect that does not change a route's status still has to name real
@@ -489,6 +510,7 @@ def main() -> int:
         "declaredButNotInHeaders": declared_not_in_headers,
         "unusedRules": unused_rules,
         "staleOverrides": stale_overrides,
+        "undocumentedTasks": undocumented_tasks,
         # Reported, not gated. A bound route with no safe call site is not
         # automatically wrong -- the ABI slice deliberately declares the whole
         # of a family so a library missing one fails at load rather than at
@@ -519,6 +541,7 @@ def main() -> int:
         + len(declared_not_in_headers)
         + len(unused_rules)
         + len(stale_overrides)
+        + len(undocumented_tasks)
         # The two that make the census mean something: a route nobody has made
         # a binding decision about, and one everybody agrees is doable and
         # nobody has done.
