@@ -30,74 +30,39 @@ use crate::native::Native;
 use crate::value::Vector4;
 
 /// What an effect was built from, and whether it works.
-impl Effect {
+///
+/// XNA's `Effect` publishes its parameters, techniques, passes and annotations
+/// and nothing about its own origin. These are the rest of `effects.h`.
+///
+/// A CNA extension: import it to call these.
+///
+/// ```rust,ignore
+/// use cna::extensions::effects::EffectFactsExt;
+/// if !effect.is_compiled()? { /* the renderer refused the source */ }
+/// ```
+pub trait EffectFactsExt {
     /// The vertex-shader source, empty when the effect was not built from any.
-    pub fn vertex_source(&self) -> Result<String> {
-        let handle = self.handle()?;
-        let native = Native::process()?;
-        let api = Arc::clone(&native);
-        crate::native::runtime::read_string(
-            |value| native.check(value),
-            // SAFETY: owned handle, live outputs; CNA's size-then-copy pair.
-            |bytes| unsafe { (api.effect_get_vertex_source_byte_count)(handle, bytes) },
-            |destination, capacity, written| unsafe {
-                (api.effect_copy_vertex_source)(handle, destination, capacity, written)
-            },
-        )
-    }
+    fn vertex_source(&self) -> Result<String>;
 
     /// The fragment-shader source, empty when the effect was not built from any.
-    pub fn fragment_source(&self) -> Result<String> {
-        let handle = self.handle()?;
-        let native = Native::process()?;
-        let api = Arc::clone(&native);
-        crate::native::runtime::read_string(
-            |value| native.check(value),
-            // SAFETY: owned handle, live outputs; CNA's size-then-copy pair.
-            |bytes| unsafe { (api.effect_get_fragment_source_byte_count)(handle, bytes) },
-            |destination, capacity, written| unsafe {
-                (api.effect_copy_fragment_source)(handle, destination, capacity, written)
-            },
-        )
-    }
+    fn fragment_source(&self) -> Result<String>;
 
     /// Whether the renderer compiled this effect.
     ///
     /// Distinct from having a renderer at all: an effect with no renderer is
     /// not compiled and never will be, and the two answers together say which
     /// of those a caller is looking at.
-    pub fn is_compiled(&self) -> Result<bool> {
-        let handle = self.handle()?;
-        let native = Native::process()?;
-        let mut value = sys::CNA_FALSE;
-        // SAFETY: the handle is owned and the output is a live local.
-        native.check(unsafe { (native.effect_get_is_compiled_ext)(handle, &mut value) })?;
-        Ok(value != sys::CNA_FALSE)
-    }
+    fn is_compiled(&self) -> Result<bool>;
 
     /// Whether a renderer is attached at all.
-    pub fn has_renderer(&self) -> Result<bool> {
-        let handle = self.handle()?;
-        let native = Native::process()?;
-        let mut value = sys::CNA_FALSE;
-        // SAFETY: the handle is owned and the output is a live local.
-        native.check(unsafe { (native.effect_has_renderer)(handle, &mut value) })?;
-        Ok(value != sys::CNA_FALSE)
-    }
+    fn has_renderer(&self) -> Result<bool>;
 
     /// Whether this is exactly the stock sprite effect.
     ///
     /// `SpriteBatch` substitutes its own effect when a caller passes none, and
     /// this is how a caller tells the substitute from an effect of their own
     /// that happens to draw sprites.
-    pub fn is_exact_stock_sprite_effect(&self) -> Result<bool> {
-        let handle = self.handle()?;
-        let native = Native::process()?;
-        let mut value = sys::CNA_FALSE;
-        // SAFETY: the handle is owned and the output is a live local.
-        native.check(unsafe { (native.effect_is_exact_stock_sprite_effect)(handle, &mut value) })?;
-        Ok(value != sys::CNA_FALSE)
-    }
+    fn is_exact_stock_sprite_effect(&self) -> Result<bool>;
 
     /// The identity of the device this effect belongs to.
     ///
@@ -113,7 +78,66 @@ impl Effect {
     /// own tests use, and the one that needs no `Game` at all -- is refused
     /// with an invalid-game-handle failure. The header does not say so; it was
     /// measured. Inside a `Game` callback it answers normally.
-    pub fn graphics_device_identity(&self) -> Result<u64> {
+    fn graphics_device_identity(&self) -> Result<u64>;
+}
+
+impl EffectFactsExt for Effect {
+    fn vertex_source(&self) -> Result<String> {
+        let handle = self.handle()?;
+        let native = Native::process()?;
+        let api = Arc::clone(&native);
+        crate::native::runtime::read_string(
+            |value| native.check(value),
+            // SAFETY: owned handle, live outputs; CNA's size-then-copy pair.
+            |bytes| unsafe { (api.effect_get_vertex_source_byte_count)(handle, bytes) },
+            |destination, capacity, written| unsafe {
+                (api.effect_copy_vertex_source)(handle, destination, capacity, written)
+            },
+        )
+    }
+
+    fn fragment_source(&self) -> Result<String> {
+        let handle = self.handle()?;
+        let native = Native::process()?;
+        let api = Arc::clone(&native);
+        crate::native::runtime::read_string(
+            |value| native.check(value),
+            // SAFETY: owned handle, live outputs; CNA's size-then-copy pair.
+            |bytes| unsafe { (api.effect_get_fragment_source_byte_count)(handle, bytes) },
+            |destination, capacity, written| unsafe {
+                (api.effect_copy_fragment_source)(handle, destination, capacity, written)
+            },
+        )
+    }
+
+    fn is_compiled(&self) -> Result<bool> {
+        let handle = self.handle()?;
+        let native = Native::process()?;
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the handle is owned and the output is a live local.
+        native.check(unsafe { (native.effect_get_is_compiled_ext)(handle, &mut value) })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    fn has_renderer(&self) -> Result<bool> {
+        let handle = self.handle()?;
+        let native = Native::process()?;
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the handle is owned and the output is a live local.
+        native.check(unsafe { (native.effect_has_renderer)(handle, &mut value) })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    fn is_exact_stock_sprite_effect(&self) -> Result<bool> {
+        let handle = self.handle()?;
+        let native = Native::process()?;
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the handle is owned and the output is a live local.
+        native.check(unsafe { (native.effect_is_exact_stock_sprite_effect)(handle, &mut value) })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    fn graphics_device_identity(&self) -> Result<u64> {
         let handle = self.handle()?;
         let native = Native::process()?;
         let mut value = sys::CNA_INVALID_HANDLE;
@@ -123,12 +147,19 @@ impl Effect {
     }
 }
 
-impl EffectPass {
+/// A pass's position within its technique.
+///
+/// A CNA extension: import it to call this.
+pub trait EffectPassExt {
     /// This pass's index within its technique.
     ///
     /// CNA's own addition: XNA's `EffectPass` has a name but no index, and a
     /// renderer that addresses passes positionally needs one.
-    pub fn index(&self) -> Result<u32> {
+    fn index(&self) -> Result<u32>;
+}
+
+impl EffectPassExt for EffectPass {
+    fn index(&self) -> Result<u32> {
         let handle = self.state.require_handle()?;
         let native = Native::process()?;
         let mut value = 0_u32;
@@ -138,9 +169,22 @@ impl EffectPass {
     }
 }
 
-impl EffectTechnique {
+/// A technique's position and identity, neither of which XNA publishes.
+///
+/// A CNA extension: import it to call these.
+pub trait EffectTechniqueExt {
     /// This technique's index within its effect.
-    pub fn index(&self) -> Result<u32> {
+    fn index(&self) -> Result<u32>;
+
+    /// This technique's stable identity.
+    ///
+    /// What a pass is tagged with, so a pass can say which technique it belongs
+    /// to without holding a reference to it.
+    fn identity(&self) -> Result<u64>;
+}
+
+impl EffectTechniqueExt for EffectTechnique {
+    fn index(&self) -> Result<u32> {
         let handle = self.state.require_handle()?;
         let native = Native::process()?;
         let mut value = 0_u32;
@@ -149,11 +193,7 @@ impl EffectTechnique {
         Ok(value)
     }
 
-    /// This technique's stable identity.
-    ///
-    /// What a pass is tagged with, so a pass can say which technique it belongs
-    /// to without holding a reference to it.
-    pub fn identity(&self) -> Result<u64> {
+    fn identity(&self) -> Result<u64> {
         let handle = self.state.require_handle()?;
         let native = Native::process()?;
         let mut value = 0_u64;
@@ -163,12 +203,34 @@ impl EffectTechnique {
     }
 }
 
-impl EffectMaterial {
+/// What a material keeps alive on CNA's side.
+///
+/// XNA has no `EffectMaterial` retention: a parameter's texture is kept alive
+/// by whatever holds the managed reference. CNA's parameter slot is
+/// non-owning, so the material retains instead, and these are that.
+///
+/// A CNA extension: import it to call these.
+pub trait EffectMaterialExt {
     /// How many parameter textures this material is keeping alive.
     ///
     /// A material retains the textures its parameters point at, because the
     /// parameter slot itself is non-owning. This is the count of those.
-    pub fn retained_parameter_texture_count(&self) -> Result<u64> {
+    fn retained_parameter_texture_count(&self) -> Result<u64>;
+
+    /// Asks the material to keep one parameter texture alive.
+    ///
+    /// The texture handle is borrowed for the call and retained by CNA
+    /// afterwards, which is what stops a parameter's texture being freed while
+    /// the material still points at it.
+    fn retain_parameter_texture(
+        &self,
+        texture_type: u32,
+        texture: &crate::graphics::Texture2D,
+    ) -> Result<()>;
+}
+
+impl EffectMaterialExt for EffectMaterial {
+    fn retained_parameter_texture_count(&self) -> Result<u64> {
         let handle = self.effect.handle()?;
         let native = Native::process()?;
         let mut value = 0_u64;
@@ -179,12 +241,7 @@ impl EffectMaterial {
         Ok(value)
     }
 
-    /// Asks the material to keep one parameter texture alive.
-    ///
-    /// The texture handle is borrowed for the call and retained by CNA
-    /// afterwards, which is what stops a parameter's texture being freed while
-    /// the material still points at it.
-    pub fn retain_parameter_texture(
+    fn retain_parameter_texture(
         &self,
         texture_type: u32,
         texture: &crate::graphics::Texture2D,
@@ -395,13 +452,24 @@ macro_rules! stock_texture {
 stock_texture!(crate::graphics::AlphaTestEffect, alpha_test_effect_get_texture);
 stock_texture!(crate::graphics::BasicEffect, basic_effect_get_texture);
 
-impl crate::graphics::DualTextureEffect {
+/// The textures CNA holds for a `DualTextureEffect`, by layer.
+///
+/// [`StockEffectTextures`] answers for the effects with one texture slot. This
+/// is the effect that blends two, so its accessor takes the layer and a shared
+/// one would have had to pick.
+///
+/// A CNA extension: import it to call this.
+pub trait DualTextureEffectExt {
     /// The identity of the texture CNA has bound to one layer, if any.
     ///
     /// Two layers rather than one, which is why this takes an index where the
     /// other stock effects take nothing: `DualTextureEffect` is the effect that
     /// blends two, and a shared accessor would have had to pick one.
-    pub fn native_texture_identity(&self, layer: u32) -> Result<Option<u64>> {
+    fn native_texture_identity(&self, layer: u32) -> Result<Option<u64>>;
+}
+
+impl DualTextureEffectExt for crate::graphics::DualTextureEffect {
+    fn native_texture_identity(&self, layer: u32) -> Result<Option<u64>> {
         let handle = self.AsEffect().handle()?;
         let native = Native::process()?;
         let mut present = sys::CNA_FALSE;
@@ -416,23 +484,53 @@ impl crate::graphics::DualTextureEffect {
 stock_texture!(crate::graphics::EnvironmentMapEffect, environment_map_effect_get_texture);
 stock_texture!(crate::graphics::SkinnedEffect, skinned_effect_get_texture);
 
-impl crate::graphics::EnvironmentMapEffect {
+/// The cube map CNA holds for an `EnvironmentMapEffect`.
+///
+/// A second slot beside the base texture [`StockEffectTextures`] answers for,
+/// which is why it is its own trait rather than a second method there.
+///
+/// A CNA extension: import it to call this.
+pub trait EnvironmentMapEffectExt {
     /// The identity of the cube map CNA has bound, if any.
     ///
     /// The environment map is a second slot beside the base texture, so it
     /// needs its own accessor rather than the shared trait's.
-    pub fn native_environment_map_identity(&self) -> Result<Option<u64>> {
+    fn native_environment_map_identity(&self) -> Result<Option<u64>>;
+}
+
+impl EnvironmentMapEffectExt for crate::graphics::EnvironmentMapEffect {
+    fn native_environment_map_identity(&self) -> Result<Option<u64>> {
         let native = Native::process()?;
         texture_identity(native.environment_map_effect_get_environment_map, self.AsEffect())
     }
 }
 
-impl crate::graphics::SkinnedEffect {
+/// CNA's per-vertex colour switch on a `SkinnedEffect`.
+///
+/// Not XNA's. The pinned `Microsoft.Xna.Framework.Graphics.dll` gives
+/// `VertexColorEnabled` to `BasicEffect` and `DualTextureEffect` and not to
+/// `SkinnedEffect`; CNA publishes it for all three. The strict projection
+/// carries it on the two XNA declares it on, and this carries CNA's third.
+///
+/// A CNA extension: import it to call these.
+///
+/// ```rust,ignore
+/// use cna::extensions::effects::SkinnedEffectExt;
+/// effect.SetVertexColorEnabled(true)?;
+/// ```
+pub trait SkinnedEffectExt {
     /// Whether the effect reads a per-vertex colour channel.
     ///
     /// XNA's `SkinnedEffect` has this and the strict projection did not,
     /// which is why it is here rather than beside the other stock properties.
-    pub fn VertexColorEnabled(&self) -> Result<bool> {
+    fn VertexColorEnabled(&self) -> Result<bool>;
+
+    /// Sets whether the effect reads a per-vertex colour channel.
+    fn SetVertexColorEnabled(&self, value: bool) -> Result<()>;
+}
+
+impl SkinnedEffectExt for crate::graphics::SkinnedEffect {
+    fn VertexColorEnabled(&self) -> Result<bool> {
         let handle = self.AsEffect().handle()?;
         let native = Native::process()?;
         let mut value = sys::CNA_FALSE;
@@ -443,8 +541,7 @@ impl crate::graphics::SkinnedEffect {
         Ok(value != sys::CNA_FALSE)
     }
 
-    /// Sets whether the effect reads a per-vertex colour channel.
-    pub fn SetVertexColorEnabled(&self, value: bool) -> Result<()> {
+    fn SetVertexColorEnabled(&self, value: bool) -> Result<()> {
         let handle = self.AsEffect().handle()?;
         let native = Native::process()?;
         // SAFETY: the handle is owned and the flag is by value.

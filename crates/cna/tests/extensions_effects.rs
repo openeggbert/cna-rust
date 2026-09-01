@@ -9,7 +9,7 @@
 //! answer rather than asserting one, because asserting it would be asserting
 //! which renderer the artifact was built with.
 
-use cna::extensions::effects::{create_sprite_effect, ColorMatrixEffect};
+use cna::extensions::effects::{create_sprite_effect, ColorMatrixEffect, EffectFactsExt};
 use cna::extensions::pbr::TextureSlot;
 use cna::extensions::shader_effect::ShaderEffect;
 use cna::Microsoft::Xna::Framework::Graphics::{
