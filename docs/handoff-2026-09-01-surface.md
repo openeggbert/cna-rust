@@ -241,7 +241,10 @@ them with no hop limit, so a call site inside an `impl Trait for Type` body is
 found exactly as one inside an inherent impl was. Proved rather than assumed:
 deleting `DeviceStateExt::set_string_marker`, the only safe caller of
 `cna_graphics_device_set_string_marker_ext`, moves the count to 98 with one
-unjustified route and fails the gate.
+unjustified route and fails the gate. The property is now permanent rather than
+a one-off: two tests in `tools/c-api-inventory/tests` build a synthetic crate
+whose only callers live in `impl Trait for Type`, and assert both that the
+routes are reachable and that deleting the caller kills one.
 
 ## 10. ABI scoreboard
 
@@ -312,7 +315,7 @@ beyond being the runtime the artifacts link.
 | bound-without-safe-site gate | PASS: 97 unreachable, 97 justified, 0 unjustified |
 | native ABI verifier | PASS: 0 findings, 0 unaudited |
 | runtime capability provenance | PASS: 35 rows, artifact and ABI confirmed |
-| API-compat / ABI / reachability / extension-surface tool tests | PASS: 28 / 33 / 14 / 8 |
+| API-compat / ABI / reachability / extension-surface tool tests | PASS: 28 / 33 / 16 / 8 |
 | packaged-source consumer | PASS: 7 + 204 files, 0 path leaks; extension calls compile with the traits and are refused without them |
 | direct-link consumer | PASS: links, no loader calls, runs a real route |
 | MSRV source audit | PASS: 0 findings |

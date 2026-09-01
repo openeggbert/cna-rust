@@ -157,7 +157,7 @@ a 1.82 API was used.
 | API-compat mutation tests | PASS: 28 |
 | extension-surface gate | PASS: 283 members, 59 traits, 987 publicly nameable items, 0 diagnostics |
 | extension-surface mutation tests | PASS: 8 |
-| reachability mutation tests | PASS: 14 |
+| reachability mutation tests | PASS: 16 (two new: a caller inside a trait impl is a safe call site, and deleting the only one kills the route) |
 | canonical route inventory + census gate | PASS: 4,055 canonical, 3,236 bound, 0 unreviewed, 0 actionable, 0 unmapped, 0 unused rules |
 | bound-without-safe-call-site gate | PASS: 97 unreachable, 97 justified, 0 unjustified; 4 planted defects each caught |
 | runtime capability provenance | PASS: 35 rows, artifact and ABI confirmed against the rebuilt library |

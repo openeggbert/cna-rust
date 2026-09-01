@@ -96,6 +96,29 @@ impl Widget {
 }
 """
 
+# The shape `RUST-SURFACE-001` made load-bearing. Every CNA-only member is now
+# reached through `impl Trait for Type` rather than through an inherent impl,
+# and a walk that only understood inherent impls would have turned 109 live
+# routes dead without anything failing.
+SAFE_AS_TRAIT_IMPL = """\
+//! The same safe layer, with every caller behind an extension trait.
+
+pub trait WidgetExt {
+    fn Open(&self) -> Result<()>;
+    fn Close(&self) -> Result<()>;
+}
+
+impl WidgetExt for Widget {
+    fn Open(&self) -> Result<()> {
+        self.native.open_widget()
+    }
+
+    fn Close(&self) -> Result<()> {
+        self.native.shut_the_widget()
+    }
+}
+"""
+
 
 def crate(table: str = TABLE, safe: str = SAFE) -> Path:
     directory = Path(tempfile.mkdtemp())
@@ -138,6 +161,20 @@ class WalkTests(unittest.TestCase):
         broken = TABLE.replace("self.really_finish_widget()", "Ok(())")
         _, unreachable = routes(table=broken)
         self.assertIn("cna_widget_close", unreachable)
+
+    def test_a_caller_inside_a_trait_impl_is_a_safe_call_site(self):
+        # `RUST-SURFACE-001` moved every CNA-only member into `impl Trait for
+        # Type`. The walk collects identifiers from files outside `native/`
+        # without caring what kind of block they sit in, and this is what says
+        # so rather than leaving it to be assumed.
+        reachable, _ = routes(safe=SAFE_AS_TRAIT_IMPL)
+        self.assertIn("cna_widget_open", reachable)
+        self.assertIn("cna_widget_close", reachable)
+
+    def test_deleting_the_only_trait_impl_caller_makes_the_route_dead(self):
+        without = SAFE_AS_TRAIT_IMPL.replace("self.native.open_widget()", "Ok(())")
+        _, unreachable = routes(safe=without)
+        self.assertIn("cna_widget_open", unreachable)
 
     def test_the_acquisition_is_not_a_use(self):
         # `load` names every field.  Counting that as a call site would make
