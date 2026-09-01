@@ -1,6 +1,7 @@
 //! The rest of `effects.h`: what an effect *is*, and the effects CNA adds.
 //!
-//! [`crate::graphics::effect`] projects XNA's `Effect` -- parameters,
+//! [`crate::Microsoft::Xna::Framework::Graphics::Effect`] projects XNA's
+//! `Effect` -- parameters,
 //! techniques, passes, annotations -- and this module completes the header
 //! around it: the source an effect was built from, whether the renderer
 //! compiled it, CNA's `ColorMatrixEffect`, and the stock `SpriteEffect`.

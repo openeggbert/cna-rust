@@ -198,7 +198,7 @@ impl Rgba8Data for Texture2D {
 /// this reports the layout a *buffer* already carries, which is what a tool
 /// describing a buffer it did not create needs.
 ///
-/// There is no counterpart for [`VertexDeclaration`] itself, and deliberately:
+/// There is no counterpart for `VertexDeclaration` itself, and deliberately:
 /// the Rust `VertexDeclaration` holds its elements and stride in Rust and has
 /// no native handle at all, so `cna_vertex_declaration_get_stride` and its
 /// neighbours have nothing on this side to be called with.

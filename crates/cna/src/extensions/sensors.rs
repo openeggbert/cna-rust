@@ -22,9 +22,9 @@
 //! None of these sensors exists on the machines this crate is verified on, so
 //! every one of them ships a deterministic backend and this module binds it.
 //! The compass and the motion sensor take a whole substitute backend
-//! ([`Compass::install_test_backend`]); the accelerometer and the gyroscope
+//! ([`Compass::set_test_backend`]); the accelerometer and the gyroscope
 //! have no such route and are steered field by field instead
-//! ([`Accelerometer::force_supported_for_tests`] and its neighbours). The
+//! ([`Accelerometer::set_supported_for_tests`] and its neighbours). The
 //! names say `for_tests` because that is what upstream calls them and because
 //! a game must not reach for them: they move CNA's own state, not the
 //! device's.

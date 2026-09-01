@@ -7,7 +7,7 @@
 //! # The launch parameters are CNA's, not a Rust mirror
 //!
 //! `crates/cna/src/game/services.rs` gives every game a
-//! [`LaunchParameters`](crate::Microsoft::Xna::Framework::LaunchParameters)
+//! [`crate::Microsoft::Xna::Framework::LaunchParameters`]
 //! dictionary, and it is a Rust `HashMap` that CNA never sees. CNA keeps its
 //! own per-game dictionary, and `cna_game_launch_parameters_parse_ext` is what
 //! fills it from a process's arguments -- which is where a real XNA game's

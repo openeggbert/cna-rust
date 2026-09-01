@@ -1,7 +1,8 @@
 //! What a modern gamepad is, beyond XNA's four values.
 //!
 //! XNA's `GamePad` is two sticks, two triggers and a button mask, and
-//! [`crate::input::gamepad`] projects exactly that. A controller made since
+//! [`crate::Microsoft::Xna::Framework::Input::GamePad`] projects exactly
+//! that. A controller made since
 //! then also has a touchpad, motion sensors, a light bar, motors in its
 //! triggers, a battery, a serial number, and its own idea of what its buttons
 //! are called -- none of which is a value Rust holds, so all of it is here.

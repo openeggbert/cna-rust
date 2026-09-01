@@ -13,7 +13,7 @@
 //! # Textures with no device
 //!
 //! [`StandaloneTexture`] is deliberately **not** a
-//! [`Texture2D`](crate::Microsoft::Xna::Framework::Graphics::Texture2D). An XNA
+//! [`crate::Microsoft::Xna::Framework::Graphics::Texture2D`]. An XNA
 //! `Texture2D` is a `GraphicsResource`, and a `GraphicsResource` has a
 //! `GraphicsDevice`; these have none. Giving them the `Texture2D` type would
 //! mean either inventing a device they do not have or making every existing

@@ -17,7 +17,7 @@
 //! variants -- lives only on a model CNA loaded. That is the gap this module
 //! closes, and it is the whole reason a [`NativeModel`] is worth having.
 //!
-//! So: load an `.xnb` through [`crate::content`] and get a
+//! So: load an `.xnb` through the strict `ContentManager` and get a
 //! [`crate::graphics::Model`]. Load a CNA-pipeline asset through
 //! [`NativeModel::load`] and get the imported scene's own facts.
 //!

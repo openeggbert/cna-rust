@@ -10,7 +10,8 @@
 //! into. It is also not derivable in Rust: every route here asks the platform's
 //! *current* layout a question, which is why each takes a live game.
 //!
-//! [`KeyboardState::ToString`] is here for a different reason -- it is a value
+//! [`KeyboardStateText::native_to_string`] is here for a different reason --
+//! it is a value
 //! operation, but the text is CNA's own formatting rather than something the
 //! bit set implies.
 
