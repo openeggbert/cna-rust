@@ -153,6 +153,31 @@ def header_inventory(header_root: Path) -> dict:
     }
 
 
+def rust_source() -> str:
+    """The whole safe Rust layer as one string, for evidence checks."""
+    return "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted((ROOT / "crates/cna/src").rglob("*.rs"))
+    )
+
+
+def missing_rust_evidence(rules: dict, source: str) -> list[str]:
+    """Rule evidence that names Rust code which is not there.
+
+    A deliberate non-binding whose reason is "Rust already does this" is only
+    as good as the claim, and prose cannot be checked.  A rule may therefore
+    carry ``rustEvidence``: exact Rust symbols the claim rests on.  This finds
+    the ones that have since been renamed or removed, so a rule cannot go on
+    pointing at code nobody has.
+    """
+    missing = []
+    for rule in rules.get("binding", {}).get("rules", []):
+        for symbol in rule.get("rustEvidence", []):
+            if symbol not in source:
+                missing.append(f"{rule.get('id', '?')}: {symbol}")
+    return missing
+
+
 def safe_layer_call_sites() -> set[str]:
     """Every native table field the safe Rust layer actually calls.
 
@@ -263,6 +288,13 @@ def classify_binding(functions: dict[str, dict], bound: set[str], rules: dict) -
             if matches(rule, name, header):
                 return dict(rule, rule=rule.get("id", f"binding[{index}]"))
         return None
+
+    # First match wins, so the order in classification.json is load-bearing:
+    # blocks first, then rules naming exact routes, then rules matching a
+    # *shape* of route across every family. A family that is blocked upstream is
+    # blocked as a unit -- singling out, say, its struct initialiser as
+    # "deliberately not bound" would be a distinction without a difference,
+    # because nobody can use it either way.
 
     result = {}
     for name, info in sorted(functions.items()):
@@ -394,6 +426,8 @@ def main() -> int:
         if name not in headers["functions"] or name in rust["functions"]
     )
 
+    absent_rust_evidence = missing_rust_evidence(rules, rust_source())
+
     # A defect that does not change a route's status still has to name real
     # routes, or a finding can quietly stop pointing at anything.
     known_defects = []
@@ -463,6 +497,7 @@ def main() -> int:
         # have family-level justifications would only teach people to bypass
         # it. RUST-CENSUS-002 owns working the list down.
         "knownDefects": known_defects,
+        "rulesNamingAbsentRustCode": absent_rust_evidence,
         "boundWithoutSafeCallSite": len(unreachable),
         "boundWithoutSafeCallSiteSample": unreachable[:20],
         "boundWithoutSafeCallSiteJustified": len(justified),
@@ -477,7 +512,8 @@ def main() -> int:
         Path(args.output).write_text(text, encoding="utf-8")
     print(text, end="")
     failures = (
-        len(stale_defect_names)
+        len(absent_rust_evidence)
+        + len(stale_defect_names)
         + 
         counts["UNMAPPED_REQUIRES_REVIEW"]
         + len(declared_not_in_headers)

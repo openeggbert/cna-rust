@@ -368,13 +368,17 @@
   "knownDefects": [
     {
       "id": "RUST-UPSTREAM-021",
-      "names": ["cna_content_manager_load_model"],
+      "names": [
+        "cna_content_manager_load_model"
+      ],
       "summary": "a content-loaded Model's teardown faults: ~MeshResource moves an empty detachedValue over a loaded part's value, and ~PartResource dereferences it. Every route answers correctly; only teardown is affected, and leaking the handle moves the fault to process exit rather than avoiding it. The routes stay BOUND because they work -- this records the defect against them so the scoreboard is not the only thing a reader sees.",
       "evidence": "docs/upstream-findings.md#rust-upstream-021, crates/cna/tests/upstream_model_destroy.rs"
     },
     {
       "id": "RUST-UPSTREAM-022",
-      "names": ["cna_model_create_skin_skeleton_handle_ext"],
+      "names": [
+        "cna_model_create_skin_skeleton_handle_ext"
+      ],
       "summary": "refuses a skin the content pipeline imported -- 'The Model skin's skeleton was not created through the C API' -- which is not the refusal the header documents. The route is bound and works for a skin added through cna_model_add_skin_ext.",
       "evidence": "docs/upstream-findings.md#rust-upstream-022, crates/cna/tests/extensions_native_model.rs"
     }
@@ -382,21 +386,25 @@
   "binding": {
     "rules": [
       {
-        "id": "value-maths-in-rust",
-        "status": "DELIBERATE_NON_BINDING",
-        "headers": [
-          "vectors.h",
-          "matrix.h",
-          "quaternion.h",
-          "math.h",
-          "curve.h",
-          "geometry.h",
-          "color.h",
-          "packed_vectors.h",
-          "vertex_values.h"
+        "id": "model-content-tag-needs-the-dictionary",
+        "status": "DEFERRED_TRACKED",
+        "names": [
+          "cna_model_get_content_tag_dictionary_ext",
+          "cna_model_get_content_tag_foreign_object_ext"
         ],
-        "reason": "these are pure value arithmetic, and cna::value implements each operation in Rust: Matrix::Invert, CreateLookAt and Decompose, Vector3::Normalize, Quaternion::Slerp, BoundingBox::Intersects, BoundingFrustum::Contains and Color::FromNonPremultiplied are Rust functions over Rust values. Binding the C route would put a second implementation of the same arithmetic behind a native call that can fail, and the two could disagree.",
-        "evidence": "crates/cna/src/value/, and crates/cna/src/value/tests.rs which measures the Rust arithmetic against XNA's documented results"
+        "task": "RUST-EXT-015a",
+        "reason": "both answer a CNA_ObjectDictionaryHandle or a foreign object made by a caller's own reflective reader, and neither the ObjectDictionary projection nor the reflective type-reader builder exists in Rust yet. Both belong to the content slice, so these two go with it rather than dragging fifteen content_readers.h routes into the models slice to reach them.",
+        "evidence": "content_readers.h's cna_object_dictionary_* and cna_reflective_type_reader_* families, all still unbound"
+      },
+      {
+        "id": "camera-destroy-segv",
+        "status": "BLOCKED_UPSTREAM",
+        "names": [
+          "cna_camera_*"
+        ],
+        "task": "RUST-UPSTREAM-020",
+        "reason": "cna_camera_create_with_test_backend_ext points CNA's global platform override at memory the camera handle owns, and cna_camera_destroy frees it without clearing the override, so any later camera query reads freed memory. Measured as SIGSEGV (wait status 139) from Rust; the baseline sequence without that query exits 0. Building a projection on a lifecycle that faults would mean hiding it.",
+        "evidence": "docs/upstream-findings.md#rust-upstream-020, crates/cna/tests/upstream_camera_destroy.rs"
       },
       {
         "id": "xna-model-is-a-rust-type",
@@ -445,25 +453,88 @@
         "evidence": "models.h's own contrast between cna_model_get_tag and cna_model_get_content_tag_dictionary_ext: 'That one is a C-owned opaque value a caller sets and reads back; this one is what a custom ContentProcessor wrote into the .xnb'"
       },
       {
-        "id": "model-content-tag-needs-the-dictionary",
-        "status": "DEFERRED_TRACKED",
+        "id": "xna-tostring-in-rust",
+        "status": "DELIBERATE_NON_BINDING",
         "names": [
-          "cna_model_get_content_tag_dictionary_ext",
-          "cna_model_get_content_tag_foreign_object_ext"
+          "cna_viewport_copy_string",
+          "cna_viewport_get_string_size",
+          "cna_gamepad_state_copy_string",
+          "cna_gamepad_state_get_string_size",
+          "cna_mouse_state_copy_string",
+          "cna_mouse_state_get_string_size",
+          "cna_touch_location_copy_string",
+          "cna_touch_location_get_string_size"
         ],
-        "task": "RUST-EXT-015a",
-        "reason": "both answer a CNA_ObjectDictionaryHandle or a foreign object made by a caller's own reflective reader, and neither the ObjectDictionary projection nor the reflective type-reader builder exists in Rust yet. Both belong to the content slice, so these two go with it rather than dragging fifteen content_readers.h routes into the models slice to reach them.",
-        "evidence": "content_readers.h's cna_object_dictionary_* and cna_reflective_type_reader_* families, all still unbound"
+        "reason": "XNA's ToString() formats, which Rust implements for each of these types with the same layout: Viewport::ToString, GamePadState::ToString, MouseState::ToString and TouchLocation::ToString. Named one by one rather than by suffix on purpose -- the same routes exist for types Rust has no ToString for yet, and a wildcard here would quietly claim a fidelity this crate does not have.",
+        "rustEvidence": [
+          "pub fn ToString"
+        ],
+        "evidence": "crates/cna/src/graphics/viewport.rs, crates/cna/src/input/gamepad.rs, crates/cna/src/input/mouse.rs, crates/cna/src/input/touch.rs"
       },
       {
-        "id": "camera-destroy-segv",
-        "status": "BLOCKED_UPSTREAM",
-        "names": [
-          "cna_camera_*"
+        "id": "value-maths-in-rust",
+        "status": "DELIBERATE_NON_BINDING",
+        "headers": [
+          "vectors.h",
+          "matrix.h",
+          "quaternion.h",
+          "math.h",
+          "curve.h",
+          "geometry.h",
+          "color.h",
+          "packed_vectors.h",
+          "vertex_values.h"
         ],
-        "task": "RUST-UPSTREAM-020",
-        "reason": "cna_camera_create_with_test_backend_ext points CNA's global platform override at memory the camera handle owns, and cna_camera_destroy frees it without clearing the override, so any later camera query reads freed memory. Measured as SIGSEGV (wait status 139) from Rust; the baseline sequence without that query exits 0. Building a projection on a lifecycle that faults would mean hiding it.",
-        "evidence": "docs/upstream-findings.md#rust-upstream-020, crates/cna/tests/upstream_camera_destroy.rs"
+        "reason": "these are pure value arithmetic, and cna::value implements each operation in Rust: Matrix::Invert, CreateLookAt and Decompose, Vector3::Normalize, Quaternion::Slerp, BoundingBox::Intersects, BoundingFrustum::Contains and Color::FromNonPremultiplied are Rust functions over Rust values. Binding the C route would put a second implementation of the same arithmetic behind a native call that can fail, and the two could disagree.",
+        "evidence": "crates/cna/src/value/, and crates/cna/src/value/tests.rs which measures the Rust arithmetic against XNA's documented results"
+      },
+      {
+        "id": "dotnet-value-identity",
+        "status": "DELIBERATE_NON_BINDING",
+        "names": [
+          "*_equals",
+          "*_get_hash_code"
+        ],
+        "reason": "XNA's Equals and GetHashCode exist because a .NET value type inherits object. Every Rust counterpart of these types derives PartialEq -- GamePadState, MouseState, KeyboardState, DisplayMode, SensorInfo, JoystickInfo, the sensor readings -- so `a == b` is the operation, the compiler checks it, and a HashMap key works without asking C anything. Where XNA's named methods matter for source fidelity the Rust types carry them too. Binding these would add a fallible native call that answers a question `==` has already answered, and the two could disagree.",
+        "rustEvidence": [
+          "pub fn Equals",
+          "pub fn GetHashCode",
+          "pub struct GamePadState",
+          "pub struct KeyboardState",
+          "pub struct MouseState",
+          "pub struct TouchLocation"
+        ],
+        "evidence": "crates/cna/src/input/gamepad.rs, crates/cna/src/input/mod.rs, crates/cna/src/input/mouse.rs, crates/cna/src/input/touch.rs, crates/cna/src/extensions/sensors.rs -- every type these routes name derives PartialEq, and TouchLocation, KeyboardState and the GamePad* types also spell XNA's own Equals and GetHashCode"
+      },
+      {
+        "id": "dotnet-value-construction",
+        "status": "DELIBERATE_NON_BINDING",
+        "names": [
+          "*_init",
+          "*_init_from_values"
+        ],
+        "reason": "these are XNA's constructors reached through C: cna_viewport_init is ToC(Viewport()) and cna_gamepad_state_init_from_values is the parameterised constructor. Rust builds these values with Default, a `new`, or a struct literal, none of which can fail. The descriptor structs that carry struct_size and struct_version are filled at the call site with size_of and the version the header states, and tools/native-abi/verify.py probes every layout against the headers -- so the field-setting these routes exist to get right is already checked by a stronger mechanism than a runtime call.",
+        "rustEvidence": [
+          "pub struct Viewport",
+          "pub struct GamePadState",
+          "pub struct PresentationParameters",
+          "struct_version"
+        ],
+        "evidence": "crates/cna/src/graphics/viewport.rs, crates/cna/src/input/gamepad.rs, crates/cna/src/graphics/presentation.rs; tools/native-abi/verify.py's layoutTypesProbed, which checks every descriptor's field order and offsets against the canonical headers"
+      },
+      {
+        "id": "dotnet-type-name",
+        "status": "DELIBERATE_NON_BINDING",
+        "names": [
+          "*_copy_type_name",
+          "*_get_type_name_size"
+        ],
+        "reason": "these answer .NET's GetType().Name, and upstream's implementations are all compile-time constants -- every GetTypeName() in cnanext returns a fixed string such as 'Microsoft.Xna.Framework.Input.KeyboardState'. A Rust caller knows the type statically at every call site, so there is no reflection question to ask, and the .NET name of a Rust value is not a fact about that value. The one place these strings genuinely matter is the content format, where the reader name is part of the .xnb, and the crate already carries them as data in AssetTypeId rather than fetching them one object at a time.",
+        "rustEvidence": [
+          "pub struct AssetTypeId",
+          "Microsoft.Xna.Framework.Content."
+        ],
+        "evidence": "cnanext modules/*/src/Xna/*.cpp -- every GetTypeName() is a constant; crates/cna/src/content/reader.rs, which names the canonical readers directly"
       }
     ],
     "overrides": {}
