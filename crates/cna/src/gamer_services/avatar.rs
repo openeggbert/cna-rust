@@ -312,6 +312,16 @@ impl AvatarDescription {
     }
 }
 
+/// The live handle behind an avatar animation, for the CNA-only surface.
+pub(crate) fn animation_handle(animation: &AvatarAnimation) -> Result<sys::CNA_Handle> {
+    animation.owner.get()
+}
+
+/// The live handle behind an avatar renderer, for the same surface.
+pub(crate) fn renderer_handle(renderer: &AvatarRenderer) -> Result<sys::CNA_Handle> {
+    renderer.owner.get()
+}
+
 /// XNA `Microsoft.Xna.Framework.GamerServices.AvatarAnimation`.
 #[derive(Debug)]
 pub struct AvatarAnimation {

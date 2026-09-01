@@ -52,8 +52,8 @@ pub use values::{
 };
 
 pub(crate) use session::{
-    available_session_handle, gamer_handle, local_gamer_handle, net_runtime, session_handle,
-    write_properties,
+    available_session_handle, gamer_handle, local_gamer_handle, machine_handle, net_runtime,
+    session_handle, write_properties,
 };
 
 /// The canonical bits behind a `SendDataOptions`, for the extension surface.

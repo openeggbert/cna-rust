@@ -27,11 +27,14 @@ use std::path::Path;
 use std::process::Command;
 
 use cna::extensions::content::NativeContentManager;
+use cna::extensions::gamer_services::{AvatarAppearance, AvatarRealRendering};
+use cna::extensions::models::SkinnedModel;
 use cna::extensions::native_model::{GltfImportKind, GltfImportSeverity, NativeModel};
 use cna::Microsoft::Xna::Framework::Graphics::{
     GraphicsDevice, GraphicsProfile, PresentationParameters,
 };
-use cna::Microsoft::Xna::Framework::{GraphicsDeviceInformation, Matrix};
+use cna::Microsoft::Xna::Framework::GamerServices::{AvatarDescription, AvatarRenderer};
+use cna::Microsoft::Xna::Framework::{Color, GraphicsDeviceInformation, Matrix, TimeSpan};
 use cna::{CnaError, ErrorCategory, Result};
 
 /// The env var naming which case the child should run.
@@ -688,3 +691,64 @@ fn a_missing_asset_fails_rather_than_answering_an_empty_model() {
     });
 }
 
+
+#[test]
+fn an_avatar_renderer_draws_a_model_a_game_supplied() {
+    if std::env::var_os("CNA_NATIVE_LIBRARY").is_none() {
+        return;
+    }
+    let Some(device) = independent_device_or_skip(|| {
+        let parameters = PresentationParameters::new();
+        parameters.SetBackBufferWidth(64);
+        parameters.SetBackBufferHeight(64);
+        GraphicsDevice::new(
+            &GraphicsDeviceInformation::new().Adapter(),
+            GraphicsProfile::HiDef,
+            &parameters,
+        )
+    }) else {
+        return;
+    };
+    // The renderer takes CNA's engine-layer model, which a build without the
+    // engine layer does not have. That is an artifact fact, not a binding one.
+    let Ok(model) = SkinnedModel::new() else {
+        println!("this artifact has no engine layer, so it has no skinned model");
+        return;
+    };
+
+    let description = AvatarDescription::CreateRandom().expect("a random avatar");
+    let renderer = AvatarRenderer::new(&description).expect("a renderer for it");
+
+    // The colours are the renderer's own state and need no model.
+    renderer
+        .set_appearance(AvatarAppearance {
+            skin: Color::CornflowerBlue,
+            hair: Color::Black,
+            shirt: Color::White,
+            pants: Color::DarkSlateGray,
+            shoes: Color::Red,
+        })
+        .expect("an appearance the renderer keeps");
+
+    // Drawing a clip before a model is named is refused, which is the
+    // documented answer and the one that proves the route is not a no-op.
+    assert!(
+        matches!(
+            renderer.draw_clip("Stand0", TimeSpan::Zero, false),
+            Err(CnaError::Native { .. })
+        ),
+        "a renderer with no real model must refuse rather than draw nothing"
+    );
+
+    renderer
+        .use_model(&device, &model)
+        .expect("the renderer takes the game's own model");
+
+    // With a model it reaches the renderer. A build that cannot draw answers a
+    // refusal; what must not happen is a Rust-side no-op reported as a draw.
+    match renderer.draw_clip("Stand0", TimeSpan::Zero, true) {
+        Ok(()) => {}
+        Err(CnaError::Native { .. }) => {}
+        Err(other) => panic!("unexpected real avatar draw failure: {other:?}"),
+    }
+}

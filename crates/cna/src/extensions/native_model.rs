@@ -288,6 +288,11 @@ impl NativeModel {
         handle_of(&self.handle, "the model has been released")
     }
 
+    /// The live handle, for the one other extension that takes a CNA model.
+    pub(crate) fn native_handle(&self) -> Result<sys::CNA_ModelHandle> {
+        self.get()
+    }
+
     /// Releases the model.
     ///
     /// # This model's teardown faults, and not releasing does not avoid it

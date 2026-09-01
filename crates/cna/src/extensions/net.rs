@@ -657,3 +657,124 @@ impl DiscoveredSessionExt for AvailableNetworkSession {
         Ok(equal != 0)
     }
 }
+
+/// The machine facts a host supplies in place of a transport.
+///
+/// `NetworkGamer.Machine`, `Id`, `IsHost`, `HasLeftSession` and
+/// `RoundtripTime` are all things a real session's transport sets as it learns
+/// them. One process with no peer learns none of them, so every one of those
+/// five XNA properties reads its default forever. CNA publishes the setters its
+/// own transport uses, and a host standing in for the network needs them for
+/// the same reason it needs [`RemoteGamerInjection`].
+pub struct NetworkGamerFacts;
+
+impl NetworkGamerFacts {
+    /// Creates a machine for a gamer to belong to.
+    ///
+    /// # Errors
+    ///
+    /// Returns the exact error CNA reports.
+    pub fn machine() -> Result<crate::net::NetworkMachine> {
+        let runtime = crate::net::net_runtime()?;
+        let mut handle = 0;
+        // SAFETY: the output receives an owned handle.
+        runtime.check(unsafe { (runtime.native().net.network_machine_create)(&mut handle) })?;
+        Ok(crate::net::NetworkMachine::adopt(runtime, handle))
+    }
+
+    /// Puts a gamer on a machine, which is what `NetworkGamer.Machine` reads.
+    ///
+    /// # Errors
+    ///
+    /// Returns the exact error CNA reports.
+    pub fn set_machine(gamer: &NetworkGamer, machine: &crate::net::NetworkMachine) -> Result<()> {
+        let runtime = crate::net::net_runtime()?;
+        let (gamer, machine) = (
+            crate::net::gamer_handle(gamer)?,
+            crate::net::machine_handle(machine)?,
+        );
+        // SAFETY: both handles are live for the call.
+        runtime.check(unsafe { (runtime.native().net.network_gamer_set_machine)(gamer, machine) })
+    }
+
+    /// Sets the session-local identifier `NetworkGamer.Id` reports.
+    ///
+    /// # Errors
+    ///
+    /// Returns the exact error CNA reports.
+    pub fn set_id(gamer: &NetworkGamer, id: u8) -> Result<()> {
+        let runtime = crate::net::net_runtime()?;
+        let handle = crate::net::gamer_handle(gamer)?;
+        // SAFETY: the handle is live and the value is a plain scalar.
+        runtime.check(unsafe { (runtime.native().net.network_gamer_set_id_ext)(handle, id) })
+    }
+
+    /// Sets whether this gamer is the session host.
+    ///
+    /// # Errors
+    ///
+    /// Returns the exact error CNA reports.
+    pub fn set_is_host(gamer: &NetworkGamer, isHost: bool) -> Result<()> {
+        let runtime = crate::net::net_runtime()?;
+        let handle = crate::net::gamer_handle(gamer)?;
+        // SAFETY: the handle is live and the value is a plain scalar.
+        runtime.check(unsafe {
+            (runtime.native().net.network_gamer_set_is_host_ext)(handle, u8::from(isHost).into())
+        })
+    }
+
+    /// Sets whether this gamer has left the session.
+    ///
+    /// # Errors
+    ///
+    /// Returns the exact error CNA reports.
+    pub fn set_has_left_session(gamer: &NetworkGamer, hasLeft: bool) -> Result<()> {
+        let runtime = crate::net::net_runtime()?;
+        let handle = crate::net::gamer_handle(gamer)?;
+        // SAFETY: the handle is live and the value is a plain scalar.
+        runtime.check(unsafe {
+            (runtime
+                .native()
+                .net
+                .network_gamer_set_has_left_session_ext)(handle, u8::from(hasLeft).into())
+        })
+    }
+
+    /// Sets the measured round-trip `NetworkGamer.RoundtripTime` reports.
+    ///
+    /// # Errors
+    ///
+    /// Returns the exact error CNA reports.
+    pub fn set_roundtrip(gamer: &NetworkGamer, roundtrip: TimeSpan) -> Result<()> {
+        let runtime = crate::net::net_runtime()?;
+        let handle = crate::net::gamer_handle(gamer)?;
+        // SAFETY: the handle is live and the value is a plain scalar.
+        runtime.check(unsafe {
+            (runtime.native().net.network_gamer_set_roundtrip_ticks_ext)(handle, roundtrip.Ticks())
+        })
+    }
+
+    /// Builds the local gamer a session would have made for a signed-in gamer.
+    ///
+    /// `NetworkSession.AddLocalGamer` is XNA's way in and is what a game uses.
+    /// This is the object underneath it, for a host that needs a
+    /// `LocalNetworkGamer` without a session having admitted one.
+    ///
+    /// # Errors
+    ///
+    /// Returns the exact error CNA reports.
+    pub fn local_gamer(
+        signedIn: &crate::gamer_services::SignedInGamer,
+        session: &NetworkSession,
+    ) -> Result<crate::net::LocalNetworkGamer> {
+        let runtime = crate::net::net_runtime()?;
+        let gamer = crate::gamer_services::signed_in_handle(signedIn)?;
+        let session = crate::net::session_handle(session)?;
+        let mut handle = 0;
+        // SAFETY: both handles are live and the output receives an owned one.
+        runtime.check(unsafe {
+            (runtime.native().net.local_network_gamer_create_ext)(gamer, session, &mut handle)
+        })?;
+        Ok(crate::net::LocalNetworkGamer::adopt(runtime, handle))
+    }
+}

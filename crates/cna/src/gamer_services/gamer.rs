@@ -2012,6 +2012,23 @@ pub(crate) struct StringView<'a> {
 /// # Errors
 ///
 /// Returns the input error for a string CNA cannot measure.
+/// The live handle behind a signed-in gamer, for the CNA-only surface.
+pub(crate) fn signed_in_handle(gamer: &SignedInGamer) -> Result<sys::CNA_Handle> {
+    gamer.gamer.handle()
+}
+
+/// Builds a friend collection from a handle CNA answered.
+pub(crate) fn adopt_friend_collection(
+    runtime: GamerServicesRuntime,
+    handle: sys::CNA_Handle,
+) -> FriendCollection {
+    FriendCollection {
+        collection: GamerCollection::adopt(runtime, handle, |parent, handle| {
+            FriendGamer::from_core(GamerCore::borrowed(parent, handle))
+        }),
+    }
+}
+
 pub(crate) fn string_view(value: &str) -> Result<StringView<'_>> {
     let byte_length = u64::try_from(value.len())
         .map_err(|_| CnaError::InvalidInput("the text is too large for CNA"))?;

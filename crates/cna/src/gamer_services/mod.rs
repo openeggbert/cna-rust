@@ -31,6 +31,8 @@ pub(crate) use self::core::GamerServicesRuntime as GamerServicesRuntimeHandle;
 pub(crate) use async_result::with_callback;
 pub(crate) use events::{add_invite_accepted, remove_invite_accepted};
 pub(crate) use gamer::string_view as borrow_string;
+pub(crate) use avatar::{animation_handle, renderer_handle};
+pub(crate) use gamer::{adopt_friend_collection, signed_in_handle};
 
 /// Opens, or reuses, the process CNA library for the extension surface.
 pub(crate) fn open_runtime() -> crate::error::Result<GamerServicesRuntimeHandle> {

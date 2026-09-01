@@ -18,10 +18,14 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use cna::extensions::gamer_services::{
-    PendingGuideRequest, SignedInGamerPublisher, SignedInGamerRegistration,
+    AchievementInjection, AchievementRegistration, AvatarAnimationClip, AvatarContentNames,
+    FreedGamerCount, FriendInjection, FriendRegistration, PendingGuideRequest,
+    SetPresenceModeText, SignedInGamerPublisher, SignedInGamerRegistration,
+    UpdateDispatcherAsync,
 };
 use cna::Microsoft::Xna::Framework::GamerServices::{
     Achievement, AvatarAnimation, AvatarAnimationPreset, AvatarBodyType, AvatarDescription,
+    GamerPresenceMode,
     AvatarExpression, AvatarRenderer, AvatarRendererState, Gamer, GamerServicesDispatcher, Guide, LeaderboardIdentity,
     LeaderboardKey, NotificationPosition, PropertyDictionary, SignedInGamer,
 };
@@ -215,6 +219,164 @@ fn awarded_achievements_come_back_from_cna() -> Result<()> {
 
     // A key nobody awarded is an error, not an empty achievement.
     assert!(achievements.Item("cna-rust-never-awarded").is_err());
+    Ok(())
+}
+
+fn achievement(key: &str, name: &str, earned: bool) -> AchievementRegistration {
+    AchievementRegistration {
+        key: key.to_owned(),
+        name: name.to_owned(),
+        description: format!("how you get {name}"),
+        display_before_earned: true,
+        is_earned: earned,
+        earned_ticks: if earned { 630_822_816_000_000_000 } else { 0 },
+    }
+}
+
+#[test]
+fn an_injected_catalog_gives_an_achievement_something_to_report() -> Result<()> {
+    if !native_enabled() {
+        return Ok(());
+    }
+    let _services = gamer_services_guard();
+
+    // `AwardAchievement` produces a real achievement, and CNA has no catalog
+    // behind it: name, description and score all come back empty, so nine of
+    // `Achievement`'s ten properties can only be measured against nothing.
+    let one = AchievementInjection::achievement(&achievement("first-light", "First Light", true))?;
+    assert_eq!(one.Key()?, "first-light");
+    assert_eq!(one.Name()?, "First Light");
+    assert_eq!(one.Description()?, "how you get First Light");
+    assert!(one.IsEarned()?);
+    assert!(one.DisplayBeforeEarned()?);
+
+    let catalog = AchievementInjection::collection(&[
+        achievement("first-light", "First Light", true),
+        achievement("long-haul", "Long Haul", false),
+    ])?;
+    assert_eq!(catalog.Count()?, 2);
+    // By key, which is XNA's string indexer.
+    assert_eq!(catalog.Item("long-haul")?.Name()?, "Long Haul");
+    assert!(!catalog.Item("long-haul")?.IsEarned()?);
+    assert_eq!(catalog.GetEnumerator()?.count(), 2);
+    assert!(!catalog.IsDisposed()?);
+    catalog.Dispose()?;
+    assert!(catalog.IsDisposed()?);
+    Ok(())
+}
+
+#[test]
+fn an_injected_friend_roster_gives_every_friend_state_a_value() -> Result<()> {
+    if !native_enabled() {
+        return Ok(());
+    }
+    let _services = gamer_services_guard();
+
+    let friends = FriendInjection::collection(&[
+        FriendRegistration {
+            gamertag: "ally".to_owned(),
+            display_name: "Ally".to_owned(),
+            is_online: true,
+            is_playing: true,
+            is_away: false,
+            is_busy: false,
+            friend_request_sent_to: false,
+            friend_request_received_from: true,
+        },
+        FriendRegistration {
+            gamertag: "absent".to_owned(),
+            display_name: "Absent".to_owned(),
+            is_online: false,
+            is_playing: false,
+            is_away: true,
+            is_busy: true,
+            friend_request_sent_to: true,
+            friend_request_received_from: false,
+        },
+    ])?;
+
+    assert_eq!(friends.Count()?, 2);
+    let ally = friends.ItemAt(0)?;
+    assert_eq!(ally.Gamertag()?, "ally");
+    assert!(ally.IsOnline()?);
+    assert!(ally.IsPlaying()?);
+    assert!(!ally.IsAway()?);
+    assert!(ally.FriendRequestReceivedFrom()?);
+
+    let absent = friends.ItemAt(1)?;
+    assert!(!absent.IsOnline()?);
+    assert!(absent.IsAway()?);
+    assert!(absent.IsBusy()?);
+    assert!(absent.FriendRequestSentTo()?);
+    // Each state has to come from its own friend: a projection that read one
+    // gamer for both positions would pass every assertion above but this one.
+    assert_ne!(ally.Gamertag()?, absent.Gamertag()?);
+    Ok(())
+}
+
+#[test]
+fn free_text_presence_says_what_xnas_sixty_ordinals_cannot() -> Result<()> {
+    if !native_enabled() {
+        return Ok(());
+    }
+    let _services = gamer_services_guard();
+    let _publisher = SignedInGamerPublisher::publish(&roster(&[("present", PlayerIndex::One)]))?;
+    let gamer = Gamer::SignedInGamers()?.ItemAt(0)?;
+
+    // XNA's presence is an enum, so it can only ever say one of sixty things.
+    SetPresenceModeText(&gamer, "Rebuilding the census")?;
+    // The strict projection still reads the enum, and CNA answers `None` for a
+    // mode that is not one of XNA's ordinals rather than inventing one.
+    assert_eq!(gamer.Presence()?.PresenceMode()?, GamerPresenceMode::None);
+    Ok(())
+}
+
+#[test]
+fn the_dispatcher_reports_whether_it_had_work_and_what_it_freed() -> Result<()> {
+    if !native_enabled() {
+        return Ok(());
+    }
+    let _services = gamer_services_guard();
+
+    // XNA's `Update` is `void`; a host outside a `Game` loop has no way to
+    // learn when to stop pumping. CNA's answers, and the answer is exactly
+    // whether the dispatcher is initialised.
+    let before = FreedGamerCount()?;
+    assert_eq!(
+        UpdateDispatcherAsync()?,
+        GamerServicesDispatcher::IsInitialized()?,
+        "the dispatcher does work exactly when it is initialised"
+    );
+    assert!(FreedGamerCount()? >= before, "the freed count never falls");
+    Ok(())
+}
+
+#[test]
+fn cna_names_the_avatar_content_xna_left_to_the_console() -> Result<()> {
+    if !native_enabled() {
+        return Ok(());
+    }
+    let _services = gamer_services_guard();
+
+    // XNA resolved a body type and an animation preset on the console and
+    // never told a game what content was behind them. There is no console
+    // here, so the game supplies the content -- and has to be able to ask what
+    // content the identity wants.
+    let female = AvatarBodyType::Female.content_name()?;
+    let male = AvatarBodyType::Male.content_name()?;
+    assert!(!female.is_empty(), "a body type names real content");
+    assert_ne!(female, male, "two body types are not one asset");
+
+    let wave = AvatarAnimationPreset::Wave.content_name()?;
+    let clap = AvatarAnimationPreset::Clap.content_name()?;
+    assert!(!wave.is_empty());
+    assert_ne!(wave, clap);
+
+    // An animation plays its preset's clip until a game names its own.
+    let animation = AvatarAnimation::new(AvatarAnimationPreset::Wave)?;
+    assert_eq!(animation.clip_name()?, wave);
+    animation.set_clip_name("Salute")?;
+    assert_eq!(animation.clip_name()?, "Salute");
     Ok(())
 }
 

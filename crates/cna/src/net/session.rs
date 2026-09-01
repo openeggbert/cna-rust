@@ -58,6 +58,11 @@ pub(crate) fn session_handle(session: &NetworkSession) -> Result<sys::CNA_Handle
     session.handle()
 }
 
+/// The live handle behind a network machine, for the same surface.
+pub(crate) fn machine_handle(machine: &NetworkMachine) -> Result<sys::CNA_Handle> {
+    machine.owner.get()
+}
+
 /// The live handle behind a discovered session, for the same surface.
 pub(crate) fn available_session_handle(
     session: &AvailableNetworkSession,
@@ -1023,7 +1028,7 @@ pub struct NetworkMachine {
 }
 
 impl NetworkMachine {
-    fn adopt(runtime: GamerServicesRuntimeHandle, handle: sys::CNA_Handle) -> Self {
+    pub(crate) fn adopt(runtime: GamerServicesRuntimeHandle, handle: sys::CNA_Handle) -> Self {
         let destroy = runtime.native().net.network_machine_destroy;
         Self {
             owner: NetHandle::new(runtime, handle, destroy),

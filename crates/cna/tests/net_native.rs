@@ -20,7 +20,7 @@ use cna::extensions::gamer_services::{SignedInGamerPublisher, SignedInGamerRegis
 use cna::extensions::net::{
     ApplySessionProperties, DiscoveredSession, DiscoveredSessionExt, DiscoveredSessionInjection,
     LastJoinError, LiveSessionCount, NetworkEventInjection, PendingSessionActionCount,
-    RemoteGamerInjection,
+    NetworkGamerFacts, RemoteGamerInjection,
 };
 use cna::Microsoft::Xna::Framework::Net::{
     NetworkSession, NetworkSessionEndReason, NetworkSessionJoinError, NetworkSessionProperties,
@@ -627,6 +627,40 @@ fn a_disposed_session_stops_being_counted_and_its_packets_go_with_it() -> Result
         before,
         "a released session is one CNA no longer holds"
     );
+    Ok(())
+}
+
+#[test]
+fn a_host_supplies_the_gamer_facts_a_transport_would_have_measured() -> Result<()> {
+    if !native_enabled() {
+        return Ok(());
+    }
+    let _net = net_guard();
+    let _publisher = publish_one("host")?;
+
+    let session = NetworkSession::Create(NetworkSessionType::Local, 1, 4)?;
+    let remote = RemoteGamerInjection::admit(&session, "peer")?;
+
+    // Five XNA properties a session's transport fills in as it learns them.
+    // One process learns none of them, so without these each reads its default
+    // for the life of the session.
+    NetworkGamerFacts::set_id(&remote, 9)?;
+    NetworkGamerFacts::set_is_host(&remote, true)?;
+    NetworkGamerFacts::set_roundtrip(&remote, TimeSpan::FromMilliseconds(37.0))?;
+    assert_eq!(remote.Id()?, 9);
+    assert!(remote.IsHost()?);
+    assert_eq!(remote.RoundtripTime()?, TimeSpan::FromMilliseconds(37.0));
+
+    let machine = NetworkGamerFacts::machine()?;
+    NetworkGamerFacts::set_machine(&remote, &machine)?;
+    // `NetworkMachine.Gamers` is populated by a session, not by this setter,
+    // so the honest assertion is that the machine exists and reports none.
+    assert_eq!(machine.Gamers()?.Count()?, 0);
+
+    NetworkGamerFacts::set_has_left_session(&remote, true)?;
+    assert!(remote.HasLeftSession()?);
+
+    session.Dispose()?;
     Ok(())
 }
 

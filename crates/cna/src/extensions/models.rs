@@ -193,6 +193,11 @@ struct RetainedResources {
 }
 
 impl SkinnedModel {
+    /// The live handle, for the avatar renderer that draws a game's own model.
+    pub(crate) fn native_handle(&self) -> Result<sys::CNA_SkinnedModelEXTHandle> {
+        self.get()
+    }
+
     /// Creates an empty model: no bones, no clips, no parts.
     pub fn new() -> Result<Self> {
         let native = Native::process()?;
