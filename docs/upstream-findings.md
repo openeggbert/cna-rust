@@ -913,11 +913,33 @@ packet, which the header documents and CNA's own comment explains:
 
 XNA returns the packet's size from this overload; FNA's bug is preserved.
 
+### Measured, in C, with no Rust in the process
+
+`tools/reproducers/census002_packet_truncation.c`, against
+`cmake-build-headless`:
+
+```text
+array overload: packet=5000 buffer=1024 result=0 out_received=1024
+reader overload: result=0 out_received=0 reader_length=5000
+```
+
+Both halves in two lines. A 5,000-byte packet into a 1,024-byte buffer is
+`CNA_RESULT_SUCCESS` with `out_received` equal to the buffer, where XNA throws;
+and the `PacketReader` overload puts **all 5,000 bytes** into the reader --
+`cna_packet_reader_get_length` says so -- while reporting that it received
+none.
+
 ### Why this is CNA rather than the binding
 
 The size is not derivable on this side. The packet is consumed by the same call
 that would have reported its length, so there is no retry, and no arithmetic
 over what CNA does publish recovers it.
+
+CNA's own reader is not an oracle for it either. It receives the whole packet
+and knows its length, but `net.h` publishes no route that copies a reader's
+bytes out -- `cna_packet_writer_copy_data_ext` exists and has no reader
+counterpart -- so the only way out is the typed `read_*` routes, and there is
+no `read_byte`.
 
 ### What a fix looks like
 

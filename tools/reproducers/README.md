@@ -30,6 +30,7 @@ to have measured something.
 | `ext015g_load_model_destroy.c` | `RUST-UPSTREAM-021` | destroying a content-loaded model with a mesh part faults. Takes a content root and an asset name. |
 | `ext015g_handbuilt_mesh.c` | `RUST-UPSTREAM-021` | the control: the same shape built by hand destroys cleanly, which is what makes *content-loaded* the answer. |
 | `ext015g_manager_teardown.c` | `RUST-UPSTREAM-021` | that leaking the model handle does not avoid the fault; it moves it to process exit. |
+| `census002_packet_truncation.c` | `RUST-UPSTREAM-028` | that a packet larger than the caller's buffer is silently cut and reported as a success -- `out_received` is the buffer, not the packet -- and that the `PacketReader` overload delivers all 5,000 bytes while reporting that it received none. Takes no arguments. |
 
 ## `ext015h_concurrent_device_create.c` — RUST-UPSTREAM-023
 
