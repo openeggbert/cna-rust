@@ -714,3 +714,15 @@ impl crate::graphics::OcclusionQuery {
         Ok(value != sys::CNA_FALSE)
     }
 }
+
+/// The read-only view of what CNA is about to create a device with, and the
+/// subscription that delivers it.
+///
+/// `GraphicsDeviceManager::ObserveDeviceSettings` returns the subscription and
+/// hands the view to a callback. Both are CNA's own -- XNA has
+/// `PreparingDeviceSettings`, which can *change* the settings, and nothing
+/// read-only beside it -- so they are named here rather than inside
+/// `cna::Microsoft::Xna::Framework`, where until now they had no name at all:
+/// the method was public and its return type was not exported, so nothing
+/// outside this crate could hold what it answered.
+pub use crate::game::{DeviceSettingsObserver, ObservedDeviceSettings};

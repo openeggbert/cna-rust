@@ -19,6 +19,7 @@ pub use components::{
 pub use components::{GameComponentCollectionExt, GameComponentRuntime};
 pub use context::GameContext;
 pub(crate) use device_manager::{manager_service_type_ids, GraphicsDeviceManagerState};
+pub use device_manager::{DeviceSettingsObserver, ObservedDeviceSettings};
 pub use device_manager::{
     GraphicsDeviceInformation, GraphicsDeviceManager, IGraphicsDeviceManager,
     PreparingDeviceSettingsEventArgs,

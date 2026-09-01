@@ -45,7 +45,7 @@ input, lifecycle, graphics-resource, and native-ABI concerns. Those modules do
 not create public namespaces: consumers continue to see only the mapped XNA
 hierarchy and deliberate CNA extensions.
 
-## Verified status (2026-08-23)
+## Verified status (2026-09-01)
 
 - Rust 1.85 check, all-feature tests, and docs exit zero. This source-tarball
   toolchain has neither `cargo-fmt` nor `cargo-clippy`, so this run records
@@ -53,16 +53,22 @@ hierarchy and deliberate CNA extensions.
   claiming either gate passed.
 - XNA 4.0 Windows runtime inventory remains 257 CLR types and 2,964 members;
   all 259 expected Rust types exist.
-- Normal strict verification exits zero: total diagnostics, missing types,
-  missing members, and every constructor/overload/property/event mapping
-  mismatch are zero. Graphics, Framework/core, Input, Storage, GamerServices,
-  Design, Audio, and Media all have zero local diagnostics.
-  `Game`, `GraphicsDevice`, and `SpriteBatch` each have zero local diagnostics.
-  Parameter/signature, disposal, type-kind, base/trait/interface, return,
-  generic/bound, ref/out, enum/value, flags, and delegate mismatches remain
-  zero.
-- Unexpected types/members, internal leaks, raw-handle leaks, public unsafe
-  APIs, allowlist entries, and unmeasured categories remain zero.
+- Strict verification: **missing** types and members are zero, and every
+  constructor/overload/property/event mapping mismatch is zero, on both the
+  selected and the complete runtime profile. Total diagnostics are **110**, all
+  of one shape -- see the unexpected-member line below. Parameter/signature,
+  disposal, type-kind, base/trait/interface, return, generic/bound, ref/out,
+  enum/value, flags and delegate mismatches remain zero, which is what makes
+  the 110 a question about *where* CNA's own members live rather than about
+  whether XNA's are right.
+- Internal type leaks, raw-handle leaks, public unsafe APIs, allowlist entries
+  and unmeasured categories are zero, re-measured 2026-09-01. **Unexpected
+  types/members are not**: the verifier reports 110 -- 109 CNA-only members
+  sitting on strict XNA types, plus `TouchPanelTestBackend`. They arrived with
+  the `RUST-EXT-015d`/`015e`/`015q` milestones and nothing re-ran the verifier
+  until `RUST-CENSUS-002` did. Whether they move behind extension traits or the
+  verifier learns to expect them is `RUST-SURFACE-001`, an open product
+  decision; this line no longer claims otherwise.
 - `ContentManager` and the managed XNB reader pipeline are real:
   typed cache/disposal, custom readers, existing/shared/external resources,
   primitive readers, textures, SpriteFont, Effect, all five stock effects, and

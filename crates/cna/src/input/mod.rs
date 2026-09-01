@@ -36,7 +36,7 @@ macro_rules! xna_keys {
         const XNA_KEYS: &[(Keys, i32)] = &[$((Keys::$name, $value)),+];
 
         impl Keys {
-            /// The key a `CNA_Key` names, or `None` when it is outside XNA's set.
+            /// The key a CNA key code names, or `None` when it is outside XNA's set.
             ///
             /// `Keys::None` is a real member of the enum -- XNA gives it the
             /// value 0 -- so it is returned as `Some(Keys::None)` here, not
@@ -44,7 +44,7 @@ macro_rules! xna_keys {
             /// none value as "there is no such key" do that folding themselves,
             /// because it is their contract rather than this conversion's.
             #[must_use]
-            pub fn from_key_code(code: cna_sys::CNA_Key) -> Option<Self> {
+            pub fn from_key_code(code: u32) -> Option<Self> {
                 i32::try_from(code).ok().and_then(Self::from_code)
             }
 

@@ -1245,7 +1245,7 @@ pub struct DeviceSettingsObserver {
 // behind it is required to be `Send`.
 unsafe impl Send for DeviceSettingsObserver {}
 
-type SettingsClosure = Box<dyn FnMut(&sys::CNA_GraphicsDeviceInformation) + Send + 'static>;
+type SettingsClosure = Box<dyn FnMut(ObservedDeviceSettings) + Send + 'static>;
 
 impl DeviceSettingsObserver {
     /// Withdraws the registration early. Idempotent.
@@ -1279,6 +1279,71 @@ impl Drop for DeviceSettingsObserver {
     }
 }
 
+/// What CNA is about to create a device with, read-only.
+///
+/// The observer hands this rather than CNA's own descriptor. Publishing the
+/// descriptor made `GraphicsDeviceManager` one of two types in the whole crate
+/// whose public API named a `cna_sys` type -- an internal-type leak the strict
+/// verifier reports and the project's own invariant says is zero. It was: the
+/// method was published, nothing called it, and the leak sat there.
+///
+/// Read-only is the point of the observer. `PreparingDeviceSettings` is the
+/// event that can *change* what the device is created with; this one is handed
+/// a `*const` and cannot, which is what makes it right for logging or
+/// asserting what was chosen.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ObservedDeviceSettings {
+    adapter_index: i32,
+    graphics_profile: u32,
+    back_buffer_width: i32,
+    back_buffer_height: i32,
+    is_full_screen: bool,
+    is_headless: bool,
+}
+
+#[allow(non_snake_case)]
+impl ObservedDeviceSettings {
+    /// The adapter CNA chose, by its own ordinal.
+    #[must_use]
+    pub const fn AdapterIndex(&self) -> i32 {
+        self.adapter_index
+    }
+
+    /// The profile the device is being created with.
+    ///
+    /// # Errors
+    ///
+    /// Returns the mapping error for a profile XNA does not declare.
+    pub fn GraphicsProfile(&self) -> Result<GraphicsProfile> {
+        graphics_profile(self.graphics_profile)
+    }
+
+    /// The back buffer's width in pixels.
+    #[must_use]
+    pub const fn BackBufferWidth(&self) -> i32 {
+        self.back_buffer_width
+    }
+
+    /// The back buffer's height in pixels.
+    #[must_use]
+    pub const fn BackBufferHeight(&self) -> i32 {
+        self.back_buffer_height
+    }
+
+    /// Whether the device is being created full screen.
+    #[must_use]
+    pub const fn IsFullScreen(&self) -> bool {
+        self.is_full_screen
+    }
+
+    /// Whether the device is being created with no window at all, which is
+    /// CNA's own addition and has no XNA counterpart.
+    #[must_use]
+    pub const fn IsHeadless(&self) -> bool {
+        self.is_headless
+    }
+}
+
 impl GraphicsDeviceManager {
     /// Watches the candidate device settings without being able to change them.
     ///
@@ -1289,7 +1354,7 @@ impl GraphicsDeviceManager {
     /// that *could* write is an observer a reader has to check for writes.
     pub fn ObserveDeviceSettings(
         &self,
-        callback: impl FnMut(&sys::CNA_GraphicsDeviceInformation) + Send + 'static,
+        callback: impl FnMut(ObservedDeviceSettings) + Send + 'static,
     ) -> Result<DeviceSettingsObserver> {
         unsafe extern "C" fn trampoline(
             information: *const sys::CNA_GraphicsDeviceInformation,
@@ -1303,10 +1368,21 @@ impl GraphicsDeviceManager {
             // information is borrowed for the duration of this call.
             let closure = unsafe { &mut *context.cast::<SettingsClosure>() };
             let information = unsafe { &*information };
+            // Copied out before the closure runs, so nothing the caller holds
+            // borrows a pointer that is valid only for this call.
+            let observed = ObservedDeviceSettings {
+                adapter_index: information.adapter_index,
+                graphics_profile: information.graphics_profile,
+                back_buffer_width: information.presentation_parameters.back_buffer_width,
+                back_buffer_height: information.presentation_parameters.back_buffer_height,
+                is_full_screen: information.presentation_parameters.is_full_screen
+                    != sys::CNA_FALSE,
+                is_headless: information.presentation_parameters.headless_ext != sys::CNA_FALSE,
+            };
             // A panic must not cross back into C, and device creation has
             // nowhere to report one.
             let _ =
-                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| closure(information)));
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| closure(observed)));
         }
 
         let boxed: SettingsClosure = Box::new(callback);
