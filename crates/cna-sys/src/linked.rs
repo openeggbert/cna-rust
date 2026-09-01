@@ -10979,4 +10979,1325 @@ extern "C" {
         argument0: *mut i32,
         argument1: *mut CNA_Bool,
     ) -> CNA_Result;
+    pub fn cna_cnb_audio_frame_bytes(
+        argument0: CNA_CnbAudioFormat,
+        argument1: u32,
+        argument2: *mut u32,
+    ) -> CNA_Result;
+    pub fn cna_cnb_byte_writer_copy_bytes(
+        argument0: CNA_CnbByteWriterHandle,
+        argument1: *mut u8,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_byte_writer_create(argument0: *mut CNA_CnbByteWriterHandle) -> CNA_Result;
+    pub fn cna_cnb_byte_writer_create_from_bytes(
+        argument0: *const u8,
+        argument1: u64,
+        argument2: *mut CNA_CnbByteWriterHandle,
+    ) -> CNA_Result;
+    pub fn cna_cnb_byte_writer_destroy(argument0: CNA_CnbByteWriterHandle) -> CNA_Result;
+    pub fn cna_cnb_byte_writer_get_size(
+        argument0: CNA_CnbByteWriterHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_byte_writer_take(
+        argument0: CNA_CnbByteWriterHandle,
+        argument1: *mut u8,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_byte_writer_write_bytes(
+        argument0: CNA_CnbByteWriterHandle,
+        argument1: *const u8,
+        argument2: u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_byte_writer_write_f32(
+        argument0: CNA_CnbByteWriterHandle,
+        argument1: f32,
+    ) -> CNA_Result;
+    pub fn cna_cnb_byte_writer_write_f64(
+        argument0: CNA_CnbByteWriterHandle,
+        argument1: f64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_byte_writer_write_i32(
+        argument0: CNA_CnbByteWriterHandle,
+        argument1: i32,
+    ) -> CNA_Result;
+    pub fn cna_cnb_byte_writer_write_keyframe(
+        argument0: CNA_CnbByteWriterHandle,
+        argument1: *const CNA_KeyframeEXT,
+    ) -> CNA_Result;
+    pub fn cna_cnb_byte_writer_write_string(
+        argument0: CNA_CnbByteWriterHandle,
+        argument1: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_cnb_byte_writer_write_u16(
+        argument0: CNA_CnbByteWriterHandle,
+        argument1: u16,
+    ) -> CNA_Result;
+    pub fn cna_cnb_byte_writer_write_u32(
+        argument0: CNA_CnbByteWriterHandle,
+        argument1: u32,
+    ) -> CNA_Result;
+    pub fn cna_cnb_byte_writer_write_u64(
+        argument0: CNA_CnbByteWriterHandle,
+        argument1: u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_byte_writer_write_u8(
+        argument0: CNA_CnbByteWriterHandle,
+        argument1: u8,
+    ) -> CNA_Result;
+    pub fn cna_cnb_byte_writer_write_zeros(
+        argument0: CNA_CnbByteWriterHandle,
+        argument1: u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_checked_add(argument0: u64, argument1: u64, argument2: *mut u64) -> CNA_Result;
+    pub fn cna_cnb_checked_multiply(
+        argument0: u64,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_chunk_entry_is_mandatory(
+        argument0: *const CNA_CnbChunkEntry,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_cnb_copy_audio_format_name(
+        argument0: CNA_CnbAudioFormat,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_copy_chunk_id_string(
+        argument0: CNA_CnbChunkId,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_copy_compressed(
+        argument0: *const u8,
+        argument1: u64,
+        argument2: CNA_CnbCompression,
+        argument3: i32,
+        argument4: *mut u8,
+        argument5: u64,
+        argument6: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_copy_compression_name(
+        argument0: CNA_CnbCompression,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_copy_decompressed(
+        argument0: *const u8,
+        argument1: u64,
+        argument2: CNA_CnbCompression,
+        argument3: u64,
+        argument4: u64,
+        argument5: *mut u8,
+        argument6: u64,
+        argument7: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_copy_format_magic(
+        argument0: *mut u8,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_copy_logical_name_problem(
+        argument0: CNA_StringView,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_crc32c(argument0: *const u8, argument1: u64, argument2: *mut u32) -> CNA_Result;
+    pub fn cna_cnb_crc32c_continue(
+        argument0: u32,
+        argument1: *const u8,
+        argument2: u64,
+        argument3: *mut u32,
+    ) -> CNA_Result;
+    pub fn cna_cnb_crc32c_portable(
+        argument0: *const u8,
+        argument1: u64,
+        argument2: *mut u32,
+    ) -> CNA_Result;
+    pub fn cna_cnb_crc32c_uses_hardware(argument0: *mut CNA_Bool) -> CNA_Result;
+    pub fn cna_cnb_document_copy_chunk_data(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: u64,
+        argument2: *mut u8,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_document_copy_external_reference_name(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_document_find_all(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: CNA_CnbChunkId,
+        argument2: *mut u64,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_document_find_single(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: CNA_CnbChunkId,
+        argument2: *mut CNA_Bool,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_document_get_chunk(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: u64,
+        argument2: *mut CNA_CnbChunkEntry,
+    ) -> CNA_Result;
+    pub fn cna_cnb_document_get_external_reference(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: u64,
+        argument2: CNA_StringView,
+        argument3: *mut CNA_CnbExternalReference,
+    ) -> CNA_Result;
+    pub fn cna_cnb_document_get_external_reference_count(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_document_get_external_reference_name_size(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_document_get_limits(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: *mut CNA_CnbReadLimits,
+    ) -> CNA_Result;
+    pub fn cna_cnb_document_open_chunk(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: u64,
+        argument2: *mut CNA_CnbReaderHandle,
+    ) -> CNA_Result;
+    pub fn cna_cnb_document_read_embedded_texture2d(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_CnbTextureDataHandle,
+    ) -> CNA_Result;
+    pub fn cna_cnb_document_require_asset(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: u32,
+        argument2: u32,
+    ) -> CNA_Result;
+    pub fn cna_cnb_document_require_mandatory_chunks_understood(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: *const CNA_CnbChunkId,
+        argument2: u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_document_require_single(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: CNA_CnbChunkId,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_get_audio_format_name_size(
+        argument0: CNA_CnbAudioFormat,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_get_chunk_id_string_size(
+        argument0: CNA_CnbChunkId,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_get_compressed_byte_count(
+        argument0: *const u8,
+        argument1: u64,
+        argument2: CNA_CnbCompression,
+        argument3: i32,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_get_compression_name_size(
+        argument0: CNA_CnbCompression,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_get_logical_name_problem_size(
+        argument0: CNA_StringView,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_get_texture_level_byte_size(
+        argument0: CNA_CnbTextureFormat,
+        argument1: u32,
+        argument2: u32,
+        argument3: u32,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_has_magic(
+        argument0: *const u8,
+        argument1: u64,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_cnb_is_block_compressed_texture_format(
+        argument0: CNA_CnbTextureFormat,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_cnb_is_compression_supported(
+        argument0: CNA_CnbCompression,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_cnb_is_known_texture_format(argument0: u32, argument1: *mut CNA_Bool) -> CNA_Result;
+    pub fn cna_cnb_is_well_formed_chunk_id(
+        argument0: CNA_CnbChunkId,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_cnb_is_well_formed_utf8(
+        argument0: CNA_StringView,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_cnb_make_chunk_id(
+        argument0: u8,
+        argument1: u8,
+        argument2: u8,
+        argument3: u8,
+        argument4: *mut CNA_CnbChunkId,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_copy_context(
+        argument0: CNA_CnbReaderHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_copy_string(
+        argument0: CNA_CnbReaderHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_create(
+        argument0: *const u8,
+        argument1: u64,
+        argument2: CNA_StringView,
+        argument3: *const CNA_CnbReadLimits,
+        argument4: *mut CNA_CnbReaderHandle,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_destroy(argument0: CNA_CnbReaderHandle) -> CNA_Result;
+    pub fn cna_cnb_reader_fail(
+        argument0: CNA_CnbReaderHandle,
+        argument1: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_get_context_size(
+        argument0: CNA_CnbReaderHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_get_position(
+        argument0: CNA_CnbReaderHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_get_remaining(
+        argument0: CNA_CnbReaderHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_get_size(
+        argument0: CNA_CnbReaderHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_read_bytes(
+        argument0: CNA_CnbReaderHandle,
+        argument1: u64,
+        argument2: *mut u8,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_read_count(
+        argument0: CNA_CnbReaderHandle,
+        argument1: u64,
+        argument2: CNA_StringView,
+        argument3: *mut u32,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_read_f32(
+        argument0: CNA_CnbReaderHandle,
+        argument1: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_read_f64(
+        argument0: CNA_CnbReaderHandle,
+        argument1: *mut f64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_read_i32(
+        argument0: CNA_CnbReaderHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_read_keyframe(
+        argument0: CNA_CnbReaderHandle,
+        argument1: *mut CNA_KeyframeEXT,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_read_seconds(
+        argument0: CNA_CnbReaderHandle,
+        argument1: CNA_StringView,
+        argument2: *mut f64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_read_string(
+        argument0: CNA_CnbReaderHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_read_u16(
+        argument0: CNA_CnbReaderHandle,
+        argument1: *mut u16,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_read_u32(
+        argument0: CNA_CnbReaderHandle,
+        argument1: *mut u32,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_read_u64(
+        argument0: CNA_CnbReaderHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_reader_read_u8(argument0: CNA_CnbReaderHandle, argument1: *mut u8) -> CNA_Result;
+    pub fn cna_cnb_reader_require_exhausted(argument0: CNA_CnbReaderHandle) -> CNA_Result;
+    pub fn cna_cnb_reader_skip(argument0: CNA_CnbReaderHandle, argument1: u64) -> CNA_Result;
+    pub fn cna_cnb_texture_format_from_surface_format(
+        argument0: CNA_SurfaceFormat,
+        argument1: *mut CNA_CnbTextureFormat,
+    ) -> CNA_Result;
+    pub fn cna_cnb_writer_add_external_reference(
+        argument0: CNA_CnbWriterHandle,
+        argument1: *const CNA_CnbExternalReference,
+        argument2: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_cnb_writer_append_embedded_texture2d(
+        argument0: CNA_CnbWriterHandle,
+        argument1: CNA_CnbTextureDataHandle,
+        argument2: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_cnb_writer_clear_external_references(argument0: CNA_CnbWriterHandle) -> CNA_Result;
+    pub fn cna_cnb_writer_get_limits(
+        argument0: CNA_CnbWriterHandle,
+        argument1: *mut CNA_CnbReadLimits,
+    ) -> CNA_Result;
+    pub fn cna_cnb_writer_get_schema_chunk_count(
+        argument0: CNA_CnbWriterHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_writer_set_compression(
+        argument0: CNA_CnbWriterHandle,
+        argument1: CNA_CnbCompression,
+        argument2: i32,
+    ) -> CNA_Result;
+    pub fn cna_cnb_writer_set_limits(
+        argument0: CNA_CnbWriterHandle,
+        argument1: *const CNA_CnbReadLimits,
+    ) -> CNA_Result;
+    pub fn cna_cnb_writer_write_to_file(
+        argument0: CNA_CnbWriterHandle,
+        argument1: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_cnb_animation_clip_copy_keyframes(
+        argument0: CNA_CnbAnimationClipHandle,
+        argument1: u64,
+        argument2: *mut CNA_KeyframeEXT,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_animation_clip_destroy(argument0: CNA_CnbAnimationClipHandle) -> CNA_Result;
+    pub fn cna_cnb_animation_clip_get(
+        argument0: CNA_CnbAnimationClipHandle,
+        argument1: *mut f64,
+        argument2: *mut u64,
+        argument3: *mut CNA_ClipTargetSpaceEXT,
+    ) -> CNA_Result;
+    pub fn cna_cnb_animation_clip_get_track(
+        argument0: CNA_CnbAnimationClipHandle,
+        argument1: u64,
+        argument2: *mut i32,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_build_model_from_cnj(
+        argument0: CNA_StringView,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_CnbModelFromCnjHandle,
+    ) -> CNA_Result;
+    pub fn cna_cnb_cnj_result_copy_absorbed_file(
+        argument0: CNA_CnjToCnbResultHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_cnj_result_copy_asset_type_name(
+        argument0: CNA_CnjToCnbResultHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_cnj_result_copy_bytes(
+        argument0: CNA_CnjToCnbResultHandle,
+        argument1: *mut u8,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_cnj_result_copy_external_reference(
+        argument0: CNA_CnjToCnbResultHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_cnj_result_destroy(argument0: CNA_CnjToCnbResultHandle) -> CNA_Result;
+    pub fn cna_cnb_cnj_result_get_absorbed_file_count(
+        argument0: CNA_CnjToCnbResultHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_cnj_result_get_absorbed_file_size(
+        argument0: CNA_CnjToCnbResultHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_cnj_result_get_asset_type_id(
+        argument0: CNA_CnjToCnbResultHandle,
+        argument1: *mut u32,
+    ) -> CNA_Result;
+    pub fn cna_cnb_cnj_result_get_asset_type_name_size(
+        argument0: CNA_CnjToCnbResultHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_cnj_result_get_external_reference_count(
+        argument0: CNA_CnjToCnbResultHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_cnj_result_get_external_reference_size(
+        argument0: CNA_CnjToCnbResultHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_compile_cnj(
+        argument0: CNA_StringView,
+        argument1: CNA_StringView,
+        argument2: CNA_StringView,
+        argument3: *mut CNA_CnjToCnbResultHandle,
+    ) -> CNA_Result;
+    pub fn cna_cnb_decode_animation_clip(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: *mut CNA_CnbAnimationClipHandle,
+    ) -> CNA_Result;
+    pub fn cna_cnb_decode_curve(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: *mut CNA_CurveHandle,
+    ) -> CNA_Result;
+    pub fn cna_cnb_decode_dds_as_texture_cube(
+        argument0: *const u8,
+        argument1: u64,
+        argument2: CNA_StringView,
+        argument3: *mut CNA_CnbTextureDataHandle,
+    ) -> CNA_Result;
+    pub fn cna_cnb_decode_song_duration_milliseconds(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: *mut u32,
+    ) -> CNA_Result;
+    pub fn cna_cnb_decode_song_name(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_decode_song_name_size(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_decode_song_stream_reference(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_decode_song_stream_reference_size(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_decode_texture3d(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: *mut CNA_CnbTextureDataHandle,
+    ) -> CNA_Result;
+    pub fn cna_cnb_decode_texture_cube(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: *mut CNA_CnbTextureDataHandle,
+    ) -> CNA_Result;
+    pub fn cna_cnb_decode_video(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: *mut CNA_CnbVideoInfo,
+    ) -> CNA_Result;
+    pub fn cna_cnb_decode_video_stream_reference(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_decode_video_stream_reference_size(
+        argument0: CNA_CnbDocumentHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_decode_wav_as_sound_effect(
+        argument0: *const u8,
+        argument1: u64,
+        argument2: CNA_StringView,
+        argument3: *mut CNA_CnbSoundEffectDataHandle,
+    ) -> CNA_Result;
+    pub fn cna_cnb_encode_animation_clip(
+        argument0: *const CNA_AnimationClipEXTDescriptor,
+        argument1: CNA_ClipTargetSpaceEXT,
+        argument2: CNA_StringView,
+        argument3: *mut u8,
+        argument4: u64,
+        argument5: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_encode_curve(
+        argument0: CNA_CurveHandle,
+        argument1: CNA_StringView,
+        argument2: *mut u8,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_encode_song(
+        argument0: CNA_StringView,
+        argument1: CNA_StringView,
+        argument2: u32,
+        argument3: CNA_StringView,
+        argument4: *mut u8,
+        argument5: u64,
+        argument6: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_encode_texture3d(
+        argument0: CNA_CnbTextureDataHandle,
+        argument1: CNA_StringView,
+        argument2: *mut u8,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_encode_texture_cube(
+        argument0: CNA_CnbTextureDataHandle,
+        argument1: CNA_StringView,
+        argument2: *mut u8,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_encode_video(
+        argument0: CNA_StringView,
+        argument1: *const CNA_CnbVideoInfo,
+        argument2: CNA_StringView,
+        argument3: *mut u8,
+        argument4: u64,
+        argument5: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_import_dds_as_texture_cube(
+        argument0: CNA_StringView,
+        argument1: *mut CNA_CnbTextureDataHandle,
+    ) -> CNA_Result;
+    pub fn cna_cnb_import_image_as_texture2d(
+        argument0: CNA_StringView,
+        argument1: *const CNA_CnbImageImportOptions,
+        argument2: *mut CNA_CnbTextureDataHandle,
+    ) -> CNA_Result;
+    pub fn cna_cnb_import_wav_as_sound_effect(
+        argument0: CNA_StringView,
+        argument1: *mut CNA_CnbSoundEffectDataHandle,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_add_animation(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: CNA_StringView,
+        argument2: *const CNA_AnimationClipEXTDescriptor,
+        argument3: CNA_ClipTargetSpaceEXT,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_add_light(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: *const CNA_CnbModelLight,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_add_morph_target(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_add_morph_weight_key(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: f64,
+        argument3: *const f32,
+        argument4: u64,
+        argument5: *const f32,
+        argument6: u64,
+        argument7: *const f32,
+        argument8: u64,
+        argument9: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_clear_morph(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_clear_skeleton(argument0: CNA_CnbModelDataHandle) -> CNA_Result;
+    pub fn cna_cnb_model_copy_animation_keyframes(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: u64,
+        argument3: *mut CNA_KeyframeEXT,
+        argument4: u64,
+        argument5: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_copy_animation_name(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_copy_morph_target_deltas(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: u64,
+        argument3: CNA_CnbMorphDeltaStream,
+        argument4: *mut f32,
+        argument5: u64,
+        argument6: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_copy_morph_weight_key_values(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: u64,
+        argument3: CNA_CnbMorphKeyStream,
+        argument4: *mut f32,
+        argument5: u64,
+        argument6: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_copy_morph_weights(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: *mut f32,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_copy_part_external_effect(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_copy_skeleton_hierarchy(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: *mut i32,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_copy_skeleton_matrices(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: CNA_CnbSkeletonMatrixSet,
+        argument2: *mut f32,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_from_cnj_copy_absorbed_file(
+        argument0: CNA_CnbModelFromCnjHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_from_cnj_copy_external_reference(
+        argument0: CNA_CnbModelFromCnjHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_from_cnj_destroy(argument0: CNA_CnbModelFromCnjHandle) -> CNA_Result;
+    pub fn cna_cnb_model_from_cnj_get_absorbed_file_count(
+        argument0: CNA_CnbModelFromCnjHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_from_cnj_get_absorbed_file_size(
+        argument0: CNA_CnbModelFromCnjHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_from_cnj_get_external_reference_count(
+        argument0: CNA_CnbModelFromCnjHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_from_cnj_get_external_reference_size(
+        argument0: CNA_CnbModelFromCnjHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_from_cnj_take_model(
+        argument0: CNA_CnbModelFromCnjHandle,
+        argument1: *mut CNA_CnbModelDataHandle,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_get_animation(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: *mut f64,
+        argument3: *mut u64,
+        argument4: *mut CNA_ClipTargetSpaceEXT,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_get_animation_name_size(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_get_animation_track(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: u64,
+        argument3: *mut i32,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_get_light(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: *mut CNA_CnbModelLight,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_get_material_sampler(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: u64,
+        argument3: *mut CNA_CnbSamplerState,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_get_material_texture_coordinate_set(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: u64,
+        argument3: *mut u8,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_get_material_texture_transform(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: u64,
+        argument3: *mut CNA_CnbTextureTransform,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_get_morph(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: *mut CNA_CnbMorphInfo,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_get_morph_weight_key(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: u64,
+        argument3: *mut CNA_CnbMorphWeightKeyInfo,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_get_part_external_effect_size(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_get_skeleton(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: *mut CNA_CnbSkeletonInfo,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_has_morph(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_set_material_sampler(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: u64,
+        argument3: *const CNA_CnbSamplerState,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_set_material_texture_coordinate_set(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: u64,
+        argument3: u8,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_set_material_texture_transform(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: u64,
+        argument3: *const CNA_CnbTextureTransform,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_set_morph(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: *const CNA_CnbMorphInfo,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_set_morph_target_deltas(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: u64,
+        argument3: CNA_CnbMorphDeltaStream,
+        argument4: *const f32,
+        argument5: u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_set_morph_weights(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: *const f32,
+        argument3: u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_set_part(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: u64,
+        argument2: *const CNA_CnbModelPartInfo,
+    ) -> CNA_Result;
+    pub fn cna_cnb_model_set_skeleton(
+        argument0: CNA_CnbModelDataHandle,
+        argument1: *const i32,
+        argument2: u64,
+        argument3: *const f32,
+        argument4: *const f32,
+        argument5: *const f32,
+    ) -> CNA_Result;
+    pub fn cna_cnb_sprite_font_data_set_glyph(
+        argument0: CNA_CnbSpriteFontDataHandle,
+        argument1: u64,
+        argument2: *const CNA_SpriteFontGlyph,
+    ) -> CNA_Result;
+    pub fn cna_cnb_texture_data_add_representation(
+        argument0: CNA_CnbTextureDataHandle,
+        argument1: CNA_CnbTextureFormat,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_texture_data_create(
+        argument0: u32,
+        argument1: u32,
+        argument2: u32,
+        argument3: u32,
+        argument4: u32,
+        argument5: *mut CNA_CnbTextureDataHandle,
+    ) -> CNA_Result;
+    pub fn cna_cnb_texture_data_select_representation(
+        argument0: CNA_CnbTextureDataHandle,
+        argument1: CNA_CnbTextureFormatSupportedFn,
+        argument2: *mut c_void,
+        argument3: *mut CNA_Bool,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_cnb_texture_data_set_level(
+        argument0: CNA_CnbTextureDataHandle,
+        argument1: u64,
+        argument2: u64,
+        argument3: *const u8,
+        argument4: u64,
+    ) -> CNA_Result;
+    pub fn cna_curve_create(argument0: *mut CNA_CurveHandle) -> CNA_Result;
+    pub fn cna_curve_destroy(argument0: CNA_CurveHandle) -> CNA_Result;
+    pub fn cna_curve_get_keys(
+        argument0: CNA_CurveHandle,
+        argument1: *mut CNA_CurveKeyCollectionHandle,
+    ) -> CNA_Result;
+    pub fn cna_curve_get_post_loop(
+        argument0: CNA_CurveHandle,
+        argument1: *mut CNA_CurveLoopType,
+    ) -> CNA_Result;
+    pub fn cna_curve_get_pre_loop(
+        argument0: CNA_CurveHandle,
+        argument1: *mut CNA_CurveLoopType,
+    ) -> CNA_Result;
+    pub fn cna_curve_key_collection_add(
+        argument0: CNA_CurveKeyCollectionHandle,
+        argument1: CNA_CurveKey,
+    ) -> CNA_Result;
+    pub fn cna_curve_key_collection_destroy(argument0: CNA_CurveKeyCollectionHandle) -> CNA_Result;
+    pub fn cna_curve_key_collection_get(
+        argument0: CNA_CurveKeyCollectionHandle,
+        argument1: i32,
+        argument2: *mut CNA_CurveKey,
+    ) -> CNA_Result;
+    pub fn cna_curve_key_collection_get_count(
+        argument0: CNA_CurveKeyCollectionHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_curve_set_post_loop(
+        argument0: CNA_CurveHandle,
+        argument1: CNA_CurveLoopType,
+    ) -> CNA_Result;
+    pub fn cna_curve_set_pre_loop(
+        argument0: CNA_CurveHandle,
+        argument1: CNA_CurveLoopType,
+    ) -> CNA_Result;
+    pub fn cna_alpha_test_effect_get_texture(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Bool,
+        argument2: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_basic_effect_get_texture(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Bool,
+        argument2: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_color_matrix_effect_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_color_matrix_effect_get_matrix(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_ColorMatrix4x4,
+    ) -> CNA_Result;
+    pub fn cna_color_matrix_effect_get_offset(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Vector4,
+    ) -> CNA_Result;
+    pub fn cna_color_matrix_effect_reset(argument0: CNA_EffectHandle) -> CNA_Result;
+    pub fn cna_color_matrix_effect_set_grayscale(argument0: CNA_EffectHandle) -> CNA_Result;
+    pub fn cna_color_matrix_effect_set_matrix(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_ColorMatrix4x4,
+    ) -> CNA_Result;
+    pub fn cna_color_matrix_effect_set_offset(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_Vector4,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_load_effect(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_dual_texture_effect_get_texture(
+        argument0: CNA_EffectHandle,
+        argument1: u32,
+        argument2: *mut CNA_Bool,
+        argument3: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_effect_copy_fragment_source(
+        argument0: CNA_EffectHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_effect_copy_vertex_source(
+        argument0: CNA_EffectHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_effect_get_fragment_source_byte_count(
+        argument0: CNA_EffectHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_effect_get_graphics_device(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_effect_get_is_compiled_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_effect_get_vertex_source_byte_count(
+        argument0: CNA_EffectHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_effect_has_renderer(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_effect_is_exact_stock_sprite_effect(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_effect_material_get_retained_parameter_texture_count_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_effect_material_retain_parameter_texture_ext(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_EffectTextureType,
+        argument2: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_effect_pass_get_index_ext(
+        argument0: CNA_EffectPassHandle,
+        argument1: *mut u32,
+    ) -> CNA_Result;
+    pub fn cna_effect_technique_get_identity(
+        argument0: CNA_EffectTechniqueHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_effect_technique_get_index_ext(
+        argument0: CNA_EffectTechniqueHandle,
+        argument1: *mut u32,
+    ) -> CNA_Result;
+    pub fn cna_environment_map_effect_get_environment_map(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Bool,
+        argument2: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_environment_map_effect_get_texture(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Bool,
+        argument2: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_get_encode_output_to_srgb_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_get_specular_color_factor_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_get_texture(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_PbrTextureSlot,
+        argument2: *mut CNA_Bool,
+        argument3: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_get_texture_coordinate_set_ext(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_PbrTextureSlot,
+        argument2: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_get_texture_is_srgb_ext(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_PbrTextureSlot,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_get_texture_transform_ext(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_PbrTextureSlot,
+        argument2: *mut CNA_TextureTransformEXT,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_set_encode_output_to_srgb_ext(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_set_specular_color_factor_ext(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_set_texture(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_PbrTextureSlot,
+        argument2: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_set_texture_coordinate_set_ext(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_PbrTextureSlot,
+        argument2: i32,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_set_texture_is_srgb_ext(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_PbrTextureSlot,
+        argument2: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_pbr_effect_set_texture_transform_ext(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_PbrTextureSlot,
+        argument2: *const CNA_TextureTransformEXT,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_copy_compile_error_ext(
+        argument0: CNA_EffectHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_create(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: CNA_StringView,
+        argument3: *mut CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_declare_uniform_block_ext(
+        argument0: CNA_EffectHandle,
+        argument1: i32,
+        argument2: *const CNA_StringView,
+        argument3: *const i32,
+        argument4: u64,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_get_projection(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_get_view(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_get_world(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_has_renderer(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_is_valid(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_set_projection(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_set_texture2d(
+        argument0: CNA_EffectHandle,
+        argument1: i32,
+        argument2: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_set_texture3d(
+        argument0: CNA_EffectHandle,
+        argument1: i32,
+        argument2: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_set_texture_cube(
+        argument0: CNA_EffectHandle,
+        argument1: i32,
+        argument2: CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_set_uniform_float(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_StringView,
+        argument2: f32,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_set_uniform_float_array(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_StringView,
+        argument2: *const f32,
+        argument3: u64,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_set_uniform_int32(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_StringView,
+        argument2: i32,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_set_uniform_mat4_array(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_StringView,
+        argument2: *const f32,
+        argument3: i32,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_set_uniform_matrix(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_StringView,
+        argument2: CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_set_uniform_vec3_array(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_StringView,
+        argument2: *const f32,
+        argument3: i32,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_set_uniform_vector2(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_StringView,
+        argument2: CNA_Vector2,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_set_uniform_vector2_array(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_StringView,
+        argument2: *const CNA_Vector2,
+        argument3: u64,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_set_uniform_vector3(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_StringView,
+        argument2: CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_set_uniform_vector4(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_StringView,
+        argument2: CNA_Vector4,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_set_view(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_shader_effect_set_world(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_skinned_effect_get_texture(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Bool,
+        argument2: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_skinned_effect_get_vertex_color_enabled(
+        argument0: CNA_EffectHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_skinned_effect_set_vertex_color_enabled(
+        argument0: CNA_EffectHandle,
+        argument1: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_sprite_effect_create(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_content_manager_load_object_dictionary_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_ObjectDictionaryHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_get_content_tag_dictionary_ext(
+        argument0: CNA_ModelHandle,
+        argument1: *mut CNA_Bool,
+        argument2: *mut CNA_ObjectDictionaryHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_get_content_tag_foreign_object_ext(
+        argument0: CNA_ModelHandle,
+        argument1: *mut CNA_Bool,
+        argument2: *mut *mut c_void,
+    ) -> CNA_Result;
+    pub fn cna_object_dictionary_ext_contains_key(
+        argument0: CNA_ObjectDictionaryHandle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_object_dictionary_ext_copy_array(
+        argument0: CNA_ObjectDictionaryHandle,
+        argument1: CNA_StringView,
+        argument2: CNA_ObjectDictionaryValueKind,
+        argument3: *mut c_void,
+        argument4: u64,
+        argument5: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_object_dictionary_ext_copy_key_at(
+        argument0: CNA_ObjectDictionaryHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_object_dictionary_ext_copy_runtime_type_name(
+        argument0: CNA_ObjectDictionaryHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_object_dictionary_ext_copy_string(
+        argument0: CNA_ObjectDictionaryHandle,
+        argument1: CNA_StringView,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_object_dictionary_ext_copy_value(
+        argument0: CNA_ObjectDictionaryHandle,
+        argument1: CNA_StringView,
+        argument2: CNA_ObjectDictionaryValueKind,
+        argument3: *mut c_void,
+        argument4: u64,
+    ) -> CNA_Result;
+    pub fn cna_object_dictionary_ext_destroy(argument0: CNA_ObjectDictionaryHandle) -> CNA_Result;
+    pub fn cna_object_dictionary_ext_get_count(
+        argument0: CNA_ObjectDictionaryHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_object_dictionary_ext_get_entry(
+        argument0: CNA_ObjectDictionaryHandle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_ObjectDictionaryEntry,
+    ) -> CNA_Result;
+    pub fn cna_object_dictionary_ext_get_foreign_object(
+        argument0: CNA_ObjectDictionaryHandle,
+        argument1: CNA_StringView,
+        argument2: *mut *mut c_void,
+    ) -> CNA_Result;
+    pub fn cna_object_dictionary_ext_get_key_size_at(
+        argument0: CNA_ObjectDictionaryHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_object_dictionary_ext_get_runtime_type_name_size(
+        argument0: CNA_ObjectDictionaryHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_object_dictionary_ext_get_string_size(
+        argument0: CNA_ObjectDictionaryHandle,
+        argument1: CNA_StringView,
+        argument2: *mut u64,
+    ) -> CNA_Result;
 }

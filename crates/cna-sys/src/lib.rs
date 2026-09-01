@@ -685,6 +685,206 @@ pub type CNA_CRTMaskType = u32;
 pub type CNA_DitherMode = u32;
 pub type CNA_DepthEffectMode = u32;
 pub type CNA_CnbChunkId = u32;
+pub type CNA_CnbByteWriterHandle = CNA_Handle;
+pub type CNA_CnbAnimationClipHandle = CNA_Handle;
+pub type CNA_CurveHandle = CNA_Handle;
+pub type CNA_ObjectDictionaryHandle = CNA_Handle;
+pub type CNA_ObjectDictionaryValueKind = u32;
+
+pub const CNA_OBJECT_DICTIONARY_VALUE_UNKNOWN: CNA_ObjectDictionaryValueKind = 0;
+pub const CNA_OBJECT_DICTIONARY_VALUE_BOOLEAN: CNA_ObjectDictionaryValueKind = 1;
+pub const CNA_OBJECT_DICTIONARY_VALUE_INT32: CNA_ObjectDictionaryValueKind = 2;
+pub const CNA_OBJECT_DICTIONARY_VALUE_SINGLE: CNA_ObjectDictionaryValueKind = 3;
+pub const CNA_OBJECT_DICTIONARY_VALUE_DOUBLE: CNA_ObjectDictionaryValueKind = 4;
+pub const CNA_OBJECT_DICTIONARY_VALUE_STRING: CNA_ObjectDictionaryValueKind = 5;
+pub const CNA_OBJECT_DICTIONARY_VALUE_VECTOR2: CNA_ObjectDictionaryValueKind = 6;
+pub const CNA_OBJECT_DICTIONARY_VALUE_VECTOR3: CNA_ObjectDictionaryValueKind = 7;
+pub const CNA_OBJECT_DICTIONARY_VALUE_VECTOR4: CNA_ObjectDictionaryValueKind = 8;
+pub const CNA_OBJECT_DICTIONARY_VALUE_MATRIX: CNA_ObjectDictionaryValueKind = 9;
+pub const CNA_OBJECT_DICTIONARY_VALUE_QUATERNION: CNA_ObjectDictionaryValueKind = 10;
+pub const CNA_OBJECT_DICTIONARY_VALUE_COLOR: CNA_ObjectDictionaryValueKind = 11;
+pub const CNA_OBJECT_DICTIONARY_VALUE_BOUNDING_SPHERE: CNA_ObjectDictionaryValueKind = 12;
+pub const CNA_OBJECT_DICTIONARY_VALUE_BOUNDING_BOX: CNA_ObjectDictionaryValueKind = 13;
+pub const CNA_OBJECT_DICTIONARY_VALUE_FOREIGN_OBJECT: CNA_ObjectDictionaryValueKind = 14;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_ObjectDictionaryEntry {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub kind: CNA_ObjectDictionaryValueKind,
+    pub is_array: CNA_Bool,
+    pub element_count: u64,
+}
+
+/// A colour transform, row-major, as `ColorMatrixEffect` stores it.
+///
+/// Sixteen floats rather than a `CNA_Matrix`: it multiplies RGBA, not
+/// positions, and giving it the geometry type would invite it to be passed
+/// where a world transform belongs.
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_ColorMatrix4x4 {
+    pub values: [f32; 16],
+}
+
+impl Default for CNA_ColorMatrix4x4 {
+    fn default() -> Self {
+        Self { values: [0.0; 16] }
+    }
+}
+pub type CNA_CurveKeyCollectionHandle = CNA_Handle;
+pub type CNA_CurveLoopType = u32;
+pub type CNA_CurveContinuity = u32;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CurveKey {
+    pub position: f32,
+    pub value: f32,
+    pub tangent_in: f32,
+    pub tangent_out: f32,
+    pub continuity: CNA_CurveContinuity,
+}
+
+/// A caller's predicate over the representations a texture carries.
+///
+/// Called synchronously, once per representation in order, and never retained
+/// past the call it was passed to. It must not call back into this ABI.
+pub type CNA_CnbTextureFormatSupportedFn =
+    Option<unsafe extern "C" fn(format: CNA_CnbTextureFormat, context: *mut c_void) -> CNA_Bool>;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbImageImportOptions {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub color_key: [u8; 3],
+    pub has_color_key: CNA_Bool,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbVideoInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub duration_milliseconds: u32,
+    pub width: u32,
+    pub height: u32,
+    pub frames_per_second: f32,
+    pub soundtrack_type: CNA_VideoSoundtrackType,
+    pub reserved: u32,
+}
+pub type CNA_CnbModelFromCnjHandle = CNA_Handle;
+pub type CNA_CnjToCnbResultHandle = CNA_Handle;
+
+pub type CNA_CnbMorphDeltaStream = u32;
+
+pub const CNA_CNB_MORPH_DELTA_POSITION: CNA_CnbMorphDeltaStream = 0;
+pub const CNA_CNB_MORPH_DELTA_NORMAL: CNA_CnbMorphDeltaStream = 1;
+pub const CNA_CNB_MORPH_DELTA_TANGENT: CNA_CnbMorphDeltaStream = 2;
+
+pub type CNA_CnbMorphKeyStream = u32;
+
+pub const CNA_CNB_MORPH_KEY_WEIGHTS: CNA_CnbMorphKeyStream = 0;
+pub const CNA_CNB_MORPH_KEY_IN_TANGENT: CNA_CnbMorphKeyStream = 1;
+pub const CNA_CNB_MORPH_KEY_OUT_TANGENT: CNA_CnbMorphKeyStream = 2;
+
+pub type CNA_CnbSkeletonMatrixSet = u32;
+
+pub const CNA_CNB_SKELETON_MATRIX_BIND_POSE: CNA_CnbSkeletonMatrixSet = 0;
+pub const CNA_CNB_SKELETON_MATRIX_INVERSE_BIND_POSE: CNA_CnbSkeletonMatrixSet = 1;
+pub const CNA_CNB_SKELETON_MATRIX_ROOT_PREFIX: CNA_CnbSkeletonMatrixSet = 2;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbSkeletonInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub joint_count: u64,
+    pub has_root_prefix: CNA_Bool,
+    pub reserved: [u8; 7],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbMorphInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub vertex_count: u32,
+    pub reserved: u32,
+    pub target_count: u64,
+    pub weight_count: u64,
+    pub weight_track_key_count: u64,
+    pub recompute_flat_normals: CNA_Bool,
+    pub weight_track_step_interpolation: CNA_Bool,
+    pub weight_track_cubic_spline: CNA_Bool,
+    pub reserved2: [u8; 5],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbMorphWeightKeyInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub time_seconds: f64,
+    pub weight_count: u64,
+    pub in_tangent_count: u64,
+    pub out_tangent_count: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbModelLight {
+    pub direction: [f32; 3],
+    pub diffuse_color: [f32; 3],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbSamplerState {
+    pub filter: u32,
+    pub address_u: u32,
+    pub address_v: u32,
+    pub declared: CNA_Bool,
+    pub reserved: [u8; 3],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbTextureTransform {
+    pub offset_x: f32,
+    pub offset_y: f32,
+    pub scale_x: f32,
+    pub scale_y: f32,
+    pub rotation: f32,
+}
+pub type CNA_CnbReaderHandle = CNA_Handle;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbChunkEntry {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub offset: u64,
+    pub stored_size: u64,
+    pub uncompressed_size: u64,
+    pub r#type: CNA_CnbChunkId,
+    pub flags: u32,
+    pub checksum: u32,
+    pub compression: CNA_CnbCompression,
+    pub alignment: u32,
+    pub reserved: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_CnbExternalReference {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub flags: u32,
+    pub expected_asset_type_id: u32,
+}
 pub type CNA_CnbCompression = u32;
 pub type CNA_CnbTextureFormat = u32;
 pub type CNA_CnbDocumentHandle = CNA_Handle;
@@ -11593,4 +11793,831 @@ pub type cna_sensors_get_last_error_id_ext_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_sensor_unsubscribe_ext_fn = unsafe extern "C" fn(
     CNA_SensorEventRegistrationHandle,
+) -> CNA_Result;
+
+// --- RUST-EXT-015a: CNB's primitive writer, reader and chunk navigation ----
+//
+// Not generic byte I/O. These carry CNB's canonical encoding and its checks:
+// length-prefixed UTF-8 validated against a read limit, a fixed 48-byte
+// keyframe layout, seconds refused unless a `TimeSpan` can hold them, and
+// integers decomposed byte by byte so a built document does not depend on
+// the host's byte order. Reimplementing that over `Vec<u8>` would be a
+// second encoder of the same format, and the two could disagree.
+pub type cna_cnb_audio_frame_bytes_fn = unsafe extern "C" fn(
+    CNA_CnbAudioFormat, u32, *mut u32,
+) -> CNA_Result;
+pub type cna_cnb_byte_writer_copy_bytes_fn = unsafe extern "C" fn(
+    CNA_CnbByteWriterHandle, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_byte_writer_create_fn = unsafe extern "C" fn(
+    *mut CNA_CnbByteWriterHandle,
+) -> CNA_Result;
+pub type cna_cnb_byte_writer_create_from_bytes_fn = unsafe extern "C" fn(
+    *const u8, u64, *mut CNA_CnbByteWriterHandle,
+) -> CNA_Result;
+pub type cna_cnb_byte_writer_destroy_fn = unsafe extern "C" fn(
+    CNA_CnbByteWriterHandle,
+) -> CNA_Result;
+pub type cna_cnb_byte_writer_get_size_fn = unsafe extern "C" fn(
+    CNA_CnbByteWriterHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_byte_writer_take_fn = unsafe extern "C" fn(
+    CNA_CnbByteWriterHandle, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_byte_writer_write_bytes_fn = unsafe extern "C" fn(
+    CNA_CnbByteWriterHandle, *const u8, u64,
+) -> CNA_Result;
+pub type cna_cnb_byte_writer_write_f32_fn = unsafe extern "C" fn(
+    CNA_CnbByteWriterHandle, f32,
+) -> CNA_Result;
+pub type cna_cnb_byte_writer_write_f64_fn = unsafe extern "C" fn(
+    CNA_CnbByteWriterHandle, f64,
+) -> CNA_Result;
+pub type cna_cnb_byte_writer_write_i32_fn = unsafe extern "C" fn(
+    CNA_CnbByteWriterHandle, i32,
+) -> CNA_Result;
+pub type cna_cnb_byte_writer_write_keyframe_fn = unsafe extern "C" fn(
+    CNA_CnbByteWriterHandle, *const CNA_KeyframeEXT,
+) -> CNA_Result;
+pub type cna_cnb_byte_writer_write_string_fn = unsafe extern "C" fn(
+    CNA_CnbByteWriterHandle, CNA_StringView,
+) -> CNA_Result;
+pub type cna_cnb_byte_writer_write_u16_fn = unsafe extern "C" fn(
+    CNA_CnbByteWriterHandle, u16,
+) -> CNA_Result;
+pub type cna_cnb_byte_writer_write_u32_fn = unsafe extern "C" fn(
+    CNA_CnbByteWriterHandle, u32,
+) -> CNA_Result;
+pub type cna_cnb_byte_writer_write_u64_fn = unsafe extern "C" fn(
+    CNA_CnbByteWriterHandle, u64,
+) -> CNA_Result;
+pub type cna_cnb_byte_writer_write_u8_fn = unsafe extern "C" fn(
+    CNA_CnbByteWriterHandle, u8,
+) -> CNA_Result;
+pub type cna_cnb_byte_writer_write_zeros_fn = unsafe extern "C" fn(
+    CNA_CnbByteWriterHandle, u64,
+) -> CNA_Result;
+pub type cna_cnb_checked_add_fn = unsafe extern "C" fn(u64, u64, *mut u64) -> CNA_Result;
+pub type cna_cnb_checked_multiply_fn = unsafe extern "C" fn(u64, u64, *mut u64) -> CNA_Result;
+pub type cna_cnb_chunk_entry_is_mandatory_fn = unsafe extern "C" fn(
+    *const CNA_CnbChunkEntry, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_cnb_copy_audio_format_name_fn = unsafe extern "C" fn(
+    CNA_CnbAudioFormat, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_copy_chunk_id_string_fn = unsafe extern "C" fn(
+    CNA_CnbChunkId, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_copy_compressed_fn = unsafe extern "C" fn(
+    *const u8, u64, CNA_CnbCompression, i32, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_copy_compression_name_fn = unsafe extern "C" fn(
+    CNA_CnbCompression, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_copy_decompressed_fn = unsafe extern "C" fn(
+    *const u8, u64, CNA_CnbCompression, u64, u64, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_copy_format_magic_fn = unsafe extern "C" fn(*mut u8, u64, *mut u64) -> CNA_Result;
+pub type cna_cnb_copy_logical_name_problem_fn = unsafe extern "C" fn(
+    CNA_StringView, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_crc32c_fn = unsafe extern "C" fn(*const u8, u64, *mut u32) -> CNA_Result;
+pub type cna_cnb_crc32c_continue_fn = unsafe extern "C" fn(
+    u32, *const u8, u64, *mut u32,
+) -> CNA_Result;
+pub type cna_cnb_crc32c_portable_fn = unsafe extern "C" fn(*const u8, u64, *mut u32) -> CNA_Result;
+pub type cna_cnb_crc32c_uses_hardware_fn = unsafe extern "C" fn(*mut CNA_Bool) -> CNA_Result;
+pub type cna_cnb_document_copy_chunk_data_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, u64, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_document_copy_external_reference_name_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_document_find_all_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, CNA_CnbChunkId, *mut u64, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_document_find_single_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, CNA_CnbChunkId, *mut CNA_Bool, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_document_get_chunk_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, u64, *mut CNA_CnbChunkEntry,
+) -> CNA_Result;
+pub type cna_cnb_document_get_external_reference_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, u64, CNA_StringView, *mut CNA_CnbExternalReference,
+) -> CNA_Result;
+pub type cna_cnb_document_get_external_reference_count_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_document_get_external_reference_name_size_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_document_get_limits_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut CNA_CnbReadLimits,
+) -> CNA_Result;
+pub type cna_cnb_document_open_chunk_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, u64, *mut CNA_CnbReaderHandle,
+) -> CNA_Result;
+pub type cna_cnb_document_read_embedded_texture2d_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, CNA_StringView, *mut CNA_CnbTextureDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_document_require_asset_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, u32, u32,
+) -> CNA_Result;
+pub type cna_cnb_document_require_mandatory_chunks_understood_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *const CNA_CnbChunkId, u64,
+) -> CNA_Result;
+pub type cna_cnb_document_require_single_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, CNA_CnbChunkId, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_get_audio_format_name_size_fn = unsafe extern "C" fn(
+    CNA_CnbAudioFormat, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_get_chunk_id_string_size_fn = unsafe extern "C" fn(
+    CNA_CnbChunkId, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_get_compressed_byte_count_fn = unsafe extern "C" fn(
+    *const u8, u64, CNA_CnbCompression, i32, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_get_compression_name_size_fn = unsafe extern "C" fn(
+    CNA_CnbCompression, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_get_logical_name_problem_size_fn = unsafe extern "C" fn(
+    CNA_StringView, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_get_texture_level_byte_size_fn = unsafe extern "C" fn(
+    CNA_CnbTextureFormat, u32, u32, u32, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_has_magic_fn = unsafe extern "C" fn(*const u8, u64, *mut CNA_Bool) -> CNA_Result;
+pub type cna_cnb_is_block_compressed_texture_format_fn = unsafe extern "C" fn(
+    CNA_CnbTextureFormat, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_cnb_is_compression_supported_fn = unsafe extern "C" fn(
+    CNA_CnbCompression, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_cnb_is_known_texture_format_fn = unsafe extern "C" fn(
+    u32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_cnb_is_well_formed_chunk_id_fn = unsafe extern "C" fn(
+    CNA_CnbChunkId, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_cnb_is_well_formed_utf8_fn = unsafe extern "C" fn(
+    CNA_StringView, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_cnb_make_chunk_id_fn = unsafe extern "C" fn(
+    u8, u8, u8, u8, *mut CNA_CnbChunkId,
+) -> CNA_Result;
+pub type cna_cnb_reader_copy_context_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_reader_copy_string_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_reader_create_fn = unsafe extern "C" fn(
+    *const u8, u64, CNA_StringView, *const CNA_CnbReadLimits, *mut CNA_CnbReaderHandle,
+) -> CNA_Result;
+pub type cna_cnb_reader_destroy_fn = unsafe extern "C" fn(CNA_CnbReaderHandle) -> CNA_Result;
+pub type cna_cnb_reader_fail_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, CNA_StringView,
+) -> CNA_Result;
+pub type cna_cnb_reader_get_context_size_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_reader_get_position_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_reader_get_remaining_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_reader_get_size_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_reader_read_bytes_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, u64, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_reader_read_count_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, u64, CNA_StringView, *mut u32,
+) -> CNA_Result;
+pub type cna_cnb_reader_read_f32_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, *mut f32,
+) -> CNA_Result;
+pub type cna_cnb_reader_read_f64_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, *mut f64,
+) -> CNA_Result;
+pub type cna_cnb_reader_read_i32_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_cnb_reader_read_keyframe_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, *mut CNA_KeyframeEXT,
+) -> CNA_Result;
+pub type cna_cnb_reader_read_seconds_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, CNA_StringView, *mut f64,
+) -> CNA_Result;
+pub type cna_cnb_reader_read_string_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_reader_read_u16_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, *mut u16,
+) -> CNA_Result;
+pub type cna_cnb_reader_read_u32_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, *mut u32,
+) -> CNA_Result;
+pub type cna_cnb_reader_read_u64_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_reader_read_u8_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle, *mut u8,
+) -> CNA_Result;
+pub type cna_cnb_reader_require_exhausted_fn = unsafe extern "C" fn(
+    CNA_CnbReaderHandle,
+) -> CNA_Result;
+pub type cna_cnb_reader_skip_fn = unsafe extern "C" fn(CNA_CnbReaderHandle, u64) -> CNA_Result;
+pub type cna_cnb_texture_format_from_surface_format_fn = unsafe extern "C" fn(
+    CNA_SurfaceFormat, *mut CNA_CnbTextureFormat,
+) -> CNA_Result;
+pub type cna_cnb_writer_add_external_reference_fn = unsafe extern "C" fn(
+    CNA_CnbWriterHandle, *const CNA_CnbExternalReference, CNA_StringView,
+) -> CNA_Result;
+pub type cna_cnb_writer_append_embedded_texture2d_fn = unsafe extern "C" fn(
+    CNA_CnbWriterHandle, CNA_CnbTextureDataHandle, CNA_StringView,
+) -> CNA_Result;
+pub type cna_cnb_writer_clear_external_references_fn = unsafe extern "C" fn(
+    CNA_CnbWriterHandle,
+) -> CNA_Result;
+pub type cna_cnb_writer_get_limits_fn = unsafe extern "C" fn(
+    CNA_CnbWriterHandle, *mut CNA_CnbReadLimits,
+) -> CNA_Result;
+pub type cna_cnb_writer_get_schema_chunk_count_fn = unsafe extern "C" fn(
+    CNA_CnbWriterHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_writer_set_compression_fn = unsafe extern "C" fn(
+    CNA_CnbWriterHandle, CNA_CnbCompression, i32,
+) -> CNA_Result;
+pub type cna_cnb_writer_set_limits_fn = unsafe extern "C" fn(
+    CNA_CnbWriterHandle, *const CNA_CnbReadLimits,
+) -> CNA_Result;
+pub type cna_cnb_writer_write_to_file_fn = unsafe extern "C" fn(
+    CNA_CnbWriterHandle, CNA_StringView,
+) -> CNA_Result;
+
+// --- RUST-EXT-015a: the CNB model schema, the asset codecs and the .cnj path
+//
+// The half of cnb.h a game reaches when it builds or reads content rather
+// than merely loading it: a model's animations, lights, morph targets and
+// skeleton; the per-asset encoders and decoders; and `.cnj`, which is the
+// shape CNA's glTF import writes and which this crate has no reader for.
+pub type cna_cnb_animation_clip_copy_keyframes_fn = unsafe extern "C" fn(
+    CNA_CnbAnimationClipHandle, u64, *mut CNA_KeyframeEXT, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_animation_clip_destroy_fn = unsafe extern "C" fn(
+    CNA_CnbAnimationClipHandle,
+) -> CNA_Result;
+pub type cna_cnb_animation_clip_get_fn = unsafe extern "C" fn(
+    CNA_CnbAnimationClipHandle, *mut f64, *mut u64, *mut CNA_ClipTargetSpaceEXT,
+) -> CNA_Result;
+pub type cna_cnb_animation_clip_get_track_fn = unsafe extern "C" fn(
+    CNA_CnbAnimationClipHandle, u64, *mut i32, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_build_model_from_cnj_fn = unsafe extern "C" fn(
+    CNA_StringView, CNA_StringView, *mut CNA_CnbModelFromCnjHandle,
+) -> CNA_Result;
+pub type cna_cnb_cnj_result_copy_absorbed_file_fn = unsafe extern "C" fn(
+    CNA_CnjToCnbResultHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_cnj_result_copy_asset_type_name_fn = unsafe extern "C" fn(
+    CNA_CnjToCnbResultHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_cnj_result_copy_bytes_fn = unsafe extern "C" fn(
+    CNA_CnjToCnbResultHandle, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_cnj_result_copy_external_reference_fn = unsafe extern "C" fn(
+    CNA_CnjToCnbResultHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_cnj_result_destroy_fn = unsafe extern "C" fn(
+    CNA_CnjToCnbResultHandle,
+) -> CNA_Result;
+pub type cna_cnb_cnj_result_get_absorbed_file_count_fn = unsafe extern "C" fn(
+    CNA_CnjToCnbResultHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_cnj_result_get_absorbed_file_size_fn = unsafe extern "C" fn(
+    CNA_CnjToCnbResultHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_cnj_result_get_asset_type_id_fn = unsafe extern "C" fn(
+    CNA_CnjToCnbResultHandle, *mut u32,
+) -> CNA_Result;
+pub type cna_cnb_cnj_result_get_asset_type_name_size_fn = unsafe extern "C" fn(
+    CNA_CnjToCnbResultHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_cnj_result_get_external_reference_count_fn = unsafe extern "C" fn(
+    CNA_CnjToCnbResultHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_cnj_result_get_external_reference_size_fn = unsafe extern "C" fn(
+    CNA_CnjToCnbResultHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_compile_cnj_fn = unsafe extern "C" fn(
+    CNA_StringView, CNA_StringView, CNA_StringView, *mut CNA_CnjToCnbResultHandle,
+) -> CNA_Result;
+pub type cna_cnb_decode_animation_clip_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut CNA_CnbAnimationClipHandle,
+) -> CNA_Result;
+pub type cna_cnb_decode_curve_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut CNA_CurveHandle,
+) -> CNA_Result;
+pub type cna_cnb_decode_dds_as_texture_cube_fn = unsafe extern "C" fn(
+    *const u8, u64, CNA_StringView, *mut CNA_CnbTextureDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_decode_song_duration_milliseconds_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut u32,
+) -> CNA_Result;
+pub type cna_cnb_decode_song_name_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_decode_song_name_size_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_decode_song_stream_reference_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_decode_song_stream_reference_size_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_decode_texture3d_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut CNA_CnbTextureDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_decode_texture_cube_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut CNA_CnbTextureDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_decode_video_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut CNA_CnbVideoInfo,
+) -> CNA_Result;
+pub type cna_cnb_decode_video_stream_reference_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_decode_video_stream_reference_size_fn = unsafe extern "C" fn(
+    CNA_CnbDocumentHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_decode_wav_as_sound_effect_fn = unsafe extern "C" fn(
+    *const u8, u64, CNA_StringView, *mut CNA_CnbSoundEffectDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_encode_animation_clip_fn = unsafe extern "C" fn(
+    *const CNA_AnimationClipEXTDescriptor, CNA_ClipTargetSpaceEXT, CNA_StringView, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_encode_curve_fn = unsafe extern "C" fn(
+    CNA_CurveHandle, CNA_StringView, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_encode_song_fn = unsafe extern "C" fn(
+    CNA_StringView, CNA_StringView, u32, CNA_StringView, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_encode_texture3d_fn = unsafe extern "C" fn(
+    CNA_CnbTextureDataHandle, CNA_StringView, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_encode_texture_cube_fn = unsafe extern "C" fn(
+    CNA_CnbTextureDataHandle, CNA_StringView, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_encode_video_fn = unsafe extern "C" fn(
+    CNA_StringView, *const CNA_CnbVideoInfo, CNA_StringView, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_import_dds_as_texture_cube_fn = unsafe extern "C" fn(
+    CNA_StringView, *mut CNA_CnbTextureDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_import_image_as_texture2d_fn = unsafe extern "C" fn(
+    CNA_StringView, *const CNA_CnbImageImportOptions, *mut CNA_CnbTextureDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_import_wav_as_sound_effect_fn = unsafe extern "C" fn(
+    CNA_StringView, *mut CNA_CnbSoundEffectDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_model_add_animation_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, CNA_StringView, *const CNA_AnimationClipEXTDescriptor, CNA_ClipTargetSpaceEXT, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_add_light_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, *const CNA_CnbModelLight, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_add_morph_target_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_add_morph_weight_key_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, f64, *const f32, u64, *const f32, u64, *const f32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_clear_morph_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64,
+) -> CNA_Result;
+pub type cna_cnb_model_clear_skeleton_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_model_copy_animation_keyframes_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, u64, *mut CNA_KeyframeEXT, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_copy_animation_name_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_copy_morph_target_deltas_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, u64, CNA_CnbMorphDeltaStream, *mut f32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_copy_morph_weight_key_values_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, u64, CNA_CnbMorphKeyStream, *mut f32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_copy_morph_weights_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut f32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_copy_part_external_effect_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_copy_skeleton_hierarchy_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, *mut i32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_copy_skeleton_matrices_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, CNA_CnbSkeletonMatrixSet, *mut f32, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_from_cnj_copy_absorbed_file_fn = unsafe extern "C" fn(
+    CNA_CnbModelFromCnjHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_from_cnj_copy_external_reference_fn = unsafe extern "C" fn(
+    CNA_CnbModelFromCnjHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_from_cnj_destroy_fn = unsafe extern "C" fn(
+    CNA_CnbModelFromCnjHandle,
+) -> CNA_Result;
+pub type cna_cnb_model_from_cnj_get_absorbed_file_count_fn = unsafe extern "C" fn(
+    CNA_CnbModelFromCnjHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_from_cnj_get_absorbed_file_size_fn = unsafe extern "C" fn(
+    CNA_CnbModelFromCnjHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_from_cnj_get_external_reference_count_fn = unsafe extern "C" fn(
+    CNA_CnbModelFromCnjHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_from_cnj_get_external_reference_size_fn = unsafe extern "C" fn(
+    CNA_CnbModelFromCnjHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_from_cnj_take_model_fn = unsafe extern "C" fn(
+    CNA_CnbModelFromCnjHandle, *mut CNA_CnbModelDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_model_get_animation_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut f64, *mut u64, *mut CNA_ClipTargetSpaceEXT,
+) -> CNA_Result;
+pub type cna_cnb_model_get_animation_name_size_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_get_animation_track_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, u64, *mut i32, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_get_light_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut CNA_CnbModelLight,
+) -> CNA_Result;
+pub type cna_cnb_model_get_material_sampler_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, u64, *mut CNA_CnbSamplerState,
+) -> CNA_Result;
+pub type cna_cnb_model_get_material_texture_coordinate_set_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, u64, *mut u8,
+) -> CNA_Result;
+pub type cna_cnb_model_get_material_texture_transform_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, u64, *mut CNA_CnbTextureTransform,
+) -> CNA_Result;
+pub type cna_cnb_model_get_morph_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut CNA_CnbMorphInfo,
+) -> CNA_Result;
+pub type cna_cnb_model_get_morph_weight_key_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, u64, *mut CNA_CnbMorphWeightKeyInfo,
+) -> CNA_Result;
+pub type cna_cnb_model_get_part_external_effect_size_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_model_get_skeleton_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, *mut CNA_CnbSkeletonInfo,
+) -> CNA_Result;
+pub type cna_cnb_model_has_morph_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_cnb_model_set_material_sampler_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, u64, *const CNA_CnbSamplerState,
+) -> CNA_Result;
+pub type cna_cnb_model_set_material_texture_coordinate_set_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, u64, u8,
+) -> CNA_Result;
+pub type cna_cnb_model_set_material_texture_transform_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, u64, *const CNA_CnbTextureTransform,
+) -> CNA_Result;
+pub type cna_cnb_model_set_morph_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *const CNA_CnbMorphInfo,
+) -> CNA_Result;
+pub type cna_cnb_model_set_morph_target_deltas_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, u64, CNA_CnbMorphDeltaStream, *const f32, u64,
+) -> CNA_Result;
+pub type cna_cnb_model_set_morph_weights_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *const f32, u64,
+) -> CNA_Result;
+pub type cna_cnb_model_set_part_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, u64, *const CNA_CnbModelPartInfo,
+) -> CNA_Result;
+pub type cna_cnb_model_set_skeleton_fn = unsafe extern "C" fn(
+    CNA_CnbModelDataHandle, *const i32, u64, *const f32, *const f32, *const f32,
+) -> CNA_Result;
+pub type cna_cnb_sprite_font_data_set_glyph_fn = unsafe extern "C" fn(
+    CNA_CnbSpriteFontDataHandle, u64, *const CNA_SpriteFontGlyph,
+) -> CNA_Result;
+pub type cna_cnb_texture_data_add_representation_fn = unsafe extern "C" fn(
+    CNA_CnbTextureDataHandle, CNA_CnbTextureFormat, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_texture_data_create_fn = unsafe extern "C" fn(
+    u32, u32, u32, u32, u32, *mut CNA_CnbTextureDataHandle,
+) -> CNA_Result;
+pub type cna_cnb_texture_data_select_representation_fn = unsafe extern "C" fn(
+    CNA_CnbTextureDataHandle, CNA_CnbTextureFormatSupportedFn, *mut c_void, *mut CNA_Bool, *mut u64,
+) -> CNA_Result;
+pub type cna_cnb_texture_data_set_level_fn = unsafe extern "C" fn(
+    CNA_CnbTextureDataHandle, u64, u64, *const u8, u64,
+) -> CNA_Result;
+
+// --- RUST-EXT-015a: the curve marshalling bridge -----------------------------
+//
+// Just enough of curve.h to hand a Rust `Curve` to CNB's codec and take one
+// back. The arithmetic stays Rust's -- `cna::value::curve` evaluates, loops
+// and computes tangents itself, and none of those routes are here. These
+// eleven exist because `cnb_decode_curve` answers a `CNA_CurveHandle` and
+// `cnb_encode_curve` wants one, and a Curve is one of CNB's eight asset
+// types: without them a Rust game cannot load a curve asset at all.
+pub type cna_curve_create_fn = unsafe extern "C" fn(*mut CNA_CurveHandle) -> CNA_Result;
+pub type cna_curve_destroy_fn = unsafe extern "C" fn(CNA_CurveHandle) -> CNA_Result;
+pub type cna_curve_get_keys_fn = unsafe extern "C" fn(
+    CNA_CurveHandle, *mut CNA_CurveKeyCollectionHandle,
+) -> CNA_Result;
+pub type cna_curve_get_pre_loop_fn = unsafe extern "C" fn(
+    CNA_CurveHandle, *mut CNA_CurveLoopType,
+) -> CNA_Result;
+pub type cna_curve_get_post_loop_fn = unsafe extern "C" fn(
+    CNA_CurveHandle, *mut CNA_CurveLoopType,
+) -> CNA_Result;
+pub type cna_curve_set_pre_loop_fn = unsafe extern "C" fn(
+    CNA_CurveHandle, CNA_CurveLoopType,
+) -> CNA_Result;
+pub type cna_curve_set_post_loop_fn = unsafe extern "C" fn(
+    CNA_CurveHandle, CNA_CurveLoopType,
+) -> CNA_Result;
+pub type cna_curve_key_collection_add_fn = unsafe extern "C" fn(
+    CNA_CurveKeyCollectionHandle, CNA_CurveKey,
+) -> CNA_Result;
+pub type cna_curve_key_collection_get_fn = unsafe extern "C" fn(
+    CNA_CurveKeyCollectionHandle, i32, *mut CNA_CurveKey,
+) -> CNA_Result;
+pub type cna_curve_key_collection_get_count_fn = unsafe extern "C" fn(
+    CNA_CurveKeyCollectionHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_curve_key_collection_destroy_fn = unsafe extern "C" fn(
+    CNA_CurveKeyCollectionHandle,
+) -> CNA_Result;
+
+// --- RUST-EXT-015c: the rest of effects.h -----------------------------------
+//
+// CNA's own `ShaderEffect` -- source in, uniforms set by name -- plus the
+// reflection constructors, the PBR texture slots, and the stock effects'
+// remaining accessors.
+pub type cna_alpha_test_effect_get_texture_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Bool, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_basic_effect_get_texture_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Bool, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_color_matrix_effect_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_color_matrix_effect_get_matrix_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_ColorMatrix4x4,
+) -> CNA_Result;
+pub type cna_color_matrix_effect_get_offset_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Vector4,
+) -> CNA_Result;
+pub type cna_color_matrix_effect_reset_fn = unsafe extern "C" fn(CNA_EffectHandle) -> CNA_Result;
+pub type cna_color_matrix_effect_set_grayscale_fn = unsafe extern "C" fn(
+    CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_color_matrix_effect_set_matrix_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_ColorMatrix4x4,
+) -> CNA_Result;
+pub type cna_color_matrix_effect_set_offset_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_Vector4,
+) -> CNA_Result;
+pub type cna_content_manager_load_effect_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_dual_texture_effect_get_texture_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, u32, *mut CNA_Bool, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_effect_copy_fragment_source_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_effect_copy_vertex_source_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_effect_get_fragment_source_byte_count_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_effect_get_graphics_device_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_effect_get_is_compiled_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_effect_get_vertex_source_byte_count_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_effect_has_renderer_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_effect_is_exact_stock_sprite_effect_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_effect_material_get_retained_parameter_texture_count_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_effect_material_retain_parameter_texture_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_EffectTextureType, CNA_Handle,
+) -> CNA_Result;
+pub type cna_effect_pass_get_index_ext_fn = unsafe extern "C" fn(
+    CNA_EffectPassHandle, *mut u32,
+) -> CNA_Result;
+pub type cna_effect_technique_get_identity_fn = unsafe extern "C" fn(
+    CNA_EffectTechniqueHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_effect_technique_get_index_ext_fn = unsafe extern "C" fn(
+    CNA_EffectTechniqueHandle, *mut u32,
+) -> CNA_Result;
+pub type cna_environment_map_effect_get_environment_map_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Bool, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_environment_map_effect_get_texture_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Bool, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_pbr_effect_get_encode_output_to_srgb_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_pbr_effect_get_specular_color_factor_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_pbr_effect_get_texture_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_PbrTextureSlot, *mut CNA_Bool, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_pbr_effect_get_texture_coordinate_set_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_PbrTextureSlot, *mut i32,
+) -> CNA_Result;
+pub type cna_pbr_effect_get_texture_is_srgb_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_PbrTextureSlot, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_pbr_effect_get_texture_transform_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_PbrTextureSlot, *mut CNA_TextureTransformEXT,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_encode_output_to_srgb_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_specular_color_factor_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_Vector3,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_texture_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_PbrTextureSlot, CNA_Handle,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_texture_coordinate_set_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_PbrTextureSlot, i32,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_texture_is_srgb_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_PbrTextureSlot, CNA_Bool,
+) -> CNA_Result;
+pub type cna_pbr_effect_set_texture_transform_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_PbrTextureSlot, *const CNA_TextureTransformEXT,
+) -> CNA_Result;
+pub type cna_shader_effect_copy_compile_error_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_shader_effect_create_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, CNA_StringView, *mut CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_shader_effect_declare_uniform_block_ext_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, i32, *const CNA_StringView, *const i32, u64,
+) -> CNA_Result;
+pub type cna_shader_effect_get_projection_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_shader_effect_get_view_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_shader_effect_get_world_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_shader_effect_has_renderer_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_shader_effect_is_valid_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_shader_effect_set_projection_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_Matrix,
+) -> CNA_Result;
+pub type cna_shader_effect_set_texture2d_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, i32, CNA_Handle,
+) -> CNA_Result;
+pub type cna_shader_effect_set_texture3d_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, i32, CNA_Handle,
+) -> CNA_Result;
+pub type cna_shader_effect_set_texture_cube_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, i32, CNA_Handle,
+) -> CNA_Result;
+pub type cna_shader_effect_set_uniform_float_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_StringView, f32,
+) -> CNA_Result;
+pub type cna_shader_effect_set_uniform_float_array_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_StringView, *const f32, u64,
+) -> CNA_Result;
+pub type cna_shader_effect_set_uniform_int32_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_StringView, i32,
+) -> CNA_Result;
+pub type cna_shader_effect_set_uniform_mat4_array_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_StringView, *const f32, i32,
+) -> CNA_Result;
+pub type cna_shader_effect_set_uniform_matrix_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_StringView, CNA_Matrix,
+) -> CNA_Result;
+pub type cna_shader_effect_set_uniform_vec3_array_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_StringView, *const f32, i32,
+) -> CNA_Result;
+pub type cna_shader_effect_set_uniform_vector2_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_StringView, CNA_Vector2,
+) -> CNA_Result;
+pub type cna_shader_effect_set_uniform_vector2_array_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_StringView, *const CNA_Vector2, u64,
+) -> CNA_Result;
+pub type cna_shader_effect_set_uniform_vector3_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_StringView, CNA_Vector3,
+) -> CNA_Result;
+pub type cna_shader_effect_set_uniform_vector4_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_StringView, CNA_Vector4,
+) -> CNA_Result;
+pub type cna_shader_effect_set_view_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_Matrix,
+) -> CNA_Result;
+pub type cna_shader_effect_set_world_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_Matrix,
+) -> CNA_Result;
+pub type cna_skinned_effect_get_texture_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Bool, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_skinned_effect_get_vertex_color_enabled_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_skinned_effect_set_vertex_color_enabled_fn = unsafe extern "C" fn(
+    CNA_EffectHandle, CNA_Bool,
+) -> CNA_Result;
+pub type cna_sprite_effect_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_EffectHandle,
+) -> CNA_Result;
+
+// --- RUST-EXT-015a: the content Tag a processor wrote --------------------
+//
+// A tagged value store, which is what makes it safely projectable: a caller
+// asks an entry's kind and CNA answers; the Rust side then picks the
+// destination type from *that* answer rather than from a caller's claim, so
+// there is no offset or size for a caller to get wrong.
+pub type cna_object_dictionary_ext_contains_key_fn = unsafe extern "C" fn(
+    CNA_ObjectDictionaryHandle, CNA_StringView, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_object_dictionary_ext_copy_array_fn = unsafe extern "C" fn(
+    CNA_ObjectDictionaryHandle, CNA_StringView, CNA_ObjectDictionaryValueKind, *mut c_void, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_object_dictionary_ext_copy_key_at_fn = unsafe extern "C" fn(
+    CNA_ObjectDictionaryHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_object_dictionary_ext_copy_runtime_type_name_fn = unsafe extern "C" fn(
+    CNA_ObjectDictionaryHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_object_dictionary_ext_copy_string_fn = unsafe extern "C" fn(
+    CNA_ObjectDictionaryHandle, CNA_StringView, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_object_dictionary_ext_copy_value_fn = unsafe extern "C" fn(
+    CNA_ObjectDictionaryHandle, CNA_StringView, CNA_ObjectDictionaryValueKind, *mut c_void, u64,
+) -> CNA_Result;
+pub type cna_object_dictionary_ext_destroy_fn = unsafe extern "C" fn(
+    CNA_ObjectDictionaryHandle,
+) -> CNA_Result;
+pub type cna_object_dictionary_ext_get_count_fn = unsafe extern "C" fn(
+    CNA_ObjectDictionaryHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_object_dictionary_ext_get_entry_fn = unsafe extern "C" fn(
+    CNA_ObjectDictionaryHandle, CNA_StringView, *mut CNA_ObjectDictionaryEntry,
+) -> CNA_Result;
+pub type cna_object_dictionary_ext_get_foreign_object_fn = unsafe extern "C" fn(
+    CNA_ObjectDictionaryHandle, CNA_StringView, *mut *mut c_void,
+) -> CNA_Result;
+pub type cna_object_dictionary_ext_get_key_size_at_fn = unsafe extern "C" fn(
+    CNA_ObjectDictionaryHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_object_dictionary_ext_get_runtime_type_name_size_fn = unsafe extern "C" fn(
+    CNA_ObjectDictionaryHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_object_dictionary_ext_get_string_size_fn = unsafe extern "C" fn(
+    CNA_ObjectDictionaryHandle, CNA_StringView, *mut u64,
+) -> CNA_Result;
+pub type cna_content_manager_load_object_dictionary_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_ObjectDictionaryHandle,
+) -> CNA_Result;
+pub type cna_model_get_content_tag_dictionary_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, *mut CNA_Bool, *mut CNA_ObjectDictionaryHandle,
+) -> CNA_Result;
+pub type cna_model_get_content_tag_foreign_object_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, *mut CNA_Bool, *mut *mut c_void,
 ) -> CNA_Result;

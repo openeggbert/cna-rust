@@ -807,27 +807,47 @@ pub enum TextureSlot {
 }
 
 impl TextureSlot {
-    /// Every slot, in the importer's own order.
+    /// Every slot, in the ABI's own order.
+    ///
+    /// This is the order `CNA_PbrMaterialEXT::texture_coordinate_sets` and
+    /// `::texture_transforms` are indexed in, and the order the
+    /// `CNA_PBR_TEXTURE_*` identities are numbered in: base colour, normal,
+    /// metallic-roughness, **emissive, occlusion**, specular, specular colour.
+    ///
+    /// Emissive before occlusion, which is not the order this enum's variants
+    /// happen to be declared in and not the order a reader expects. Getting it
+    /// the other way round silently reads and writes the wrong slot, which is
+    /// what it used to do.
     pub const ALL: [Self; TEXTURE_SLOT_COUNT] = [
         Self::BaseColor,
         Self::Normal,
         Self::MetallicRoughness,
-        Self::Occlusion,
         Self::Emissive,
+        Self::Occlusion,
         Self::Specular,
         Self::SpecularColor,
     ];
 
+    /// This slot's position in the ABI's per-slot arrays.
+    ///
+    /// The same number as the slot's `CNA_PBR_TEXTURE_*` identity, which is why
+    /// [`Self::to_native`] is this cast rather than a second table that could
+    /// drift from it.
     const fn index(self) -> usize {
         match self {
             Self::BaseColor => 0,
             Self::Normal => 1,
             Self::MetallicRoughness => 2,
-            Self::Occlusion => 3,
-            Self::Emissive => 4,
+            Self::Emissive => 3,
+            Self::Occlusion => 4,
             Self::Specular => 5,
             Self::SpecularColor => 6,
         }
+    }
+
+    /// The `CNA_PBR_TEXTURE_*` identity for this slot.
+    pub(crate) const fn to_native(self) -> sys::CNA_PbrTextureSlot {
+        self.index() as sys::CNA_PbrTextureSlot
     }
 }
 
@@ -1977,5 +1997,182 @@ impl core::fmt::Debug for GltfMaterialExtensionTextures<'_> {
                 &self.iridescence_thickness.is_some(),
             )
             .finish()
+    }
+}
+
+/// The per-slot texture state, on a live effect rather than in a material value.
+///
+/// [`PbrMaterialFull`] carries the numbers a material was authored with;
+/// these read and write what the effect is set to *now*, including the textures
+/// themselves, which a material value deliberately does not hold.
+impl PbrEffect {
+    /// Binds a texture to one slot, or clears it with `None`.
+    pub fn set_texture(&self, slot: TextureSlot, texture: Option<&Texture2D>) -> Result<()> {
+        let handle = match texture {
+            Some(texture) => texture.handle()?,
+            None => sys::CNA_INVALID_HANDLE,
+        };
+        // SAFETY: both handles belong to live values and the slot is by value.
+        self.native.check(unsafe {
+            (self.native.pbr_effect_set_texture)(self.handle, slot.to_native(), handle)
+        })
+    }
+
+    /// Whether a slot has a texture bound, and which handle it is.
+    ///
+    /// The identity rather than a [`Texture2D`]: the texture is the effect's,
+    /// not the caller's, and handing back an owning Rust value would promise a
+    /// lifetime this side does not control. It is enough to tell two slots'
+    /// textures apart and to see whether one is bound at all.
+    pub fn texture_identity(&self, slot: TextureSlot) -> Result<Option<u64>> {
+        let mut present = sys::CNA_FALSE;
+        let mut handle = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and both outputs are live locals.
+        self.native.check(unsafe {
+            (self.native.pbr_effect_get_texture)(
+                self.handle,
+                slot.to_native(),
+                &mut present,
+                &mut handle,
+            )
+        })?;
+        Ok((present != sys::CNA_FALSE).then_some(handle))
+    }
+
+    /// Which packed UV channel a slot samples.
+    pub fn texture_coordinate_set(&self, slot: TextureSlot) -> Result<i32> {
+        let mut value = 0_i32;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.pbr_effect_get_texture_coordinate_set_ext)(
+                self.handle,
+                slot.to_native(),
+                &mut value,
+            )
+        })?;
+        Ok(value)
+    }
+
+    /// Sets which packed UV channel a slot samples.
+    pub fn set_texture_coordinate_set(&self, slot: TextureSlot, value: i32) -> Result<()> {
+        // SAFETY: the handle is owned and both values are by value.
+        self.native.check(unsafe {
+            (self.native.pbr_effect_set_texture_coordinate_set_ext)(
+                self.handle,
+                slot.to_native(),
+                value,
+            )
+        })
+    }
+
+    /// Whether a slot's texture is sampled as sRGB.
+    ///
+    /// A colour texture is; a normal map or a metallic-roughness map is not,
+    /// and treating one as the other is a visible error rather than a subtle
+    /// one.
+    pub fn texture_is_srgb(&self, slot: TextureSlot) -> Result<bool> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.pbr_effect_get_texture_is_srgb_ext)(
+                self.handle,
+                slot.to_native(),
+                &mut value,
+            )
+        })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    /// Sets whether a slot's texture is sampled as sRGB.
+    pub fn set_texture_is_srgb(&self, slot: TextureSlot, value: bool) -> Result<()> {
+        // SAFETY: the handle is owned and both values are by value.
+        self.native.check(unsafe {
+            (self.native.pbr_effect_set_texture_is_srgb_ext)(
+                self.handle,
+                slot.to_native(),
+                u8::from(value),
+            )
+        })
+    }
+
+    /// One slot's `KHR_texture_transform`.
+    pub fn texture_transform(&self, slot: TextureSlot) -> Result<TextureTransform> {
+        let mut value = sys::CNA_TextureTransformEXT::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.pbr_effect_get_texture_transform_ext)(
+                self.handle,
+                slot.to_native(),
+                &mut value,
+            )
+        })?;
+        Ok(TextureTransform::from_native(value))
+    }
+
+    /// Sets one slot's `KHR_texture_transform`.
+    pub fn set_texture_transform(
+        &self,
+        slot: TextureSlot,
+        value: TextureTransform,
+    ) -> Result<()> {
+        let native_value = value.to_native();
+        // SAFETY: the handle is owned and the transform outlives the call.
+        self.native.check(unsafe {
+            (self.native.pbr_effect_set_texture_transform_ext)(
+                self.handle,
+                slot.to_native(),
+                &native_value,
+            )
+        })
+    }
+
+    /// Whether the effect encodes its output to sRGB.
+    ///
+    /// A pipeline that already writes to an sRGB render target must leave this
+    /// off, or the encode happens twice and everything washes out.
+    pub fn encode_output_to_srgb(&self) -> Result<bool> {
+        let mut value = sys::CNA_FALSE;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.pbr_effect_get_encode_output_to_srgb_ext)(self.handle, &mut value)
+        })?;
+        Ok(value != sys::CNA_FALSE)
+    }
+
+    /// Sets whether the effect encodes its output to sRGB.
+    pub fn set_encode_output_to_srgb(&self, value: bool) -> Result<()> {
+        // SAFETY: the handle is owned and the flag is by value.
+        self.native.check(unsafe {
+            (self.native.pbr_effect_set_encode_output_to_srgb_ext)(self.handle, u8::from(value))
+        })
+    }
+
+    /// The `KHR_materials_specular` colour factor.
+    pub fn specular_color_factor(&self) -> Result<Vector3> {
+        let mut value = sys::CNA_Vector3::default();
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native.check(unsafe {
+            (self.native.pbr_effect_get_specular_color_factor_ext)(self.handle, &mut value)
+        })?;
+        Ok(Vector3 {
+            X: value.x,
+            Y: value.y,
+            Z: value.z,
+        })
+    }
+
+    /// Sets the `KHR_materials_specular` colour factor.
+    pub fn set_specular_color_factor(&self, value: Vector3) -> Result<()> {
+        // SAFETY: the handle is owned and the vector is by value.
+        self.native.check(unsafe {
+            (self.native.pbr_effect_set_specular_color_factor_ext)(
+                self.handle,
+                sys::CNA_Vector3 {
+                    x: value.X,
+                    y: value.Y,
+                    z: value.Z,
+                },
+            )
+        })
     }
 }

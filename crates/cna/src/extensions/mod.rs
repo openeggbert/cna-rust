@@ -7,6 +7,7 @@
 
 pub mod content;
 pub mod devices;
+pub mod effects;
 pub mod engine;
 pub mod events;
 pub mod gamer_services;
@@ -16,11 +17,14 @@ pub mod input;
 pub mod input_devices;
 pub mod logging;
 pub mod media;
+pub mod cnb;
 pub mod models;
 pub mod native_model;
 pub mod net;
+pub mod object_dictionary;
 pub mod pbr;
 pub mod runtime;
+pub mod shader_effect;
 pub mod sensors;
 pub mod text_input;
 pub mod window;

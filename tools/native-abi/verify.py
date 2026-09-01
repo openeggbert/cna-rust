@@ -479,7 +479,12 @@ def abi_probes(cna_root: Path, manifest: dict) -> tuple[dict[str, int], dict[str
                 f"_p{position}: {parameter}"
                 for position, parameter in enumerate(value["rustParameters"])
             )
-            body = "()" if value["rustReturn"] == "()" else "CNA_RESULT_SUCCESS"
+            # The probe only needs *a* value of the return type; what it
+            # measures is that the signature coerces to the alias. `Default`
+            # covers every return this ABI uses -- `()`, `CNA_Result` and
+            # `CNA_Bool` -- where the old `CNA_RESULT_SUCCESS` fallback was a
+            # `u32` and would not compile for the `u8` one.
+            body = "Default::default()"
             rust_lines.append(
                 f"unsafe extern \"C\" fn callback_{index}({parameters}) -> {value['rustReturn']} {{ {body} }}"
             )

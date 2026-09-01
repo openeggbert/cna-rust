@@ -90,7 +90,7 @@ pub struct Keyframe {
 }
 
 impl Keyframe {
-    fn to_native(self) -> sys::CNA_KeyframeEXT {
+    pub(crate) fn to_native(self) -> sys::CNA_KeyframeEXT {
         sys::CNA_KeyframeEXT {
             time_seconds: self.time_seconds,
             translation: sys::CNA_Vector3 {
@@ -112,7 +112,7 @@ impl Keyframe {
         }
     }
 
-    const fn from_native(value: sys::CNA_KeyframeEXT) -> Self {
+    pub(crate) const fn from_native(value: sys::CNA_KeyframeEXT) -> Self {
         Self {
             time_seconds: value.time_seconds,
             translation: Vector3 {
@@ -852,14 +852,14 @@ pub struct OwnedResourceCounts {
 }
 
 /// One clip's keyframes and tracks, kept alive while CNA reads them.
-struct StagedClip {
-    descriptor: sys::CNA_AnimationClipEXTDescriptor,
+pub(crate) struct StagedClip {
+    pub(crate) descriptor: sys::CNA_AnimationClipEXTDescriptor,
     _keyframes: Vec<Vec<sys::CNA_KeyframeEXT>>,
     _tracks: Vec<sys::CNA_BoneTrackEXTDescriptor>,
 }
 
 impl StagedClip {
-    fn new(clip: &AnimationClip) -> Self {
+    pub(crate) fn new(clip: &AnimationClip) -> Self {
         let keyframes: Vec<Vec<sys::CNA_KeyframeEXT>> = clip
             .tracks
             .iter()

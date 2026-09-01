@@ -130,7 +130,7 @@ pub struct EffectTechniqueDescriptor {
     pub passes: Vec<String>,
 }
 
-struct EffectViewState {
+pub(crate) struct EffectViewState {
     owner: Arc<ResourceState>,
     handle: Mutex<sys::CNA_Handle>,
     kind: u8,
@@ -145,7 +145,7 @@ impl EffectViewState {
         })
     }
 
-    fn require_handle(&self) -> Result<sys::CNA_Handle> {
+    pub(crate) fn require_handle(&self) -> Result<sys::CNA_Handle> {
         self.owner.require_handle()?;
         let handle = *self
             .handle
@@ -412,7 +412,7 @@ impl Effect {
         Ok(())
     }
 
-    pub(super) fn from_handle(device: &GraphicsDevice, handle: sys::CNA_Handle) -> Self {
+    pub(crate) fn from_handle(device: &GraphicsDevice, handle: sys::CNA_Handle) -> Self {
         Self {
             state: ResourceState::new(device, handle, ResourceKind::Effect),
             parameters: Mutex::new(None),
@@ -677,7 +677,7 @@ impl Drop for Effect {
 
 /// XNA material Effect subtype cloned through CNA's material constructor.
 pub struct EffectMaterial {
-    effect: Effect,
+    pub(crate) effect: Effect,
 }
 
 #[allow(non_snake_case)]
@@ -1399,7 +1399,7 @@ impl IntoIterator for EffectParameterCollection {
 }
 
 pub struct EffectPass {
-    state: Arc<EffectViewState>,
+    pub(crate) state: Arc<EffectViewState>,
     name: String,
     annotations: Mutex<Option<Arc<EffectAnnotationCollection>>>,
 }
@@ -1516,7 +1516,7 @@ impl IntoIterator for EffectPassCollection {
 }
 
 pub struct EffectTechnique {
-    state: Arc<EffectViewState>,
+    pub(crate) state: Arc<EffectViewState>,
     name: String,
     annotations: Mutex<Option<Arc<EffectAnnotationCollection>>>,
     passes: Mutex<Option<Arc<EffectPassCollection>>>,

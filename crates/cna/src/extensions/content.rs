@@ -53,7 +53,7 @@ pub struct ReadLimits {
 
 impl ReadLimits {
     /// CNA's process-wide default bounds, with this value's overrides applied.
-    fn to_native(self, native: &Arc<Native>) -> Result<sys::CNA_CnbReadLimits> {
+    pub(crate) fn to_native(self, native: &Arc<Native>) -> Result<sys::CNA_CnbReadLimits> {
         let mut limits = sys::CNA_CnbReadLimits {
             struct_size: core::mem::size_of::<sys::CNA_CnbReadLimits>() as u32,
             struct_version: sys::CNA_CNB_READ_LIMITS_STRUCT_VERSION,
@@ -86,7 +86,7 @@ impl ReadLimits {
         Ok(limits)
     }
 
-    const fn is_default(self) -> bool {
+    pub(crate) const fn is_default(self) -> bool {
         self.max_file_size.is_none()
             && self.max_chunk_size.is_none()
             && self.max_total_uncompressed_size.is_none()
@@ -123,16 +123,16 @@ enum DocumentOwner {
 /// One parsed `.cnb` document.
 #[derive(Debug)]
 pub struct CnbDocument {
-    native: Arc<Native>,
-    handle: sys::CNA_CnbDocumentHandle,
+    pub(crate) native: Arc<Native>,
+    pub(crate) handle: sys::CNA_CnbDocumentHandle,
     owner: DocumentOwner,
 }
 
 /// Texture pixels decoded from, or destined for, a `.cnb` document.
 #[derive(Debug)]
 pub struct CnbTextureData {
-    native: Arc<Native>,
-    handle: sys::CNA_CnbTextureDataHandle,
+    pub(crate) native: Arc<Native>,
+    pub(crate) handle: sys::CNA_CnbTextureDataHandle,
 }
 
 /// What a texture's pixels are laid out as inside a document.
@@ -147,6 +147,16 @@ impl CnbTextureFormat {
     #[must_use]
     pub const fn value(self) -> u32 {
         self.0
+    }
+
+    /// Wraps a raw identifier read out of a document.
+    ///
+    /// Not validated here: `CnbTextureFormat::is_known` is the question, and a
+    /// caller reading a file wants to ask it explicitly rather than have a
+    /// constructor decide.
+    #[must_use]
+    pub const fn from_value(value: u32) -> Self {
+        Self(value)
     }
 
     /// Bytes per pixel, or per block for a block-compressed format.
@@ -272,14 +282,14 @@ impl AssetTypeId {
 /// A copy route asked with zero capacity reports the required byte count and
 /// returns `BUFFER_TOO_SMALL`, which is the answer rather than a failure. Only
 /// a zero-length result comes back as success, so both have to be admitted.
-fn accept_size_probe(native: &Arc<Native>, result: sys::CNA_Result) -> Result<()> {
+pub(crate) fn accept_size_probe(native: &Arc<Native>, result: sys::CNA_Result) -> Result<()> {
     if result == sys::CNA_RESULT_BUFFER_TOO_SMALL {
         return Ok(());
     }
     native.check(result)
 }
 
-fn string_view(value: &str) -> sys::CNA_StringView {
+pub(crate) fn string_view(value: &str) -> sys::CNA_StringView {
     sys::CNA_StringView {
         data: value.as_ptr().cast::<core::ffi::c_char>(),
         byte_length: value.len() as u64,
@@ -728,7 +738,7 @@ pub enum CnbEffectKind {
 }
 
 impl CnbEffectKind {
-    const fn from_native(value: sys::CNA_CnbEffectKind) -> Option<Self> {
+    pub(crate) const fn from_native(value: sys::CNA_CnbEffectKind) -> Option<Self> {
         Some(match value {
             sys::CNA_CNB_EFFECT_KIND_BASIC => Self::Basic,
             sys::CNA_CNB_EFFECT_KIND_SKINNED => Self::Skinned,
@@ -740,7 +750,7 @@ impl CnbEffectKind {
         })
     }
 
-    const fn to_native(self) -> sys::CNA_CnbEffectKind {
+    pub(crate) const fn to_native(self) -> sys::CNA_CnbEffectKind {
         match self {
             Self::Basic => sys::CNA_CNB_EFFECT_KIND_BASIC,
             Self::Skinned => sys::CNA_CNB_EFFECT_KIND_SKINNED,
@@ -772,7 +782,7 @@ pub enum CnbMaterialTexture {
 }
 
 impl CnbMaterialTexture {
-    const fn to_native(self) -> sys::CNA_CnbMaterialTextureSlot {
+    pub(crate) const fn to_native(self) -> sys::CNA_CnbMaterialTextureSlot {
         match self {
             Self::BaseColor => sys::CNA_CNB_MATERIAL_TEXTURE_BASE_COLOR,
             Self::Second => sys::CNA_CNB_MATERIAL_TEXTURE_SECOND,
@@ -887,8 +897,8 @@ pub struct CnbMeshInfo {
 /// declared, so they live here instead.
 #[derive(Debug)]
 pub struct CnbModel {
-    native: Arc<Native>,
-    handle: sys::CNA_CnbModelDataHandle,
+    pub(crate) native: Arc<Native>,
+    pub(crate) handle: sys::CNA_CnbModelDataHandle,
 }
 
 impl CnbModel {
@@ -1341,7 +1351,7 @@ impl Drop for CnbModel {
 }
 
 impl CnbModelPart {
-    fn to_native(self) -> sys::CNA_CnbModelPartInfo {
+    pub(crate) fn to_native(self) -> sys::CNA_CnbModelPartInfo {
         sys::CNA_CnbModelPartInfo {
             struct_size: core::mem::size_of::<sys::CNA_CnbModelPartInfo>() as u32,
             struct_version: sys::CNA_CNB_MODEL_PART_INFO_STRUCT_VERSION,
@@ -1409,8 +1419,8 @@ const fn decode_parent(value: i32) -> Option<u64> {
 /// registered name before dispatching a loader.
 #[derive(Debug)]
 pub struct CnbWriter {
-    native: Arc<Native>,
-    handle: sys::CNA_CnbWriterHandle,
+    pub(crate) native: Arc<Native>,
+    pub(crate) handle: sys::CNA_CnbWriterHandle,
 }
 
 impl CnbWriter {
@@ -1944,8 +1954,8 @@ pub struct CnbSpriteFontInfo {
 /// A compiled sprite font: metrics, glyphs and an atlas.
 #[derive(Debug)]
 pub struct CnbSpriteFont {
-    native: Arc<Native>,
-    handle: sys::CNA_CnbSpriteFontDataHandle,
+    pub(crate) native: Arc<Native>,
+    pub(crate) handle: sys::CNA_CnbSpriteFontDataHandle,
 }
 
 impl CnbSpriteFont {
@@ -2073,7 +2083,7 @@ impl Drop for CnbSpriteFont {
 }
 
 impl CnbGlyph {
-    fn to_native(self) -> sys::CNA_SpriteFontGlyph {
+    pub(crate) fn to_native(self) -> sys::CNA_SpriteFontGlyph {
         sys::CNA_SpriteFontGlyph {
             struct_size: core::mem::size_of::<sys::CNA_SpriteFontGlyph>() as u32,
             struct_version: 1,
@@ -2149,7 +2159,7 @@ impl CnbAudioFormat {
         })
     }
 
-    const fn to_native(self) -> sys::CNA_CnbAudioFormat {
+    pub(crate) const fn to_native(self) -> sys::CNA_CnbAudioFormat {
         match self {
             Self::Unknown => sys::CNA_CNB_AUDIO_FORMAT_UNKNOWN,
             Self::Pcm16 => sys::CNA_CNB_AUDIO_FORMAT_PCM16,
@@ -2179,8 +2189,8 @@ pub struct CnbSoundEffectInfo {
 /// A compiled sound effect: its shape and its samples.
 #[derive(Debug)]
 pub struct CnbSoundEffect {
-    native: Arc<Native>,
-    handle: sys::CNA_CnbSoundEffectDataHandle,
+    pub(crate) native: Arc<Native>,
+    pub(crate) handle: sys::CNA_CnbSoundEffectDataHandle,
 }
 
 impl CnbSoundEffect {

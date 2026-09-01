@@ -404,7 +404,7 @@ impl TextureRuntime for TextureCube {
 }
 
 impl TextureCube {
-    pub(super) fn handle(&self) -> Result<sys::CNA_Handle> {
+    pub(crate) fn handle(&self) -> Result<sys::CNA_Handle> {
         self.state.require_handle()
     }
 }

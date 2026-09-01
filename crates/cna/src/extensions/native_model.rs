@@ -50,6 +50,7 @@ use cna_sys as sys;
 use crate::error::{CnaError, Result};
 use crate::extensions::content::NativeContentManager;
 use crate::extensions::models::{ModelAnimations, SkinningData};
+use crate::extensions::object_dictionary::ObjectDictionary;
 use crate::native::Native;
 use crate::value::{BoundingSphere, Matrix, Vector3};
 
@@ -1691,5 +1692,58 @@ fn value_matrix(value: sys::CNA_Matrix) -> Matrix {
         M21: value.m21, M22: value.m22, M23: value.m23, M24: value.m24,
         M31: value.m31, M32: value.m32, M33: value.m33, M34: value.m34,
         M41: value.m41, M42: value.m42, M43: value.m43, M44: value.m44,
+    }
+}
+
+/// The `Tag` the content pipeline wrote, beside the C-owned one.
+impl NativeModel {
+    /// The model's content `Tag`, as a dictionary.
+    ///
+    /// `None` when the model carries no tag *or* carries one of another shape,
+    /// which upstream is explicit is not an error: an unset `Tag` is `null` in
+    /// XNA and absent here.
+    ///
+    /// The dictionary **outlives the model**: it keeps the loaded asset's data
+    /// alive on its own, so releasing the model first is safe and does not
+    /// invalidate it. That is why it comes back owned rather than borrowed.
+    pub fn content_tag(&self) -> Result<Option<ObjectDictionary>> {
+        let handle = self.get()?;
+        let mut has_tag = 0_u8;
+        let mut dictionary = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the handle is owned and both outputs are live locals.
+        self.native.check(unsafe {
+            (self.native.models.model_get_content_tag_dictionary_ext)(
+                handle,
+                &mut has_tag,
+                &mut dictionary,
+            )
+        })?;
+        Ok((has_tag != 0).then(|| ObjectDictionary::from_owned_handle(&self.native, dictionary)))
+    }
+
+    /// The model's content `Tag`, as an object a caller's own reflective reader
+    /// made.
+    ///
+    /// The other half of a caller-registered reflective type: `ModelReader`'s
+    /// tag path takes a reference and refuses a value, so a type registered the
+    /// value-shaped way fails the load rather than arriving in the wrong form.
+    ///
+    /// The pointer is the caller's own -- CNA never dereferences, copies or
+    /// frees it -- and stays valid as long as the caller keeps it so. `None`
+    /// when the model has no tag or carries one of another shape.
+    pub fn content_tag_foreign_object(&self) -> Result<Option<*mut core::ffi::c_void>> {
+        let handle = self.get()?;
+        let mut has_tag = 0_u8;
+        let mut object = core::ptr::null_mut();
+        // SAFETY: the handle is owned and both outputs are live locals. The
+        // pointer is not dereferenced here.
+        self.native.check(unsafe {
+            (self.native.models.model_get_content_tag_foreign_object_ext)(
+                handle,
+                &mut has_tag,
+                &mut object,
+            )
+        })?;
+        Ok((has_tag != 0).then_some(object))
     }
 }

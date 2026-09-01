@@ -386,17 +386,6 @@
   "binding": {
     "rules": [
       {
-        "id": "model-content-tag-needs-the-dictionary",
-        "status": "DEFERRED_TRACKED",
-        "names": [
-          "cna_model_get_content_tag_dictionary_ext",
-          "cna_model_get_content_tag_foreign_object_ext"
-        ],
-        "task": "RUST-EXT-015a",
-        "reason": "both answer a CNA_ObjectDictionaryHandle or a foreign object made by a caller's own reflective reader, and neither the ObjectDictionary projection nor the reflective type-reader builder exists in Rust yet. Both belong to the content slice, so these two go with it rather than dragging fifteen content_readers.h routes into the models slice to reach them.",
-        "evidence": "content_readers.h's cna_object_dictionary_* and cna_reflective_type_reader_* families, all still unbound"
-      },
-      {
         "id": "camera-destroy-segv",
         "status": "BLOCKED_UPSTREAM",
         "names": [
@@ -497,8 +486,46 @@
           "packed_vectors.h",
           "vertex_values.h"
         ],
-        "reason": "these are pure value arithmetic, and cna::value implements each operation in Rust: Matrix::Invert, CreateLookAt and Decompose, Vector3::Normalize, Quaternion::Slerp, BoundingBox::Intersects, BoundingFrustum::Contains and Color::FromNonPremultiplied are Rust functions over Rust values. Binding the C route would put a second implementation of the same arithmetic behind a native call that can fail, and the two could disagree.",
+        "reason": "these are pure value arithmetic, and cna::value implements each operation in Rust: Matrix::Invert, CreateLookAt and Decompose, Vector3::Normalize, Quaternion::Slerp, BoundingBox::Intersects, BoundingFrustum::Contains and Color::FromNonPremultiplied are Rust functions over Rust values. Binding the C route would put a second implementation of the same arithmetic behind a native call that can fail, and the two could disagree. Eleven curve routes are the exception and are bound: cnb_decode_curve answers a CNA_CurveHandle and cnb_encode_curve wants one, and a Curve is one of CNB's eight asset types, so without a way to build and read a native curve a Rust game could not load a curve asset at all. They are used for marshalling only -- create, destroy, the two loop modes, and the key collection -- and nothing that evaluates or computes tangents is bound, so the arithmetic is still Rust's.",
         "evidence": "crates/cna/src/value/, and crates/cna/src/value/tests.rs which measures the Rust arithmetic against XNA's documented results"
+      },
+      {
+        "id": "effect-reflection-built-in-place",
+        "status": "DELIBERATE_NON_BINDING",
+        "names": [
+          "cna_effect_annotation_collection_create",
+          "cna_effect_parameter_collection_create",
+          "cna_effect_parameter_create",
+          "cna_effect_pass_collection_create",
+          "cna_effect_pass_create",
+          "cna_effect_pass_create_indexed_ext",
+          "cna_effect_technique_collection_create",
+          "cna_effect_technique_collection_add_default",
+          "cna_effect_technique_create_default",
+          "cna_effect_technique_create_named",
+          "cna_effect_technique_create_reflected_ext"
+        ],
+        "reason": "each of these makes a detached technique, pass, parameter or collection that a second call then adds somewhere. CNA also offers the combined form -- cna_effect_pass_collection_add_create, cna_effect_parameter_collection_add_create, cna_effect_technique_collection_add_named, cna_effect_annotation_collection_add -- and that is what this crate's Effect uses, because it cannot leave a half-built object stranded between the two calls. A detached technique that is never added has no use and no owner; binding the split form would add a way to leak one.",
+        "rustEvidence": [
+          "effect_pass_collection_add_create",
+          "effect_parameter_collection_add_create",
+          "effect_technique_collection_add_named"
+        ],
+        "evidence": "crates/cna/src/graphics/effect.rs, whose apply_reflection_blueprint builds the whole graph through the add-create routes"
+      },
+      {
+        "id": "reflective-reader-writes-at-caller-offsets",
+        "status": "DELIBERATE_NON_BINDING",
+        "names": [
+          "cna_reflective_type_reader_builder_*",
+          "cna_reflective_type_reader_*",
+          "cna_enum_type_reader_*"
+        ],
+        "reason": "the reflective builder declares a field as a value kind and a byte offset -- 'where to store it in the object' -- and CNA then writes that many bytes into a pointer the caller's create callback returned. Nothing checks that the offset is inside the object or that the kind matches the field's type, so a caller who pairs offset_of!(T, an_i32) with the Matrix kind gets sixty-four bytes written over a four-byte field, from safe Rust. A wrapper cannot check either half. The capability is not lost: cna_content_type_reader_manager_register is the other extension point for a caller's own type, and it reads fields through a borrowed ContentReader rather than writing at offsets, which is the shape this crate already binds safely for .cnb loaders.",
+        "rustEvidence": [
+          "pub trait CnbLoader"
+        ],
+        "evidence": "content_readers.h's own wording for cna_reflective_type_reader_builder_add_field; crates/cna/src/extensions/content.rs, whose CnbLoader is the same extension point in the safe shape"
       },
       {
         "id": "dotnet-value-identity",
@@ -539,9 +566,10 @@
         "status": "DELIBERATE_NON_BINDING",
         "names": [
           "*_copy_type_name",
-          "*_get_type_name_size"
+          "*_get_type_name_size",
+          "*_get_type_name_byte_count"
         ],
-        "reason": "these answer .NET's GetType().Name, and upstream's implementations are all compile-time constants -- every GetTypeName() in cnanext returns a fixed string such as 'Microsoft.Xna.Framework.Input.KeyboardState'. A Rust caller knows the type statically at every call site, so there is no reflection question to ask, and the .NET name of a Rust value is not a fact about that value. The one place these strings genuinely matter is the content format, where the reader name is part of the .xnb, and the crate already carries them as data in AssetTypeId rather than fetching them one object at a time.",
+        "reason": "these answer .NET's GetType().Name, and upstream's implementations are all compile-time constants -- every GetTypeName() in cnanext returns a fixed string such as 'Microsoft.Xna.Framework.Input.KeyboardState'. A Rust caller knows the type statically at every call site, so there is no reflection question to ask, and the .NET name of a Rust value is not a fact about that value. The one place these strings genuinely matter is the content format, where the reader name is part of the .xnb, and the crate already carries them as data in AssetTypeId rather than fetching them one object at a time. Both spellings of the size half are covered: some families call it `_get_type_name_size` and some `_get_type_name_byte_count`, and binding one because the wildcard happened to miss the other is how an accessor with no caller gets into the crate.",
         "rustEvidence": [
           "pub struct AssetTypeId",
           "Microsoft.Xna.Framework.Content."
