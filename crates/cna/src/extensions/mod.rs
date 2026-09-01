@@ -39,4 +39,5 @@ pub mod shader_effect;
 pub mod sensors;
 pub mod storage_ext;
 pub mod text_input;
+pub mod touch;
 pub mod window;

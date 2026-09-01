@@ -144,10 +144,12 @@ pub mod Microsoft {
 
                 #[allow(non_snake_case)]
                 pub mod Touch {
+                    // `TouchPanelTestBackend` is deliberately absent: it is
+                    // CNA's substitute panel and lives in
+                    // `cna::extensions::touch`.
                     pub use crate::input::{
                         GestureSample, GestureType, TouchCollection, TouchCollectionEnumerator,
                         TouchLocation, TouchLocationState, TouchPanel, TouchPanelCapabilities,
-                        TouchPanelTestBackend,
                     };
                 }
             }

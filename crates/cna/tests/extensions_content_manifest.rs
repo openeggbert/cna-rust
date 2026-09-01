@@ -14,11 +14,12 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use cna::extensions::content::{AssetTypeId, CnbWriter, NativeContentManager};
+use cna::extensions::touch::TouchPanelTestBackend;
 use cna::Microsoft::Xna::Framework::Graphics::{
     GraphicsDevice, GraphicsProfile, PresentationParameters,
 };
 use cna::Microsoft::Xna::Framework::Input::Touch::{
-    TouchLocationState, TouchPanel, TouchPanelTestBackend,
+    TouchLocationState, TouchPanel,
 };
 use cna::Microsoft::Xna::Framework::{
     Game, GameContext, GraphicsDeviceInformation, Vector2,
