@@ -857,11 +857,63 @@ impl OcclusionQueryExt for crate::graphics::OcclusionQuery {
 /// The read-only view of what CNA is about to create a device with, and the
 /// subscription that delivers it.
 ///
-/// `GraphicsDeviceManager::ObserveDeviceSettings` returns the subscription and
-/// hands the view to a callback. Both are CNA's own -- XNA has
+/// [`GraphicsDeviceManagerExt::ObserveDeviceSettings`] returns the subscription
+/// and hands the view to a callback. Both are CNA's own -- XNA has
 /// `PreparingDeviceSettings`, which can *change* the settings, and nothing
 /// read-only beside it -- so they are named here rather than inside
 /// `cna::Microsoft::Xna::Framework`, where until now they had no name at all:
 /// the method was public and its return type was not exported, so nothing
 /// outside this crate could hold what it answered.
-pub use crate::game::{DeviceSettingsObserver, ObservedDeviceSettings};
+///
+/// [`PresentationMode`] had the same defect and is fixed the same way.
+/// `GraphicsDeviceManagerExt::PreferredPresentationMode` answers one, the enum
+/// was `pub` in a private module and re-exported nowhere, and a consumer could
+/// call the method and not name what came back.
+pub use crate::game::{DeviceSettingsObserver, ObservedDeviceSettings, PresentationMode};
+
+/// The `runtime_graphics_manager.h` routes with no XNA counterpart.
+///
+/// `PreferredPresentationMode` is the one that adds a capability rather than a
+/// reading: XNA scales the back buffer to the window one way and gives a game
+/// no say. CNA has five, and letterboxing versus stretching is a decision a
+/// game with a fixed-aspect design has to be able to make.
+///
+/// `ObserveDeviceSettings` is the read-only pair to XNA's
+/// `PreparingDeviceSettings`, which the strict projection carries: that one
+/// hands a handler a mutable configuration, this one a `*const`. Its return
+/// types, [`DeviceSettingsObserver`] and [`ObservedDeviceSettings`], are named
+/// in this module for the same reason the method now is.
+///
+/// A CNA extension: import it to call these.
+///
+/// ```rust,ignore
+/// use cna::extensions::graphics_device_ext::GraphicsDeviceManagerExt;
+/// let observer = manager.ObserveDeviceSettings(|settings| { /* ... */ })?;
+/// ```
+pub trait GraphicsDeviceManagerExt {
+    /// The device CNA currently has for this manager, if any.
+    ///
+    /// `GraphicsDevice()` answers the Rust value, which exists from the moment
+    /// the manager creates one. This asks CNA, and answers `None` before the
+    /// device is created and after it is lost -- the two states in which the
+    /// Rust value is present and the native one is not.
+    fn HasNativeGraphicsDevice(&self) -> Result<bool>;
+
+    /// How the back buffer is fitted to the window.
+    fn PreferredPresentationMode(&self) -> Result<PresentationMode>;
+
+    /// Sets how the back buffer is fitted to the window.
+    fn SetPreferredPresentationMode(&self, value: PresentationMode) -> Result<()>;
+
+    /// Watches the candidate device settings without being able to change them.
+    ///
+    /// The read-only pair to `PreparingDeviceSettings`, which hands a handler a
+    /// mutable configuration so it can edit what the device is created with.
+    /// This one is handed a `*const` and cannot, which is what makes it the
+    /// right subscription for logging or asserting what was chosen: an observer
+    /// that *could* write is an observer a reader has to check for writes.
+    fn ObserveDeviceSettings(
+        &self,
+        callback: impl FnMut(ObservedDeviceSettings) + Send + 'static,
+    ) -> Result<DeviceSettingsObserver>;
+}
