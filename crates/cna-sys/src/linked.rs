@@ -2249,6 +2249,63 @@ extern "C" {
         argument2: *const CNA_AudioListener,
         argument3: *const CNA_AudioEmitter,
     ) -> CNA_Result;
+    pub fn cna_camera_copy_name_at_ext(
+        argument0: CNA_Handle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_camera_create(argument0: CNA_Handle, argument1: *mut CNA_CameraHandle) -> CNA_Result;
+    pub fn cna_camera_create_with_test_backend_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_CameraHandle,
+    ) -> CNA_Result;
+    pub fn cna_camera_destroy(argument0: CNA_CameraHandle) -> CNA_Result;
+    pub fn cna_camera_device_info_init(argument0: *mut CNA_CameraDeviceInfo) -> CNA_Result;
+    pub fn cna_camera_get_count_ext(argument0: CNA_Handle, argument1: *mut u64) -> CNA_Result;
+    pub fn cna_camera_get_frame_height_ext(
+        argument0: CNA_CameraHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_camera_get_frame_width_ext(
+        argument0: CNA_CameraHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_camera_get_info_at_ext(
+        argument0: CNA_Handle,
+        argument1: u64,
+        argument2: *mut CNA_CameraDeviceInfo,
+    ) -> CNA_Result;
+    pub fn cna_camera_get_is_supported_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_camera_get_name_size_at_ext(
+        argument0: CNA_Handle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_camera_get_state_ext(
+        argument0: CNA_CameraHandle,
+        argument1: *mut CNA_CameraState,
+    ) -> CNA_Result;
+    pub fn cna_camera_set_test_frame_ext(
+        argument0: CNA_CameraHandle,
+        argument1: i32,
+        argument2: i32,
+        argument3: *const CNA_Color,
+        argument4: u64,
+    ) -> CNA_Result;
+    pub fn cna_camera_set_test_state_ext(
+        argument0: CNA_CameraHandle,
+        argument1: CNA_CameraState,
+    ) -> CNA_Result;
+    pub fn cna_camera_try_acquire_frame_ext(
+        argument0: CNA_CameraHandle,
+        argument1: CNA_Handle,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
     pub fn cna_cue_destroy(argument0: CNA_Handle) -> CNA_Result;
     pub fn cna_cue_get_info(argument0: CNA_Handle, argument1: *mut CNA_CueInfo) -> CNA_Result;
     pub fn cna_cue_get_name_size(argument0: CNA_Handle, argument1: *mut u64) -> CNA_Result;

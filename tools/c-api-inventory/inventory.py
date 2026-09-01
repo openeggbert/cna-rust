@@ -153,6 +153,29 @@ def header_inventory(header_root: Path) -> dict:
     }
 
 
+def safe_layer_call_sites() -> set[str]:
+    """Every native table field the safe Rust layer actually calls.
+
+    ``BOUND`` means the route is declared in ``cna-sys``.  That is not the same
+    as a caller being able to reach it: a route can be declared, resolved at
+    load, and still have no safe API in front of it.  The fields are named after
+    the route minus its ``cna_`` prefix, so scanning the safe layer for those
+    identifiers says which bound routes a user can actually call.
+    """
+    used: set[str] = set()
+    root = ROOT / "crates/cna/src"
+    for path in root.rglob("*.rs"):
+        # native/ is where the tables are declared and filled; a mention there
+        # is the declaration, not a call site.
+        if "native" in path.relative_to(root).parts[:1]:
+            continue
+        # Whole identifiers, not just `table.field`: most of the safe layer
+        # reaches its routes through macros that take the field name as a bare
+        # token, so `engine.foo` never appears literally for those.
+        used |= set(re.findall(r"\b([a-z][a-z0-9_]{3,})\b", path.read_text(encoding="utf-8")))
+    return used
+
+
 def rust_sys_inventory() -> dict:
     """Collects every identity the reviewed cna-sys slice declares."""
     source = CNA_SYS.read_text(encoding="utf-8")
@@ -296,6 +319,18 @@ def main() -> int:
 
     routes = classify(headers["functions"], rust["functions"], rules)
     binding = classify_binding(headers["functions"], rust["functions"], rules)
+
+    # Bound but with no safe call site.  Each one needs a stated reason, or the
+    # binding is dead weight nobody can use.
+    reachable = safe_layer_call_sites()
+    justified = rules.get("bindingUnreachable", {})
+    unreachable = sorted(
+        name
+        for name in headers["functions"]
+        if binding[name]["status"] == "BOUND"
+        and name[len("cna_"):] not in reachable
+        and name not in justified
+    )
     if args.list:
         wanted = args.list
         for name, value in routes.items():
@@ -368,6 +403,16 @@ def main() -> int:
         "declaredButNotInHeaders": declared_not_in_headers,
         "unusedRules": unused_rules,
         "staleOverrides": stale_overrides,
+        # Reported, not gated. A bound route with no safe call site is not
+        # automatically wrong -- the ABI slice deliberately declares the whole
+        # of a family so a library missing one fails at load rather than at
+        # first use, and read-only projections legitimately leave the C
+        # mutators uncalled. Turning this into a gate before those families
+        # have family-level justifications would only teach people to bypass
+        # it. RUST-CENSUS-002 owns working the list down.
+        "boundWithoutSafeCallSite": len(unreachable),
+        "boundWithoutSafeCallSiteSample": unreachable[:20],
+        "boundWithoutSafeCallSiteJustified": len(justified),
         "unmapped": sorted(
             name
             for name, value in routes.items()

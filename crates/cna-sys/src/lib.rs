@@ -822,6 +822,26 @@ pub type CNA_AnimationPlayerHandle = CNA_Handle;
 pub type CNA_MorphTargetDataEXTHandle = CNA_Handle;
 pub type CNA_ModelAnimationsEXTHandle = CNA_Handle;
 pub type CNA_PbrTextureSlot = u32;
+pub type CNA_CameraHandle = CNA_Handle;
+pub type CNA_CameraState = u32;
+pub type CNA_CameraPosition = u32;
+
+pub const CNA_CAMERA_STATE_NOT_SUPPORTED: CNA_CameraState = 0;
+pub const CNA_CAMERA_STATE_CLOSED: CNA_CameraState = 1;
+pub const CNA_CAMERA_STATE_OPENING: CNA_CameraState = 2;
+pub const CNA_CAMERA_STATE_DENIED: CNA_CameraState = 3;
+pub const CNA_CAMERA_STATE_READY: CNA_CameraState = 4;
+pub const CNA_CAMERA_POSITION_UNKNOWN: CNA_CameraPosition = 0;
+pub const CNA_CAMERA_POSITION_FRONT_FACING: CNA_CameraPosition = 1;
+pub const CNA_CAMERA_POSITION_BACK_FACING: CNA_CameraPosition = 2;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CNA_CameraDeviceInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub position: CNA_CameraPosition,
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -10997,4 +11017,45 @@ pub type cna_model_mesh_part_set_sampler_state_ext_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_matrix_create_infinite_perspective_field_of_view_ext_fn = unsafe extern "C" fn(
     f32, f32, f32, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_camera_copy_name_at_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_camera_create_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_CameraHandle,
+) -> CNA_Result;
+pub type cna_camera_create_with_test_backend_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_CameraHandle,
+) -> CNA_Result;
+pub type cna_camera_destroy_fn = unsafe extern "C" fn(CNA_CameraHandle) -> CNA_Result;
+pub type cna_camera_device_info_init_fn = unsafe extern "C" fn(
+    *mut CNA_CameraDeviceInfo,
+) -> CNA_Result;
+pub type cna_camera_get_count_ext_fn = unsafe extern "C" fn(CNA_Handle, *mut u64) -> CNA_Result;
+pub type cna_camera_get_frame_height_ext_fn = unsafe extern "C" fn(
+    CNA_CameraHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_camera_get_frame_width_ext_fn = unsafe extern "C" fn(
+    CNA_CameraHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_camera_get_info_at_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, *mut CNA_CameraDeviceInfo,
+) -> CNA_Result;
+pub type cna_camera_get_is_supported_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_camera_get_name_size_at_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_camera_get_state_ext_fn = unsafe extern "C" fn(
+    CNA_CameraHandle, *mut CNA_CameraState,
+) -> CNA_Result;
+pub type cna_camera_set_test_frame_ext_fn = unsafe extern "C" fn(
+    CNA_CameraHandle, i32, i32, *const CNA_Color, u64,
+) -> CNA_Result;
+pub type cna_camera_set_test_state_ext_fn = unsafe extern "C" fn(
+    CNA_CameraHandle, CNA_CameraState,
+) -> CNA_Result;
+pub type cna_camera_try_acquire_frame_ext_fn = unsafe extern "C" fn(
+    CNA_CameraHandle, CNA_Handle, *mut CNA_Bool,
 ) -> CNA_Result;

@@ -728,6 +728,34 @@ pub(crate) struct EngineApi {
     pub(crate) model_animations_ext_set_clip_target_space_at: sys::cna_model_animations_ext_set_clip_target_space_at_fn,
     pub(crate) model_mesh_part_get_sampler_state_ext: sys::cna_model_mesh_part_get_sampler_state_ext_fn,
     pub(crate) model_mesh_part_set_sampler_state_ext: sys::cna_model_mesh_part_set_sampler_state_ext_fn,
+    #[allow(dead_code)]
+    pub(crate) camera_copy_name_at_ext: sys::cna_camera_copy_name_at_ext_fn,
+    /// The camera family is resolved in full but mostly unwrapped:
+    /// `RUST-UPSTREAM-020` makes its teardown fault, so only the routes the
+    /// reproducer drives have a safe API. The slots are still filled, because
+    /// a library missing one should fail at load rather than at first use.
+    #[allow(dead_code)]
+    pub(crate) camera_create: sys::cna_camera_create_fn,
+    pub(crate) camera_create_with_test_backend_ext: sys::cna_camera_create_with_test_backend_ext_fn,
+    pub(crate) camera_destroy: sys::cna_camera_destroy_fn,
+    #[allow(dead_code)]
+    pub(crate) camera_device_info_init: sys::cna_camera_device_info_init_fn,
+    pub(crate) camera_get_count_ext: sys::cna_camera_get_count_ext_fn,
+    #[allow(dead_code)]
+    pub(crate) camera_get_frame_height_ext: sys::cna_camera_get_frame_height_ext_fn,
+    #[allow(dead_code)]
+    pub(crate) camera_get_frame_width_ext: sys::cna_camera_get_frame_width_ext_fn,
+    #[allow(dead_code)]
+    pub(crate) camera_get_info_at_ext: sys::cna_camera_get_info_at_ext_fn,
+    pub(crate) camera_get_is_supported_ext: sys::cna_camera_get_is_supported_ext_fn,
+    #[allow(dead_code)]
+    pub(crate) camera_get_name_size_at_ext: sys::cna_camera_get_name_size_at_ext_fn,
+    pub(crate) camera_get_state_ext: sys::cna_camera_get_state_ext_fn,
+    #[allow(dead_code)]
+    pub(crate) camera_set_test_frame_ext: sys::cna_camera_set_test_frame_ext_fn,
+    pub(crate) camera_set_test_state_ext: sys::cna_camera_set_test_state_ext_fn,
+    #[allow(dead_code)]
+    pub(crate) camera_try_acquire_frame_ext: sys::cna_camera_try_acquire_frame_ext_fn,
     pub(crate) model_mesh_part_create: sys::cna_model_mesh_part_create_fn,
     pub(crate) model_mesh_part_destroy: sys::cna_model_mesh_part_destroy_fn,
     pub(crate) model_mesh_part_get_num_vertices: sys::cna_model_mesh_part_get_num_vertices_fn,
@@ -1690,6 +1718,21 @@ impl EngineApi {
             model_animations_ext_set_clip_target_space_at: symbol!(cna_model_animations_ext_set_clip_target_space_at, _),
             model_mesh_part_get_sampler_state_ext: symbol!(cna_model_mesh_part_get_sampler_state_ext, _),
             model_mesh_part_set_sampler_state_ext: symbol!(cna_model_mesh_part_set_sampler_state_ext, _),
+            camera_copy_name_at_ext: symbol!(cna_camera_copy_name_at_ext, _),
+            camera_create: symbol!(cna_camera_create, _),
+            camera_create_with_test_backend_ext: symbol!(cna_camera_create_with_test_backend_ext, _),
+            camera_destroy: symbol!(cna_camera_destroy, _),
+            camera_device_info_init: symbol!(cna_camera_device_info_init, _),
+            camera_get_count_ext: symbol!(cna_camera_get_count_ext, _),
+            camera_get_frame_height_ext: symbol!(cna_camera_get_frame_height_ext, _),
+            camera_get_frame_width_ext: symbol!(cna_camera_get_frame_width_ext, _),
+            camera_get_info_at_ext: symbol!(cna_camera_get_info_at_ext, _),
+            camera_get_is_supported_ext: symbol!(cna_camera_get_is_supported_ext, _),
+            camera_get_name_size_at_ext: symbol!(cna_camera_get_name_size_at_ext, _),
+            camera_get_state_ext: symbol!(cna_camera_get_state_ext, _),
+            camera_set_test_frame_ext: symbol!(cna_camera_set_test_frame_ext, _),
+            camera_set_test_state_ext: symbol!(cna_camera_set_test_state_ext, _),
+            camera_try_acquire_frame_ext: symbol!(cna_camera_try_acquire_frame_ext, _),
             model_mesh_part_create: symbol!(cna_model_mesh_part_create, _),
             model_mesh_part_destroy: symbol!(cna_model_mesh_part_destroy, _),
             model_mesh_part_get_num_vertices: symbol!(cna_model_mesh_part_get_num_vertices, _),

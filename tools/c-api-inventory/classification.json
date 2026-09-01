@@ -383,6 +383,16 @@
         ],
         "reason": "these are pure value arithmetic, and cna::value implements each operation in Rust: Matrix::Invert, CreateLookAt and Decompose, Vector3::Normalize, Quaternion::Slerp, BoundingBox::Intersects, BoundingFrustum::Contains and Color::FromNonPremultiplied are Rust functions over Rust values. Binding the C route would put a second implementation of the same arithmetic behind a native call that can fail, and the two could disagree.",
         "evidence": "crates/cna/src/value/, and crates/cna/src/value/tests.rs which measures the Rust arithmetic against XNA's documented results"
+      },
+      {
+        "id": "camera-destroy-segv",
+        "status": "BLOCKED_UPSTREAM",
+        "names": [
+          "cna_camera_*"
+        ],
+        "task": "RUST-UPSTREAM-020",
+        "reason": "cna_camera_create_with_test_backend_ext points CNA's global platform override at memory the camera handle owns, and cna_camera_destroy frees it without clearing the override, so any later camera query reads freed memory. Measured as SIGSEGV (wait status 139) from Rust; the baseline sequence without that query exits 0. Building a projection on a lifecycle that faults would mean hiding it.",
+        "evidence": "docs/upstream-findings.md#rust-upstream-020, crates/cna/tests/upstream_camera_destroy.rs"
       }
     ],
     "overrides": {}

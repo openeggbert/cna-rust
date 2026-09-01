@@ -208,3 +208,165 @@ pub fn set_clipboard_text(game: &GameContext<'_>, text: &str) -> Result<()> {
     // SAFETY: `view` borrows `text` for the duration of the call.
     native.check(unsafe { (native.runtime.clipboard_set_text)(handle, view) })
 }
+
+/// What a camera is currently doing.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum CameraState {
+    /// The platform reports no camera support at all.
+    #[default]
+    NotSupported,
+    /// Present, not opened.
+    Closed,
+    /// Opening.
+    Opening,
+    /// The user or the platform refused access.
+    Denied,
+    /// Open and delivering frames.
+    Ready,
+    /// It was ready and the platform took it away.
+    Lost,
+}
+
+impl CameraState {
+    const fn from_native(value: sys::CNA_CameraState) -> Self {
+        match value {
+            sys::CNA_CAMERA_STATE_CLOSED => Self::Closed,
+            sys::CNA_CAMERA_STATE_OPENING => Self::Opening,
+            sys::CNA_CAMERA_STATE_DENIED => Self::Denied,
+            sys::CNA_CAMERA_STATE_READY => Self::Ready,
+            5 => Self::Lost,
+            _ => Self::NotSupported,
+        }
+    }
+
+    const fn to_native(self) -> sys::CNA_CameraState {
+        match self {
+            Self::NotSupported => sys::CNA_CAMERA_STATE_NOT_SUPPORTED,
+            Self::Closed => sys::CNA_CAMERA_STATE_CLOSED,
+            Self::Opening => sys::CNA_CAMERA_STATE_OPENING,
+            Self::Denied => sys::CNA_CAMERA_STATE_DENIED,
+            Self::Ready => sys::CNA_CAMERA_STATE_READY,
+            Self::Lost => 5,
+        }
+    }
+}
+
+/// One camera the platform reports.
+///
+/// # This family is blocked upstream
+///
+/// `RUST-UPSTREAM-020`. `cna_camera_create_with_test_backend_ext` hands CNA's
+/// **global** platform override a raw pointer into the camera resource, and
+/// `cna_camera_destroy` frees that resource without clearing the override. Any
+/// later call that consults the platform camera list reads freed memory.
+///
+/// The type is therefore deliberately small: it exists so
+/// `tests/upstream_camera_destroy.rs` can drive the sequence and keep measuring
+/// whether the defect is still there. It is **not** a projection anybody should
+/// build on yet, and the safe API does not pretend the lifecycle is sound --
+/// wrapping a crashing teardown in a friendly `Result` would hide it.
+pub struct Camera {
+    native: std::sync::Arc<crate::native::Native>,
+    handle: std::sync::Mutex<sys::CNA_CameraHandle>,
+}
+
+impl Camera {
+    /// How many cameras the platform reports.
+    ///
+    /// After any camera has been destroyed this reads through the dangling
+    /// override described on [`Camera`]. That is the reproducer's payload.
+    pub fn count(game: &GameContext<'_>) -> Result<u64> {
+        let (native, handle) = game.native_game();
+        let mut value = 0_u64;
+        // SAFETY: the game handle is callback-live and the output is a live
+        // local.
+        native.check(unsafe { (native.engine.camera_get_count_ext)(handle, &mut value) })?;
+        Ok(value)
+    }
+
+    /// Whether the platform supports cameras at all.
+    pub fn is_supported(game: &GameContext<'_>) -> Result<bool> {
+        let (native, handle) = game.native_game();
+        let mut value = 0_u8;
+        // SAFETY: the game handle is callback-live and the output is a live
+        // local.
+        native
+            .check(unsafe { (native.engine.camera_get_is_supported_ext)(handle, &mut value) })?;
+        Ok(value != 0)
+    }
+
+    /// Opens CNA's deterministic test camera.
+    pub fn with_test_backend(game: &GameContext<'_>) -> Result<Self> {
+        let (native, handle) = game.native_game();
+        let mut camera = sys::CNA_INVALID_HANDLE;
+        // SAFETY: the game handle is callback-live and the output is a live
+        // local.
+        native.check(unsafe {
+            (native.engine.camera_create_with_test_backend_ext)(handle, &mut camera)
+        })?;
+        Ok(Self {
+            native: std::sync::Arc::clone(native),
+            handle: std::sync::Mutex::new(camera),
+        })
+    }
+
+    fn get(&self) -> Result<sys::CNA_CameraHandle> {
+        let handle = *self
+            .handle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if handle == sys::CNA_INVALID_HANDLE {
+            return Err(crate::error::CnaError::InvalidInput(
+                "the camera has been released",
+            ));
+        }
+        Ok(handle)
+    }
+
+    /// What the camera is doing.
+    pub fn state(&self) -> Result<CameraState> {
+        let handle = self.get()?;
+        let mut value = 0;
+        // SAFETY: the handle is owned and the output is a live local.
+        self.native
+            .check(unsafe { (self.native.engine.camera_get_state_ext)(handle, &mut value) })?;
+        Ok(CameraState::from_native(value))
+    }
+
+    /// Drives the test backend's state.
+    pub fn set_test_state(&self, state: CameraState) -> Result<()> {
+        let handle = self.get()?;
+        // SAFETY: the handle is owned and the identity is canonical.
+        self.native.check(unsafe {
+            (self.native.engine.camera_set_test_state_ext)(handle, state.to_native())
+        })
+    }
+
+    /// Releases the camera.
+    ///
+    /// This is the call that leaves CNA's platform override pointing at freed
+    /// memory; see [`Camera`].
+    pub fn release(&self) -> Result<()> {
+        let mut guard = self
+            .handle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let handle = *guard;
+        if handle == sys::CNA_INVALID_HANDLE {
+            return Ok(());
+        }
+        // SAFETY: the handle was published by this object's own create route
+        // and is released exactly once, here.
+        self.native
+            .check(unsafe { (self.native.engine.camera_destroy)(handle) })?;
+        *guard = sys::CNA_INVALID_HANDLE;
+        Ok(())
+    }
+}
+
+impl Drop for Camera {
+    fn drop(&mut self) {
+        let _ = self.release();
+    }
+}
