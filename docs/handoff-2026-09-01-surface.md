@@ -308,7 +308,8 @@ beyond being the runtime the artifacts link.
 | `cargo doc --workspace --no-deps` | PASS, no warnings |
 | strict verifier, selected profile | PASS: 0 diagnostics, 0 allowlist |
 | strict verifier, complete runtime profile | PASS: 0 diagnostics, 0 allowlist |
-| strict verifier on the `--all-features` rustdoc | PASS: 0 diagnostics |
+| strict verifier on the `--all-features` rustdoc, both profiles | PASS: 0 diagnostics |
+| extension-surface gate on the `--all-features` rustdoc | PASS: 0 diagnostics |
 | leak verifier | PASS: 0 / 0 / 0 |
 | extension-surface gate | PASS: 283 members, 59 traits, 0 diagnostics |
 | C API inventory + census gate | PASS: 4,055 canonical, 0 unmapped, 0 unreviewed, 0 actionable |
