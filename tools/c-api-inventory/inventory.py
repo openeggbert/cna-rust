@@ -240,12 +240,46 @@ def classify_binding(functions: dict[str, dict], bound: set[str], rules: dict) -
     ``BOUND`` is measured.  Everything else has to be stated in
     classification.json with a reason, and a task when the reason is a block or
     a deferral, so no route can quietly sit in limbo.
+
+    A declared *block* outranks the measurement, because the two answer
+    different questions.  A blocked family is often declared in ``cna-sys``
+    anyway -- so its reproducer can drive it, and so the ABI gate keeps checking
+    its prototypes -- and counting those declarations as BOUND would put routes
+    nobody can use on the same line of the scoreboard as routes that work.  The
+    declaration is still recorded, in ``declaredInCnaSys``, so a reader can see
+    that the symbols are there.
     """
     binding = rules.get("binding", {"rules": [], "overrides": {}})
+    outranks_measurement = {
+        "BLOCKED_UPSTREAM", "BLOCKED_RENDERER", "BLOCKED_PLATFORM",
+        "BLOCKED_HARDWARE", "BLOCKED_ASSET",
+    }
+
+    def stated(name: str, header: str) -> dict | None:
+        override = binding.get("overrides", {}).get(name)
+        if override is not None:
+            return dict(override, rule="override")
+        for index, rule in enumerate(binding.get("rules", [])):
+            if matches(rule, name, header):
+                return dict(rule, rule=rule.get("id", f"binding[{index}]"))
+        return None
+
     result = {}
     for name, info in sorted(functions.items()):
         header = info["header"]
         if name in bound:
+            blocked = stated(name, header)
+            if blocked is not None and blocked["status"] in outranks_measurement:
+                result[name] = {
+                    "status": blocked["status"],
+                    "reason": blocked["reason"],
+                    "evidence": blocked.get("evidence", ""),
+                    "task": blocked.get("task"),
+                    "rule": blocked["rule"],
+                    "declaredInCnaSys": True,
+                    "header": header,
+                }
+                continue
             result[name] = {
                 "status": "BOUND",
                 "reason": "declared in the reviewed cna-sys slice",
@@ -360,6 +394,24 @@ def main() -> int:
         if name not in headers["functions"] or name in rust["functions"]
     )
 
+    # A defect that does not change a route's status still has to name real
+    # routes, or a finding can quietly stop pointing at anything.
+    known_defects = []
+    stale_defect_names = []
+    for defect in rules.get("knownDefects", []):
+        named = defect.get("names", [])
+        missing = [name for name in named if name not in headers["functions"]]
+        stale_defect_names.extend(missing)
+        known_defects.append({
+            "id": defect["id"],
+            "routes": len(named),
+            "summary": defect["summary"],
+            "evidence": defect.get("evidence", ""),
+            "statuses": sorted({
+                binding[name]["status"] for name in named if name in binding
+            }),
+        })
+
     report = {
         "schemaVersion": 1,
         "canonicalFunctions": len(headers["functions"]),
@@ -410,6 +462,7 @@ def main() -> int:
         # mutators uncalled. Turning this into a gate before those families
         # have family-level justifications would only teach people to bypass
         # it. RUST-CENSUS-002 owns working the list down.
+        "knownDefects": known_defects,
         "boundWithoutSafeCallSite": len(unreachable),
         "boundWithoutSafeCallSiteSample": unreachable[:20],
         "boundWithoutSafeCallSiteJustified": len(justified),
@@ -424,6 +477,8 @@ def main() -> int:
         Path(args.output).write_text(text, encoding="utf-8")
     print(text, end="")
     failures = (
+        len(stale_defect_names)
+        + 
         counts["UNMAPPED_REQUIRES_REVIEW"]
         + len(declared_not_in_headers)
         + len(unused_rules)

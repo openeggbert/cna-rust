@@ -781,6 +781,102 @@ pub type CNA_DebugDrawHandle = CNA_Handle;
 pub type CNA_FrustumCullerEXTHandle = CNA_Handle;
 pub type CNA_LodGroupEXTHandle = CNA_Handle;
 pub type CNA_ModelMeshPartHandle = CNA_Handle;
+pub type CNA_ModelHandle = CNA_Handle;
+pub type CNA_ModelBoneHandle = CNA_Handle;
+pub type CNA_ModelBoneCollectionHandle = CNA_Handle;
+pub type CNA_ModelMeshHandle = CNA_Handle;
+pub type CNA_ModelMeshCollectionHandle = CNA_Handle;
+pub type CNA_ModelMeshPartCollectionHandle = CNA_Handle;
+pub type CNA_ModelEffectCollectionHandle = CNA_Handle;
+
+
+pub type CNA_GltfImportDiagnosticSeverityEXT = u32;
+
+pub const CNA_GLTF_IMPORT_SEVERITY_INFORMATION_EXT: CNA_GltfImportDiagnosticSeverityEXT = 0;
+pub const CNA_GLTF_IMPORT_SEVERITY_WARNING_EXT: CNA_GltfImportDiagnosticSeverityEXT = 1;
+
+pub type CNA_GltfImportDiagnosticKindEXT = u32;
+
+pub const CNA_GLTF_IMPORT_KIND_INFORMATION_EXT: CNA_GltfImportDiagnosticKindEXT = 0;
+pub const CNA_GLTF_IMPORT_KIND_GENERATED_DATA_EXT: CNA_GltfImportDiagnosticKindEXT = 1;
+pub const CNA_GLTF_IMPORT_KIND_INVALID_SOURCE_DATA_EXT: CNA_GltfImportDiagnosticKindEXT = 2;
+pub const CNA_GLTF_IMPORT_KIND_APPROXIMATION_EXT: CNA_GltfImportDiagnosticKindEXT = 3;
+pub const CNA_GLTF_IMPORT_KIND_DROPPED_DATA_EXT: CNA_GltfImportDiagnosticKindEXT = 4;
+pub const CNA_GLTF_IMPORT_KIND_UNSUPPORTED_FEATURE_EXT: CNA_GltfImportDiagnosticKindEXT = 5;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_GltfImportReportEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub node_count: u64,
+    pub mesh_instance_count: u64,
+    pub distinct_mesh_count: u64,
+    pub shared_mesh_count: u64,
+    pub max_node_depth: u64,
+    pub camera_node_count: u64,
+    pub light_node_count: u64,
+    pub imported_light_count: u64,
+    pub primitive_count: u64,
+    pub skin_count: u64,
+    pub animation_count: u64,
+    pub clip_count: u64,
+    pub diagnostic_count: u64,
+    pub warning_count: u64,
+    pub dropped_feature_count: u64,
+    pub approximation_count: u64,
+    pub anything_lost: CNA_Bool,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_GltfImportDiagnosticEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub severity: CNA_GltfImportDiagnosticSeverityEXT,
+    pub kind: CNA_GltfImportDiagnosticKindEXT,
+    pub count: u64,
+    pub worst_magnitude: f64,
+    pub detail_count: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_GltfImportDiagnosticDescriptorEXT {
+    pub code: CNA_StringView,
+    pub severity: CNA_GltfImportDiagnosticSeverityEXT,
+    pub kind: CNA_GltfImportDiagnosticKindEXT,
+    pub subject: CNA_StringView,
+    pub count: u64,
+    pub worst_magnitude: f64,
+    pub details: *const CNA_StringView,
+    pub detail_count: u64,
+    pub message: CNA_StringView,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_ModelCameraEXT {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub scene_node_index: i32,
+    pub is_perspective: CNA_Bool,
+    pub has_infinite_far_plane: CNA_Bool,
+    pub has_authored_aspect_ratio: CNA_Bool,
+    pub projection: CNA_Matrix,
+    pub world_transform: CNA_Matrix,
+    pub aspect_ratio: f32,
+    pub field_of_view: f32,
+    pub near_plane_distance: f32,
+    pub far_plane_distance: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_ModelCameraDescriptorEXT {
+    pub name: CNA_StringView,
+    pub camera: CNA_ModelCameraEXT,
+}
 pub type CNA_LodSelectionMode = u32;
 
 pub const CNA_LOD_SELECTION_MODE_DISTANCE: CNA_LodSelectionMode = 0;
@@ -11058,4 +11154,241 @@ pub type cna_camera_set_test_state_ext_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_camera_try_acquire_frame_ext_fn = unsafe extern "C" fn(
     CNA_CameraHandle, CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+
+// --- RUST-EXT-015g: the Model object graph an XNA game loads and draws ------
+//
+// Every navigation route below hands back an *owned* handle, including the
+// ones the header calls views: `cna_model_get_bones` answers a fresh
+// collection handle on each call, and a bone view taken from it keeps
+// answering -- name and all -- after `cna_model_destroy`. Measured with
+// tools/reproducers/ext015g_model_ownership.c, which is why the safe layer's
+// `ModelBone`/`ModelMesh`/`ModelMeshPart` carry no lifetime parameter.
+pub type cna_content_manager_load_model_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_ModelHandle,
+) -> CNA_Result;
+pub type cna_model_add_camera_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, *const CNA_ModelCameraDescriptorEXT,
+) -> CNA_Result;
+pub type cna_model_add_gltf_import_diagnostic_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, *const CNA_GltfImportDiagnosticDescriptorEXT,
+) -> CNA_Result;
+pub type cna_model_add_skin_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, CNA_StringView, CNA_SkinningDataHandle, *const u64, u64,
+) -> CNA_Result;
+pub type cna_model_apply_bind_pose_bone_transforms_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, CNA_SkinningDataHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_model_apply_clip_to_bones_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, CNA_ModelAnimationsEXTHandle, u64, f64,
+) -> CNA_Result;
+pub type cna_model_bone_collection_contains_fn = unsafe extern "C" fn(
+    CNA_ModelBoneCollectionHandle, CNA_ModelBoneHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_model_bone_collection_destroy_fn = unsafe extern "C" fn(
+    CNA_ModelBoneCollectionHandle,
+) -> CNA_Result;
+pub type cna_model_bone_collection_find_fn = unsafe extern "C" fn(
+    CNA_ModelBoneCollectionHandle, CNA_StringView, *mut CNA_Bool, *mut CNA_ModelBoneHandle,
+) -> CNA_Result;
+pub type cna_model_bone_collection_get_at_fn = unsafe extern "C" fn(
+    CNA_ModelBoneCollectionHandle, u64, *mut CNA_ModelBoneHandle,
+) -> CNA_Result;
+pub type cna_model_bone_collection_get_count_fn = unsafe extern "C" fn(
+    CNA_ModelBoneCollectionHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_model_bone_copy_name_fn = unsafe extern "C" fn(
+    CNA_ModelBoneHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_bone_destroy_fn = unsafe extern "C" fn(CNA_ModelBoneHandle) -> CNA_Result;
+pub type cna_model_bone_get_children_fn = unsafe extern "C" fn(
+    CNA_ModelBoneHandle, *mut CNA_ModelBoneCollectionHandle,
+) -> CNA_Result;
+pub type cna_model_bone_get_index_fn = unsafe extern "C" fn(
+    CNA_ModelBoneHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_model_bone_get_name_byte_count_fn = unsafe extern "C" fn(
+    CNA_ModelBoneHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_model_bone_get_parent_fn = unsafe extern "C" fn(
+    CNA_ModelBoneHandle, *mut CNA_Bool, *mut CNA_ModelBoneHandle,
+) -> CNA_Result;
+pub type cna_model_bone_get_transform_fn = unsafe extern "C" fn(
+    CNA_ModelBoneHandle, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_model_bone_set_transform_fn = unsafe extern "C" fn(
+    CNA_ModelBoneHandle, CNA_Matrix,
+) -> CNA_Result;
+pub type cna_model_clear_cameras_ext_fn = unsafe extern "C" fn(CNA_ModelHandle) -> CNA_Result;
+pub type cna_model_clear_skins_ext_fn = unsafe extern "C" fn(CNA_ModelHandle) -> CNA_Result;
+pub type cna_model_copy_absolute_bone_transforms_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, *mut CNA_Matrix, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_copy_bone_transforms_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, *mut CNA_Matrix, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_copy_camera_name_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_copy_gltf_import_diagnostic_code_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_copy_gltf_import_diagnostic_detail_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_copy_gltf_import_diagnostic_message_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_copy_gltf_import_diagnostic_subject_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_copy_material_variant_name_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_copy_skin_name_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_create_skin_skeleton_handle_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, *mut CNA_SkinningDataHandle,
+) -> CNA_Result;
+pub type cna_model_destroy_fn = unsafe extern "C" fn(CNA_ModelHandle) -> CNA_Result;
+pub type cna_model_draw_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, CNA_Matrix, CNA_Matrix, CNA_Matrix,
+) -> CNA_Result;
+pub type cna_model_effect_collection_contains_fn = unsafe extern "C" fn(
+    CNA_ModelEffectCollectionHandle, CNA_EffectHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_model_effect_collection_destroy_fn = unsafe extern "C" fn(
+    CNA_ModelEffectCollectionHandle,
+) -> CNA_Result;
+pub type cna_model_effect_collection_get_at_fn = unsafe extern "C" fn(
+    CNA_ModelEffectCollectionHandle, u64, *mut CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_model_effect_collection_get_count_fn = unsafe extern "C" fn(
+    CNA_ModelEffectCollectionHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_model_get_bones_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, *mut CNA_ModelBoneCollectionHandle,
+) -> CNA_Result;
+pub type cna_model_get_bone_transform_count_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_model_get_bounding_sphere_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, *mut CNA_Bool, *mut CNA_BoundingSphere,
+) -> CNA_Result;
+pub type cna_model_get_camera_count_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_model_get_camera_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, *mut CNA_ModelCameraEXT,
+) -> CNA_Result;
+pub type cna_model_get_camera_name_byte_count_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_get_gltf_import_diagnostic_code_byte_count_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_get_gltf_import_diagnostic_detail_byte_count_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_get_gltf_import_diagnostic_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, *mut CNA_GltfImportDiagnosticEXT,
+) -> CNA_Result;
+pub type cna_model_get_gltf_import_diagnostic_message_byte_count_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_get_gltf_import_diagnostic_subject_byte_count_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_get_gltf_import_report_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, *mut CNA_GltfImportReportEXT,
+) -> CNA_Result;
+pub type cna_model_get_material_variant_count_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_model_get_material_variant_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_model_get_material_variant_name_byte_count_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_get_meshes_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, *mut CNA_ModelMeshCollectionHandle,
+) -> CNA_Result;
+pub type cna_model_get_root_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, *mut CNA_Bool, *mut CNA_ModelBoneHandle,
+) -> CNA_Result;
+pub type cna_model_get_skin_count_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_model_get_skin_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, *mut CNA_Bool, *mut u64,
+) -> CNA_Result;
+pub type cna_model_get_skin_mesh_index_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_get_skin_name_byte_count_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_mesh_collection_contains_fn = unsafe extern "C" fn(
+    CNA_ModelMeshCollectionHandle, CNA_ModelMeshHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_model_mesh_collection_destroy_fn = unsafe extern "C" fn(
+    CNA_ModelMeshCollectionHandle,
+) -> CNA_Result;
+pub type cna_model_mesh_collection_find_fn = unsafe extern "C" fn(
+    CNA_ModelMeshCollectionHandle, CNA_StringView, *mut CNA_Bool, *mut CNA_ModelMeshHandle,
+) -> CNA_Result;
+pub type cna_model_mesh_collection_get_at_fn = unsafe extern "C" fn(
+    CNA_ModelMeshCollectionHandle, u64, *mut CNA_ModelMeshHandle,
+) -> CNA_Result;
+pub type cna_model_mesh_collection_get_count_fn = unsafe extern "C" fn(
+    CNA_ModelMeshCollectionHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_model_mesh_copy_name_fn = unsafe extern "C" fn(
+    CNA_ModelMeshHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_model_mesh_destroy_fn = unsafe extern "C" fn(CNA_ModelMeshHandle) -> CNA_Result;
+pub type cna_model_mesh_draw_fn = unsafe extern "C" fn(CNA_ModelMeshHandle) -> CNA_Result;
+pub type cna_model_mesh_get_bounding_sphere_fn = unsafe extern "C" fn(
+    CNA_ModelMeshHandle, *mut CNA_BoundingSphere,
+) -> CNA_Result;
+pub type cna_model_mesh_get_effects_fn = unsafe extern "C" fn(
+    CNA_ModelMeshHandle, *mut CNA_ModelEffectCollectionHandle,
+) -> CNA_Result;
+pub type cna_model_mesh_get_mesh_parts_fn = unsafe extern "C" fn(
+    CNA_ModelMeshHandle, *mut CNA_ModelMeshPartCollectionHandle,
+) -> CNA_Result;
+pub type cna_model_mesh_get_name_byte_count_fn = unsafe extern "C" fn(
+    CNA_ModelMeshHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_model_mesh_get_parent_bone_fn = unsafe extern "C" fn(
+    CNA_ModelMeshHandle, *mut CNA_Bool, *mut CNA_ModelBoneHandle,
+) -> CNA_Result;
+pub type cna_model_mesh_part_collection_destroy_fn = unsafe extern "C" fn(
+    CNA_ModelMeshPartCollectionHandle,
+) -> CNA_Result;
+pub type cna_model_mesh_part_collection_get_at_fn = unsafe extern "C" fn(
+    CNA_ModelMeshPartCollectionHandle, u64, *mut CNA_ModelMeshPartHandle,
+) -> CNA_Result;
+pub type cna_model_mesh_part_collection_get_count_fn = unsafe extern "C" fn(
+    CNA_ModelMeshPartCollectionHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_model_mesh_part_get_effect_fn = unsafe extern "C" fn(
+    CNA_ModelMeshPartHandle, *mut CNA_Bool, *mut CNA_EffectHandle,
+) -> CNA_Result;
+pub type cna_model_mesh_part_get_index_buffer_fn = unsafe extern "C" fn(
+    CNA_ModelMeshPartHandle, *mut CNA_Bool, *mut CNA_IndexBufferHandle,
+) -> CNA_Result;
+pub type cna_model_mesh_part_get_vertex_buffer_fn = unsafe extern "C" fn(
+    CNA_ModelMeshPartHandle, *mut CNA_Bool, *mut CNA_VertexBufferHandle,
+) -> CNA_Result;
+pub type cna_model_set_bone_transforms_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, *const CNA_Matrix, u64,
+) -> CNA_Result;
+pub type cna_model_set_gltf_import_report_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, *const CNA_GltfImportReportEXT,
+) -> CNA_Result;
+pub type cna_model_set_material_variant_ext_fn = unsafe extern "C" fn(
+    CNA_ModelHandle, i32,
 ) -> CNA_Result;

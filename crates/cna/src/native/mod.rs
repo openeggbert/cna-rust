@@ -15,6 +15,7 @@ mod graphics;
 mod input;
 mod loader;
 pub(crate) mod media;
+pub(crate) mod models;
 pub(crate) mod net;
 pub(crate) mod runtime;
 mod storage;

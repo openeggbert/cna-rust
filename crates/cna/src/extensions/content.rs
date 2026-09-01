@@ -1530,6 +1530,15 @@ impl NativeContentManager {
     }
 }
 
+impl NativeContentManager {
+    /// The manager handle, for routes projected in another module.
+    ///
+    /// Borrowed for the duration of one call; the manager owns it.
+    pub(crate) const fn handle(&self) -> sys::CNA_Handle {
+        self.handle
+    }
+}
+
 impl Drop for NativeContentManager {
     fn drop(&mut self) {
         // SAFETY: the handle is owned by this value and released exactly once.

@@ -365,6 +365,20 @@
     }
   },
   "bindingDocumentation": "Two questions, two axes. `category` answers why a canonical route exists and which part of the projection it belongs to. `binding` answers whether Rust binds it and, when it does not, why not -- with evidence, and with a durable task when the reason is temporary. A purpose is never an answer to the binding question: 'this backs XNA' says nothing about whether the Rust projection reaches it. BOUND is measured from the reviewed cna-sys slice and is never declared here; every other status must be stated, and every statement must carry a reason and evidence a reader can check.",
+  "knownDefects": [
+    {
+      "id": "RUST-UPSTREAM-021",
+      "names": ["cna_content_manager_load_model"],
+      "summary": "a content-loaded Model's teardown faults: ~MeshResource moves an empty detachedValue over a loaded part's value, and ~PartResource dereferences it. Every route answers correctly; only teardown is affected, and leaking the handle moves the fault to process exit rather than avoiding it. The routes stay BOUND because they work -- this records the defect against them so the scoreboard is not the only thing a reader sees.",
+      "evidence": "docs/upstream-findings.md#rust-upstream-021, crates/cna/tests/upstream_model_destroy.rs"
+    },
+    {
+      "id": "RUST-UPSTREAM-022",
+      "names": ["cna_model_create_skin_skeleton_handle_ext"],
+      "summary": "refuses a skin the content pipeline imported -- 'The Model skin's skeleton was not created through the C API' -- which is not the refusal the header documents. The route is bound and works for a skin added through cna_model_add_skin_ext.",
+      "evidence": "docs/upstream-findings.md#rust-upstream-022, crates/cna/tests/extensions_native_model.rs"
+    }
+  ],
   "binding": {
     "rules": [
       {
@@ -383,6 +397,63 @@
         ],
         "reason": "these are pure value arithmetic, and cna::value implements each operation in Rust: Matrix::Invert, CreateLookAt and Decompose, Vector3::Normalize, Quaternion::Slerp, BoundingBox::Intersects, BoundingFrustum::Contains and Color::FromNonPremultiplied are Rust functions over Rust values. Binding the C route would put a second implementation of the same arithmetic behind a native call that can fail, and the two could disagree.",
         "evidence": "crates/cna/src/value/, and crates/cna/src/value/tests.rs which measures the Rust arithmetic against XNA's documented results"
+      },
+      {
+        "id": "xna-model-is-a-rust-type",
+        "status": "DELIBERATE_NON_BINDING",
+        "names": [
+          "cna_model_create",
+          "cna_model_create_default",
+          "cna_model_create_with_parents",
+          "cna_model_bone_create",
+          "cna_model_bone_create_default",
+          "cna_model_bone_add_child",
+          "cna_model_bone_collection_create",
+          "cna_model_mesh_create",
+          "cna_model_mesh_create_named",
+          "cna_model_mesh_collection_create",
+          "cna_model_mesh_set_bounding_sphere",
+          "cna_model_mesh_set_parent_bone",
+          "cna_model_mesh_part_create_default",
+          "cna_model_mesh_part_collection_create",
+          "cna_model_mesh_part_set_effect",
+          "cna_model_mesh_part_set_index_buffer",
+          "cna_model_mesh_part_set_vertex_buffer",
+          "cna_model_mesh_part_set_num_vertices",
+          "cna_model_mesh_part_set_primitive_count",
+          "cna_model_mesh_part_set_start_index",
+          "cna_model_mesh_part_set_vertex_offset",
+          "cna_model_effect_collection_add",
+          "cna_model_effect_collection_remove",
+          "cna_model_set_owned_resources"
+        ],
+        "reason": "these build a native Model by hand, and crates/cna/src/graphics/model.rs already is the XNA Model in Rust: Model, ModelBone, ModelMesh, ModelMeshPart, their collections and enumerators, CopyAbsoluteBoneTransformsTo and Draw, built by this crate's own .xnb ModelReader and disposed through ContentDisposable. Binding these would put a second, weaker Model in the crate -- one whose parts are opaque handles rather than typed Rust values -- for callers who already have the real one. The read side of the same header is bound, because a model CNA loaded carries glTF facts the Rust reader cannot produce.",
+        "evidence": "crates/cna/src/graphics/model.rs, crates/cna/src/content/reader.rs (model_reader), crates/cna/tests/content_xnb.rs"
+      },
+      {
+        "id": "model-c-owned-tag",
+        "status": "DELIBERATE_NON_BINDING",
+        "names": [
+          "cna_model_get_tag",
+          "cna_model_set_tag",
+          "cna_model_mesh_get_tag",
+          "cna_model_mesh_set_tag",
+          "cna_model_mesh_part_get_tag",
+          "cna_model_mesh_part_set_tag"
+        ],
+        "reason": "this tag is an opaque 64-bit slot for a C caller's own pointer -- upstream calls it 'the C-owned opaque model tag' and never reads it. A Rust caller attaches data by keeping it in their own type, which is typed, borrow-checked and cannot outlive what it describes. The tag an asset actually carries is a different route, cna_model_get_content_tag_dictionary_ext, and that one is tracked rather than refused.",
+        "evidence": "models.h's own contrast between cna_model_get_tag and cna_model_get_content_tag_dictionary_ext: 'That one is a C-owned opaque value a caller sets and reads back; this one is what a custom ContentProcessor wrote into the .xnb'"
+      },
+      {
+        "id": "model-content-tag-needs-the-dictionary",
+        "status": "DEFERRED_TRACKED",
+        "names": [
+          "cna_model_get_content_tag_dictionary_ext",
+          "cna_model_get_content_tag_foreign_object_ext"
+        ],
+        "task": "RUST-EXT-015a",
+        "reason": "both answer a CNA_ObjectDictionaryHandle or a foreign object made by a caller's own reflective reader, and neither the ObjectDictionary projection nor the reflective type-reader builder exists in Rust yet. Both belong to the content slice, so these two go with it rather than dragging fifteen content_readers.h routes into the models slice to reach them.",
+        "evidence": "content_readers.h's cna_object_dictionary_* and cna_reflective_type_reader_* families, all still unbound"
       },
       {
         "id": "camera-destroy-segv",

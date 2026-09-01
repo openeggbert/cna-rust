@@ -14,6 +14,7 @@ use super::engine::EngineApi;
 use super::gamer_services::GamerServicesApi;
 use super::net::NetApi;
 use super::media::MediaApi;
+use super::models::ModelsApi;
 use super::runtime::RuntimeApi;
 
 #[derive(Debug)]
@@ -23,6 +24,7 @@ pub(crate) struct Native {
     pub(crate) media: MediaApi,
     pub(crate) runtime: RuntimeApi,
     pub(crate) engine: EngineApi,
+    pub(crate) models: ModelsApi,
     pub(crate) gamer_services: GamerServicesApi,
     /// Resolved with the library so a CNA build missing any Net route fails at
     /// load. The safe `Microsoft.Xna.Framework.Net` projection is the next
@@ -669,6 +671,7 @@ impl Native {
         Ok(Self {
             runtime: RuntimeApi::load(&source)?,
             engine: EngineApi::load(&source)?,
+            models: ModelsApi::load(&source)?,
             gamer_services: GamerServicesApi::load(&source)?,
             net: NetApi::load(&source)?,
             error_get_last_info: symbol!(cna_error_get_last_info,

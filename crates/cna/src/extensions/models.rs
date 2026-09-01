@@ -1058,6 +1058,26 @@ impl SkinningData {
         })
     }
 
+    /// Wraps a handle CNA freshly created for this side to own.
+    ///
+    /// Used by `native_model`, whose skin-skeleton route answers a *new* handle
+    /// rather than the one that was added -- the model keeps its own reference,
+    /// so releasing this one never releases the model's.
+    pub(crate) fn from_owned_handle(
+        native: &Arc<Native>,
+        handle: sys::CNA_SkinningDataHandle,
+    ) -> Self {
+        Self {
+            handle: Mutex::new(handle),
+            native: Arc::clone(native),
+        }
+    }
+
+    /// The live handle, for routes projected in another module.
+    pub(crate) fn handle(&self) -> Result<sys::CNA_SkinningDataHandle> {
+        self.get()
+    }
+
     fn get(&self) -> Result<sys::CNA_SkinningDataHandle> {
         let handle = *self
             .handle
@@ -2345,6 +2365,11 @@ impl ModelAnimations {
             handle: Mutex::new(handle),
             native,
         })
+    }
+
+    /// The live handle, for routes projected in another module.
+    pub(crate) fn handle(&self) -> Result<sys::CNA_ModelAnimationsEXTHandle> {
+        self.get()
     }
 
     fn get(&self) -> Result<sys::CNA_ModelAnimationsEXTHandle> {

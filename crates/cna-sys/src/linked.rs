@@ -10403,4 +10403,375 @@ extern "C" {
         argument0: CNA_LodGroupEXTHandle,
         argument1: CNA_LodSelectionMode,
     ) -> CNA_Result;
+    pub fn cna_content_manager_load_model(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_ModelHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_add_camera_ext(
+        argument0: CNA_ModelHandle,
+        argument1: *const CNA_ModelCameraDescriptorEXT,
+    ) -> CNA_Result;
+    pub fn cna_model_add_gltf_import_diagnostic_ext(
+        argument0: CNA_ModelHandle,
+        argument1: *const CNA_GltfImportDiagnosticDescriptorEXT,
+    ) -> CNA_Result;
+    pub fn cna_model_add_skin_ext(
+        argument0: CNA_ModelHandle,
+        argument1: CNA_StringView,
+        argument2: CNA_SkinningDataHandle,
+        argument3: *const u64,
+        argument4: u64,
+    ) -> CNA_Result;
+    pub fn cna_model_apply_bind_pose_bone_transforms_ext(
+        argument0: CNA_ModelHandle,
+        argument1: CNA_SkinningDataHandle,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_apply_clip_to_bones_ext(
+        argument0: CNA_ModelHandle,
+        argument1: CNA_ModelAnimationsEXTHandle,
+        argument2: u64,
+        argument3: f64,
+    ) -> CNA_Result;
+    pub fn cna_model_bone_collection_contains(
+        argument0: CNA_ModelBoneCollectionHandle,
+        argument1: CNA_ModelBoneHandle,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_model_bone_collection_destroy(
+        argument0: CNA_ModelBoneCollectionHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_bone_collection_find(
+        argument0: CNA_ModelBoneCollectionHandle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_Bool,
+        argument3: *mut CNA_ModelBoneHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_bone_collection_get_at(
+        argument0: CNA_ModelBoneCollectionHandle,
+        argument1: u64,
+        argument2: *mut CNA_ModelBoneHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_bone_collection_get_count(
+        argument0: CNA_ModelBoneCollectionHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_bone_copy_name(
+        argument0: CNA_ModelBoneHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_bone_destroy(argument0: CNA_ModelBoneHandle) -> CNA_Result;
+    pub fn cna_model_bone_get_children(
+        argument0: CNA_ModelBoneHandle,
+        argument1: *mut CNA_ModelBoneCollectionHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_bone_get_index(
+        argument0: CNA_ModelBoneHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_model_bone_get_name_byte_count(
+        argument0: CNA_ModelBoneHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_bone_get_parent(
+        argument0: CNA_ModelBoneHandle,
+        argument1: *mut CNA_Bool,
+        argument2: *mut CNA_ModelBoneHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_bone_get_transform(
+        argument0: CNA_ModelBoneHandle,
+        argument1: *mut CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_model_bone_set_transform(
+        argument0: CNA_ModelBoneHandle,
+        argument1: CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_model_clear_cameras_ext(argument0: CNA_ModelHandle) -> CNA_Result;
+    pub fn cna_model_clear_skins_ext(argument0: CNA_ModelHandle) -> CNA_Result;
+    pub fn cna_model_copy_absolute_bone_transforms(
+        argument0: CNA_ModelHandle,
+        argument1: *mut CNA_Matrix,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_copy_bone_transforms(
+        argument0: CNA_ModelHandle,
+        argument1: *mut CNA_Matrix,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_copy_camera_name_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_copy_gltf_import_diagnostic_code_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_copy_gltf_import_diagnostic_detail_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: u64,
+        argument3: *mut c_char,
+        argument4: u64,
+        argument5: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_copy_gltf_import_diagnostic_message_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_copy_gltf_import_diagnostic_subject_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_copy_material_variant_name_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_copy_skin_name_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_create_skin_skeleton_handle_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: *mut CNA_SkinningDataHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_destroy(argument0: CNA_ModelHandle) -> CNA_Result;
+    pub fn cna_model_draw(
+        argument0: CNA_ModelHandle,
+        argument1: CNA_Matrix,
+        argument2: CNA_Matrix,
+        argument3: CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_model_effect_collection_contains(
+        argument0: CNA_ModelEffectCollectionHandle,
+        argument1: CNA_EffectHandle,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_model_effect_collection_destroy(
+        argument0: CNA_ModelEffectCollectionHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_effect_collection_get_at(
+        argument0: CNA_ModelEffectCollectionHandle,
+        argument1: u64,
+        argument2: *mut CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_effect_collection_get_count(
+        argument0: CNA_ModelEffectCollectionHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_get_bone_transform_count(
+        argument0: CNA_ModelHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_get_bones(
+        argument0: CNA_ModelHandle,
+        argument1: *mut CNA_ModelBoneCollectionHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_get_bounding_sphere_ext(
+        argument0: CNA_ModelHandle,
+        argument1: *mut CNA_Bool,
+        argument2: *mut CNA_BoundingSphere,
+    ) -> CNA_Result;
+    pub fn cna_model_get_camera_count_ext(
+        argument0: CNA_ModelHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_get_camera_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: *mut CNA_ModelCameraEXT,
+    ) -> CNA_Result;
+    pub fn cna_model_get_camera_name_byte_count_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_get_gltf_import_diagnostic_code_byte_count_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_get_gltf_import_diagnostic_detail_byte_count_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_get_gltf_import_diagnostic_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: *mut CNA_GltfImportDiagnosticEXT,
+    ) -> CNA_Result;
+    pub fn cna_model_get_gltf_import_diagnostic_message_byte_count_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_get_gltf_import_diagnostic_subject_byte_count_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_get_gltf_import_report_ext(
+        argument0: CNA_ModelHandle,
+        argument1: *mut CNA_GltfImportReportEXT,
+    ) -> CNA_Result;
+    pub fn cna_model_get_material_variant_count_ext(
+        argument0: CNA_ModelHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_get_material_variant_ext(
+        argument0: CNA_ModelHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_model_get_material_variant_name_byte_count_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_get_meshes(
+        argument0: CNA_ModelHandle,
+        argument1: *mut CNA_ModelMeshCollectionHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_get_root(
+        argument0: CNA_ModelHandle,
+        argument1: *mut CNA_Bool,
+        argument2: *mut CNA_ModelBoneHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_get_skin_count_ext(
+        argument0: CNA_ModelHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_get_skin_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: *mut CNA_Bool,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_get_skin_mesh_index_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_get_skin_name_byte_count_ext(
+        argument0: CNA_ModelHandle,
+        argument1: u64,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_collection_contains(
+        argument0: CNA_ModelMeshCollectionHandle,
+        argument1: CNA_ModelMeshHandle,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_collection_destroy(
+        argument0: CNA_ModelMeshCollectionHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_collection_find(
+        argument0: CNA_ModelMeshCollectionHandle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_Bool,
+        argument3: *mut CNA_ModelMeshHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_collection_get_at(
+        argument0: CNA_ModelMeshCollectionHandle,
+        argument1: u64,
+        argument2: *mut CNA_ModelMeshHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_collection_get_count(
+        argument0: CNA_ModelMeshCollectionHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_copy_name(
+        argument0: CNA_ModelMeshHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_destroy(argument0: CNA_ModelMeshHandle) -> CNA_Result;
+    pub fn cna_model_mesh_draw(argument0: CNA_ModelMeshHandle) -> CNA_Result;
+    pub fn cna_model_mesh_get_bounding_sphere(
+        argument0: CNA_ModelMeshHandle,
+        argument1: *mut CNA_BoundingSphere,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_get_effects(
+        argument0: CNA_ModelMeshHandle,
+        argument1: *mut CNA_ModelEffectCollectionHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_get_mesh_parts(
+        argument0: CNA_ModelMeshHandle,
+        argument1: *mut CNA_ModelMeshPartCollectionHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_get_name_byte_count(
+        argument0: CNA_ModelMeshHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_get_parent_bone(
+        argument0: CNA_ModelMeshHandle,
+        argument1: *mut CNA_Bool,
+        argument2: *mut CNA_ModelBoneHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_part_collection_destroy(
+        argument0: CNA_ModelMeshPartCollectionHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_part_collection_get_at(
+        argument0: CNA_ModelMeshPartCollectionHandle,
+        argument1: u64,
+        argument2: *mut CNA_ModelMeshPartHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_part_collection_get_count(
+        argument0: CNA_ModelMeshPartCollectionHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_part_get_effect(
+        argument0: CNA_ModelMeshPartHandle,
+        argument1: *mut CNA_Bool,
+        argument2: *mut CNA_EffectHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_part_get_index_buffer(
+        argument0: CNA_ModelMeshPartHandle,
+        argument1: *mut CNA_Bool,
+        argument2: *mut CNA_IndexBufferHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_mesh_part_get_vertex_buffer(
+        argument0: CNA_ModelMeshPartHandle,
+        argument1: *mut CNA_Bool,
+        argument2: *mut CNA_VertexBufferHandle,
+    ) -> CNA_Result;
+    pub fn cna_model_set_bone_transforms(
+        argument0: CNA_ModelHandle,
+        argument1: *const CNA_Matrix,
+        argument2: u64,
+    ) -> CNA_Result;
+    pub fn cna_model_set_gltf_import_report_ext(
+        argument0: CNA_ModelHandle,
+        argument1: *const CNA_GltfImportReportEXT,
+    ) -> CNA_Result;
+    pub fn cna_model_set_material_variant_ext(
+        argument0: CNA_ModelHandle,
+        argument1: i32,
+    ) -> CNA_Result;
 }
