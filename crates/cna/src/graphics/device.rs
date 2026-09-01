@@ -8,7 +8,7 @@
 
 use core::mem::size_of;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock, Weak};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError, Weak};
 
 use cna_sys as sys;
 
@@ -363,6 +363,13 @@ pub struct GraphicsDevice {
 }
 
 #[allow(non_snake_case)]
+/// Serialises independent device construction across the process.
+///
+/// See `GraphicsDevice::new` for the reproducer and the counts. The guard
+/// is held only across `cna_graphics_device_create`, so it costs nothing
+/// once the devices exist.
+static CREATING_A_DEVICE: Mutex<()> = Mutex::new(());
+
 impl GraphicsDevice {
     pub(crate) fn bind(native: &Arc<Native>, game: sys::CNA_Handle) -> Self {
         Self::with_owner(
@@ -449,11 +456,30 @@ impl GraphicsDevice {
         }
         let native = Native::process()?;
         let parameters = presentationParameters.to_native(true);
-        let handle = native.create_graphics_device(
-            adapter_index,
-            graphicsProfile as u32,
-            &parameters,
-        )?;
+        // RUST-UPSTREAM-023: two threads inside cna_graphics_device_create at
+        // once corrupt the heap on the GL renderers -- the SDL3/EGL context
+        // creation underneath it has no lock of its own, and the ABI neither
+        // documents a thread affinity nor answers CNA_RESULT_THREAD. A safe
+        // Rust API may not hand out that race, so construction is serialised
+        // here. The measurement behind the choice is that serialising *only*
+        // the create call removes the crash: 9 aborts in 40 unserialised runs
+        // of tools/reproducers/ext015h_concurrent_device_create.c, 0 in the 80
+        // serialised ones (40 with destroy free, 40 with it serialised too). Devices may still be used and destroyed
+        // concurrently; it is construction alone that races.
+        //
+        // This lock covers calls made through this crate. A process that also
+        // calls cna_graphics_device_create directly is outside its reach, and
+        // the upstream fix is what makes that case safe.
+        let handle = {
+            let _creating = CREATING_A_DEVICE
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            native.create_graphics_device(
+                adapter_index,
+                graphicsProfile as u32,
+                &parameters,
+            )?
+        };
         Ok(Self::with_owner(&native, DeviceOwner::Independent, handle))
     }
 

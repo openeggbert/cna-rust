@@ -12384,14 +12384,20 @@ impl AreaLightBrdfTable {
 
     /// The table's texture, as an owned resource that aliases the table.
     ///
-    /// Deliberately **not** a [`BorrowedRenderTarget`], which is what every
-    /// other texture accessor in this module answers with. Upstream publishes
-    /// this one through `CreateOwnedTexture2D` rather than
-    /// `CreateBorrowedRenderTarget2D`: the handle is an *owned* `Texture2D`
-    /// that counts against the game's children and is released with the texture
-    /// destroy, and releasing it through `cna_render_target_destroy` fails and
-    /// strands it. The handle aliases the table, so it keeps the table alive
-    /// and destroying it destroys nothing but the handle.
+    /// Deliberately **not** a [`BorrowedRenderTarget`], which is what the ten
+    /// other `_get_` routes in this module answer with. `RUST-UPSTREAM-025`.
+    ///
+    /// Upstream publishes this one through `CreateOwnedTexture2D` rather than
+    /// `CreateBorrowedRenderTarget2D`, making it the only getter in the engine
+    /// layer that hands back an owned handle. The storage really is borrowed --
+    /// the handle aliases the table, so it keeps the table alive and destroying
+    /// it destroys nothing but the table's reference -- but the *handle* is an
+    /// owned `Texture2D`: it is released with the texture destroy rather than
+    /// the render-target destroy, and it counts against the game's graphics
+    /// resources, so a handle left alive blocks `cna_game_destroy`. None of the
+    /// ten analogous getters does either of those things.
+    ///
+    /// Dropping the [`Texture2D`] this returns settles all of it.
     pub fn texture(&self) -> Result<Option<Texture2D>> {
         let handle = self.core.get()?;
         let mut value = sys::CNA_INVALID_HANDLE;

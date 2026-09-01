@@ -5365,6 +5365,9 @@ struct ForwardFindings {
     supported: bool,
     effect_present: bool,
     release_while_borrowed: Option<String>,
+    /// The `EngineHandle::release` regression: after a *refused* release, is
+    /// the object still usable? Reads back what a set/get round-trip answers.
+    usable_after_a_refused_release: Option<(f32, f32)>,
     release_after_borrow: Option<String>,
     base_color: Vec<((f32, f32, f32), (f32, f32, f32))>,
     metallic: Vec<(f32, f32)>,
@@ -5421,6 +5424,15 @@ impl Game for ForwardGame {
         {
             let borrowed = effect.effect()?;
             findings.release_while_borrowed = effect.release().err().map(|e| e.to_string());
+            // The regression this pins: `EngineHandle::release` used to clear
+            // its handle slot before checking whether the destroy succeeded, so
+            // a refused release threw away the only handle to a still-live
+            // native object -- every later call answered "has been released"
+            // and the process aborted at exit with the child still owned. The
+            // slot is now cleared only on success, so the effect must still
+            // round-trip a value here.
+            effect.set_roughness(0.375)?;
+            findings.usable_after_a_refused_release = Some((0.375, effect.roughness()?));
             drop(borrowed);
         }
 
@@ -5592,6 +5604,17 @@ fn the_clustered_forward_effect_clamps_what_it_documents_and_shades_what_it_is_g
         "and allowed once the borrow is gone: {:?}",
         findings.release_after_borrow
     );
+    if findings.release_while_borrowed.is_some() {
+        let (asked, got) = findings
+            .usable_after_a_refused_release
+            .expect("the post-refusal round-trip ran");
+        assert_eq!(
+            asked, got,
+            "a refused release must leave the object callable. Clearing the handle \
+             slot before the destroy succeeded is the defect this pins: it stranded a \
+             live native object behind a handle that answered \"has been released\""
+        );
+    }
 
     // --- the material terms ------------------------------------------------
     println!("base colour: {:?}", findings.base_color);
@@ -7695,6 +7718,11 @@ struct AreaLightFindings {
     table: Option<(i32, i32, f64, Option<(i32, i32)>)>,
     sized_table: Option<(i32, i32)>,
     bad_table: bool,
+    /// RUST-UPSTREAM-025. Two successive `texture()` calls, then what
+    /// survives what: (both answered, sizes agree, the table still reads its
+    /// size after one texture handle is dropped, the second handle still
+    /// reads its width after the table is released).
+    brdf_texture_ownership: Option<(bool, bool, bool, Option<i32>)>,
     terms: Vec<(f32, f32, f32, f32)>,
     lobe_scales: Vec<(f32, f32)>,
     coverage: Vec<(&'static str, f32)>,
@@ -7835,6 +7863,38 @@ impl Game for AreaLightGame {
                 .texture()?
                 .map(|texture| (texture.Width(), texture.Height())),
         ));
+        // RUST-UPSTREAM-025: this texture is published through
+        // `CreateOwnedTexture2D` over an aliasing shared_ptr, where the header
+        // says "borrows". Measure what that actually means rather than reading
+        // it off either the word or the constructor name.
+        {
+            let ownership_table = AreaLightBrdfTable::new(&device)?;
+            let first = ownership_table.texture()?;
+            let second = ownership_table.texture()?;
+            let both = first.is_some() && second.is_some();
+            let agree = match (&first, &second) {
+                (Some(a), Some(b)) => {
+                    a.Width() == b.Width() && a.Height() == b.Height()
+                }
+                _ => false,
+            };
+            // Drop one handle. The header says releasing it "releases only the
+            // handle, never the texture", so the table must be unharmed.
+            drop(first);
+            let table_survives_a_dropped_texture = ownership_table.size().is_ok();
+            // Now release the table while a texture handle is still alive. The
+            // alias is supposed to keep the table's storage up, so the width
+            // should still read.
+            ownership_table.release()?;
+            let width_after_the_table_went = second.map(|texture| texture.Width());
+            findings.brdf_texture_ownership = Some((
+                both,
+                agree,
+                table_survives_a_dropped_texture,
+                width_after_the_table_went,
+            ));
+        }
+
         let sized = AreaLightBrdfTable::with_size(&device, 8, 16)?;
         findings.sized_table = Some((sized.size()?, sized.sample_count()?));
         sized.release()?;
@@ -8028,6 +8088,32 @@ fn an_area_light_is_a_surface_and_its_table_is_the_lobe_it_shades_with() {
         "a table built to a size is that size, with that sample count"
     );
     assert!(findings.bad_table, "a size below one is refused");
+
+    // RUST-UPSTREAM-025. Reported as measured: the point of this block is that
+    // the observable contract is recorded, not that a particular answer is
+    // right, because the header and the implementation disagree about which it
+    // should be.
+    let (both, agree, table_survives, width_after) = findings
+        .brdf_texture_ownership
+        .expect("the BRDF texture ownership block ran");
+    println!(
+        "NOTE: RUST-UPSTREAM-025 brdf texture: both answered {both}, sizes agree {agree}, \
+         table readable after one handle dropped {table_survives}, \
+         width after the table was released {width_after:?}"
+    );
+    assert!(both, "two successive texture() calls both answer");
+    assert!(agree, "the two handles describe the same texture");
+    assert!(
+        table_survives,
+        "dropping a texture handle must not disturb the table: the header says \
+         releasing it releases only the handle, never the texture"
+    );
+    assert_eq!(
+        width_after,
+        Some(AreaLightBrdfTable::DEFAULT_SIZE),
+        "the texture handle aliases the table, so it must keep the table's storage \
+         alive and still read its width after the table handle was released"
+    );
 
     // The lobe narrows as the surface smooths: magnitude at low roughness is
     // higher than at high, and the average direction leans towards the normal.

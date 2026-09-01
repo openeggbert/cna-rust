@@ -81,6 +81,24 @@ Three defects in CNA, each with a reproducer that runs without this repository:
   not avoid it; the registry runs the same destructor at exit.
 - **`RUST-UPSTREAM-022`** — a content-loaded skin's skeleton is unreachable,
   with a refusal the header does not document.
+- **`RUST-UPSTREAM-024`** — the morph-target stride list restates a literal
+  `{32, 52, 56}` where CNA's canonical table lists eleven. The three it takes
+  are exactly the tangent-less layouts, so PBR morph targets (stride 48 and 68)
+  are unreachable through the C API. The blender had the same literal and was
+  fixed; the C API's validator was not.
+
+- **`RUST-UPSTREAM-025`** — `cna_area_light_brdf_table_get_texture` publishes an
+  owned handle where every other engine-layer getter publishes borrowed. The
+  aliasing behaves as documented; what is wrong is the handle kind, which gates
+  `cna_game_destroy`. The contract, not the implementation.
+
+- **`RUST-UPSTREAM-023`** — `cna_graphics_device_create` races with itself.
+  Six threads in it at once corrupt the heap on the GL renderers; the stack is
+  CNA's own, down through SDL3 into EGL. `GraphicsDevice::new` now serialises
+  construction, which the reproducer measures to be sufficient, so no route is
+  blocked — but any other caller in the same process still is. This is what
+  made `extensions_effects` fail intermittently under the parallel suite.
+
 - **`RUST-UPSTREAM-020`** — the camera test backend leaves CNA's global
   platform override dangling. Re-measured, still reproduces.
 

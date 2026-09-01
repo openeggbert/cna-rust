@@ -297,3 +297,321 @@ documented refusal does not currently cover this case.
 into `None`: "there is no skeleton" and "the skeleton exists and cannot be
 reached" are different facts, and `ModelSkin::has_skeleton` already reports the
 first.
+
+---
+
+## RUST-UPSTREAM-023 — concurrent `cna_graphics_device_create` corrupts the heap
+
+| | |
+|---|---|
+| Symbols | `cna_graphics_device_create` |
+| Dependency | cnanext `35268971c826d48ec3d40939e9b34a2b0595f94b`, ABI 0.21.0 |
+| Artifact | `cmake-build-opengles3`, `CNA_GRAPHICS_RENDERER=OPENGLES3`; not reproducible on `cmake-build-headless` |
+| Severity | Memory corruption. `SIGSEGV` or a glibc `double free or corruption` `SIGABRT`, in a call documented to fail cleanly |
+| Blocks | Nothing permanently — the binding serialises construction — but it makes any multi-threaded C caller of this route unsafe |
+| Last measured | 2026-09-01, reproduces |
+
+### What happens
+
+Six threads call `cna_graphics_device_create` at the same time, each with its
+own `CNA_PresentationParameters` and its own output handle. Nothing is shared
+between them at the ABI surface. About one run in five dies:
+
+```text
+double free or corruption (fasttop)
+tcache_thread_shutdown(): unaligned tcache chunk detected
+```
+
+or a plain `SIGSEGV`. The rest of the runs report `CNA_RESULT_SUCCESS` on
+every thread and exit cleanly, so the corruption is a race and not a refusal.
+
+### Mechanism
+
+From the `SIGSEGV` core, the whole path is upstream C++ and SDL:
+
+```text
+cna_graphics_device_create
+  Microsoft::Xna::Framework::Graphics::GraphicsDevice::GraphicsDevice(...)
+  GraphicsDevice::resolveRenderer()
+  GraphicsDevice::createRenderer()
+  CNA::Internal::Renderers::EasyGL::CreateGraphicsRendererForProfile(...)
+  EasyGL::EasyGLRenderer::EasyGLRenderer(...)
+  EasyGL::EasyGLPlatformContext::EasyGLPlatformContext(...)
+  CNA::Platform::Sdl3::Sdl3GlContext::CreateContext(uint32_t, const GlContextDescription&)
+  SDL_GL_CreateContext_REAL -> Wayland_GLES_CreateContext
+  SDL_EGL_CreateContext -> SDL_EGL_MakeCurrent -> driBindContext -> dri_create_image
+```
+
+`Sdl3GlContext::CreateContext` does take a `std::mutex` — the `SIGABRT` core
+catches a second thread blocked in `std::lock_guard` inside it — but the lock
+does not cover the whole construction, so two threads still reach SDL's video
+and EGL layer concurrently. SDL's video subsystem is not safe to call from
+several threads at once, and Mesa's context binding underneath it is what
+scribbles on the heap.
+
+### Reproducer
+
+`tools/reproducers/ext015h_concurrent_device_create.c`. Build it against an
+artifact and run it repeatedly; `REPRO_THREADS`, `REPRO_NO_DESTROY`,
+`REPRO_SERIALIZE_CREATE` and `REPRO_SERIALIZE_DESTROY` select the variants.
+
+| Variant | Artifact | Aborts |
+|---|---|---|
+| 6 threads, create + destroy | OPENGLES3 | 13 / 70 |
+| 6 threads, create only (handles leaked) | OPENGLES3 | 8 / 30 |
+| 1 thread, create + destroy | OPENGLES3 | 0 / 30 |
+| 6 threads, create + destroy | HEADLESS | 0 / 30 |
+| 6 threads, create only | HEADLESS | 0 / 30 |
+| 6 threads, **create serialised**, destroy free | OPENGLES3 | 0 / 40 |
+| 6 threads, create and destroy both serialised | OPENGLES3 | 0 / 40 |
+
+Two things follow from that table. Destroying is not implicated: leaking every
+handle crashes just as often, and serialising destroy on top of create buys
+nothing. And the renderer is: HEADLESS builds no GL context and never faults.
+
+### Why this is CNA rather than the binding
+
+It reproduces in twenty lines of C with no Rust in the process, and the entire
+faulting stack is inside `libcna_c_api.so` and its own dependencies.
+
+It is also a contract question, not only an implementation one. This ABI
+already has a way to say "you called me from a thread you may not":
+`CNA_RESULT_THREAD` / `CNA_ERROR_CATEGORY_THREAD`, defined in `abi.h` and
+`core.h` as "invoked from a disallowed thread". `cna_graphics_device_create`
+neither documents a thread affinity in its header block — which is otherwise
+careful, covering several devices being live at once and one being destroyed
+while another lives — nor returns that result. It corrupts the heap instead.
+
+### What a fix looks like
+
+Either of two, and the choice is upstream's:
+
+- Serialise renderer construction internally, so the guarantee the header
+  already implies ("several may exist at once") holds however they were made.
+- Or declare the affinity: document that this route is main-thread-only, and
+  answer `CNA_RESULT_THREAD` when it is not, which is what the result code is
+  for.
+
+Serialising is the smaller change and matches what the binding measured to be
+sufficient.
+
+### Status in the binding
+
+`GraphicsDevice::new` holds a process-wide `CREATING_A_DEVICE` mutex across the
+`cna_graphics_device_create` call and releases it immediately after, so devices
+are still used and dropped concurrently. Safe Rust may not hand out a data race
+that corrupts the heap, and the reproducer shows serialising construction alone
+removes it.
+
+The lock reaches only calls made through this crate. A process that also calls
+`cna_graphics_device_create` directly — another binding in the same address
+space, say — is not protected, which is why this stays an upstream finding
+rather than a closed one.
+
+This is what made `crates/cna/tests/extensions_effects.rs` fail intermittently
+under a parallel run: five of its six tests build an independent device, and
+the test harness runs them on separate threads. Before the fix that binary
+aborted on 12 of 40 runs; after it, 0 of 40. The regression test is
+`crates/cna/tests/upstream_concurrent_device_create.rs`.
+
+---
+
+## RUST-UPSTREAM-024 — the morph-target stride list is stale, and excludes every tangent-carrying layout
+
+| | |
+|---|---|
+| Symbols | `cna_morph_target_data_ext_create`, `cna_morph_target_data_ext_blend`, `cna_model_mesh_part_set_morph_weights_ext` |
+| Dependency | cnanext `35268971c826d48ec3d40939e9b34a2b0595f94b`, ABI 0.21.0 |
+| Artifact | Renderer-independent; measured on `cmake-build-headless` |
+| Severity | Capability gap with a documented cause. A clean `CNA_RESULT_INVALID_ARGUMENT`, no fault |
+| Blocks | Morph targets on any physically based glTF mesh, through the C API |
+| Last measured | 2026-09-01, reproduces |
+
+### What happens
+
+`ValidateMorphShape` in `CnaCApiModels.cpp:1168` opens with
+
+```cpp
+if (data.Stride != 32 && data.Stride != 52 && data.Stride != 56) {
+    return InvalidArgument("Morph target stride must be 32, 52, or 56 bytes.");
+}
+```
+
+CNA's renderer has one canonical table of what a stride means,
+`InferredLayoutForStride` in `VertexDeclarationFidelity.hpp`, and it lists
+eleven strides: 16, 20, 24, 32, 48, 52, 56, 60, 68, 76, 80. The C API takes
+three of them. Measured from Rust:
+
+```text
+accepted [32, 52, 56]
+refused 16, 20, 24, 48, 60, 68, 76, 80
+  -- all: "Morph target stride must be 32, 52, or 56 bytes."
+```
+
+### Why those three
+
+They are exactly the canonical layouts with **no tangent**. Every stride the
+route accepts carries Position at 0 and Normal at 12 and stops there; every
+stride it refuses that has a normal — 48 and 68 — carries a `Vector4` Tangent
+at offset 24 as well.
+
+| Stride | Position | Normal | Tangent | C API |
+|---|---|---|---|---|
+| 32 | 0 | 12 | — | accepted |
+| 52 | 0 | 12 | — | accepted |
+| 56 | 0 | 12 | — | accepted |
+| 48 | 0 | 12 | 24 (`Vector4`) | refused |
+| 68 | 0 | 12 | 24 (`Vector4`) | refused |
+
+48 is the unskinned tangent layout and 68 the skinned one. Since GLTF-215
+changed which effect a metallic-roughness material selects, those two are what
+an ordinary PBR glTF mesh gets — so PBR morph targets cannot be handed to this
+route at all.
+
+### This list was already retired once, in the other half of the codebase
+
+`BlendMorphTargetsEXT` in `modules/graphics/src/Xna/MorphTargetEXT.cpp` used to
+hold the same literal and no longer does. Its own comment says why:
+
+> This used to be the literal list {32, 52, 56}, written when those were the
+> only strides a mesh with normals could have. GLTF-215 changed which effect a
+> metallic-roughness material selects, and with it the strides an ordinary glTF
+> mesh gets (48 unskinned, 68 skinned) — both of which carry Normal at offset
+> 12 and neither of which was in the list, so every PBR morph target silently
+> kept its base normals while its positions moved. Restating an ABI is what let
+> that happen, so the predicate is now a query against the canonical stride
+> table itself and cannot go stale again.
+
+The fix (GLTF-278) landed in the blender and not in the C API's validator, so
+the same restated ABI survives one layer up — and it now fails closed rather
+than silently, which is better but still wrong.
+
+### Why this is CNA rather than the binding
+
+The literal is in CNA's own C source, it contradicts CNA's own canonical table,
+and CNA's own comment argues against restating it. Nothing about the Rust
+projection is involved: `MorphTargetData::new` passes the caller's stride
+through unchanged and reports the refusal.
+
+The header is silent on this too. `models.h` documents `stride` only as "byte
+stride of one base-pose vertex" and names no permitted set, so a caller has no
+way to learn the restriction except by being refused.
+
+### What a fix looks like
+
+Replace the literal in `ValidateMorphShape` with the query the blender already
+uses — `InferredLayoutForStride(stride, UnlistedStrideLayout::RendererRefusesIt)`
+and a check that the layout is `known` — so the validator and the blender agree
+by construction. If a narrower set really is intended, `models.h` should say
+which and why.
+
+### Status in the binding
+
+Reported as measured. `MorphTargetData::new` documents the restriction and the
+reason in full, and `crates/cna/tests/upstream_morph_stride.rs` pins the
+accepted set to `[32, 52, 56]` and fails when it changes — which is what will
+say this can be retired. No Rust-side workaround: re-packing a caller's stride-48
+vertices into stride 32 would drop their tangents, which is the very data the
+refusal is about.
+
+---
+
+## RUST-UPSTREAM-025 — the only engine-layer getter that publishes an owned handle
+
+| | |
+|---|---|
+| Symbols | `cna_area_light_brdf_table_get_texture` |
+| Dependency | cnanext `35268971c826d48ec3d40939e9b34a2b0595f94b`, ABI 0.21.0 |
+| Artifact | `cmake-build-opengles3`, `CNA_CNAEXT=ON` (the engine layer is required) |
+| Severity | Contract inconsistency with a real consequence: the handle gates `cna_game_destroy` |
+| Blocks | Nothing. The route works and the binding models it as it is |
+| Last measured | 2026-09-01, reproduces |
+
+### The anomaly
+
+The header says the handle borrows:
+
+> The handle **borrows**: it keeps the table alive while it exists, and
+> releasing it releases only the handle, never the texture.
+
+The implementation publishes it through `CreateOwnedTexture2D`
+(`CnaCApiEngineLayer.cpp:20394`), over an aliasing `shared_ptr` that shares the
+*table's* refcount while pointing at the texture.
+
+Counted across the engine layer, that makes it the odd one out:
+
+| Publisher | Routes |
+|---|---|
+| `CreateBorrowedRenderTarget2D` | 10, every one of them a getter: `cna_color_grade_pass_get_lut`, `cna_effect_get_shadow_map_ext`, `cna_effect_get_image_based_light_ext`, `cna_render_pipeline_get_scene_target`, `cna_clustered_forward_effect_get_opaque_frame`, `cna_weighted_blended_transparency_get_{accumulation,revealage}_texture_ext`, `cna_render_target_pool_acquire`, `cna_pbr_material_apply_state`, `cna_clustered_shadow_policy_select` |
+| `CreateOwnedTexture2D` | 4: `cna_color_grade_pass_create_identity_lut`, `cna_cube_lut_create_strip_texture`, `cna_environment_processor_generate_brdf_lut` — and `cna_area_light_brdf_table_get_texture` |
+
+Three of the four owned publishers *make* a texture the caller asked for. The
+fourth is a plain `_get_`. It is the only getter in the module that hands back
+an owned handle.
+
+### Implementation, contract, or both — it is the contract
+
+The implementation does what the prose promises. Measured from Rust, in
+`crates/cna/tests/extensions_engine.rs`:
+
+```text
+NOTE: RUST-UPSTREAM-025 brdf texture: both answered true, sizes agree true,
+      table readable after one handle dropped true,
+      width after the table was released Some(32)
+```
+
+Two successive calls both answer and describe the same texture; dropping one
+handle leaves the table fully readable, so releasing the handle really does
+release nothing but the handle; and a handle held past
+`cna_area_light_brdf_table_destroy` still reads its width, so the alias really
+does keep the table alive. Every clause of the header's sentence holds.
+
+What differs is the *kind* of handle, and that is not a naming detail:
+
+```cpp
+// CreateOwnedTexture2DWithKind, CnaCApiGraphics.cpp:503
+if (parentGame != CNA_INVALID_HANDLE) {
+    AddOwnedGraphicsResourceFor(parentGame);
+}
+```
+
+`CreateBorrowedRenderTarget2D` does not make that call, and takes an explicit
+`adapterLifetime` instead. And the counter it bumps is the one that gates
+shutdown — `AddOwnedGraphicsResourceFor`'s own comment says "Only a game's
+resources gate `cna_game_destroy`".
+
+So a caller who reads the table's texture inside a game and does not destroy
+the handle has, without being told, made the game undestroyable. Doing exactly
+the same thing with `cna_effect_get_shadow_map_ext` — the same shape of call,
+one page away in the same header — costs nothing. The handle also answers
+`cna_texture2d_destroy` rather than `cna_render_target_destroy`, unlike all ten
+of its analogues, so a caller who disposes of it the way the neighbours are
+disposed of strands it.
+
+### Why this is CNA rather than the binding
+
+The choice of publisher is in CNA's C source, the counter it bumps is CNA's,
+and the header sentence that does not mention any of it is CNA's. A binding can
+only model the behaviour or misreport it.
+
+### What a fix looks like
+
+Either of two, and the choice is upstream's — they are not equivalent:
+
+- **Publish it borrowed**, like the other ten getters, so a `_get_` route costs
+  nothing to call and the handle is disposed of the way its neighbours are.
+  This changes the handle kind, so it is an ABI-visible change.
+- **Or keep it owned and say so**: state in the header that this handle is an
+  owned `Texture2D`, that it counts against the game's graphics resources, and
+  that it must be released with `cna_texture2d_destroy`. The word "borrows" is
+  true of the *storage* and misleading about the *handle*, which is precisely
+  the confusion worth removing.
+
+### Status in the binding
+
+`AreaLightBrdfTable::texture` wraps it with `Texture2D::from_owned_handle`, so
+Rust's drop destroys the handle and the game's resource count returns to zero
+on its own. The doc comment states the anomaly rather than smoothing it over,
+because a caller who reaches past the binding needs to know. The measurement
+above is asserted, so a change of behaviour upstream fails the test rather than
+passing silently.

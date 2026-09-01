@@ -1709,17 +1709,22 @@ pub struct MorphTargetData {
 impl MorphTargetData {
     /// Creates morph data from a base pose and its targets.
     ///
-    /// **The stride must be 32, 52 or 56 bytes**, and that list is narrower
-    /// than the renderer's own. `cna_morph_target_data_ext_create` checks the
-    /// literal three; CNA's canonical blender deliberately stopped doing that
-    /// and queries the stride table instead, because the list went stale when a
+    /// **The stride must be 32, 52 or 56 bytes** -- three of the eleven the
+    /// renderer's own canonical table lists. `RUST-UPSTREAM-024`.
+    ///
+    /// The three it takes are exactly the layouts with no tangent. CNA's
+    /// canonical blender deliberately stopped restating this list and queries
+    /// the stride table instead, because the list went stale when a
     /// metallic-roughness material began selecting layouts of stride 48
-    /// (unskinned) and 68 (skinned) -- both of which carry a normal, and both
-    /// of which the old list silently excluded, so every physically based morph
-    /// target kept its base normals while its positions moved. The C entry
-    /// point still has the literal, so an ordinary glTF PBR mesh cannot be
-    /// handed to it at all. This is upstream's to fix; the binding reports the
-    /// refusal as it is rather than working around it.
+    /// (unskinned) and 68 (skinned) -- both of which carry Normal at offset 12
+    /// and a `Vector4` Tangent at 24, and both of which the old list silently
+    /// excluded, so every physically based morph target kept its base normals
+    /// while its positions moved. The C entry point still has the literal, so
+    /// an ordinary glTF PBR mesh cannot be handed to it at all.
+    ///
+    /// This is upstream's to fix and the binding reports the refusal as it is.
+    /// Re-packing a caller's stride-48 vertices into stride 32 would drop the
+    /// tangents, which is the data the refusal is about.
     pub fn new(
         base_vertex_bytes: &[u8],
         stride: i32,

@@ -30,3 +30,23 @@ to have measured something.
 | `ext015g_load_model_destroy.c` | `RUST-UPSTREAM-021` | destroying a content-loaded model with a mesh part faults. Takes a content root and an asset name. |
 | `ext015g_handbuilt_mesh.c` | `RUST-UPSTREAM-021` | the control: the same shape built by hand destroys cleanly, which is what makes *content-loaded* the answer. |
 | `ext015g_manager_teardown.c` | `RUST-UPSTREAM-021` | that leaking the model handle does not avoid the fault; it moves it to process exit. |
+
+## `ext015h_concurrent_device_create.c` — RUST-UPSTREAM-023
+
+Six threads call `cna_graphics_device_create` at once. On a GL renderer about
+one run in five dies with `SIGSEGV` or glibc's "double free or corruption";
+serialising the create call alone removes it.
+
+```sh
+CNAX=../../cnanext
+ART=$CNAX/cmake-build-opengles3/modules/c-api
+cc -O0 -g -pthread tools/reproducers/ext015h_concurrent_device_create.c \
+   -I$CNAX/modules/c-api/include -L$ART -lcna_c_api -Wl,-rpath,$ART \
+   -o build-probe/ext015h_concurrent_device_create
+for i in $(seq 1 40); do ./build-probe/ext015h_concurrent_device_create >/dev/null 2>&1 || echo abort; done
+```
+
+Environment knobs, all off by default: `REPRO_THREADS=<1..6>`,
+`REPRO_NO_DESTROY=1` (leak the handles), `REPRO_SERIALIZE_CREATE=1`,
+`REPRO_SERIALIZE_DESTROY=1`. A run needs no display; it is the GL renderer
+being *built* that matters, not whether it ends up with a surface.
