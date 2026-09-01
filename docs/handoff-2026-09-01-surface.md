@@ -353,11 +353,46 @@ import lines; not one call was rewritten.
 ## 15. Git
 
 ```text
-cna-rust           develop, tree clean, nothing pushed this session
+cna-rust           develop, tree clean
+                   14 local commits, ahead 14 / behind 0 of origin/develop
+                   NOTHING PUSHED
 cna-rust-template  develop @ 416642b, tree clean, untouched
-cnanext            0 tracked modifications
-sharp-runtimenext  0 tracked modifications
+cnanext            next    @ 7712534d3, 0 tracked modifications
+sharp-runtimenext  next    @ 9cc96cd57, 0 tracked modifications
+
+git diff --check    clean, both writable repositories
 ```
+
+The fourteen commits, oldest first:
+
+```text
+06903c4  the graphics device's own surface, behind four traits     110 -> 80
+db1f103  the effect family's CNA-only surface, seven traits         80 -> 65
+4142546  the media family's CNA-only surface, eight traits          65 -> 42
+fd897f4  the audio, XACT and storage CNA-only surface               42 -> 26
+1e7010d  the graphics device manager's four CNA-only members        26 -> 22
+29c7cba  the last twenty-one members -- UNEXPECTED_MEMBER is zero   22 ->  1
+1fb5135  TouchPanelTestBackend leaves the strict Touch namespace     1 ->  0
+ce92e64  a gate for the surface the strict verifier cannot see
+bffa599  prove the extension call shapes from outside the crate
+79c919e  close RUST-SURFACE-001, with the numbers the verifier reports
+51840a5  the seventeen-section record for the surface milestone
+602dfe9  a trait-impl caller is a safe call site, permanently
+5311763  what the naming rule now covers, and the split
+(tip)    the ending git state, the commits, and where the artifacts are
+```
+
+### Build artifacts
+
+Everything built under the repository's own shared directories, never in the
+session scratchpad or `/tmp`. `build-consumer/` is 3.7 GB and holds the
+packaged-source stage, the direct-link consumer and its 725 MB target tree, the
+two new 20 KB extension-import projects, and the re-vendored generated
+standalone. The standalone was re-vendored **into its existing directory with
+its target tree preserved**, so it rebuilt incrementally rather than from
+scratch. `build-consumer/generated/my-cna-game` (597 MB) is an older run's
+project that nothing here used; it is the one candidate for deletion if space
+is wanted.
 
 ## 16. Remaining work
 
