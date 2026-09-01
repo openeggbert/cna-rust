@@ -134,41 +134,45 @@ Status values: `READY`, `IN_PROGRESS`, `DONE`, `BLOCKED_UPSTREAM`,
 | RUST-TEMPLATE-002 | Template modern-extension canary | `--extensions-smoke` | DONE, and re-qualified on a renderer that draws: the canary used to fail outright on every GL-family renderer because its standalone-device half needs a windowless `GraphicsDevice`. It now tolerates exactly that refusal, keeps the `.cnb` model half that was being lost with it, and reports the engine-layer version |
 | RUST-TEMPLATE-003 | Generated standalone project on the live ABI | re-verified on ABI 0.21; the canary caught the generator dropping `cna-sys`'s new build script, now taken from the manifest. Re-generated and re-run against the `OPENGLES3` artifact with the engine layer bound: `--extensions-smoke`, `--frames 60` and `--stability-test` all exit zero | DONE |
 
-## Qualification, 2026-08-31 (ABI 0.21 milestone)
+## Qualification, 2026-09-01 (the reachability milestone)
 
 Run against the HEADLESS **ABI 0.21** artifact with SHA-256
-`3a976d2494580ca9af45fbb2be30c13b01d05477f98ae80796ef26898c97d812`, built out
-of tree from `cnanext` at `599d14e5` (clean) and `sharp-runtimenext` at
-`4a49afb0` (clean). Library exports and header declarations agree exactly at
-4,054.
+`94078be94dc1f1e6c8787c1cd17b08c9430d1e4bb5699947cd2b7aafee40281d`, rebuilt
+in place from `cnanext` at `7712534d3` (clean), with `sharp-runtimenext` at
+`9cc96cd57` (clean). Library exports and header declarations agree exactly at
+4,055. Every windowed run was on an Xvfb display.
+
+Two rows are worse than the record they replace, and both are re-measurements
+rather than regressions: the strict verifier had not been run since CNA's own
+members were put on strict XNA types, and the MSRV audit had not been run since
+a 1.82 API was used.
 
 | Gate | Result |
 |---|---|
-| `cargo check --workspace --all-targets` | PASS, no warnings |
-| `cargo test --workspace --all-features` | PASS: 51 suites, 156 assertions, 0 failures |
-| `cargo test --workspace` (dynamic linkage) | PASS: 40 suites, 133 assertions |
-| `cargo test --workspace --no-default-features --features direct-link` | PASS: 40 suites, 133 assertions -- identical |
-| `cargo doc --workspace --no-deps` | PASS, no warnings |
-| native ABI verifier | PASS: 1,591 functions, 5,488 prototype positions, 2,272 C/Rust measurements, 121 layouts, 121 layout field sets, 23 callbacks, 790 constants, 1,587 symbol acquisitions, 1,591 linked declarations, 0 findings, 0 unaudited |
+| `cargo check --workspace --all-targets` | PASS |
+| `cargo test --workspace --all-features` | PASS: 278 tests, 0 failures |
+| `cargo doc --workspace --no-deps` | PASS, **no warnings** (nine broken or redundant intra-doc links fixed) |
+| native ABI verifier | PASS: 3,251 functions, 11,586 prototype positions, 3,174 C/Rust measurements, 187 layouts, 39 callbacks, 902 constants, 3,250 symbol acquisitions, 0 findings, 0 unaudited |
 | ABI mutation tests | PASS: 33 |
 | API-compat mutation tests | PASS: 28 |
-| canonical route inventory | PASS: 4,054 canonical, 1,591 bound, 0 unmapped, 0 stale overrides, 0 unused rules |
-| runtime capability provenance | PASS: 35 rows, artifact and ABI 0.21 confirmed |
-| selected XNA profile (strict) | PASS: 257 types, 2,964 members, 0 diagnostics, 0 unmeasured categories |
-| complete XNA runtime profile | PASS: 331 types, 3,640 members, 0 missing, 0 diagnostics |
-| Content Pipeline profile | 125 missing types -- **stated product boundary**, see [content-pipeline-decision.md](content-pipeline-decision.md) |
-| superset discovery profile | 125 missing types, all of them the pipeline |
-| leak verifier | PASS: 0 diagnostics, empty allowlist, 0 out-of-profile types, 0 unmeasured |
-| MSRV source audit | PASS |
-| packaged-source consumer | PASS: 7 sys files, 158 crate files, 0 workspace path leaks |
-| direct-link consumer | PASS: links `libcna_c_api.so`, imports no `dlopen`/`dlsym`/`dlclose`, runs a real `GraphicsDevice` lifecycle |
-| template: build, 60, 600, `--extensions-smoke` | PASS |
-| generated standalone project: build, 60, 600, `--extensions-smoke`, no developer path | PASS |
+| reachability mutation tests | PASS: 14 |
+| canonical route inventory + census gate | PASS: 4,055 canonical, 3,236 bound, 0 unreviewed, 0 actionable, 0 unmapped, 0 unused rules |
+| bound-without-safe-call-site gate | PASS: 97 unreachable, 97 justified, 0 unjustified; 4 planted defects each caught |
+| runtime capability provenance | PASS: 35 rows, artifact and ABI confirmed against the rebuilt library |
+| selected XNA profile (strict) | **110 diagnostics**, all `UNEXPECTED_*` -- `RUST-SURFACE-001` |
+| complete XNA runtime profile | **110**, the same ones; 0 missing types, 0 missing members |
+| Content Pipeline profile | 125 missing types (product-boundary decision, `RUST-XNA-004`) |
+| leak verifier | PASS: 0 internal leaks, 0 raw handles, 0 public unsafe, 0 allowlist |
+| MSRV source audit | PASS (one 1.82 API found and removed) |
+| packaged-source consumer | PASS: 7 sys files, 203 crate files, 0 workspace path leaks |
+| direct-link consumer | PASS: links, no loader calls, runs a real route |
+| template: build, 60, 600, `--extensions-smoke` | PASS on HEADLESS and OPENGLES3 |
+| generated standalone: build, 60, 600, `--extensions-smoke` | PASS on HEADLESS and OPENGLES3 |
 | `git diff --check`, both writable repositories | clean |
-| `cnanext` / `sharp-runtimenext` modified by this session | 0 files, both clean |
 | MSRV 1.74 runtime | NOT_RUN -- no 1.74 toolchain on this host |
-| `rustfmt`, `clippy` | NOT_AVAILABLE |
+| `rustfmt`, `clippy` | NOT_AVAILABLE on this source-tarball toolchain |
 | sanitizers | NOT_RUN -- no instrumented artifact was built |
+| wasm | NOT_RUN -- no wasm target installed |
 | WebAssembly target | NOT_AVAILABLE -- no wasm std installed, no `rustup` to add one |
 
 ## Qualification, 2026-08-31 (previous, ABI 0.20 milestone)

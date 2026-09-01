@@ -115,28 +115,44 @@ re-measured against the live ABI before it may be carried forward.
 
 ### 3c. Full canonical C API accounting
 
-Every canonical route carries exactly one classification and there are no
-unexplained holes. The live canonical surface grew from 4,051 to 4,054 routes
-while this milestone was in progress; the inventory measures the live headers,
-so the total moves with them. See
+Every canonical route carries exactly one **purpose** and exactly one **binding
+decision**, and there are no unexplained holes in either. The two are separate
+questions -- what a route is for, and why Rust does or does not bind it -- and
+conflating them is what once left 1,170 routes with no purpose at all. The live
+canonical surface moves as CNA adds routes; the inventory measures the live
+headers, so these totals move with them. See
 [docs/c-api-classification.md](docs/c-api-classification.md).
 
-| Category | Routes |
+Measured against cnanext `7712534d3`, 4055 canonical routes:
+
+| Purpose | Routes |
 |---|---:|
-| `RUST_SYS_BOUND` | 1,326 |
-| `CNA_EXTENSION_BACKING` | 1,705 |
-| `STRICT_XNA_BACKING` | 275 |
-| `MANAGED_BY_DESIGN` | 577 |
-| `UPSTREAM_NOT_USEFUL_TO_RUST` | 126 |
-| `TOOLING_ONLY` | 42 |
-| `PLATFORM_ONLY` | 3 |
+| `CNA_EXTENSION_BACKING` | 1,854 |
+| `STRICT_XNA_BACKING` | 1,374 |
+| `MANAGED_BY_DESIGN` | 648 |
+| `UPSTREAM_NOT_USEFUL_TO_RUST` | 132 |
+| `TOOLING_ONLY` | 43 |
+| `PLATFORM_ONLY` | 4 |
 | `DEFERRED_RUNTIME` | 0 |
 | `INTERNAL_RUNTIME_ONLY` | 0 |
 | `UNMAPPED_REQUIRES_REVIEW` | 0 |
 
+| Binding decision | Routes |
+|---|---:|
+| `BOUND` | 3,236 |
+| `DELIBERATE_NON_BINDING` | 804 |
+| `BLOCKED_UPSTREAM` | 15 |
+| `DEFERRED_TRACKED` | 0 |
+| `ACTIONABLE_LOCAL` | 0 |
+| `UNREVIEWED` | 0 |
+
+Bound is not the same as reachable, and the census measures that separately:
+of the 3,236 bound routes, 97 have no safe call site, every one of them
+justified with a reason and one outcome from a closed set. The gate fails on an unexplained one.
+
 ### 3d. Modern CNA API under `cna::extensions`
 
-1,770 canonical routes still back CNA concepts XNA 4.0 does not have. They are
+1,854 canonical routes back CNA concepts XNA 4.0 does not have. They are
 exposed as safe, idiomatic Rust under `cna::extensions`, never inside the
 strict XNA hierarchy, and never as raw `cna_*` calls. See
 [docs/extensions.md](docs/extensions.md).

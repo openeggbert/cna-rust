@@ -22,8 +22,8 @@ concepts remain under `cna::extensions`.
 ## Native boundary and ABI evidence
 
 `cna-sys` contains the reviewed ABI-0.21 slice: fixed-width aliases, exact
-semantic handle typedefs, `repr(C)` structures, callbacks, constants, and 1,326
-function-pointer declarations. The
+semantic handle typedefs, `repr(C)` structures, callbacks, constants, and
+3,251 function-pointer declarations. The
 safe bridge is grouped by concern:
 
 - `native/api.rs`: symbol inventory and the loading gate;
@@ -53,10 +53,12 @@ The ABI verifier derives full C prototypes from Clang's view of canonical CNA
 headers and compares them with every reviewed `cna-sys` function type. It
 measures return and parameter types, scalar width/signedness, pointer depth and
 constness, callback/struct pointers, and boolean/enum representations. The
-current pass checks 1,326 functions and 4,574 prototype type positions.
-Independent C and Rust probes make 1,845 measurements across 98 structures,
-19 callback signatures, scalar representations, and 665 constants, with zero
-mismatches.
+current pass checks 3,251 functions and
+11,586 prototype type positions. Independent C and
+Rust probes make 3,174 measurements across
+187 structures, 39 callback
+signatures, scalar representations, and 902 constants, with
+zero mismatches.
 
 A second, independent gate covers the 1,119 symbol acquisitions that fill the
 runtime function-pointer tables. Matching prototypes are not enough on their

@@ -417,6 +417,14 @@ correction was a correction.
     with fourteen mutation tests.
 11. Three routes counted as `BOUND` were declared and acquired by nothing.
     Unbound.
+14. `Option::is_none_or` (stabilised 1.82) in a crate declaring MSRV 1.74. It
+    arrived with `RUST-EXT-015q` and the MSRV audit was not re-run, so a 1.74
+    build would not have compiled and nothing on a 1.85 host would have said
+    so. Replaced with `map_or(true, ..)`.
+15. Nine intra-doc links: six that resolve to nothing -- module notes pointing
+    at private modules and at methods under names they do not have -- and three
+    merely noisy. `cargo doc` is silent now, which is what makes the next one
+    visible.
 
 **In CNA upstream:** `RUST-UPSTREAM-028` and `RUST-UPSTREAM-029`, both new and
 both written up with the IL or the source that settles them.
@@ -438,8 +446,8 @@ both written up with the IL or the source that settles them.
 | Gate | Result |
 |---|---|
 | `cargo check --workspace --all-targets` | pass |
-| `cargo test --workspace --all-features` | see §13.1 |
-| `cargo doc --workspace --no-deps` | pass (rustdoc runs inside the API verifier) |
+| `cargo test --workspace --all-features` | **278 passed, 0 failed**, `direct-link` enabled |
+| `cargo doc --workspace --no-deps` | pass, **no warnings** -- nine broken or redundant intra-doc links fixed |
 | C API inventory + census gate | **exit 0**, first time with the reachability gate armed |
 | census mutation controls | 4 planted defects, 4 caught |
 | reachability mutation tests | 14 |
@@ -448,7 +456,7 @@ both written up with the IL or the source that settles them.
 | strict XNA verifier, selected profile | 110 diagnostics, all `UNEXPECTED_*`; see §12.13 |
 | strict XNA verifier, complete profile | 110, the same ones |
 | leak verifier | **0** -- internal leaks, raw handles, public unsafe, allowlist |
-| MSRV source audit | `MSRV_SOURCE_AUDIT=PASS`, `MSRV_RUNTIME=NOT_RUN` (no 1.74 toolchain) |
+| MSRV source audit | `MSRV_SOURCE_AUDIT=PASS` after removing one 1.82 API; `MSRV_RUNTIME=NOT_RUN` (no 1.74 toolchain) |
 | `rustfmt` | `NOT_AVAILABLE` on this source-tarball toolchain |
 | `clippy` | `NOT_AVAILABLE` on this source-tarball toolchain |
 | sanitizers | `NOT_RUN` |
