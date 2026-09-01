@@ -260,6 +260,12 @@ CNA_NATIVE_LIBRARY=/path/to/libcna_c_api.so \
 
 CNA_NATIVE_LIBRARY=/path/to/libcna_c_api.so \
   cargo test --workspace --all-features --test native_stress -- --nocapture
+
+# The visualization spectrum against a real device. Runs SDL's dummy driver and
+# pulseaudio in one go and requires them to agree, so it stays meaningful on a
+# host with no audio hardware. Plays a short, quiet, project-authored tone.
+CNA_NATIVE_LIBRARY=/path/to/libcna_c_api.so \
+  cargo test --test audio_backend_real -- --nocapture
 ```
 
 `--all-features` enables `direct-link`, which makes CNA a **link-time**
