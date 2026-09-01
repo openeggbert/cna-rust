@@ -1,104 +1,119 @@
 # CNA-Rust next work
 
-## 2026-08-31 — ABI 0.21, owned devices, CNB content, and two linkage modes
+## 2026-09-01 — the binding-status axis, and five families decided end to end
 
-The previous milestone closed the complete XNA 4.0 runtime profile. This one
-kept that at strict zero and moved everything else: the binding now admits live
-ABI 0.21, constructs graphics devices of its own, reads and writes CNA's
-compiled content format, and fills its function tables either through the
-platform loader or through symbols the linker resolved.
+The previous milestone closed the XNA 4.0 runtime profile and admitted ABI
+0.21. This one is about the *other* question the census had never asked
+separately: not what a route is for, but **why it is not bound**.
 
 ```text
-CNANEXT_HEAD=599d14e54e073b566d77b3d6fb30ac52d3d810b7 (clean)
-SHARP_RUNTIMENEXT_HEAD=4a49afb0cfe6a41e6e0af0bb62dc5175976731bb (clean)
+CNANEXT_HEAD=e20749761c0d57cfcae5cc7ff57b76e94a78b319
+CNANEXT_AT_QUALIFICATION=35268971c826d48ec3d40939e9b34a2b0595f94b
+                             # the artifacts below were built from this;
+                             # e2074976 is one net fix and does not touch
+                             # modules/c-api/include, so the canonical surface
+                             # measured here is unchanged
+SHARP_RUNTIMENEXT_HEAD=bd282d101640005454639b372f67e119ffa5642b
 
-ABI=0.21.0 / 0x1500          # was 0.20.0
-LIBRARY_SHA256=3a976d2494580ca9af45fbb2be30c13b01d05477f98ae80796ef26898c97d812
+ARTIFACT_ENGINE=cnanext/cmake-build-opengles3   # CNA_CNAEXT=ON, OPENGLES3
+ARTIFACT_HEADLESS=cnanext/cmake-build-headless  # CNA_CNAEXT=OFF, HEADLESS
+LIBRARY_SHA256=78f8933f9a84aa23f9ea8f3834ca9940f2744fd7c269e0dcc1fc79be7462e39b
 LIBRARY_EXPORTS=4054
-HEADER_EXPORTS=4054          # artifact and headers now agree exactly
-ENGINE_LAYER_VERSION=2
+HEADER_EXPORTS=4054
 
-ABI_FUNCTIONS=1591           # was 1326
-PROTOTYPE_TYPE_POSITIONS=5488  # was 4574
-C_RUST_MEASUREMENTS=2272     # was 1845
-LAYOUTS=121                  # was 98
-LAYOUT_FIELD_SETS_CHECKED=121  # new gate
-CALLBACKS=23                 # was 19
-CONSTANTS=790                # was 665
-SYMBOL_ACQUISITIONS=1587     # was 1119; +203 the gate had never seen
-LINKED_DECLARATIONS=1591     # new: the direct-link mode's typed externs
+CANONICAL_ROUTES=4054
+BOUND=2909                   # was 2523
+DELIBERATE_NON_BINDING=714   # was 457
+BLOCKED_UPSTREAM=15
+DEFERRED_TRACKED=0
+UNREVIEWED=416               # was 1074
+ACTIONABLE_LOCAL=0
+
+RUST_SYS_DECLARATIONS=2924
+SYMBOL_ACQUISITIONS=2920
+LINKED_DECLARATIONS=2924
+PROTOTYPE_MISMATCHES=0
+SYMBOL_TYPE_MISMATCHES=0
+LAYOUT_FIELD_SETS_CHECKED=179
+C_RUST_MEASUREMENTS=3040
 ABI_FINDINGS=0
 UNAUDITED_DECLARATIONS=0
 
-CANONICAL_ROUTES=4054
-RUST_SYS_BOUND=1591          # was 1326
-CNA_EXTENSION_BACKING=1452
-STRICT_XNA_BACKING=271
-MANAGED_BY_DESIGN=577
-UPSTREAM_NOT_USEFUL_TO_RUST=118  # was 126; eight were misclassified
-TOOLING_ONLY=42
-PLATFORM_ONLY=3
-DEFERRED_RUNTIME=0
-UNMAPPED_ROUTES=0
-
-PROFILE_SELECTED_DIAGNOSTICS=0
-PROFILE_FULL_MISSING_TYPES=0
-PROFILE_FULL_DIAGNOSTICS=0
-PROFILE_PIPELINE_MISSING_TYPES=125   # stated product boundary, not a backlog
-PROFILE_SUPERSET_MISSING_TYPES=125
-LEAK_DIAGNOSTICS=0
-
-WORKSPACE_TEST_SUITES=51
-WORKSPACE_TEST_ASSERTIONS=156
+WORKSPACE_TEST_FILES=30
+WORKSPACE_TEST_FUNCTIONS=159
+BOUND_WITHOUT_SAFE_CALL_SITE=894   # reported, not gated; RUST-CENSUS-002
 ```
+
+### The census now asks two questions instead of one
+
+```text
+purpose   what is this route for?      CNA_EXTENSION_BACKING, STRICT_XNA_BACKING, …
+binding   why does Rust not bind it?   BOUND, DELIBERATE_NON_BINDING, BLOCKED_*, …
+```
+
+Conflating them had two consequences, both now fixed: 1,170 routes had *no*
+purpose because `RUST_SYS_BOUND` short-circuited classification, and two header
+rules had been deleted as "unused" for the same reason. A declared status needs
+a reason; a block or a deferral needs a task as well; and a rule may carry
+`rustEvidence`, Rust symbols the census greps for, so "Rust already does this"
+cannot rot silently when the Rust it names is renamed.
+
+The gate fails while anything is `UNREVIEWED` or `ACTIONABLE_LOCAL`. It
+currently fails on 416 undecided routes, which is the honest state.
+
+### Five families decided end to end
+
+| Family | Bound | Deliberate | What was actually there |
+|---|---|---|---|
+| `models.h` | 80 | 30 | the Rust `Model` already existed; what was missing was CNA's *loaded* model and its glTF facts |
+| `sensors.h` | 50 | 12 | a whole motion sensor, events, and the deterministic backends |
+| `cnb.h` | 178 | 0 | the format itself: writer, cursor, chunks, codecs, `.cnj` |
+| `effects.h` | 66 | 12 | `ShaderEffect`, `ColorMatrixEffect`, and what an effect can say about itself |
+| `content_readers.h` | 14 | 12 | the content `Tag`; the reflective builder is unsafe to project |
 
 ### What this milestone found
 
-Four defects that had already shipped, each found by writing a test that
-asserted a value rather than a success code:
+Three defects in CNA, each with a reproducer that runs without this repository:
 
-- **`CNA_CnbReadLimits` was missing a field.** Six declared bounds against
-  seven in C; padding hid it exactly, so `sizeof`, alignment and every declared
-  offset agreed. The layout gate could not have caught it, so the verifier now
-  asks Clang for each structure's real field list — 121 checked.
-- **203 media routes were outside the symbol gate entirely.** They were `usize`
-  slots each call site transmuted, so `SYMBOL_TYPE_MISMATCH` had no declared
-  alias to check. Typed now; all 203 proved correctly paired.
-- **The symbol gate then went blind.** Moving call sites to identifiers broke
-  its regex, and it reported zero acquisitions and zero mismatches — a clean
-  pass. There is a floor under the scan now.
-- **Tightening one `.cnb` read bound zeroed the others,** because `None` was
-  sent as `0` and CNA reads `0` as a literal limit.
+- **`RUST-UPSTREAM-021`** — destroying a content-loaded `Model` with a mesh
+  part faults. `~MeshResource` moves an empty `detachedValue` over a loaded
+  part's `value` and `~PartResource` dereferences it. Leaking the handle does
+  not avoid it; the registry runs the same destructor at exit.
+- **`RUST-UPSTREAM-022`** — a content-loaded skin's skeleton is unreachable,
+  with a refusal the header does not document.
+- **`RUST-UPSTREAM-020`** — the camera test backend leaves CNA's global
+  platform override dangling. Re-measured, still reproduces.
 
-And one in the tooling: the project generator dropped `cna-sys`'s new build
-script, which the generated-project canary caught.
+And two in this crate, both found by asserting a value rather than a code:
 
-### Two decisions, both recorded with evidence
+- **The PBR texture slots were transposed.** `TextureSlot::index()` mapped
+  Occlusion to 3 and Emissive to 4; the ABI is the other way round, so
+  `PbrMaterialFull`'s per-slot coordinate set and transform silently read and
+  wrote each other's slot.
+- **`Accelerometer::inject` documented the wrong unit.** It takes metres per
+  second squared and the reading comes back in `g`; injecting 9.80665 reads
+  back 1.0. The gyroscope converts nothing, and now says so.
 
-- [`docs/content-pipeline-decision.md`](docs/content-pipeline-decision.md) —
-  the 125 design-time types are **out of scope**. Seventeen cannot be projected
-  faithfully at all, and CNA's own `.cnj`/`.cnb` tooling already does the job,
-  through routes this binding now uses.
-- [`docs/engine-layer-scope.md`](docs/engine-layer-scope.md) — the engine layer
-  is bound one slice at a time, and a slice qualifies when its semantics can be
-  asserted exactly. 808 routes remain, blocked on a GPU-backed artifact rather
-  than on anything here.
+Two more measured facts that are not defects but were not written down:
 
-## Do next
+- `cna_effect_get_graphics_device` resolves through the effect's *parent game*,
+  so an effect on an independently constructed `GraphicsDevice` is refused.
+- `cna_cnb_document_require_asset`'s second argument is the **highest** schema
+  version a decoder understands, not the version it expects. Reading it the
+  other way makes every decoder refuse every file older than itself.
 
-Everything locally actionable is done: `docs/backlog.md` has no `READY` row.
-What remains is blocked, and each row says on what.
+### Do next
 
-1. **A GPU-backed qualified artifact** is the single highest-value unblock. It
-   turns most of the 224 engine-layer families from "constructs" into
-   "constructs and can be asserted", and it is what
-   `docs/engine-layer-scope.md` names as the trigger.
-2. **A wasm Rust target.** The binding's side is done — `direct-link` works and
-   is verified — so `RUST-PLATFORM-003` now waits only on a toolchain this host
-   does not have and that this session may not install.
-3. **Re-measure the three standing upstream blockers** when cnanext moves.
-   `RUST-BEHAVIOR-011` was one of four and is now fixed; the others are
-   `runtime.h`'s missing context rebind, `runtime_graphics_manager.h`'s missing
-   ranking route, and `cna_gamer_*` on a network gamer handle.
-4. **A second machine** for `RUST-BEHAVIOR-012`, and **real hardware** for the
-   sensor, haptic and audio-backend rows.
+1. **The remaining 416 undecided routes.** `graphics_device.h` (40),
+   `input_gamepad.h` (37), `runtime_components.h` (34), `devices.h` (34),
+   `content.h` (30), `input_touch.h` (25) and a long tail. Each needs the same
+   treatment the five families above got: read what is already in Rust before
+   deciding anything is missing.
+2. **`RUST-CENSUS-002`: 894 bound routes with no safe call site.** Reported
+   rather than gated, because declaring a whole family so a missing symbol fails
+   at load is deliberate and read-only projections legitimately leave the C
+   mutators uncalled. Working the list down is what turns that from a claim into
+   a measurement.
+3. **The standing blockers.** A GPU-backed qualified artifact for the engine
+   layer; a wasm toolchain for `RUST-PLATFORM-003`; a second machine for
+   `RUST-BEHAVIOR-012`.
