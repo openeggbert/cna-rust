@@ -15,6 +15,7 @@ use cna::extensions::device_surface::{
     DeviceSurface, ReadsVertexLayout, Rgba8Data, ScaledSprite,
 };
 use cna::extensions::events::EventArgs;
+use cna::extensions::graphics_device_ext::DeviceStateExt;
 use cna::extensions::resource_events::NotifiesContentLost;
 use cna::Microsoft::Xna::Framework::Graphics::{
     BufferUsage, GraphicsDevice, GraphicsProfile, PresentationParameters, RenderTargetUsage,

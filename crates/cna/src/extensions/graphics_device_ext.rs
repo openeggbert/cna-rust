@@ -73,7 +73,9 @@ impl DeviceEvent {
     }
 }
 
-/// Capabilities a game asks before choosing a rendering path.
+// The two shapes almost every route in this module has. They stay inherent
+// because they are private plumbing rather than public surface: an inherent
+// `pub fn` on a strict XNA type is what this module exists not to add.
 impl GraphicsDevice {
     fn flag(
         &self,
@@ -85,32 +87,84 @@ impl GraphicsDevice {
         native.check(route(&native, handle, &mut value))?;
         Ok(value != sys::CNA_FALSE)
     }
+}
 
+/// Capabilities a game asks before choosing a rendering path.
+///
+/// Distinct from [`crate::extensions::graphics::RendererCapabilityExt`], which
+/// is CNA's generic capability *tables* -- a feature enum, a limit enum, a
+/// per-format usage mask. These are the individually typed questions
+/// `graphics_device.h` publishes, and the colour space the display is
+/// presenting in.
+///
+/// A CNA extension: import it to call these.
+///
+/// ```rust,ignore
+/// use cna::extensions::graphics_device_ext::DeviceCapabilityExt;
+/// if device.executes_shader_effect_source()? { /* ... */ }
+/// ```
+pub trait DeviceCapabilityExt {
     /// Whether this renderer compiles shader-effect source at all.
     ///
     /// `false` means `ShaderEffect` will construct and never draw, which is a
     /// different answer from a shader that failed to compile.
-    pub fn executes_shader_effect_source(&self) -> Result<bool> {
-        self.flag(|native, handle, out| {
-            // SAFETY: owned handle, live output.
-            unsafe { (native.graphics_device_executes_shader_effect_source_ext)(handle, out) }
-        })
-    }
+    fn executes_shader_effect_source(&self) -> Result<bool>;
 
     /// Whether this renderer can light from an environment map.
-    pub fn supports_image_based_lighting(&self) -> Result<bool> {
-        self.flag(|native, handle, out| {
-            // SAFETY: owned handle, live output.
-            unsafe { (native.graphics_device_supports_image_based_lighting_ext)(handle, out) }
-        })
-    }
+    fn supports_image_based_lighting(&self) -> Result<bool>;
 
     /// Whether a surface format can be drawn into rather than only sampled.
     ///
     /// The two are different capabilities and a renderer routinely has one
     /// without the other, which is why this is not `SurfaceFormat`'s own
     /// question.
-    pub fn supports_surface_format_as_render_target(
+    fn supports_surface_format_as_render_target(
+        &self,
+        format: SurfaceFormat,
+    ) -> Result<bool>;
+
+    /// Whether the display can present in that colour space.
+    fn supports_display_color_space(&self, color_space: u32) -> Result<bool>;
+
+    /// The colour space the display is currently presenting in.
+    fn display_color_space(&self) -> Result<u32>;
+
+    /// Asks the display to present in that colour space.
+    ///
+    /// Answers whether it took. A refusal is an ordinary answer on a display
+    /// that cannot, which is why it is not a failure.
+    fn set_display_color_space(&self, color_space: u32) -> Result<bool>;
+
+    /// The largest compute work-group count on one axis.
+    fn max_compute_work_group_count(&self, axis: i32) -> Result<i32>;
+
+    /// The largest compute work-group size on one axis.
+    fn max_compute_work_group_size(&self, axis: i32) -> Result<i32>;
+
+    /// The largest number of invocations one work group may have.
+    ///
+    /// Separate from the per-axis sizes and smaller than their product on real
+    /// hardware, which is why a dispatch sized from the axes alone can still be
+    /// refused.
+    fn max_compute_work_group_invocations(&self) -> Result<i32>;
+}
+
+impl DeviceCapabilityExt for GraphicsDevice {
+    fn executes_shader_effect_source(&self) -> Result<bool> {
+        self.flag(|native, handle, out| {
+            // SAFETY: owned handle, live output.
+            unsafe { (native.graphics_device_executes_shader_effect_source_ext)(handle, out) }
+        })
+    }
+
+    fn supports_image_based_lighting(&self) -> Result<bool> {
+        self.flag(|native, handle, out| {
+            // SAFETY: owned handle, live output.
+            unsafe { (native.graphics_device_supports_image_based_lighting_ext)(handle, out) }
+        })
+    }
+
+    fn supports_surface_format_as_render_target(
         &self,
         format: SurfaceFormat,
     ) -> Result<bool> {
@@ -128,8 +182,7 @@ impl GraphicsDevice {
         Ok(value != sys::CNA_FALSE)
     }
 
-    /// Whether the display can present in that colour space.
-    pub fn supports_display_color_space(&self, color_space: u32) -> Result<bool> {
+    fn supports_display_color_space(&self, color_space: u32) -> Result<bool> {
         let handle = self.handle()?;
         let native = Native::process()?;
         let mut value = sys::CNA_FALSE;
@@ -144,8 +197,7 @@ impl GraphicsDevice {
         Ok(value != sys::CNA_FALSE)
     }
 
-    /// The colour space the display is currently presenting in.
-    pub fn display_color_space(&self) -> Result<u32> {
+    fn display_color_space(&self) -> Result<u32> {
         let handle = self.handle()?;
         let native = Native::process()?;
         let mut value = 0_u32;
@@ -156,11 +208,7 @@ impl GraphicsDevice {
         Ok(value)
     }
 
-    /// Asks the display to present in that colour space.
-    ///
-    /// Answers whether it took. A refusal is an ordinary answer on a display
-    /// that cannot, which is why it is not a failure.
-    pub fn set_display_color_space(&self, color_space: u32) -> Result<bool> {
+    fn set_display_color_space(&self, color_space: u32) -> Result<bool> {
         let handle = self.handle()?;
         let native = Native::process()?;
         let mut value = sys::CNA_FALSE;
@@ -171,8 +219,7 @@ impl GraphicsDevice {
         Ok(value != sys::CNA_FALSE)
     }
 
-    /// The largest compute work-group count on one axis.
-    pub fn max_compute_work_group_count(&self, axis: i32) -> Result<i32> {
+    fn max_compute_work_group_count(&self, axis: i32) -> Result<i32> {
         let handle = self.handle()?;
         let native = Native::process()?;
         let mut value = 0_i32;
@@ -187,8 +234,7 @@ impl GraphicsDevice {
         Ok(value)
     }
 
-    /// The largest compute work-group size on one axis.
-    pub fn max_compute_work_group_size(&self, axis: i32) -> Result<i32> {
+    fn max_compute_work_group_size(&self, axis: i32) -> Result<i32> {
         let handle = self.handle()?;
         let native = Native::process()?;
         let mut value = 0_i32;
@@ -199,12 +245,7 @@ impl GraphicsDevice {
         Ok(value)
     }
 
-    /// The largest number of invocations one work group may have.
-    ///
-    /// Separate from the per-axis sizes and smaller than their product on real
-    /// hardware, which is why a dispatch sized from the axes alone can still be
-    /// refused.
-    pub fn max_compute_work_group_invocations(&self) -> Result<i32> {
+    fn max_compute_work_group_invocations(&self) -> Result<i32> {
         let handle = self.handle()?;
         let native = Native::process()?;
         let mut value = 0_i32;
@@ -216,34 +257,120 @@ impl GraphicsDevice {
     }
 }
 
-/// Device state, lifecycle, and the render-state toggles under the state objects.
 impl GraphicsDevice {
-    /// Whether the device has been disposed.
-    pub fn is_disposed_native(&self) -> Result<bool> {
-        self.flag(|native, handle, out| {
-            // SAFETY: owned handle, live output.
-            unsafe { (native.graphics_device_get_is_disposed)(handle, out) }
-        })
+    fn toggle(
+        &self,
+        enabled: bool,
+        route: impl FnOnce(&Native, sys::CNA_Handle, sys::CNA_Bool) -> sys::CNA_Result,
+    ) -> Result<()> {
+        let handle = self.handle()?;
+        let native = Native::process()?;
+        native.check(route(&native, handle, u8::from(enabled)))
     }
+}
+
+/// Device state, lifecycle, and the render-state toggles under the state objects.
+///
+/// XNA reaches render state only through `BlendState`, `DepthStencilState` and
+/// their siblings, which set several things at once. CNA also publishes the
+/// individual toggles underneath them, along with the device's own disposal,
+/// resource accounting and renderer-rebuild routes.
+///
+/// A CNA extension: import it to call these.
+///
+/// ```rust,ignore
+/// use cna::extensions::graphics_device_ext::DeviceStateExt;
+/// device.set_depth_test_enabled(false)?;
+/// ```
+pub trait DeviceStateExt {
+    /// Whether the device has been disposed.
+    fn is_disposed_native(&self) -> Result<bool>;
 
     /// Disposes the device through CNA rather than through Rust's `Drop`.
     ///
     /// The strict projection's `Dispose` is the one to reach for; this exists
     /// because the route is part of the header and a caller holding a device
     /// CNA owns may need it.
-    pub fn dispose_native(&self) -> Result<()> {
-        let handle = self.handle()?;
-        let native = Native::process()?;
-        // SAFETY: the handle is owned by a live device.
-        native.check(unsafe { (native.graphics_device_dispose)(handle) })
-    }
+    fn dispose_native(&self) -> Result<()>;
 
     /// How many resources the device is currently tracking.
     ///
     /// The count that must fall back to its starting value when everything a
     /// test made is dropped, which is what makes a leak assertable rather than
     /// merely unlikely.
-    pub fn tracked_resource_count(&self) -> Result<u64> {
+    fn tracked_resource_count(&self) -> Result<u64>;
+
+    /// Clears the colour and depth buffers in one call.
+    fn clear_color_depth(&self, color: Color, depth: f32) -> Result<()>;
+
+    /// Makes one effect the device's current one.
+    fn set_current_effect(&self, effect: &Effect) -> Result<()>;
+
+    /// Unbinds one texture from every slot it is bound to.
+    ///
+    /// What a caller does before destroying a texture the device may still be
+    /// holding, which is otherwise a refusal at destroy time.
+    fn unbind_texture(&self, texture: &Texture2D) -> Result<()>;
+
+    /// Turns blending on or off directly.
+    fn set_blend_enabled(&self, enabled: bool) -> Result<()>;
+
+    /// Turns depth testing on or off directly.
+    fn set_depth_test_enabled(&self, enabled: bool) -> Result<()>;
+
+    /// Turns depth writing on or off directly.
+    fn set_depth_write_enabled(&self, enabled: bool) -> Result<()>;
+
+    /// Whether the device tries to recover a lost renderer context.
+    fn set_context_recovery_enabled(&self, enabled: bool) -> Result<()>;
+
+    /// What the device does when a 3D call cannot be served.
+    fn unsupported_3d_call_behavior(&self) -> Result<Unsupported3DCallBehavior>;
+
+    /// Chooses what the device does when a 3D call cannot be served.
+    fn set_unsupported_3d_call_behavior(
+        &self,
+        behavior: Unsupported3DCallBehavior,
+    ) -> Result<()>;
+
+    /// Changes the profile the device reports and enforces.
+    fn set_graphics_profile(&self, profile: GraphicsProfile) -> Result<()>;
+
+    /// Rebuilds the renderer for a different multi-sample count.
+    ///
+    /// Heavier than a state change: it recreates the renderer, so every
+    /// resource the device tracks sees a lost-and-reset cycle.
+    fn recreate_renderer_for_multi_sample_count(&self, count: i32) -> Result<()>;
+
+    /// Tells the device its content-loaded resources are gone.
+    ///
+    /// What a content manager calls when it unloads, so the device stops
+    /// tracking resources whose backing has already been freed.
+    fn notify_content_lost_resources(&self) -> Result<()>;
+
+    /// Puts a named marker in the renderer's command stream.
+    ///
+    /// For a graphics debugger. A renderer with no marker support ignores it,
+    /// which is why this reports nothing.
+    fn set_string_marker(&self, text: &str) -> Result<()>;
+}
+
+impl DeviceStateExt for GraphicsDevice {
+    fn is_disposed_native(&self) -> Result<bool> {
+        self.flag(|native, handle, out| {
+            // SAFETY: owned handle, live output.
+            unsafe { (native.graphics_device_get_is_disposed)(handle, out) }
+        })
+    }
+
+    fn dispose_native(&self) -> Result<()> {
+        let handle = self.handle()?;
+        let native = Native::process()?;
+        // SAFETY: the handle is owned by a live device.
+        native.check(unsafe { (native.graphics_device_dispose)(handle) })
+    }
+
+    fn tracked_resource_count(&self) -> Result<u64> {
         let handle = self.handle()?;
         let native = Native::process()?;
         let mut value = 0_u64;
@@ -253,8 +380,7 @@ impl GraphicsDevice {
         Ok(value)
     }
 
-    /// Clears the colour and depth buffers in one call.
-    pub fn clear_color_depth(&self, color: Color, depth: f32) -> Result<()> {
+    fn clear_color_depth(&self, color: Color, depth: f32) -> Result<()> {
         let handle = self.handle()?;
         let native = Native::process()?;
         let native_color = sys::CNA_Color {
@@ -269,8 +395,7 @@ impl GraphicsDevice {
         })
     }
 
-    /// Makes one effect the device's current one.
-    pub fn set_current_effect(&self, effect: &Effect) -> Result<()> {
+    fn set_current_effect(&self, effect: &Effect) -> Result<()> {
         let handle = self.handle()?;
         let native = Native::process()?;
         // SAFETY: both handles belong to live values.
@@ -279,61 +404,42 @@ impl GraphicsDevice {
         })
     }
 
-    /// Unbinds one texture from every slot it is bound to.
-    ///
-    /// What a caller does before destroying a texture the device may still be
-    /// holding, which is otherwise a refusal at destroy time.
-    pub fn unbind_texture(&self, texture: &Texture2D) -> Result<()> {
+    fn unbind_texture(&self, texture: &Texture2D) -> Result<()> {
         let handle = self.handle()?;
         let native = Native::process()?;
         // SAFETY: both handles belong to live values.
         native.check(unsafe { (native.graphics_device_unbind_texture)(handle, texture.handle()?) })
     }
 
-    /// Turns blending on or off directly.
-    pub fn set_blend_enabled(&self, enabled: bool) -> Result<()> {
+    fn set_blend_enabled(&self, enabled: bool) -> Result<()> {
         self.toggle(enabled, |native, handle, value| {
             // SAFETY: owned handle, flag by value.
             unsafe { (native.graphics_device_set_blend_enabled)(handle, value) }
         })
     }
 
-    /// Turns depth testing on or off directly.
-    pub fn set_depth_test_enabled(&self, enabled: bool) -> Result<()> {
+    fn set_depth_test_enabled(&self, enabled: bool) -> Result<()> {
         self.toggle(enabled, |native, handle, value| {
             // SAFETY: owned handle, flag by value.
             unsafe { (native.graphics_device_set_depth_test_enabled)(handle, value) }
         })
     }
 
-    /// Turns depth writing on or off directly.
-    pub fn set_depth_write_enabled(&self, enabled: bool) -> Result<()> {
+    fn set_depth_write_enabled(&self, enabled: bool) -> Result<()> {
         self.toggle(enabled, |native, handle, value| {
             // SAFETY: owned handle, flag by value.
             unsafe { (native.graphics_device_set_depth_write_enabled)(handle, value) }
         })
     }
 
-    /// Whether the device tries to recover a lost renderer context.
-    pub fn set_context_recovery_enabled(&self, enabled: bool) -> Result<()> {
+    fn set_context_recovery_enabled(&self, enabled: bool) -> Result<()> {
         self.toggle(enabled, |native, handle, value| {
             // SAFETY: owned handle, flag by value.
             unsafe { (native.graphics_device_set_context_recovery_enabled)(handle, value) }
         })
     }
 
-    fn toggle(
-        &self,
-        enabled: bool,
-        route: impl FnOnce(&Native, sys::CNA_Handle, sys::CNA_Bool) -> sys::CNA_Result,
-    ) -> Result<()> {
-        let handle = self.handle()?;
-        let native = Native::process()?;
-        native.check(route(&native, handle, u8::from(enabled)))
-    }
-
-    /// What the device does when a 3D call cannot be served.
-    pub fn unsupported_3d_call_behavior(&self) -> Result<Unsupported3DCallBehavior> {
+    fn unsupported_3d_call_behavior(&self) -> Result<Unsupported3DCallBehavior> {
         let handle = self.handle()?;
         let native = Native::process()?;
         let mut value = 0_u32;
@@ -346,8 +452,7 @@ impl GraphicsDevice {
         ))
     }
 
-    /// Chooses what the device does when a 3D call cannot be served.
-    pub fn set_unsupported_3d_call_behavior(
+    fn set_unsupported_3d_call_behavior(
         &self,
         behavior: Unsupported3DCallBehavior,
     ) -> Result<()> {
@@ -362,8 +467,7 @@ impl GraphicsDevice {
         })
     }
 
-    /// Changes the profile the device reports and enforces.
-    pub fn set_graphics_profile(&self, profile: GraphicsProfile) -> Result<()> {
+    fn set_graphics_profile(&self, profile: GraphicsProfile) -> Result<()> {
         let handle = self.handle()?;
         let native = Native::process()?;
         // SAFETY: the handle is owned and the profile is by value.
@@ -372,11 +476,7 @@ impl GraphicsDevice {
         })
     }
 
-    /// Rebuilds the renderer for a different multi-sample count.
-    ///
-    /// Heavier than a state change: it recreates the renderer, so every
-    /// resource the device tracks sees a lost-and-reset cycle.
-    pub fn recreate_renderer_for_multi_sample_count(&self, count: i32) -> Result<()> {
+    fn recreate_renderer_for_multi_sample_count(&self, count: i32) -> Result<()> {
         let handle = self.handle()?;
         let native = Native::process()?;
         // SAFETY: the handle is owned and the count is by value.
@@ -385,22 +485,14 @@ impl GraphicsDevice {
         })
     }
 
-    /// Tells the device its content-loaded resources are gone.
-    ///
-    /// What a content manager calls when it unloads, so the device stops
-    /// tracking resources whose backing has already been freed.
-    pub fn notify_content_lost_resources(&self) -> Result<()> {
+    fn notify_content_lost_resources(&self) -> Result<()> {
         let handle = self.handle()?;
         let native = Native::process()?;
         // SAFETY: the handle is owned.
         native.check(unsafe { (native.graphics_device_notify_content_lost_resources_ext)(handle) })
     }
 
-    /// Puts a named marker in the renderer's command stream.
-    ///
-    /// For a graphics debugger. A renderer with no marker support ignores it,
-    /// which is why this reports nothing.
-    pub fn set_string_marker(&self, text: &str) -> Result<()> {
+    fn set_string_marker(&self, text: &str) -> Result<()> {
         let handle = self.handle()?;
         let native = Native::process()?;
         let view = sys::CNA_StringView {
@@ -499,9 +591,48 @@ pub struct ResourceDestroyed {
     pub name: String,
 }
 
-impl GraphicsDevice {
+/// The device's own lifecycle and resource-tracking events.
+///
+/// XNA raises `Disposing`, `DeviceLost`, `DeviceReset` and `DeviceResetting`
+/// through CLR events, which the strict projection covers with its
+/// `Add*Handler`/`Remove*Handler` pairs. These are CNA's native subscriptions
+/// to the same transitions plus the two resource-tracking events XNA has no
+/// counterpart for, and each returns a [`DeviceSubscription`] that withdraws
+/// itself on drop.
+///
+/// A CNA extension: import it to call these.
+///
+/// ```rust,ignore
+/// use cna::extensions::graphics_device_ext::{DeviceEvent, DeviceEventExt};
+/// let subscription = device.on_event(DeviceEvent::DeviceReset, || {})?;
+/// ```
+pub trait DeviceEventExt {
     /// Calls `callback` when the device raises that event.
-    pub fn on_event(
+    fn on_event(
+        &self,
+        event: DeviceEvent,
+        callback: impl FnMut() + Send + 'static,
+    ) -> Result<DeviceSubscription>;
+
+    /// Calls `callback` whenever the device starts tracking a resource.
+    ///
+    /// The event carries whether a resource is attached rather than the
+    /// resource itself: the object is the device's, mid-construction, and
+    /// handing a Rust value out here would be publishing a half-built one.
+    fn on_resource_created(
+        &self,
+        callback: impl FnMut(bool) + Send + 'static,
+    ) -> Result<DeviceSubscription>;
+
+    /// Calls `callback` whenever the device stops tracking a resource.
+    fn on_resource_destroyed(
+        &self,
+        callback: impl FnMut(ResourceDestroyed) + Send + 'static,
+    ) -> Result<DeviceSubscription>;
+}
+
+impl DeviceEventExt for GraphicsDevice {
+    fn on_event(
         &self,
         event: DeviceEvent,
         callback: impl FnMut() + Send + 'static,
@@ -551,12 +682,7 @@ impl GraphicsDevice {
         })
     }
 
-    /// Calls `callback` whenever the device starts tracking a resource.
-    ///
-    /// The event carries whether a resource is attached rather than the
-    /// resource itself: the object is the device's, mid-construction, and
-    /// handing a Rust value out here would be publishing a half-built one.
-    pub fn on_resource_created(
+    fn on_resource_created(
         &self,
         callback: impl FnMut(bool) + Send + 'static,
     ) -> Result<DeviceSubscription> {
@@ -606,8 +732,7 @@ impl GraphicsDevice {
         })
     }
 
-    /// Calls `callback` whenever the device stops tracking a resource.
-    pub fn on_resource_destroyed(
+    fn on_resource_destroyed(
         &self,
         callback: impl FnMut(ResourceDestroyed) + Send + 'static,
     ) -> Result<DeviceSubscription> {
@@ -687,9 +812,28 @@ pub fn primitive_vertex_count(
     Ok(value)
 }
 
-impl crate::graphics::OcclusionQuery {
+/// What CNA can say about an XNA `OcclusionQuery` that XNA cannot.
+///
+/// A CNA extension: import it to call these.
+///
+/// ```rust,ignore
+/// use cna::extensions::graphics_device_ext::OcclusionQueryExt;
+/// let exact = query.is_pixel_count_precise()?;
+/// ```
+pub trait OcclusionQueryExt {
     /// Whether a renderer is attached to answer this query at all.
-    pub fn has_renderer(&self) -> Result<bool> {
+    fn has_renderer(&self) -> Result<bool>;
+
+    /// Whether the pixel count is exact rather than conservative.
+    ///
+    /// A renderer that only answers "some pixels passed" reports `false`, and a
+    /// game that draws a lens flare proportional to the count needs to know
+    /// which it is getting.
+    fn is_pixel_count_precise(&self) -> Result<bool>;
+}
+
+impl OcclusionQueryExt for crate::graphics::OcclusionQuery {
+    fn has_renderer(&self) -> Result<bool> {
         let handle = self.native_handle()?;
         let native = Native::process()?;
         let mut value = sys::CNA_FALSE;
@@ -698,12 +842,7 @@ impl crate::graphics::OcclusionQuery {
         Ok(value != sys::CNA_FALSE)
     }
 
-    /// Whether the pixel count is exact rather than conservative.
-    ///
-    /// A renderer that only answers "some pixels passed" reports `false`, and a
-    /// game that draws a lens flare proportional to the count needs to know
-    /// which it is getting.
-    pub fn is_pixel_count_precise(&self) -> Result<bool> {
+    fn is_pixel_count_precise(&self) -> Result<bool> {
         let handle = self.native_handle()?;
         let native = Native::process()?;
         let mut value = sys::CNA_FALSE;

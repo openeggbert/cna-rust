@@ -16,7 +16,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use cna::extensions::graphics_device_ext::{
-    primitive_vertex_count, DeviceEvent, Unsupported3DCallBehavior,
+    primitive_vertex_count, DeviceCapabilityExt, DeviceEvent, DeviceEventExt, DeviceStateExt,
+    Unsupported3DCallBehavior,
 };
 use cna::Microsoft::Xna::Framework::Graphics::{
     GraphicsDevice, GraphicsProfile, PresentationParameters, PrimitiveType, SurfaceFormat,
