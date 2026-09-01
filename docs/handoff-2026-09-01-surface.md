@@ -355,7 +355,7 @@ import lines; not one call was rewritten.
 
 ```text
 cna-rust           develop, tree clean
-                   14 local commits, ahead 14 / behind 0 of origin/develop
+                   16 local commits, ahead 16 / behind 0 of origin/develop
                    NOTHING PUSHED
 cna-rust-template  develop @ 416642b, tree clean, untouched
 cnanext            next    @ 7712534d3, 0 tracked modifications
@@ -364,7 +364,7 @@ sharp-runtimenext  next    @ 9cc96cd57, 0 tracked modifications
 git diff --check    clean, both writable repositories
 ```
 
-The fourteen commits, oldest first:
+The sixteen commits, oldest first:
 
 ```text
 06903c4  the graphics device's own surface, behind four traits     110 -> 80
@@ -380,7 +380,9 @@ bffa599  prove the extension call shapes from outside the crate
 51840a5  the seventeen-section record for the surface milestone
 602dfe9  a trait-impl caller is a safe call site, permanently
 5311763  what the naming rule now covers, and the split
-(tip)    the ending git state, the commits, and where the artifacts are
+2d25477  the ending git state, the commits, and where the artifacts are
+29cf1da  both strict profiles and the extension gate on --all-features
+(tip)    the final commit count
 ```
 
 ### Build artifacts
