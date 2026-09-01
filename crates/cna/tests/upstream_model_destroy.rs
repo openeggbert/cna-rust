@@ -86,7 +86,12 @@ fn host() -> Option<(GraphicsDevice, NativeContentManager)> {
             println!("REPRO: skip -- this renderer needs a window: {message}");
             return None;
         }
-        Err(error) => panic!("independent GraphicsDevice construction failed: {error}"),
+        Err(error) => panic!(
+            "independent GraphicsDevice construction failed with something other than \
+             the renderer's no-window refusal, which is the only failure this skips. \
+             Seen once under a parallel full-suite run and not reproduced since, so the \
+             exact text matters: {error:?}"
+        ),
     };
     let root = content_root();
     let manager = NativeContentManager::new(&device, root.to_str().expect("utf-8 root"))

@@ -689,6 +689,34 @@ pub type CNA_CnbByteWriterHandle = CNA_Handle;
 pub type CNA_CnbAnimationClipHandle = CNA_Handle;
 pub type CNA_CurveHandle = CNA_Handle;
 pub type CNA_SystemTrayHandle = CNA_Handle;
+
+pub type CNA_GamePadButtonLabel = u32;
+
+pub const CNA_GAMEPAD_BUTTON_LABEL_UNKNOWN: CNA_GamePadButtonLabel = 0;
+pub const CNA_GAMEPAD_BUTTON_LABEL_A: CNA_GamePadButtonLabel = 1;
+pub const CNA_GAMEPAD_BUTTON_LABEL_B: CNA_GamePadButtonLabel = 2;
+pub const CNA_GAMEPAD_BUTTON_LABEL_X: CNA_GamePadButtonLabel = 3;
+pub const CNA_GAMEPAD_BUTTON_LABEL_Y: CNA_GamePadButtonLabel = 4;
+pub const CNA_GAMEPAD_BUTTON_LABEL_CROSS: CNA_GamePadButtonLabel = 5;
+pub const CNA_GAMEPAD_BUTTON_LABEL_CIRCLE: CNA_GamePadButtonLabel = 6;
+pub const CNA_GAMEPAD_BUTTON_LABEL_SQUARE: CNA_GamePadButtonLabel = 7;
+pub const CNA_GAMEPAD_BUTTON_LABEL_TRIANGLE: CNA_GamePadButtonLabel = 8;
+
+pub type CNA_GamePadConnectionState = u32;
+
+pub const CNA_GAMEPAD_CONNECTION_STATE_UNKNOWN: CNA_GamePadConnectionState = 0;
+pub const CNA_GAMEPAD_CONNECTION_STATE_WIRED: CNA_GamePadConnectionState = 1;
+pub const CNA_GAMEPAD_CONNECTION_STATE_WIRELESS: CNA_GamePadConnectionState = 2;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_GamePadTouchpadFinger {
+    pub is_down: CNA_Bool,
+    pub reserved: [u8; 3],
+    pub x: f32,
+    pub y: f32,
+    pub pressure: f32,
+}
 pub type CNA_GraphicsDeviceEventRegistrationHandle = CNA_Handle;
 
 pub type CNA_GraphicsDeviceEvent = u32;
@@ -12931,4 +12959,80 @@ pub type cna_occlusion_query_has_renderer_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_primitive_type_get_vertex_count_fn = unsafe extern "C" fn(
     CNA_PrimitiveType, i32, *mut i32,
+) -> CNA_Result;
+
+// --- RUST-EXT-015e: what a modern gamepad is, beyond XNA's four values ------
+//
+// XNA's GamePad is two sticks, two triggers and a button mask. A controller
+// since then also has a touchpad, motion sensors, a light bar, trigger
+// motors, a battery, a serial number and its own idea of what its buttons
+// are called. None of that is a value Rust holds, so all of it is bound.
+pub type cna_gamepad_copy_guid_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_gamepad_copy_name_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_gamepad_copy_path_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_gamepad_copy_serial_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_gamepad_exclude_axis_dead_zone_fn = unsafe extern "C" fn(
+    f32, f32, *mut f32,
+) -> CNA_Result;
+pub type cna_gamepad_get_accelerometer_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, *mut CNA_Vector3, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_gamepad_get_button_label_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, CNA_GamePadButtonFlags, *mut CNA_GamePadButtonLabel,
+) -> CNA_Result;
+pub type cna_gamepad_get_connection_state_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, *mut CNA_GamePadConnectionState,
+) -> CNA_Result;
+pub type cna_gamepad_get_firmware_version_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, *mut u16,
+) -> CNA_Result;
+pub type cna_gamepad_get_guid_size_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, *mut u64,
+) -> CNA_Result;
+pub type cna_gamepad_get_gyro_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, *mut CNA_Vector3, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_gamepad_get_name_size_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, *mut u64,
+) -> CNA_Result;
+pub type cna_gamepad_get_path_size_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, *mut u64,
+) -> CNA_Result;
+pub type cna_gamepad_get_player_index_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, *mut i32,
+) -> CNA_Result;
+pub type cna_gamepad_get_power_info_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, *mut CNA_PowerState, *mut i32,
+) -> CNA_Result;
+pub type cna_gamepad_get_serial_size_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, *mut u64,
+) -> CNA_Result;
+pub type cna_gamepad_get_steam_handle_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, *mut u64,
+) -> CNA_Result;
+pub type cna_gamepad_get_touchpad_count_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, *mut i32,
+) -> CNA_Result;
+pub type cna_gamepad_get_touchpad_finger_count_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, i32, *mut i32,
+) -> CNA_Result;
+pub type cna_gamepad_get_touchpad_finger_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, i32, i32, *mut CNA_GamePadTouchpadFinger, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_gamepad_set_light_bar_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, CNA_Color,
+) -> CNA_Result;
+pub type cna_gamepad_set_player_index_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, i32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_gamepad_set_trigger_vibration_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_PlayerIndex, f32, f32, *mut CNA_Bool,
 ) -> CNA_Result;

@@ -10,6 +10,7 @@ pub mod devices;
 pub mod effects;
 pub mod engine;
 pub mod events;
+pub mod gamepad_ext;
 pub mod gamer_services;
 pub mod graphics;
 pub mod graphics_device_ext;

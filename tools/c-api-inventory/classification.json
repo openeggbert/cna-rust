@@ -551,14 +551,16 @@
           "cna_gamepad_state_get_thumb_sticks",
           "cna_gamepad_state_get_triggers",
           "cna_gamepad_thumb_sticks_init_from_positions",
-          "cna_gamepad_triggers_init_from_positions"
+          "cna_gamepad_triggers_init_from_positions",
+          "cna_gamepad_state_set_packet_number_ext"
         ],
-        "reason": "a GamePadState is four small values and these construct or read them. crates/cna/src/input/gamepad.rs builds each with a Rust constructor -- GamePadDPad::new, GamePadTriggers::new with its own NaN-aware clamp, GamePadThumbSticks::new, GamePadState's from_... -- and reads them back through Buttons, DPad, ThumbSticks and Triggers. `is_pressed` is GamePadState::IsButtonDown. Binding these would put a fallible native call in front of a field read the compiler already checks. The routes that read a *device* rather than a value -- the touchpad, the motion sensors, the light bar -- are bound, because those are not values Rust holds.",
+        "reason": "a GamePadState is four small values and these construct or read them. crates/cna/src/input/gamepad.rs builds each with a Rust constructor -- GamePadDPad::new, GamePadTriggers::new with its own NaN-aware clamp, GamePadThumbSticks::new, GamePadState's from_... -- and reads them back through Buttons, DPad, ThumbSticks and Triggers. `is_pressed` is GamePadState::IsButtonDown. Binding these would put a fallible native call in front of a field read the compiler already checks. The routes that read a *device* rather than a value -- the touchpad, the motion sensors, the light bar -- are bound, because those are not values Rust holds. The packet-number setter is in the same rule: it writes a field into a caller's CNA_GamePadState, and Rust's GamePadState carries its own PacketNumber, read straight off the state CNA filled.",
         "rustEvidence": [
           "pub const fn IsButtonDown",
           "pub const fn ThumbSticks",
           "pub const fn DPad",
-          "pub struct GamePadButtons"
+          "pub struct GamePadButtons",
+          "pub const fn PacketNumber"
         ],
         "evidence": "crates/cna/src/input/gamepad.rs, and the behaviour corpus which measures the trigger clamp and the button mask against XNA's documented results"
       },

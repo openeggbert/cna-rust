@@ -12605,4 +12605,138 @@ extern "C" {
         argument1: i32,
         argument2: *mut i32,
     ) -> CNA_Result;
+    pub fn cna_gamepad_copy_guid_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_copy_name_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_copy_path_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_copy_serial_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: *mut c_char,
+        argument3: u64,
+        argument4: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_exclude_axis_dead_zone(
+        argument0: f32,
+        argument1: f32,
+        argument2: *mut f32,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_get_accelerometer_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: *mut CNA_Vector3,
+        argument3: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_get_button_label_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: CNA_GamePadButtonFlags,
+        argument3: *mut CNA_GamePadButtonLabel,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_get_connection_state_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: *mut CNA_GamePadConnectionState,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_get_firmware_version_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: *mut u16,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_get_guid_size_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_get_gyro_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: *mut CNA_Vector3,
+        argument3: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_get_name_size_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_get_path_size_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_get_player_index_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_get_power_info_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: *mut CNA_PowerState,
+        argument3: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_get_serial_size_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_get_steam_handle_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_get_touchpad_count_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_get_touchpad_finger_count_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: i32,
+        argument3: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_get_touchpad_finger_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: i32,
+        argument3: i32,
+        argument4: *mut CNA_GamePadTouchpadFinger,
+        argument5: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_set_light_bar_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: CNA_Color,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_set_player_index_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: i32,
+        argument3: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_gamepad_set_trigger_vibration_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_PlayerIndex,
+        argument2: f32,
+        argument3: f32,
+        argument4: *mut CNA_Bool,
+    ) -> CNA_Result;
 }

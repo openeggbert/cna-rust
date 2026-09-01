@@ -43,7 +43,7 @@ impl PowerState {
         Self::from_native(value)
     }
 
-    const fn from_native(value: sys::CNA_PowerState) -> Self {
+    pub(crate) const fn from_native(value: sys::CNA_PowerState) -> Self {
         match value {
             sys::CNA_POWER_STATE_ERROR => Self::Error,
             sys::CNA_POWER_STATE_UNKNOWN => Self::Unknown,

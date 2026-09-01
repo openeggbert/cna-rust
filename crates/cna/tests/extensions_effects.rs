@@ -44,7 +44,12 @@ fn device() -> Option<GraphicsDevice> {
             println!("this renderer cannot create a device without a window: {message}");
             None
         }
-        Err(error) => panic!("independent GraphicsDevice construction failed: {error}"),
+        Err(error) => panic!(
+            "independent GraphicsDevice construction failed with something other than \
+             the renderer's no-window refusal, which is the only failure this skips. \
+             Seen once under a parallel full-suite run and not reproduced since, so the \
+             exact text matters: {error:?}"
+        ),
     }
 }
 
