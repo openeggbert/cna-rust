@@ -1631,6 +1631,7 @@
     "cna_network_session_property_enumerator_move_next": 2,
     "cna_network_session_property_enumerator_reset": 1,
     "cna_network_session_remove_gamer_ext": 3,
+    "cna_network_session_replace_session_properties": 2,
     "cna_network_session_reset_ready": 1,
     "cna_network_session_send_network_event_ext": 2,
     "cna_network_session_set_allow_host_migration": 2,

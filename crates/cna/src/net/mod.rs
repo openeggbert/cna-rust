@@ -51,7 +51,10 @@ pub use values::{
     SendDataOptions,
 };
 
-pub(crate) use session::{gamer_handle, local_gamer_handle, net_runtime, session_handle};
+pub(crate) use session::{
+    available_session_handle, gamer_handle, local_gamer_handle, net_runtime, session_handle,
+    write_properties,
+};
 
 /// The canonical bits behind a `SendDataOptions`, for the extension surface.
 pub(crate) fn send_data_bits(options: SendDataOptions) -> u32 {

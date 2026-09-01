@@ -48,13 +48,22 @@ impl GamerServicesDispatcher {
     ///
     /// Returns the exact error CNA reports.
     pub fn Initialize(serviceProvider: &crate::game::GameContext<'_>) -> Result<()> {
+        Self::initialize_with_game(serviceProvider.handle)
+    }
+
+    /// The same call, for a caller that already holds the game handle.
+    ///
+    /// `GamerServicesComponent` is the one: XNA's component initialises the
+    /// dispatcher from `Game.Services` during `Game.Initialize`, which is
+    /// inside a lifecycle callback but not inside a `GameContext`.
+    pub(crate) fn initialize_with_game(game: sys::CNA_Handle) -> Result<()> {
         let runtime = GamerServicesRuntime::open()?;
         // SAFETY: the game handle is callback-scoped and live.
         runtime.check(unsafe {
             (runtime
                 .native()
                 .gamer_services
-                .gamer_services_dispatcher_initialize)(serviceProvider.handle)
+                .gamer_services_dispatcher_initialize)(game)
         })
     }
 

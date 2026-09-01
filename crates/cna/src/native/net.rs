@@ -182,6 +182,8 @@ pub(crate) struct NetApi {
         sys::cna_network_session_set_private_gamer_slots_fn,
     pub(crate) network_session_copy_session_properties:
         sys::cna_network_session_copy_session_properties_fn,
+    pub(crate) network_session_replace_session_properties:
+        sys::cna_network_session_replace_session_properties_fn,
     pub(crate) network_session_get_session_state: sys::cna_network_session_get_session_state_fn,
     pub(crate) network_session_get_session_type: sys::cna_network_session_get_session_type_fn,
     pub(crate) network_session_get_simulated_latency_ticks:
@@ -660,6 +662,9 @@ impl NetApi {
             ),
             network_session_copy_session_properties: symbol!(cna_network_session_copy_session_properties,
                 sys::cna_network_session_copy_session_properties_fn
+            ),
+            network_session_replace_session_properties: symbol!(cna_network_session_replace_session_properties,
+                sys::cna_network_session_replace_session_properties_fn
             ),
             network_session_get_session_state: symbol!(cna_network_session_get_session_state,
                 sys::cna_network_session_get_session_state_fn

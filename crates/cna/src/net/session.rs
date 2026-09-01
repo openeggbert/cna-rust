@@ -58,6 +58,13 @@ pub(crate) fn session_handle(session: &NetworkSession) -> Result<sys::CNA_Handle
     session.handle()
 }
 
+/// The live handle behind a discovered session, for the same surface.
+pub(crate) fn available_session_handle(
+    session: &AvailableNetworkSession,
+) -> Result<sys::CNA_Handle> {
+    session.owner.get()
+}
+
 /// The live handle behind a network gamer, for the same surface.
 pub(crate) fn gamer_handle(gamer: &NetworkGamer) -> Result<sys::CNA_Handle> {
     gamer.gamer.handle()
@@ -994,12 +1001,16 @@ impl LocalNetworkGamer {
         data: &mut PacketReader,
         sender: &mut Option<NetworkGamer>,
     ) -> Result<i32> {
-        let mut buffer = vec![0_u8; 4096];
-        let received = self.ReceiveData(&mut buffer, sender)?;
-        let length = usize::try_from(received)
-            .map_err(|_| CnaError::InvalidInput("CNA reported an impossible packet length"))?;
-        buffer.truncate(length);
-        data.fill(&buffer);
+        // One byte more than the largest packet this overload delivers, so a
+        // packet that fills the buffer is a packet that did not fit. See
+        // LARGEST_PACKET_INTO_A_READER.
+        let capacity = LARGEST_PACKET_INTO_A_READER + 1;
+        let received = data.receive(capacity, |buffer| self.ReceiveData(buffer, sender))?;
+        if usize::try_from(received).unwrap_or(0) > LARGEST_PACKET_INTO_A_READER {
+            return Err(CnaError::InvalidInput(
+                "the received packet is larger than a PacketReader can be given",
+            ));
+        }
         Ok(received)
     }
 }
@@ -1330,6 +1341,25 @@ fn byte_array(data: &[u8]) -> Result<(*const u8, u64)> {
     };
     Ok((pointer, count))
 }
+
+/// The largest packet `ReceiveData(PacketReader, out sender)` will deliver.
+///
+/// XNA has no such limit and needs none: it peeks the queue, resizes the
+/// reader to `Peek().Size`, and receives into an array that is exactly big
+/// enough. `net_sessions.h` publishes no route that reports a queued packet's
+/// size, and CNA's own array receive **truncates** to the buffer it is given
+/// -- `len = min(packet.size, data.size)` -- where XNA throws
+/// `ArgumentException` for an array too small. So a projection over the array
+/// route has to choose a size in advance, and the two ways to get that wrong
+/// are silence and a fixed number nobody wrote down.
+///
+/// This was `vec![0_u8; 4096]`, unexplained, with the short read reported as a
+/// success. It is now a stated ceiling, and a packet above it is an error
+/// rather than a packet with its tail removed. Sixty-four kibibytes is far
+/// above any packet XNA's session layer produces and above ENet's unfragmented
+/// payload; raising it is one constant, and removing the ceiling needs the
+/// peek route `RUST-UPSTREAM-028` asks for.
+const LARGEST_PACKET_INTO_A_READER: usize = 64 * 1024;
 
 /// Reads a CNA properties handle into XNA's managed eight-slot value.
 fn read_properties(

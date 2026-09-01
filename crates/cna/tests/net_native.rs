@@ -17,10 +17,14 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use cna::extensions::gamer_services::{SignedInGamerPublisher, SignedInGamerRegistration};
-use cna::extensions::net::{NetworkEventInjection, RemoteGamerInjection};
+use cna::extensions::net::{
+    ApplySessionProperties, DiscoveredSession, DiscoveredSessionExt, DiscoveredSessionInjection,
+    LastJoinError, LiveSessionCount, NetworkEventInjection, PendingSessionActionCount,
+    RemoteGamerInjection,
+};
 use cna::Microsoft::Xna::Framework::Net::{
-    NetworkSession, NetworkSessionEndReason, NetworkSessionProperties, NetworkSessionState,
-    NetworkSessionType, PacketReader, PacketWriter, SendDataOptions,
+    NetworkSession, NetworkSessionEndReason, NetworkSessionJoinError, NetworkSessionProperties,
+    NetworkSessionState, NetworkSessionType, PacketReader, PacketWriter, SendDataOptions,
 };
 use cna::Microsoft::Xna::Framework::{PlayerIndex, TimeSpan};
 use cna::{
@@ -133,6 +137,26 @@ fn session_properties_round_trip_through_cna() -> Result<()> {
     assert_eq!(stored.Item(1), None);
     assert_eq!(stored.Count(), 8);
     assert_eq!(session.PrivateGamerSlots()?, 1);
+
+    // XNA's getter is a reference: `session.SessionProperties[0] = 5` changes
+    // the session. CNA hands back a copy, so writing to `stored` alone changes
+    // nothing -- which is the state this projection was in, silently.
+    let mut mutated = stored;
+    mutated.SetItem(0, Some(5));
+    mutated.SetItem(3, None);
+    mutated.SetItem(7, Some(11));
+    assert_eq!(
+        session.SessionProperties()?.Item(0),
+        Some(7),
+        "a copy is a copy: mutating it must not reach the session"
+    );
+
+    ApplySessionProperties(&session, &mutated)?;
+    let applied = session.SessionProperties()?;
+    assert_eq!(applied.Item(0), Some(5));
+    assert_eq!(applied.Item(3), None, "clearing a slot must clear it");
+    assert_eq!(applied.Item(7), Some(11));
+    assert_eq!(applied.Count(), 8);
     Ok(())
 }
 
@@ -432,6 +456,177 @@ fn an_injected_packet_arrives_with_its_sender_and_bytes() -> Result<()> {
     if let Some(from) = packet_sender {
         assert_eq!(from.Id()?, sender.Id()?);
     }
+    Ok(())
+}
+
+#[test]
+fn a_packet_reader_receives_a_whole_large_packet_or_says_it_could_not() -> Result<()> {
+    if !native_enabled() {
+        return Ok(());
+    }
+    let _net = net_guard();
+
+    let _publisher = publish_one("receiver")?;
+    let session = NetworkSession::Create(NetworkSessionType::Local, 1, 4)?;
+    let local = session.LocalGamers()?.ItemAt(0)?;
+    let sender = RemoteGamerInjection::admit(&session, "sender")?;
+
+    // 4,096 bytes was the old buffer, and a packet past it came back short
+    // with a success. XNA never returns a short packet: it sizes the reader to
+    // the packet before reading it.
+    let big: Vec<u8> = (0..20_000_u32).map(|index| (index % 251) as u8).collect();
+    NetworkEventInjection::packet(&local, &sender, &big, SendDataOptions::Reliable)?;
+    let mut reader = PacketReader::new();
+    let mut from = None;
+    let received = local.ReceiveDataWithDataAndSender(&mut reader, &mut from)?;
+    assert_eq!(received, 20_000, "the whole packet, not the first 4,096 bytes");
+    assert_eq!(reader.Length(), 20_000);
+    reader.SetPosition(19_996);
+    assert_eq!(
+        reader.ReadSingle()?.to_bits(),
+        u32::from_le_bytes([big[19_996], big[19_997], big[19_998], big[19_999]]),
+        "the last four bytes must be the packet's own, read as XNA reads them"
+    );
+
+    // Above the stated ceiling the projection refuses rather than delivering a
+    // packet with its tail removed. CNA truncates and reports the short count
+    // as a success, so this is the one place the difference can be seen.
+    let enormous = vec![7_u8; 64 * 1024 + 1];
+    NetworkEventInjection::packet(&local, &sender, &enormous, SendDataOptions::Reliable)?;
+    let mut reader = PacketReader::new();
+    let mut from = None;
+    assert!(
+        matches!(
+            local.ReceiveDataWithDataAndSender(&mut reader, &mut from),
+            Err(CnaError::InvalidInput(_))
+        ),
+        "a packet past the ceiling is an error, not a silent short read"
+    );
+    Ok(())
+}
+
+fn discovered(host: &str, port: u16, sessionType: NetworkSessionType) -> DiscoveredSession {
+    let mut properties = NetworkSessionProperties::new();
+    properties.SetItem(2, Some(42));
+    DiscoveredSession {
+        host_gamertag: format!("{host}-host"),
+        host_address: host.to_owned(),
+        host_port: port,
+        current_gamer_count: 3,
+        open_public_gamer_slots: 5,
+        open_private_gamer_slots: 1,
+        session_type: sessionType,
+        session_properties: properties,
+        roundtrip: Some(TimeSpan::FromMilliseconds(25.0)),
+    }
+}
+
+#[test]
+fn an_injected_discovered_session_answers_every_xna_property_and_cnas_own() -> Result<()> {
+    if !native_enabled() {
+        return Ok(());
+    }
+    let _net = net_guard();
+
+    // `Find` on one machine finds nothing, so without an injection route the
+    // whole of `AvailableNetworkSession` -- six XNA properties and three CNA
+    // facts -- is unreachable rather than merely untested.
+    let session = DiscoveredSessionInjection::session(&discovered("10.0.0.7", 27015, NetworkSessionType::PlayerMatch))?;
+
+    assert_eq!(session.HostGamertag()?, "10.0.0.7-host");
+    assert_eq!(session.CurrentGamerCount()?, 3);
+    assert_eq!(session.OpenPublicGamerSlots()?, 5);
+    assert_eq!(session.OpenPrivateGamerSlots()?, 1);
+    assert_eq!(session.SessionProperties()?.Item(2), Some(42));
+    let quality = session.QualityOfService()?;
+    assert!(quality.IsAvailable());
+    assert_eq!(quality.AverageRoundtripTime(), TimeSpan::FromMilliseconds(25.0));
+
+    // XNA never says where the session is; CNA does, and a host layer that
+    // makes its own connection decision needs all three.
+    assert_eq!(session.connect_address()?, "10.0.0.7");
+    assert_eq!(session.connect_port()?, 27015);
+    assert_eq!(session.advertised_session_type()?, NetworkSessionType::PlayerMatch);
+
+    // Identity, both halves. CNA publishes `equals` and `not_equals`
+    // separately and the projection refuses an answer where they disagree.
+    let other = DiscoveredSessionInjection::session(&discovered("10.0.0.8", 27016, NetworkSessionType::PlayerMatch))?;
+    assert!(session.is_same_session(&session)?);
+    assert!(!session.is_same_session(&other)?);
+
+    let collection = DiscoveredSessionInjection::collection(&[
+        discovered("10.0.0.7", 27015, NetworkSessionType::PlayerMatch),
+        discovered("10.0.0.8", 27016, NetworkSessionType::PlayerMatch),
+    ])?;
+    assert_eq!(collection.Count()?, 2);
+    assert_eq!(collection.ItemAt(1)?.connect_port()?, 27016);
+    Ok(())
+}
+
+#[test]
+fn a_refused_join_reports_the_error_xnas_exception_would_carry() -> Result<()> {
+    if !native_enabled() {
+        return Ok(());
+    }
+    let _net = net_guard();
+    let _publisher = publish_one("joiner")?;
+
+    // Nothing is listening on this address, so the join fails. XNA puts the
+    // reason on `NetworkSessionJoinException.JoinError`; an exception object
+    // cannot cross the ABI, so CNA records it per thread and this is where a
+    // caller reads it.
+    //
+    // `SystemLink` on purpose: CNA gates its real transport on that type, and
+    // a `PlayerMatch` join never leaves the process, so it succeeds and there
+    // is no join error to report.
+    let unreachable =
+        DiscoveredSessionInjection::session(&discovered("203.0.113.9", 27015, NetworkSessionType::SystemLink))?;
+    let refused = NetworkSession::Join(&unreachable);
+    assert!(refused.is_err(), "no session is listening on a TEST-NET-3 address");
+    assert_eq!(
+        LastJoinError()?,
+        Some(NetworkSessionJoinError::SessionNotFound),
+        "a refused join must report which of XNA's three reasons applied"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_disposed_session_stops_being_counted_and_its_packets_go_with_it() -> Result<()> {
+    if !native_enabled() {
+        return Ok(());
+    }
+    let _net = net_guard();
+    let _publisher = publish_one("counted")?;
+
+    let before = LiveSessionCount()?;
+    assert_eq!(PendingSessionActionCount()?, 0, "no creation is in flight");
+
+    {
+        let session = NetworkSession::Create(NetworkSessionType::Local, 1, 4)?;
+        assert_eq!(
+            LiveSessionCount()?,
+            before + 1,
+            "a created session is a session CNA holds"
+        );
+
+        // A queue that is cleared is a queue the next read finds empty.
+        // Without the clear, a test that injected a packet and did not receive
+        // it leaves the packet for whatever runs next.
+        let local = session.LocalGamers()?.ItemAt(0)?;
+        let sender = RemoteGamerInjection::admit(&session, "sender")?;
+        NetworkEventInjection::packet(&local, &sender, &[9, 9, 9], SendDataOptions::Reliable)?;
+        assert!(local.IsDataAvailable()?);
+        NetworkEventInjection::clear_packets(&local)?;
+        assert!(!local.IsDataAvailable()?, "a cleared queue is empty");
+
+        session.Dispose()?;
+    }
+    assert_eq!(
+        LiveSessionCount()?,
+        before,
+        "a released session is one CNA no longer holds"
+    );
     Ok(())
 }
 

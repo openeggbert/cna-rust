@@ -391,6 +391,38 @@ impl PacketReader {
         self.position = 0;
     }
 
+    /// Receives one packet straight into the reader's own buffer.
+    ///
+    /// This is the shape XNA's `LocalNetworkGamer.ReceiveData(PacketReader,
+    /// out sender)` has: it resizes the reader, hands the array to the
+    /// byte-array overload, and the reader ends up holding exactly the packet.
+    /// `capacity` is what the reader is sized to before the call; the caller
+    /// decides what it means for a packet to fill it.
+    pub(crate) fn receive<F>(&mut self, capacity: usize, receive: F) -> Result<i32>
+    where
+        F: FnOnce(&mut [u8]) -> Result<i32>,
+    {
+        self.buffer.clear();
+        self.buffer.resize(capacity, 0);
+        let received = match receive(&mut self.buffer) {
+            Ok(received) => received,
+            Err(error) => {
+                self.buffer.clear();
+                self.position = 0;
+                return Err(error);
+            }
+        };
+        let length = usize::try_from(received)
+            .ok()
+            .filter(|length| *length <= capacity)
+            .ok_or(CnaError::InvalidInput(
+                "CNA reported an impossible packet length",
+            ))?;
+        self.buffer.truncate(length);
+        self.position = 0;
+        Ok(received)
+    }
+
     fn take<const N: usize>(&mut self) -> Result<[u8; N]> {
         if self.disposed {
             return Err(CnaError::InvalidInput("the PacketReader is disposed"));

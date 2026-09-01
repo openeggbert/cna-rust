@@ -842,3 +842,135 @@ classification rule `sample-arithmetic-is-xna-faithful-in-rust` records that
 with this finding as its evidence, and
 `crates/cna/tests/extensions_audio_ext.rs` pins the Rust answers to the values
 the decompiled reference gives, including 88,198.
+
+## RUST-UPSTREAM-028 — a queued packet's size is unreachable, and the receive truncates
+
+| | |
+|---|---|
+| Symbols | `cna_local_network_gamer_receive_data`, `cna_local_network_gamer_receive_data_at`, `cna_local_network_gamer_receive_data_into_packet_reader` |
+| Dependency | cnanext `7712534d3d22c7e284714e0e87afebba3f3cb472`, ABI 0.21.0 |
+| Artifact | Renderer-independent; measured on `cmake-build-headless` |
+| Severity | Capability gap plus a silent short read: a packet larger than the caller's buffer loses its tail and the call reports success |
+| Blocks | Exact XNA `ReceiveData(PacketReader, out sender)` sizing. The binding states a ceiling instead |
+| Last measured | 2026-09-01, reproduces |
+
+### What XNA does
+
+`LocalNetworkGamer.ReceiveData(PacketReader data, out NetworkGamer sender)`
+does not guess at a size. It peeks the incoming queue, resizes the reader to
+that packet's exact length, and hands the reader's own array to the byte-array
+overload:
+
+```text
+IL_0034: Queue`1<IncomingPacket>::Peek()
+IL_0039: ldfld  int32 IncomingPacket::Size
+IL_003e: callvirt instance void PacketReader::Resize(int32)
+IL_0055: call   instance int32 LocalNetworkGamer::ReceiveData(uint8[], int32, NetworkGamer&)
+```
+
+And the byte-array overload does not truncate. When `offset + Size >
+data.Length` it throws:
+
+```text
+IL_0069: FrameworkResources::get_PacketArrayTooSmall()
+IL_0092: newobj instance void System.ArgumentException::.ctor(string, string)
+IL_0097: throw
+```
+
+So in XNA a short packet is impossible: either the array is big enough and you
+get all of it, or you get an exception.
+
+### What CNA does
+
+`LocalNetworkGamer::ReceiveData` in `modules/net/src/Xna/LocalNetworkGamer.cpp`
+computes
+
+```cpp
+int len = std::min(static_cast<int>(packet.Packet.size()), static_cast<int>(data.size()));
+```
+
+and copies `len` bytes. A packet larger than the destination is silently cut
+down to it, and `cna_local_network_gamer_receive_data` reports `len` as
+`out_received` with `CNA_RESULT_SUCCESS`. The C header states this plainly --
+"fills the destination up to its own length" -- so it is deliberate, and it is
+still a different contract from XNA's.
+
+`net_sessions.h` publishes no route that reports the size of the packet at the
+head of the queue. `cna_local_network_gamer_get_is_data_available` answers
+whether there is one, not how large it is. A caller therefore cannot size its
+buffer the way XNA sizes the reader, and cannot tell a packet that fitted
+exactly from one that was cut.
+
+The third overload does not help. `cna_local_network_gamer_receive_data_into_packet_reader`
+takes a **CNA** packet reader, and the reader in this projection is a managed
+Rust object with no CNA handle -- and the route reports zero bytes for every
+packet, which the header documents and CNA's own comment explains:
+
+```cpp
+// FNA declares `uint len = 0` here and never updates it before returning it —
+// the written data is real, but the reported length is always 0. Preserved as-is.
+```
+
+XNA returns the packet's size from this overload; FNA's bug is preserved.
+
+### Why this is CNA rather than the binding
+
+The size is not derivable on this side. The packet is consumed by the same call
+that would have reported its length, so there is no retry, and no arithmetic
+over what CNA does publish recovers it.
+
+### What a fix looks like
+
+One route: `cna_local_network_gamer_get_pending_packet_size` (or an
+`out_pending_size` on the existing receive, filled before the copy). With it a
+projection can do exactly what XNA does. A second, smaller fix would be for the
+array receive to report the packet's true length in `out_received` even when it
+copied less, which would at least make truncation detectable.
+
+### Status in the binding
+
+`ReceiveData(PacketReader, out sender)` states a ceiling --
+`LARGEST_PACKET_INTO_A_READER`, 64 KiB -- receives into `capacity + 1`, and
+reports an error rather than a short packet when the extra byte is used. It was
+an unexplained `vec![0_u8; 4096]` with the short read returned as a success.
+`crates/cna/tests/net_native.rs::a_packet_reader_receives_a_whole_large_packet_or_says_it_could_not`
+delivers 20,000 bytes whole and refuses 65,537.
+
+## RUST-UPSTREAM-029 — CNA's `GamerServicesComponent` skips the base component
+
+| | |
+|---|---|
+| Symbols | `cna_gamer_services_component_create` |
+| Dependency | cnanext `7712534d3d22c7e284714e0e87afebba3f3cb472`, ABI 0.21.0 |
+| Artifact | Renderer-independent |
+| Severity | Behavioural divergence from XNA in a canonical component |
+| Blocks | Nothing. The Rust component implements XNA's order itself |
+| Last measured | 2026-09-01, reproduces (source-level) |
+
+XNA's `GamerServicesComponent` calls the base component at the end of both
+overrides:
+
+```text
+Initialize()          IL_0036: call instance void GameComponent::Initialize()
+Update(gameTime)      IL_0007: call instance void GameComponent::Update(GameTime)
+```
+
+CNA's does not, and says so:
+
+```cpp
+// FNA's override does not call base.Initialize() — matched here intentionally.
+// FNA's override does not call base.Update() — matched here intentionally.
+```
+
+That is a deliberate match to FNA, whose base methods happen to be empty. It is
+still not what Microsoft XNA does, and a `GameComponent` subclass whose base
+does something -- as this projection's does, since `GameComponent::Initialize`
+and `Update` are real -- would behave differently.
+
+### Status in the binding
+
+`cna_gamer_services_component_create` is not called. The Rust
+`GamerServicesComponent` performs XNA's three `Initialize` calls and XNA's two
+`Update` calls in XNA's order, base included, over the dispatcher routes
+directly. Measured in
+`crates/cna/tests/small_families_native.rs::the_gamer_services_component_hands_the_dispatcher_the_game_window`.

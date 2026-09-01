@@ -6561,6 +6561,10 @@ extern "C" {
         argument1: CNA_NetworkGamerHandle,
         argument2: CNA_NetworkSessionEndReason,
     ) -> CNA_Result;
+    pub fn cna_network_session_replace_session_properties(
+        argument0: CNA_NetworkSessionHandle,
+        argument1: CNA_NetworkSessionPropertiesHandle,
+    ) -> CNA_Result;
     pub fn cna_network_session_reset_ready(argument0: CNA_NetworkSessionHandle) -> CNA_Result;
     pub fn cna_network_session_send_network_event_ext(
         argument0: CNA_NetworkSessionHandle,

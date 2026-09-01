@@ -20,13 +20,50 @@
 
 #![allow(clippy::missing_errors_doc, non_snake_case)]
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use cna_sys as sys;
 
 use crate::error::{CnaError, Result};
 use crate::gamer_services::{Achievement, AchievementCollection, SignedInGamer};
 use crate::input::PlayerIndex;
+
+/// The first refusal `GamerServicesComponent` could not throw.
+///
+/// XNA's `GamerServicesComponent.Initialize` and `Update` are `void` and
+/// throw. Both are `void` in this projection too, and there is nothing to
+/// throw them into: the game's component collection calls them from a
+/// lifecycle callback that has no `Result` to carry a failure. So the first
+/// one is kept here, exactly once, and a host that wants to know reads it.
+///
+/// Only the *first* is kept. A dispatcher that cannot initialise will refuse
+/// every subsequent `Update` as well, and the hundredth copy of that says
+/// nothing the first did not.
+static COMPONENT_ERROR: Mutex<Option<CnaError>> = Mutex::new(None);
+
+pub(crate) fn record_component_error(error: CnaError) {
+    let mut pending = COMPONENT_ERROR
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if pending.is_none() {
+        *pending = Some(error);
+    }
+}
+
+/// Reports and clears the refusal `GamerServicesComponent` could not throw.
+///
+/// Returns `Ok(())` when the component has not failed since the last read.
+///
+/// # Errors
+///
+/// The first error CNA reported from the component's `Initialize` or `Update`.
+pub fn TakeComponentError() -> Result<()> {
+    COMPONENT_ERROR
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .take()
+        .map_or(Ok(()), Err)
+}
 
 /// The integer indexer XNA's achievement collection also declares.
 pub trait AchievementCollectionExt {

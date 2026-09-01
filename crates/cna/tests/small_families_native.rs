@@ -7,14 +7,16 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
-use cna::Microsoft::Xna::Framework::GamerServices::GamerServicesComponent;
+use cna::extensions::gamer_services::TakeComponentError;
+use cna::extensions::window::WindowHandle;
+use cna::Microsoft::Xna::Framework::GamerServices::{GamerServicesComponent, GamerServicesDispatcher};
 use cna::Microsoft::Xna::Framework::Graphics::IGraphicsDeviceService;
 use cna::Microsoft::Xna::Framework::Input::Touch::{GestureType, TouchPanel};
 use cna::Microsoft::Xna::Framework::Input::Keyboard;
 use cna::Microsoft::Xna::Framework::Storage::{StorageContainer, StorageDevice};
 use cna::Microsoft::Xna::Framework::{
-    Game, GameContext, GraphicsDeviceManager, IGameComponent, IGraphicsDeviceManager,
-    PlayerIndex, PreparingDeviceSettingsEventArgs,
+    Game, GameContext, GameTime, GraphicsDeviceManager, IGameComponent,
+    IGraphicsDeviceManager, PlayerIndex, PreparingDeviceSettingsEventArgs,
 };
 use cna::{
     run_for_frames, CnaError, FileMode, GameComponentCollectionExt, GameState, GameStateAccess,
@@ -136,6 +138,94 @@ fn native_game_guard() -> MutexGuard<'static, ()> {
         .get_or_init(|| Mutex::new(()))
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// A game that reports its own window handle from inside a frame.
+///
+/// `GameWindow::Handle` is only meaningful while the game is bound, so the
+/// comparison `GamerServicesComponent` exists to make -- did the dispatcher
+/// get *this* window? -- has to be taken during a callback, not after `Run`.
+#[derive(Default)]
+struct WindowReportingGame {
+    state: Arc<GameState>,
+    seen: Arc<Mutex<Option<(WindowHandle, WindowHandle)>>>,
+}
+
+impl GameStateAccess for WindowReportingGame {
+    fn game_state(&self) -> &Arc<GameState> {
+        &self.state
+    }
+}
+
+impl Game for WindowReportingGame {
+    fn Update(&mut self, _: &mut GameContext<'_>, _: &GameTime) -> Result<()> {
+        let pair = (
+            self.state.Window().Handle(),
+            GamerServicesDispatcher::WindowHandle()?,
+        );
+        *self
+            .seen
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(pair);
+        Ok(())
+    }
+}
+
+fn seen_handles(seen: &Arc<Mutex<Option<(WindowHandle, WindowHandle)>>>) -> (WindowHandle, WindowHandle) {
+    seen.lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .expect("the game reported its window from inside a frame")
+}
+
+#[test]
+fn the_gamer_services_component_hands_the_dispatcher_the_game_window() {
+    if !native_enabled() {
+        return;
+    }
+    let _native_game = native_game_guard();
+
+    // The control, which is also what this component used to do: a game with
+    // no `GamerServicesComponent` leaves the dispatcher exactly as it found
+    // it. Before this milestone the *with*-component case did the same, which
+    // is why a game that added the component still got a dispatcher nobody
+    // ever initialised or pumped.
+    GamerServicesDispatcher::SetWindowHandle(WindowHandle::default())
+        .expect("the dispatcher accepts a window handle");
+    let without = WindowReportingGame::default();
+    let seen_without = Arc::clone(&without.seen);
+    run_for_frames(without, 1).expect("a game with no gamer-services component runs");
+    let (_, dispatcher_without) = seen_handles(&seen_without);
+    assert_eq!(
+        dispatcher_without,
+        WindowHandle::default(),
+        "nothing but the component may hand the dispatcher a window"
+    );
+
+    // With it, XNA's `Initialize` runs: the window handle first, then the
+    // `InstallingTitleUpdate` subscription, then the dispatcher itself.
+    GamerServicesDispatcher::SetWindowHandle(WindowHandle::default())
+        .expect("the dispatcher accepts a window handle");
+    let with = WindowReportingGame::default();
+    let seen_with = Arc::clone(&with.seen);
+    let component: Arc<dyn IGameComponent> = Arc::new(GamerServicesComponent::new(&with));
+    with.state.Components().Add(component);
+    run_for_frames(with, 1).expect("a game with a gamer-services component runs");
+
+    let (window, dispatcher) = seen_handles(&seen_with);
+    // HEADLESS has no window and reports handle zero for both sides, so this
+    // equality only discriminates on a renderer that has one. The OPENGLES3
+    // run is where it does: deleting the component's `SetWindowHandle` leaves
+    // the dispatcher on the zero this test seeded and fails here.
+    assert_eq!(
+        dispatcher, window,
+        "the dispatcher must hold the game's own window, not another one"
+    );
+    assert!(
+        GamerServicesDispatcher::IsInitialized().expect("the dispatcher reports its state"),
+        "the component initialises the dispatcher, which is what lets an \
+         asynchronous gamer-services call ever complete"
+    );
+    TakeComponentError().expect("the component reported no refusal");
 }
 
 #[test]

@@ -8723,6 +8723,9 @@ pub type cna_network_session_property_enumerator_reset_fn = unsafe extern "C" fn
 pub type cna_network_session_remove_gamer_ext_fn = unsafe extern "C" fn(
     CNA_NetworkSessionHandle, CNA_NetworkGamerHandle, CNA_NetworkSessionEndReason,
 ) -> CNA_Result;
+pub type cna_network_session_replace_session_properties_fn = unsafe extern "C" fn(
+    CNA_NetworkSessionHandle, CNA_NetworkSessionPropertiesHandle,
+) -> CNA_Result;
 pub type cna_network_session_reset_ready_fn = unsafe extern "C" fn(
     CNA_NetworkSessionHandle,
 ) -> CNA_Result;
