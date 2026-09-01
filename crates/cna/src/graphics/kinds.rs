@@ -14,16 +14,22 @@ macro_rules! xna_enum {
             /// The member a native value names, or `None` for one this enum has
             /// no member for.
             ///
-            /// Reading an enum *back* from CNA needs this, and until
-            /// `vertex_resources.h`'s element routes were bound nothing did --
-            /// every use went the other way, where `as u32` is enough. `None`
-            /// rather than a default because a value outside the set means CNA
-            /// knows something this build does not, and a silently substituted
-            /// member would hide that.
+            /// `pub(crate)` and `const`, so the crate's own decoding stays a
+            /// compile-time conversion. The public spelling is the trait
+            /// implementation below: this is a CNA concept, and a strict XNA
+            /// enum may not carry one inherently.
             #[must_use]
-            pub const fn from_native_value(value: u32) -> Option<Self> {
+            pub(crate) const fn from_native_value(value: u32) -> Option<Self> {
                 $(if value == $value as u32 { return Some(Self::$variant); })+
                 None
+            }
+        }
+
+        impl crate::extensions::graphics::NativeEnumValue for $name {
+            fn from_native_value(value: u32) -> Option<Self> {
+                // The inherent `const fn` above; an inherent associated
+                // function is resolved before a trait one.
+                Self::from_native_value(value)
             }
         }
     };

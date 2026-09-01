@@ -346,3 +346,54 @@ fn to_native_color(color: Color) -> sys::CNA_Color {
         a: color.A(),
     }
 }
+
+/// The `texture_volume.h` route that decodes a cube map from memory.
+///
+/// XNA builds a `TextureCube` face by face and has nothing that reads a whole
+/// cube from a file. A DDS blob carries all six faces, their mip chains and
+/// their format at once, and re-deriving that in Rust would mean parsing DDS
+/// here.
+///
+/// A CNA extension: import it, and `TextureCube::FromDdsMemory` resolves
+/// through the trait.
+///
+/// ```rust,ignore
+/// use cna::extensions::texture::TextureCubeDds;
+/// let cube = TextureCube::FromDdsMemory(&device, &blob)?;
+/// ```
+pub trait TextureCubeDds: Sized {
+    /// Decodes a DDS cube map already in memory.
+    ///
+    /// The only route to a cube map that is not built face by face. A DDS file
+    /// carries all six faces, their mip chains and their format in one blob,
+    /// and re-deriving that in Rust would mean parsing DDS here.
+    fn FromDdsMemory(graphicsDevice: &GraphicsDevice, bytes: &[u8]) -> Result<Self>;
+}
+
+/// The `texture_volume.h` route that uploads raw bytes.
+///
+/// XNA's `SetData` takes elements of a known type, and the strict projection
+/// carries it. This takes the bytes as they are, for a caller that has them in
+/// a buffer -- a decoded file, a network payload -- and does not want a round
+/// trip through a typed slice to hand them over.
+///
+/// A CNA extension: import it to call this.
+pub trait Texture3DBytes {
+    /// Uploads tightly packed bytes into a sub-volume.
+    ///
+    /// The typed `SetData` already exists and takes elements of a known type;
+    /// this takes the bytes as they are, for a caller that has them in a
+    /// buffer -- a decoded file, a network payload -- and does not want a
+    /// round trip through a typed slice to hand them over.
+    fn SetDataBytes(
+        &self,
+        level: i32,
+        left: i32,
+        top: i32,
+        right: i32,
+        bottom: i32,
+        front: i32,
+        back: i32,
+        bytes: &[u8],
+    ) -> Result<()>;
+}

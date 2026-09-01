@@ -10,6 +10,7 @@ use crate::content::{ContentDisposable, ContentLoadable};
 use crate::error::{CnaError, Result};
 use crate::extensions::events::EventHandler;
 use crate::value::Color;
+use crate::extensions::texture::Texture3DBytes;
 
 use super::resource::{ResourceKind, ResourceState};
 use super::texture_cube::{color_to_native, native_to_color};
@@ -462,15 +463,8 @@ impl crate::extensions::graphics_resource::HasResourceState for Texture3D {
     }
 }
 
-/// The `texture_volume.h` route that uploads raw bytes.
-impl Texture3D {
-    /// Uploads tightly packed bytes into a sub-volume.
-    ///
-    /// The typed `SetData` already exists and takes elements of a known type;
-    /// this takes the bytes as they are, for a caller that has them in a
-    /// buffer -- a decoded file, a network payload -- and does not want a
-    /// round trip through a typed slice to hand them over.
-    pub fn SetDataBytes(
+impl Texture3DBytes for Texture3D {
+    fn SetDataBytes(
         &self,
         level: i32,
         left: i32,

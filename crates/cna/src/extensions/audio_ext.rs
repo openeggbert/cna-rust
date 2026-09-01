@@ -185,7 +185,7 @@ pub trait MicrophoneExt {
 pub trait AudioEngineExt {
     /// The renderer descriptor at an index, as CNA formats it.
     ///
-    /// [`RendererDetails`](Self::RendererDetails) already reports the friendly
+    /// `AudioEngine::RendererDetails` already reports the friendly
     /// name and identifier separately; this is CNA's single-string spelling of
     /// the same renderer, and it is what the hash and the equality below are
     /// computed over.

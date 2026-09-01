@@ -814,3 +814,29 @@ impl Drop for AsciiPostProcessEffect {
         }
     }
 }
+
+/// Reading a strict XNA graphics enum back out of a native value.
+///
+/// XNA has no counterpart: a CLR `enum` is cast from its underlying type and
+/// an undefined value simply becomes an undefined member. CNA's ABI is
+/// versioned and can name a member a given build does not have, so this
+/// answers `None` for one rather than substituting a default -- a silently
+/// substituted member would hide that CNA knows something this build does not.
+///
+/// Reading an enum *back* out of CNA is the newer direction: until
+/// `vertex_resources.h`'s element routes were bound nothing did it, and every
+/// use went the other way, where `as u32` is enough.
+///
+/// A CNA extension: import it, and `Blend::from_native_value(..)` and its
+/// seventeen siblings resolve through the trait.
+///
+/// ```rust,ignore
+/// use cna::extensions::graphics::NativeEnumValue;
+/// let blend = Blend::from_native_value(reported).ok_or("CNA named a newer member")?;
+/// ```
+pub trait NativeEnumValue: Sized {
+    /// The member a native value names, or `None` for one this enum has no
+    /// member for.
+    #[must_use]
+    fn from_native_value(value: u32) -> Option<Self>;
+}

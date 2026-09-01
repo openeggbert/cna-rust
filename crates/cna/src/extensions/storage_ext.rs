@@ -39,7 +39,7 @@ pub fn root() -> Result<String> {
 pub trait StorageContainerExt {
     /// Whether CNA considers the container disposed.
     ///
-    /// A different question from [`IsDisposed`](Self::IsDisposed), which asks
+    /// A different question from `StorageContainer::IsDisposed`, which asks
     /// whether Rust released it. They differ when the device goes away
     /// underneath a container the Rust value still holds.
     fn NativeIsDisposed(&self) -> Result<bool>;

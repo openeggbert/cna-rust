@@ -36,15 +36,15 @@ macro_rules! xna_keys {
         const XNA_KEYS: &[(Keys, i32)] = &[$((Keys::$name, $value)),+];
 
         impl Keys {
-            /// The key a CNA key code names, or `None` when it is outside XNA's set.
+            /// The key a CNA key code names, or `None` when it is outside XNA's
+            /// set.
             ///
-            /// `Keys::None` is a real member of the enum -- XNA gives it the
-            /// value 0 -- so it is returned as `Some(Keys::None)` here, not
-            /// folded into `None`. The layout routes that use CNA's canonical
-            /// none value as "there is no such key" do that folding themselves,
-            /// because it is their contract rather than this conversion's.
+            /// `pub(crate)`; the public spelling is
+            /// [`crate::extensions::keyboard::KeyFromNativeCode`]. A CNA key
+            /// code is a CNA concept, and a strict XNA enum may not carry one
+            /// inherently.
             #[must_use]
-            pub fn from_key_code(code: u32) -> Option<Self> {
+            pub(crate) fn from_key_code(code: u32) -> Option<Self> {
                 i32::try_from(code).ok().and_then(Self::from_code)
             }
 
@@ -53,6 +53,14 @@ macro_rules! xna_keys {
                     $($value => Some(Self::$name),)+
                     _ => None,
                 }
+            }
+        }
+
+        impl crate::extensions::keyboard::KeyFromNativeCode for Keys {
+            fn from_key_code(code: u32) -> Option<Self> {
+                // The inherent one above; an inherent associated function is
+                // resolved before a trait one.
+                Self::from_key_code(code)
             }
         }
     };

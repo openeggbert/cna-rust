@@ -160,3 +160,29 @@ impl KeyboardStateText for KeyboardState {
         crate::native::Native::process()?.keyboard_state_string(&native)
     }
 }
+
+/// The key a CNA key code names.
+///
+/// XNA's `Keys` values are the Windows virtual-key codes and a game casts to
+/// them directly. CNA has its own key-code vocabulary -- what
+/// [`key_from_name`](KeyboardLayout::key_from_name) and the layout routes
+/// answer in -- and this is the conversion from that into XNA's set.
+///
+/// `Keys::None` is a real member of the enum -- XNA gives it the value 0 -- so
+/// it comes back as `Some(Keys::None)`, not folded into `None`. The layout
+/// routes that use CNA's canonical none value as "there is no such key" do that
+/// folding themselves, because it is their contract rather than this
+/// conversion's.
+///
+/// A CNA extension: import it, and `Keys::from_key_code(..)` resolves through
+/// the trait.
+///
+/// ```rust,ignore
+/// use cna::extensions::keyboard::KeyFromNativeCode;
+/// let key = Keys::from_key_code(code);
+/// ```
+pub trait KeyFromNativeCode: Sized {
+    /// The key a CNA key code names, or `None` when it is outside XNA's set.
+    #[must_use]
+    fn from_key_code(code: u32) -> Option<Self>;
+}
