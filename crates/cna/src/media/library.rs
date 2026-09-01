@@ -6,6 +6,9 @@ use cna_sys as sys;
 use crate::error::{CnaError, Result};
 use crate::game::GameContext;
 use crate::native::Native;
+use crate::extensions::media::MediaLibraryExt;
+use crate::extensions::media::MediaSourceExt;
+use crate::extensions::media::PictureExt;
 
 use super::runtime::MediaRuntime;
 use super::{
@@ -223,22 +226,8 @@ impl MediaLibrary {
 
 impl Drop for MediaLibrary { fn drop(&mut self){self.invalidate_children();self.core.invalidate();} }
 
-/// The `media.h` route that names a source's *type*.
-impl MediaSource {
-    /// The runtime type name CNA reports for this source.
-    ///
-    /// Measured, and narrower than the name suggests: it is the .NET *class*
-    /// name -- `"Microsoft.Xna.Framework.Media.MediaSource"` -- and not a
-    /// spelling of which kind of source this is. `MediaSourceType` is what
-    /// answers that, and `Name` is what the source itself is called.
-    ///
-    /// It is bound because it is the only route that reports the type name at
-    /// all, and a caller writing a diagnostic wants what CNA would print; it is
-    /// documented this way so nobody reaches for it expecting the kind.
-    ///
-    /// Answers `None` for a source this process did not enumerate, which is
-    /// the state a source has after its game generation ended.
-    pub fn TypeName(&self, game: &GameContext<'_>) -> Result<Option<String>> {
+impl MediaSourceExt for MediaSource {
+    fn TypeName(&self, game: &GameContext<'_>) -> Result<Option<String>> {
         let Some(index) = self.index else {
             return Ok(None);
         };
@@ -252,26 +241,14 @@ impl MediaSource {
     }
 }
 
-/// The `media_library.h` routes with no XNA counterpart.
-impl Picture {
-    /// The platform token this picture carries.
-    ///
-    /// The backend's own identifier for the underlying media object, and the
-    /// only way to tell two pictures with the same name apart.
-    pub fn PlatformToken(&self) -> Result<String> {
+impl PictureExt for Picture {
+    fn PlatformToken(&self) -> Result<String> {
         self.core.native().picture_token(self.core.handle()?)
     }
 }
 
-/// The `media_library.h` route that saves a picture from a stream.
-impl MediaLibrary {
-    /// Saves a picture the caller already has open as a stream.
-    ///
-    /// XNA's `SavePicture` takes a byte array or a stream and is one of the few
-    /// media routes a game can *write* through. This is the stream form, which
-    /// is what a game that just rendered a screenshot to a storage file has in
-    /// hand.
-    pub fn SavePictureFromStream(
+impl MediaLibraryExt for MediaLibrary {
+    fn SavePictureFromStream(
         &self,
         name: &str,
         stream: &crate::storage::StorageStream,

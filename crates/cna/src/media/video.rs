@@ -7,6 +7,8 @@ use crate::content::{ContentDisposable, ContentLoadable};
 use crate::error::{CnaError, Result};
 use crate::game::{GameContext, TimeSpan};
 use crate::graphics::{BorrowedHandle, GraphicsDevice, Texture2D};
+use crate::extensions::media::VideoExt;
+use crate::extensions::media::VideoPlayerExt;
 
 use super::{MediaRuntime, MediaState, ResourceCore, VideoSoundtrackType};
 
@@ -193,27 +195,7 @@ impl VideoPlayer {
 
 impl Drop for VideoPlayer { fn drop(&mut self){self.frame_epoch.fetch_add(1,Ordering::AcqRel);self.core.invalidate();} }
 
-/// The `video.h` routes with no XNA counterpart.
-///
-/// XNA's `Video` is a content type with no public constructor: a game gets one
-/// by loading it. CNA gives it two, from a file path and from a URI, and a Rust
-/// caller holding either has nowhere else to go -- so they are bound.
-///
-/// The track selectors exist on both the video and the player and are not the
-/// same operation. Setting a track on the *video* changes what any player will
-/// use for it; setting one on the *player* changes only that player's current
-/// playback, and is lost when it moves to another video.
 impl Video {
-    /// Opens a video from a file the platform can decode.
-    pub fn FromFile(game: &GameContext<'_>, fileName: &str) -> Result<Self> {
-        Self::adopt(game, game.native.create_video(game.handle, fileName)?)
-    }
-
-    /// Opens a video from a URI.
-    pub fn FromUri(game: &GameContext<'_>, uri: &str) -> Result<Self> {
-        Self::adopt(game, game.native.create_video_from_uri(game.handle, uri)?)
-    }
-
     fn adopt(game: &GameContext<'_>, handle: sys::CNA_VideoHandle) -> Result<Self> {
         let native = Arc::clone(game.native);
         let runtime = Arc::clone(game.media_runtime());
@@ -224,61 +206,52 @@ impl Video {
             _graphics_device: game.device.clone(),
         })
     }
+}
 
-    /// Frame width, height and rate, as the decoded stream reports them.
-    ///
-    /// Distinct from the `Width`, `Height` and `FramesPerSecond` properties a
-    /// content-loaded video carries: those are the metadata the pipeline wrote
-    /// down, and this is what the decoder found.
-    pub fn DecodedInfo(&self) -> Result<(i32, i32, f64)> {
+impl VideoExt for Video {
+    fn FromFile(game: &GameContext<'_>, fileName: &str) -> Result<Self> {
+        Self::adopt(game, game.native.create_video(game.handle, fileName)?)
+    }
+
+    fn FromUri(game: &GameContext<'_>, uri: &str) -> Result<Self> {
+        Self::adopt(game, game.native.create_video_from_uri(game.handle, uri)?)
+    }
+
+    fn DecodedInfo(&self) -> Result<(i32, i32, f64)> {
         self.core.native().video_info(self.core.handle()?)
     }
 
-    /// Overrides the duration the video reports.
-    pub fn SetDuration(&self, value: TimeSpan) -> Result<()> {
+    fn SetDuration(&self, value: TimeSpan) -> Result<()> {
         self.core
             .native()
             .set_video_duration(self.core.handle()?, value.Ticks())
     }
 
-    /// Selects which audio track any player should use for this video.
-    pub fn SetAudioTrack(&self, track: i32) -> Result<()> {
+    fn SetAudioTrack(&self, track: i32) -> Result<()> {
         self.core
             .native()
             .set_video_audio_track(self.core.handle()?, track)
     }
 
-    /// Selects which video track any player should use for this video.
-    pub fn SetVideoTrack(&self, track: i32) -> Result<()> {
+    fn SetVideoTrack(&self, track: i32) -> Result<()> {
         self.core
             .native()
             .set_video_video_track(self.core.handle()?, track)
     }
 
-    /// The file name this video was opened from.
-    pub fn FileName(&self) -> Result<String> {
+    fn FileName(&self) -> Result<String> {
         self.core.native().video_file_name(self.core.handle()?)
     }
 
-    /// Whether the video holds a graphics device for frame delivery.
-    ///
-    /// A video opened without one decodes but cannot hand back a texture, so
-    /// this is what distinguishes "no frame yet" from "no frames ever".
-    pub fn HasGraphicsDevice(&self) -> Result<bool> {
+    fn HasGraphicsDevice(&self) -> Result<bool> {
         self.core
             .native()
             .video_has_graphics_device(self.core.handle()?)
     }
 }
 
-/// The `video.h` player routes with no XNA counterpart.
-impl VideoPlayer {
-    /// Whether CNA reports this player bound to a video.
-    ///
-    /// The Rust side already remembers what it was handed; this asks CNA, which
-    /// is the answer that survives a video being disposed underneath the
-    /// player.
-    pub fn HasNativeVideo(&self) -> Result<bool> {
+impl VideoPlayerExt for VideoPlayer {
+    fn HasNativeVideo(&self) -> Result<bool> {
         Ok(self
             .core
             .native()
@@ -286,15 +259,13 @@ impl VideoPlayer {
             .is_some())
     }
 
-    /// Selects the audio track for this player's current playback only.
-    pub fn SetAudioTrack(&self, track: i32) -> Result<()> {
+    fn SetAudioTrack(&self, track: i32) -> Result<()> {
         self.core
             .native()
             .set_player_audio_track(self.core.handle()?, track)
     }
 
-    /// Selects the video track for this player's current playback only.
-    pub fn SetVideoTrack(&self, track: i32) -> Result<()> {
+    fn SetVideoTrack(&self, track: i32) -> Result<()> {
         self.core
             .native()
             .set_player_video_track(self.core.handle()?, track)

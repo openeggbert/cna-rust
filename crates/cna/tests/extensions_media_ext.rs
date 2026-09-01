@@ -14,6 +14,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use cna::extensions::media::{MediaSourceExt, SongCollectionExt, SongExt, VideoExt};
 use cna::Microsoft::Xna::Framework::Media::{MediaSource, Song, SongCollection, Video};
 use cna::Microsoft::Xna::Framework::{Game, GameContext};
 use cna::{run_for_frames, GameState, GameStateAccess, Result};
