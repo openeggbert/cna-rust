@@ -318,14 +318,6 @@
     "cna_game_services_remove_ext": {
       "category": "STRICT_XNA_BACKING",
       "rationale": "backs XNA GameServiceContainer.RemoveService"
-    },
-    "cna_content_type_reader_get_target_type_name_size": {
-      "category": "CNA_EXTENSION_BACKING",
-      "rationale": "not reflection: the canonical target type a content type reader claims, which is reader-dispatch data"
-    },
-    "cna_content_type_reader_copy_target_type_name": {
-      "category": "CNA_EXTENSION_BACKING",
-      "rationale": "not reflection: the canonical target type a content type reader claims, which is reader-dispatch data"
     }
   },
   "bindingDocumentation": "Two questions, two axes. `category` answers why a canonical route exists and which part of the projection it belongs to. `binding` answers whether Rust binds it and, when it does not, why not -- with evidence, and with a durable task when the reason is temporary. A purpose is never an answer to the binding question: 'this backs XNA' says nothing about whether the Rust projection reaches it. BOUND is measured from the reviewed cna-sys slice and is never declared here; every other status must be stated, and every statement must carry a reason and evidence a reader can check.",

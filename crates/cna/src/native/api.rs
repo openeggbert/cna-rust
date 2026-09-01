@@ -651,6 +651,41 @@ pub(crate) struct Native {
     pub(super) title_location_copy_path: sys::cna_title_location_copy_path_fn,
     pub(super) title_location_set_path_ext: sys::cna_title_location_set_path_ext_fn,
     pub(super) title_container_read_ext: sys::cna_title_container_read_ext_fn,
+    pub(super) content_reader_create: sys::cna_content_reader_create_fn,
+    pub(super) content_reader_destroy: sys::cna_content_reader_destroy_fn,
+    pub(super) content_reader_get_content_manager: sys::cna_content_reader_get_content_manager_fn,
+    pub(super) content_reader_get_asset_name_size: sys::cna_content_reader_get_asset_name_size_fn,
+    pub(super) content_reader_copy_asset_name: sys::cna_content_reader_copy_asset_name_fn,
+    pub(super) content_reader_get_version: sys::cna_content_reader_get_version_fn,
+    pub(super) content_reader_get_platform: sys::cna_content_reader_get_platform_fn,
+    pub(super) content_reader_read_matrix: sys::cna_content_reader_read_matrix_fn,
+    pub(super) content_reader_read_quaternion: sys::cna_content_reader_read_quaternion_fn,
+    pub(super) content_reader_read_vector2: sys::cna_content_reader_read_vector2_fn,
+    pub(super) content_reader_read_vector3: sys::cna_content_reader_read_vector3_fn,
+    pub(super) content_reader_read_vector4: sys::cna_content_reader_read_vector4_fn,
+    pub(super) content_reader_read_color: sys::cna_content_reader_read_color_fn,
+    pub(super) content_reader_read_bounding_sphere: sys::cna_content_reader_read_bounding_sphere_fn,
+    pub(super) content_reader_read_object_tag: sys::cna_content_reader_read_object_tag_fn,
+    pub(super) content_reader_initialize_type_readers: sys::cna_content_reader_initialize_type_readers_fn,
+    pub(super) content_reader_read_shared_resources: sys::cna_content_reader_read_shared_resources_fn,
+    pub(super) content_reader_check_collection_element_count: sys::cna_content_reader_check_collection_element_count_fn,
+    pub(super) content_reader_check_decoded_byte_size: sys::cna_content_reader_check_decoded_byte_size_fn,
+    pub(super) content_reader_read_bytes_exact: sys::cna_content_reader_read_bytes_exact_fn,
+    pub(super) content_type_reader_manager_clear_type_creators: sys::cna_content_type_reader_manager_clear_type_creators_fn,
+    pub(super) content_type_reader_manager_get_is_registered: sys::cna_content_type_reader_manager_get_is_registered_fn,
+    pub(super) content_type_reader_manager_create_reader: sys::cna_content_type_reader_manager_create_reader_fn,
+    pub(super) content_type_reader_manager_register: sys::cna_content_type_reader_manager_register_fn,
+    pub(super) content_type_reader_manager_unregister: sys::cna_content_type_reader_manager_unregister_fn,
+    pub(super) content_register_known_unsupported_xnb_readers: sys::cna_content_register_known_unsupported_xnb_readers_fn,
+    pub(super) known_unsupported_content_type_reader_create: sys::cna_known_unsupported_content_type_reader_create_fn,
+    pub(super) content_type_reader_get_can_deserialize_into_existing_object: sys::cna_content_type_reader_get_can_deserialize_into_existing_object_fn,
+    pub(super) content_type_reader_get_target_type_name_size: sys::cna_content_type_reader_get_target_type_name_size_fn,
+    pub(super) content_type_reader_copy_target_type_name: sys::cna_content_type_reader_copy_target_type_name_fn,
+    pub(super) content_type_reader_get_type_version: sys::cna_content_type_reader_get_type_version_fn,
+    pub(super) content_type_reader_supports_version: sys::cna_content_type_reader_supports_version_fn,
+    pub(super) content_type_reader_initialize: sys::cna_content_type_reader_initialize_fn,
+    pub(super) content_type_reader_read_untyped: sys::cna_content_type_reader_read_untyped_fn,
+    pub(super) content_type_reader_destroy: sys::cna_content_type_reader_destroy_fn,
     pub(super) mouse_get_state: sys::cna_mouse_get_state_fn,
     pub(super) mouse_get_window_handle: sys::cna_mouse_get_window_handle_fn,
     pub(super) mouse_set_window_handle: sys::cna_mouse_set_window_handle_fn,
@@ -2157,6 +2192,111 @@ impl Native {
             ),
             title_container_read_ext: symbol!(cna_title_container_read_ext,
                 sys::cna_title_container_read_ext_fn
+            ),
+            content_reader_create: symbol!(cna_content_reader_create,
+                sys::cna_content_reader_create_fn
+            ),
+            content_reader_destroy: symbol!(cna_content_reader_destroy,
+                sys::cna_content_reader_destroy_fn
+            ),
+            content_reader_get_content_manager: symbol!(cna_content_reader_get_content_manager,
+                sys::cna_content_reader_get_content_manager_fn
+            ),
+            content_reader_get_asset_name_size: symbol!(cna_content_reader_get_asset_name_size,
+                sys::cna_content_reader_get_asset_name_size_fn
+            ),
+            content_reader_copy_asset_name: symbol!(cna_content_reader_copy_asset_name,
+                sys::cna_content_reader_copy_asset_name_fn
+            ),
+            content_reader_get_version: symbol!(cna_content_reader_get_version,
+                sys::cna_content_reader_get_version_fn
+            ),
+            content_reader_get_platform: symbol!(cna_content_reader_get_platform,
+                sys::cna_content_reader_get_platform_fn
+            ),
+            content_reader_read_matrix: symbol!(cna_content_reader_read_matrix,
+                sys::cna_content_reader_read_matrix_fn
+            ),
+            content_reader_read_quaternion: symbol!(cna_content_reader_read_quaternion,
+                sys::cna_content_reader_read_quaternion_fn
+            ),
+            content_reader_read_vector2: symbol!(cna_content_reader_read_vector2,
+                sys::cna_content_reader_read_vector2_fn
+            ),
+            content_reader_read_vector3: symbol!(cna_content_reader_read_vector3,
+                sys::cna_content_reader_read_vector3_fn
+            ),
+            content_reader_read_vector4: symbol!(cna_content_reader_read_vector4,
+                sys::cna_content_reader_read_vector4_fn
+            ),
+            content_reader_read_color: symbol!(cna_content_reader_read_color,
+                sys::cna_content_reader_read_color_fn
+            ),
+            content_reader_read_bounding_sphere: symbol!(cna_content_reader_read_bounding_sphere,
+                sys::cna_content_reader_read_bounding_sphere_fn
+            ),
+            content_reader_read_object_tag: symbol!(cna_content_reader_read_object_tag,
+                sys::cna_content_reader_read_object_tag_fn
+            ),
+            content_reader_initialize_type_readers: symbol!(cna_content_reader_initialize_type_readers,
+                sys::cna_content_reader_initialize_type_readers_fn
+            ),
+            content_reader_read_shared_resources: symbol!(cna_content_reader_read_shared_resources,
+                sys::cna_content_reader_read_shared_resources_fn
+            ),
+            content_reader_check_collection_element_count: symbol!(cna_content_reader_check_collection_element_count,
+                sys::cna_content_reader_check_collection_element_count_fn
+            ),
+            content_reader_check_decoded_byte_size: symbol!(cna_content_reader_check_decoded_byte_size,
+                sys::cna_content_reader_check_decoded_byte_size_fn
+            ),
+            content_reader_read_bytes_exact: symbol!(cna_content_reader_read_bytes_exact,
+                sys::cna_content_reader_read_bytes_exact_fn
+            ),
+            content_type_reader_manager_clear_type_creators: symbol!(cna_content_type_reader_manager_clear_type_creators,
+                sys::cna_content_type_reader_manager_clear_type_creators_fn
+            ),
+            content_type_reader_manager_get_is_registered: symbol!(cna_content_type_reader_manager_get_is_registered,
+                sys::cna_content_type_reader_manager_get_is_registered_fn
+            ),
+            content_type_reader_manager_create_reader: symbol!(cna_content_type_reader_manager_create_reader,
+                sys::cna_content_type_reader_manager_create_reader_fn
+            ),
+            content_type_reader_manager_register: symbol!(cna_content_type_reader_manager_register,
+                sys::cna_content_type_reader_manager_register_fn
+            ),
+            content_type_reader_manager_unregister: symbol!(cna_content_type_reader_manager_unregister,
+                sys::cna_content_type_reader_manager_unregister_fn
+            ),
+            content_register_known_unsupported_xnb_readers: symbol!(cna_content_register_known_unsupported_xnb_readers,
+                sys::cna_content_register_known_unsupported_xnb_readers_fn
+            ),
+            known_unsupported_content_type_reader_create: symbol!(cna_known_unsupported_content_type_reader_create,
+                sys::cna_known_unsupported_content_type_reader_create_fn
+            ),
+            content_type_reader_get_can_deserialize_into_existing_object: symbol!(cna_content_type_reader_get_can_deserialize_into_existing_object,
+                sys::cna_content_type_reader_get_can_deserialize_into_existing_object_fn
+            ),
+            content_type_reader_get_target_type_name_size: symbol!(cna_content_type_reader_get_target_type_name_size,
+                sys::cna_content_type_reader_get_target_type_name_size_fn
+            ),
+            content_type_reader_copy_target_type_name: symbol!(cna_content_type_reader_copy_target_type_name,
+                sys::cna_content_type_reader_copy_target_type_name_fn
+            ),
+            content_type_reader_get_type_version: symbol!(cna_content_type_reader_get_type_version,
+                sys::cna_content_type_reader_get_type_version_fn
+            ),
+            content_type_reader_supports_version: symbol!(cna_content_type_reader_supports_version,
+                sys::cna_content_type_reader_supports_version_fn
+            ),
+            content_type_reader_initialize: symbol!(cna_content_type_reader_initialize,
+                sys::cna_content_type_reader_initialize_fn
+            ),
+            content_type_reader_read_untyped: symbol!(cna_content_type_reader_read_untyped,
+                sys::cna_content_type_reader_read_untyped_fn
+            ),
+            content_type_reader_destroy: symbol!(cna_content_type_reader_destroy,
+                sys::cna_content_type_reader_destroy_fn
             ),
             mouse_get_state: symbol!(cna_mouse_get_state, sys::cna_mouse_get_state_fn),
             mouse_get_window_handle: symbol!(cna_mouse_get_window_handle,

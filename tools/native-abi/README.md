@@ -19,6 +19,20 @@ python3 tools/native-abi/verify.py \
   --library /path/to/libcna_c_api.so
 ```
 
+`generate.py --linked --all-manifest-symbols` re-derives every direct-link
+declaration from Clang, one process per symbol, which at three thousand symbols
+takes roughly twenty-five minutes. A slice that adds a few dozen routes can use
+`splice-linked.py` instead, which generates only the new ones and appends them:
+
+```bash
+python3 tools/native-abi/splice-linked.py cna_some_new_route cna_another_one
+```
+
+The two produce the same file -- measured by removing declarations from a freshly
+generated `linked.rs`, splicing them back and diffing -- and the verifier reads
+`linked.rs` either way, so a splice that went wrong is caught there rather than
+trusted.
+
 Current reviewed ABI-0.21 evidence is:
 
 ```text

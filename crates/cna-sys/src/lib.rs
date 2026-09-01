@@ -753,6 +753,56 @@ pub type CNA_GraphicsDeviceEventRegistrationHandle = CNA_Handle;
 /// `graphics_resource.h`: an opaque caller token carried on a resource and
 /// reported back by the device's ResourceDestroyed event.
 pub type CNA_GraphicsResourceTag = u64;
+
+/// `content_readers.h`: the XNB reader and the process-wide reader registry.
+pub type CNA_ContentReaderHandle = CNA_Handle;
+pub type CNA_ContentTypeReaderHandle = CNA_Handle;
+
+/// Why a placeholder reader refuses. Only one reason exists at ABI 0.21.
+pub type CNA_UnsupportedContentReaderReason = u32;
+pub const CNA_UNSUPPORTED_CONTENT_READER_REASON_COMPILED_PLATFORM_SHADER_BYTECODE:
+    CNA_UnsupportedContentReaderReason = 0;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_ContentReaderCreateInfo {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub content_manager: CNA_Handle,
+    pub stream: CNA_StorageStreamHandle,
+    pub asset_name: CNA_StringView,
+    pub version: i32,
+    pub platform: u8,
+    pub reserved: [u8; 3],
+}
+
+pub type CNA_ContentTypeReaderCreateCallback =
+    Option<unsafe extern "C" fn(context: *mut c_void, out_reader_context: *mut *mut c_void) -> CNA_Result>;
+pub type CNA_ContentTypeReaderReadCallback = Option<
+    unsafe extern "C" fn(
+        reader_context: *mut c_void,
+        input: CNA_ContentReaderHandle,
+        existing_object: *mut c_void,
+        out_object: *mut *mut c_void,
+    ) -> CNA_Result,
+>;
+pub type CNA_ContentTypeReaderDestroyCallback =
+    Option<unsafe extern "C" fn(reader_context: *mut c_void)>;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_ContentTypeReaderCallbacks {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub target_type_name: CNA_StringView,
+    pub type_version: i32,
+    pub can_deserialize_into_existing_object: CNA_Bool,
+    pub reserved: [u8; 3],
+    pub create: CNA_ContentTypeReaderCreateCallback,
+    pub read: CNA_ContentTypeReaderReadCallback,
+    pub destroy: CNA_ContentTypeReaderDestroyCallback,
+    pub context: *mut c_void,
+}
 pub type CNA_GraphicsResourceEventRegistrationHandle = CNA_Handle;
 pub type CNA_GraphicsResourceDisposingCallback =
     Option<unsafe extern "C" fn(resource: CNA_Handle, context: *mut c_void)>;
@@ -13406,4 +13456,108 @@ pub type cna_title_location_set_path_ext_fn = unsafe extern "C" fn(
 ) -> CNA_Result;
 pub type cna_title_container_read_ext_fn = unsafe extern "C" fn(
     CNA_Handle, CNA_StringView, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+
+pub type cna_content_reader_create_fn = unsafe extern "C" fn(
+    *const CNA_ContentReaderCreateInfo, *mut CNA_ContentReaderHandle,
+) -> CNA_Result;
+pub type cna_content_reader_destroy_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle,
+) -> CNA_Result;
+pub type cna_content_reader_get_content_manager_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_content_reader_get_asset_name_size_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_content_reader_copy_asset_name_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_content_reader_get_version_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_content_reader_get_platform_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle, *mut u8,
+) -> CNA_Result;
+pub type cna_content_reader_read_matrix_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle, *mut CNA_Matrix,
+) -> CNA_Result;
+pub type cna_content_reader_read_quaternion_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle, *mut CNA_Quaternion,
+) -> CNA_Result;
+pub type cna_content_reader_read_vector2_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle, *mut CNA_Vector2,
+) -> CNA_Result;
+pub type cna_content_reader_read_vector3_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle, *mut CNA_Vector3,
+) -> CNA_Result;
+pub type cna_content_reader_read_vector4_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle, *mut CNA_Vector4,
+) -> CNA_Result;
+pub type cna_content_reader_read_color_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle, *mut CNA_Color,
+) -> CNA_Result;
+pub type cna_content_reader_read_bounding_sphere_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle, *mut CNA_BoundingSphere,
+) -> CNA_Result;
+pub type cna_content_reader_read_object_tag_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_content_reader_initialize_type_readers_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle,
+) -> CNA_Result;
+pub type cna_content_reader_read_shared_resources_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle,
+) -> CNA_Result;
+pub type cna_content_reader_check_collection_element_count_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle, i64, CNA_StringView,
+) -> CNA_Result;
+pub type cna_content_reader_check_decoded_byte_size_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle, i64, CNA_StringView,
+) -> CNA_Result;
+pub type cna_content_reader_read_bytes_exact_fn = unsafe extern "C" fn(
+    CNA_ContentReaderHandle, i32, CNA_StringView, *mut u8, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_content_type_reader_manager_clear_type_creators_fn = unsafe extern "C" fn(
+) -> CNA_Result;
+pub type cna_content_type_reader_manager_get_is_registered_fn = unsafe extern "C" fn(
+    CNA_StringView, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_content_type_reader_manager_create_reader_fn = unsafe extern "C" fn(
+    CNA_StringView, *mut CNA_ContentTypeReaderHandle,
+) -> CNA_Result;
+pub type cna_content_type_reader_manager_register_fn = unsafe extern "C" fn(
+    CNA_StringView, *const CNA_ContentTypeReaderCallbacks, *mut CNA_Handle,
+) -> CNA_Result;
+pub type cna_content_type_reader_manager_unregister_fn = unsafe extern "C" fn(
+    CNA_Handle,
+) -> CNA_Result;
+pub type cna_content_register_known_unsupported_xnb_readers_fn = unsafe extern "C" fn(
+) -> CNA_Result;
+pub type cna_known_unsupported_content_type_reader_create_fn = unsafe extern "C" fn(
+    CNA_StringView, CNA_UnsupportedContentReaderReason, *mut CNA_ContentTypeReaderHandle,
+) -> CNA_Result;
+pub type cna_content_type_reader_get_can_deserialize_into_existing_object_fn = unsafe extern "C" fn(
+    CNA_ContentTypeReaderHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_content_type_reader_get_target_type_name_size_fn = unsafe extern "C" fn(
+    CNA_ContentTypeReaderHandle, *mut u64,
+) -> CNA_Result;
+pub type cna_content_type_reader_copy_target_type_name_fn = unsafe extern "C" fn(
+    CNA_ContentTypeReaderHandle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_content_type_reader_get_type_version_fn = unsafe extern "C" fn(
+    CNA_ContentTypeReaderHandle, *mut i32,
+) -> CNA_Result;
+pub type cna_content_type_reader_supports_version_fn = unsafe extern "C" fn(
+    CNA_ContentTypeReaderHandle, i32, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_content_type_reader_initialize_fn = unsafe extern "C" fn(
+    CNA_ContentTypeReaderHandle,
+) -> CNA_Result;
+pub type cna_content_type_reader_read_untyped_fn = unsafe extern "C" fn(
+    CNA_ContentTypeReaderHandle, CNA_ContentReaderHandle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_content_type_reader_destroy_fn = unsafe extern "C" fn(
+    CNA_ContentTypeReaderHandle,
 ) -> CNA_Result;

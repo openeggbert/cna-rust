@@ -6,6 +6,7 @@
 //! canonical CNA family so a route's authority is obvious from where it lands.
 
 pub mod content;
+pub mod content_reader;
 pub mod devices;
 pub mod effects;
 pub mod engine;

@@ -13196,4 +13196,138 @@ extern "C" {
         argument3: u64,
         argument4: *mut u64,
     ) -> CNA_Result;
+    pub fn cna_content_reader_create(
+        argument0: *const CNA_ContentReaderCreateInfo,
+        argument1: *mut CNA_ContentReaderHandle,
+    ) -> CNA_Result;
+    pub fn cna_content_reader_destroy(argument0: CNA_ContentReaderHandle) -> CNA_Result;
+    pub fn cna_content_reader_get_content_manager(
+        argument0: CNA_ContentReaderHandle,
+        argument1: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_content_reader_get_asset_name_size(
+        argument0: CNA_ContentReaderHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_content_reader_copy_asset_name(
+        argument0: CNA_ContentReaderHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_content_reader_get_version(
+        argument0: CNA_ContentReaderHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_content_reader_get_platform(
+        argument0: CNA_ContentReaderHandle,
+        argument1: *mut u8,
+    ) -> CNA_Result;
+    pub fn cna_content_reader_read_matrix(
+        argument0: CNA_ContentReaderHandle,
+        argument1: *mut CNA_Matrix,
+    ) -> CNA_Result;
+    pub fn cna_content_reader_read_quaternion(
+        argument0: CNA_ContentReaderHandle,
+        argument1: *mut CNA_Quaternion,
+    ) -> CNA_Result;
+    pub fn cna_content_reader_read_vector2(
+        argument0: CNA_ContentReaderHandle,
+        argument1: *mut CNA_Vector2,
+    ) -> CNA_Result;
+    pub fn cna_content_reader_read_vector3(
+        argument0: CNA_ContentReaderHandle,
+        argument1: *mut CNA_Vector3,
+    ) -> CNA_Result;
+    pub fn cna_content_reader_read_vector4(
+        argument0: CNA_ContentReaderHandle,
+        argument1: *mut CNA_Vector4,
+    ) -> CNA_Result;
+    pub fn cna_content_reader_read_color(
+        argument0: CNA_ContentReaderHandle,
+        argument1: *mut CNA_Color,
+    ) -> CNA_Result;
+    pub fn cna_content_reader_read_bounding_sphere(
+        argument0: CNA_ContentReaderHandle,
+        argument1: *mut CNA_BoundingSphere,
+    ) -> CNA_Result;
+    pub fn cna_content_reader_read_object_tag(
+        argument0: CNA_ContentReaderHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_content_reader_initialize_type_readers(
+        argument0: CNA_ContentReaderHandle,
+    ) -> CNA_Result;
+    pub fn cna_content_reader_read_shared_resources(
+        argument0: CNA_ContentReaderHandle,
+    ) -> CNA_Result;
+    pub fn cna_content_reader_check_collection_element_count(
+        argument0: CNA_ContentReaderHandle,
+        argument1: i64,
+        argument2: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_content_reader_check_decoded_byte_size(
+        argument0: CNA_ContentReaderHandle,
+        argument1: i64,
+        argument2: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_content_reader_read_bytes_exact(
+        argument0: CNA_ContentReaderHandle,
+        argument1: i32,
+        argument2: CNA_StringView,
+        argument3: *mut u8,
+        argument4: u64,
+        argument5: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_content_type_reader_manager_clear_type_creators() -> CNA_Result;
+    pub fn cna_content_type_reader_manager_get_is_registered(
+        argument0: CNA_StringView,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_content_type_reader_manager_create_reader(
+        argument0: CNA_StringView,
+        argument1: *mut CNA_ContentTypeReaderHandle,
+    ) -> CNA_Result;
+    pub fn cna_content_type_reader_manager_register(
+        argument0: CNA_StringView,
+        argument1: *const CNA_ContentTypeReaderCallbacks,
+        argument2: *mut CNA_Handle,
+    ) -> CNA_Result;
+    pub fn cna_content_type_reader_manager_unregister(argument0: CNA_Handle) -> CNA_Result;
+    pub fn cna_content_register_known_unsupported_xnb_readers() -> CNA_Result;
+    pub fn cna_known_unsupported_content_type_reader_create(
+        argument0: CNA_StringView,
+        argument1: CNA_UnsupportedContentReaderReason,
+        argument2: *mut CNA_ContentTypeReaderHandle,
+    ) -> CNA_Result;
+    pub fn cna_content_type_reader_get_can_deserialize_into_existing_object(
+        argument0: CNA_ContentTypeReaderHandle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_content_type_reader_get_target_type_name_size(
+        argument0: CNA_ContentTypeReaderHandle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_content_type_reader_copy_target_type_name(
+        argument0: CNA_ContentTypeReaderHandle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_content_type_reader_get_type_version(
+        argument0: CNA_ContentTypeReaderHandle,
+        argument1: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_content_type_reader_supports_version(
+        argument0: CNA_ContentTypeReaderHandle,
+        argument1: i32,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_content_type_reader_initialize(argument0: CNA_ContentTypeReaderHandle) -> CNA_Result;
+    pub fn cna_content_type_reader_read_untyped(
+        argument0: CNA_ContentTypeReaderHandle,
+        argument1: CNA_ContentReaderHandle,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_content_type_reader_destroy(argument0: CNA_ContentTypeReaderHandle) -> CNA_Result;
 }

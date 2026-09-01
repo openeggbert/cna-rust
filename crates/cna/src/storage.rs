@@ -905,6 +905,16 @@ pub struct StorageStream {
 }
 
 impl StorageStream {
+    /// The native handle, for a route that reads this stream in place.
+    ///
+    /// `content_readers.h`'s `ContentReader` borrows a stream for its whole
+    /// life and closes it when destroyed; the handle itself stays this value's
+    /// to close, and `cna_storage_stream_close` is idempotent, so the two do
+    /// not fight.
+    pub(crate) fn native_handle(&self) -> Result<sys::CNA_StorageStreamHandle> {
+        self.state.handle()
+    }
+
     fn from_handle(
         handle: sys::CNA_StorageStreamHandle,
         container: &Arc<StorageContainerState>,

@@ -168,8 +168,13 @@ def main() -> int:
         if len(line) <= 100:
             print(line)
         else:
+            # A route that takes no arguments still has a long enough alias to
+            # wrap -- `cna_content_register_known_unsupported_xnb_readers` is
+            # 103 characters -- and printing an empty parameter line under it
+            # emitted a bare comma, which does not compile.
             print(f"pub type {symbol}_fn = unsafe extern \"C\" fn(")
-            print(f"    {parameters},")
+            if parameters:
+                print(f"    {parameters},")
             print(f") -> {returns};" if returns != "c_void" else ");")
     return 0
 
