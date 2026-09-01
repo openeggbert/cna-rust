@@ -25,10 +25,17 @@ ROOT = Path(__file__).resolve().parents[2]
 CLASSIFICATION = ROOT / "tools/c-api-inventory/classification.json"
 CNA_SYS = ROOT / "crates/cna-sys/src/lib.rs"
 
-# Every category a canonical route may carry.  The set is closed: adding one is
-# a deliberate project decision recorded in docs/c-api-classification.md.
+# Two axes, two closed sets.
+#
+# CATEGORIES answers "why does this route exist, and which part of the
+# projection owns it".  BINDING_STATUSES answers "does Rust bind it, and if
+# not, why not".  Keeping them apart is the point: a purpose is not a binding
+# decision, and the old single axis let "RUST_SYS_BOUND" erase a route's
+# purpose while leaving every unbound route with no binding decision at all.
+#
+# Adding to either set is a deliberate project decision recorded in
+# docs/c-api-classification.md.
 CATEGORIES = (
-    "RUST_SYS_BOUND",
     "STRICT_XNA_BACKING",
     "CNA_EXTENSION_BACKING",
     "MANAGED_BY_DESIGN",
@@ -39,6 +46,33 @@ CATEGORIES = (
     "UPSTREAM_NOT_USEFUL_TO_RUST",
     "UNMAPPED_REQUIRES_REVIEW",
 )
+
+BINDING_STATUSES = (
+    # Measured, never declared: the route is in the reviewed cna-sys slice.
+    "BOUND",
+    # Rust reaches the same capability another way, or the route should not
+    # exist in a safe Rust API.  Needs a reason naming the Rust surface.
+    "DELIBERATE_NON_BINDING",
+    # A CNA defect stops it.  Needs a finding id.
+    "BLOCKED_UPSTREAM",
+    # No renderer available here can run it.
+    "BLOCKED_RENDERER",
+    # This platform cannot reach it.
+    "BLOCKED_PLATFORM",
+    # No such device is attached, and CNA ships no test backend for it.
+    "BLOCKED_HARDWARE",
+    # It needs an asset this project may not carry.
+    "BLOCKED_ASSET",
+    # Real work, deliberately not now.  Needs a backlog id.
+    "DEFERRED_TRACKED",
+    # Real work, reachable today, nobody has done it.  The gate fails on these.
+    "ACTIONABLE_LOCAL",
+    # Nobody has decided.  The gate fails on these too.
+    "UNREVIEWED",
+)
+
+# A status that stops the gate is not allowed to be a bare assertion.
+NEEDS_TASK = ("BLOCKED_UPSTREAM", "DEFERRED_TRACKED")
 
 FUNCTION = re.compile(
     r"\bCNA_C_API\s+[^;{}]*?\b(cna_[A-Za-z0-9_]+)\s*\((.*?)\)\s*;", re.S
@@ -141,17 +175,14 @@ def matches(rule: dict, name: str, header: str) -> bool:
 
 
 def classify(functions: dict[str, dict], bound: set[str], rules: dict) -> dict:
-    """Assigns exactly one category to every canonical route."""
+    """Assigns exactly one purpose to every canonical route.
+
+    Purpose is independent of whether Rust binds the route: a bound route still
+    has to say which part of the projection owns it, and an unbound one still
+    has a purpose.  ``classify_binding`` answers the other question.
+    """
     result = {}
     for name, info in sorted(functions.items()):
-        if name in bound:
-            result[name] = {
-                "category": "RUST_SYS_BOUND",
-                "rationale": "declared in the reviewed cna-sys slice",
-                "rule": "measured",
-                "header": info["header"],
-            }
-            continue
         override = rules["overrides"].get(name)
         if override is not None:
             result[name] = {
@@ -180,6 +211,60 @@ def classify(functions: dict[str, dict], bound: set[str], rules: dict) -> dict:
     return result
 
 
+def classify_binding(functions: dict[str, dict], bound: set[str], rules: dict) -> dict:
+    """Answers, for every canonical route, whether Rust binds it and why not.
+
+    ``BOUND`` is measured.  Everything else has to be stated in
+    classification.json with a reason, and a task when the reason is a block or
+    a deferral, so no route can quietly sit in limbo.
+    """
+    binding = rules.get("binding", {"rules": [], "overrides": {}})
+    result = {}
+    for name, info in sorted(functions.items()):
+        header = info["header"]
+        if name in bound:
+            result[name] = {
+                "status": "BOUND",
+                "reason": "declared in the reviewed cna-sys slice",
+                "evidence": "tools/native-abi/bindings.json",
+                "rule": "measured",
+                "header": header,
+            }
+            continue
+        override = binding.get("overrides", {}).get(name)
+        if override is not None:
+            result[name] = {
+                "status": override["status"],
+                "reason": override["reason"],
+                "evidence": override.get("evidence", ""),
+                "task": override.get("task"),
+                "rule": "override",
+                "header": header,
+            }
+            continue
+        for index, rule in enumerate(binding.get("rules", [])):
+            if matches(rule, name, header):
+                result[name] = {
+                    "status": rule["status"],
+                    "reason": rule["reason"],
+                    "evidence": rule.get("evidence", ""),
+                    "task": rule.get("task"),
+                    "rule": rule.get("id", f"binding[{index}]"),
+                    "header": header,
+                }
+                break
+        else:
+            result[name] = {
+                "status": "UNREVIEWED",
+                "reason": "no binding rule states why Rust does not bind this route",
+                "evidence": "",
+                "task": None,
+                "rule": "none",
+                "header": header,
+            }
+    return result
+
+
 def main() -> int:
     args = arguments()
     if not args.cna_root:
@@ -195,22 +280,42 @@ def main() -> int:
         if rule["category"] not in CATEGORIES:
             raise ValueError(f"unknown classification category: {rule['category']}")
 
+    for rule in rules.get("binding", {}).get("rules", []) + list(
+        rules.get("binding", {}).get("overrides", {}).values()
+    ):
+        if rule["status"] not in BINDING_STATUSES:
+            raise ValueError(f"unknown binding status: {rule['status']}")
+        if rule["status"] == "BOUND":
+            raise ValueError("BOUND is measured from cna-sys, never declared")
+        if not rule.get("reason"):
+            raise ValueError(f"binding rule {rule.get('id', '?')} states no reason")
+        if rule["status"] in NEEDS_TASK and not rule.get("task"):
+            raise ValueError(
+                f"binding rule {rule.get('id', '?')} is {rule['status']} with no owning task"
+            )
+
     routes = classify(headers["functions"], rust["functions"], rules)
+    binding = classify_binding(headers["functions"], rust["functions"], rules)
     if args.list:
+        wanted = args.list
         for name, value in routes.items():
-            if value["category"] == args.list:
+            if value["category"] == wanted or binding[name]["status"] == wanted:
                 print(f"{value['header']:28} {name}")
         return 0
 
     counts = {category: 0 for category in CATEGORIES}
     for value in routes.values():
         counts[value["category"]] += 1
+    binding_counts = {status: 0 for status in BINDING_STATUSES}
+    for value in binding.values():
+        binding_counts[value["status"]] += 1
 
     declared_not_in_headers = sorted(rust["functions"] - set(headers["functions"]))
+    used = {v["rule"] for v in routes.values()} | {v["rule"] for v in binding.values()}
     unused_rules = sorted(
         rule.get("id", "")
-        for rule in rules["rules"]
-        if rule.get("id") and not any(v["rule"] == rule.get("id") for v in routes.values())
+        for rule in rules["rules"] + rules.get("binding", {}).get("rules", [])
+        if rule.get("id") and rule["id"] not in used
     )
     # An override is fiction once its route stops existing, and dead weight once
     # the route is bound: a bound route is measured, never classified by rule.
@@ -231,13 +336,31 @@ def main() -> int:
         "canonicalHeaders": len({v["header"] for v in headers["functions"].values()}),
         "rustSysFunctions": len(rust["functions"]),
         "categories": counts,
+        "bindingStatuses": binding_counts,
+        "actionableLocal": sorted(
+            name for name, value in binding.items() if value["status"] == "ACTIONABLE_LOCAL"
+        ),
+        "unreviewedBinding": sorted(
+            name for name, value in binding.items() if value["status"] == "UNREVIEWED"
+        ),
         "byHeader": {
             header: {
                 "total": sum(1 for v in routes.values() if v["header"] == header),
                 "bound": sum(
                     1
-                    for v in routes.values()
-                    if v["header"] == header and v["category"] == "RUST_SYS_BOUND"
+                    for name, v in routes.items()
+                    if v["header"] == header and binding[name]["status"] == "BOUND"
+                ),
+                "actionableLocal": sum(
+                    1
+                    for name, v in routes.items()
+                    if v["header"] == header
+                    and binding[name]["status"] == "ACTIONABLE_LOCAL"
+                ),
+                "unreviewed": sum(
+                    1
+                    for name, v in routes.items()
+                    if v["header"] == header and binding[name]["status"] == "UNREVIEWED"
                 ),
             }
             for header in sorted({v["header"] for v in routes.values()})
@@ -260,6 +383,11 @@ def main() -> int:
         + len(declared_not_in_headers)
         + len(unused_rules)
         + len(stale_overrides)
+        # The two that make the census mean something: a route nobody has made
+        # a binding decision about, and one everybody agrees is doable and
+        # nobody has done.
+        + binding_counts["UNREVIEWED"]
+        + binding_counts["ACTIONABLE_LOCAL"]
     )
     return 0 if args.report_only or failures == 0 else 1
 
