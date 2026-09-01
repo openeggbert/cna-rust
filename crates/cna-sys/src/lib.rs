@@ -688,6 +688,62 @@ pub type CNA_CnbChunkId = u32;
 pub type CNA_CnbByteWriterHandle = CNA_Handle;
 pub type CNA_CnbAnimationClipHandle = CNA_Handle;
 pub type CNA_CurveHandle = CNA_Handle;
+pub type CNA_SystemTrayHandle = CNA_Handle;
+
+pub type CNA_DeviceType = u32;
+
+pub const CNA_DEVICE_TYPE_DEVICE: CNA_DeviceType = 0;
+pub const CNA_DEVICE_TYPE_EMULATOR: CNA_DeviceType = 1;
+
+pub type CNA_MessageBoxType = u32;
+
+pub const CNA_MESSAGE_BOX_TYPE_ERROR: CNA_MessageBoxType = 0;
+pub const CNA_MESSAGE_BOX_TYPE_WARNING: CNA_MessageBoxType = 1;
+pub const CNA_MESSAGE_BOX_TYPE_INFORMATION: CNA_MessageBoxType = 2;
+
+/// The files a dialog returned, borrowed for the duration of the call.
+pub type CNA_FileDialogResultCallback = Option<
+    unsafe extern "C" fn(files: *const CNA_StringView, count: u64, context: *mut c_void),
+>;
+
+/// One tray entry was clicked.
+pub type CNA_TrayEntryClickCallback = Option<unsafe extern "C" fn(context: *mut c_void)>;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CNA_FileDialogFilter {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub name: CNA_StringView,
+    pub pattern: CNA_StringView,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_MessageBoxTestLog {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub simple_calls: u32,
+    pub choice_calls: u32,
+    pub last_type: CNA_MessageBoxType,
+    pub last_button_count: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CNA_VibrationTestLog {
+    pub struct_size: u32,
+    pub struct_version: u32,
+    pub start_calls: u32,
+    pub stop_calls: u32,
+    pub left_right_calls: u32,
+    pub reserved: u32,
+    pub last_duration_ticks: i64,
+    pub last_intensity: f32,
+    pub last_large_motor: f32,
+    pub last_small_motor: f32,
+    pub reserved_float: f32,
+}
 pub type CNA_ObjectDictionaryHandle = CNA_Handle;
 pub type CNA_ObjectDictionaryValueKind = u32;
 
@@ -12621,3 +12677,106 @@ pub type cna_model_get_content_tag_dictionary_ext_fn = unsafe extern "C" fn(
 pub type cna_model_get_content_tag_foreign_object_ext_fn = unsafe extern "C" fn(
     CNA_ModelHandle, *mut CNA_Bool, *mut *mut c_void,
 ) -> CNA_Result;
+
+// --- RUST-EXT-015d: the desktop devices, and their test backends ------------
+//
+// A system tray, message boxes, file dialogs, a vibration motor and a URL
+// launcher. Every one of them ships a substitute backend and a test log,
+// which is what makes them qualifiable on a machine with no tray, no
+// gamepad and no desktop session at all.
+pub type cna_devices_clipboard_set_text_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_environment_get_device_type_fn = unsafe extern "C" fn(
+    *mut CNA_DeviceType,
+) -> CNA_Result;
+pub type cna_file_dialog_get_is_supported_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_file_dialog_set_test_backend_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Bool, *const CNA_StringView, u64,
+) -> CNA_Result;
+pub type cna_file_dialog_show_open_file_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_FileDialogResultCallback, *mut c_void, *const CNA_FileDialogFilter, u64, CNA_StringView, CNA_Bool,
+) -> CNA_Result;
+pub type cna_file_dialog_show_open_folder_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_FileDialogResultCallback, *mut c_void, CNA_StringView, CNA_Bool,
+) -> CNA_Result;
+pub type cna_file_dialog_show_save_file_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_FileDialogResultCallback, *mut c_void, *const CNA_FileDialogFilter, u64, CNA_StringView,
+) -> CNA_Result;
+pub type cna_message_box_get_is_supported_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_message_box_get_test_log_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_MessageBoxTestLog,
+) -> CNA_Result;
+pub type cna_message_box_set_test_backend_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Bool, i32,
+) -> CNA_Result;
+pub type cna_message_box_show_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_MessageBoxType, CNA_StringView, CNA_StringView, *const CNA_StringView, u64, *mut i32,
+) -> CNA_Result;
+pub type cna_message_box_show_simple_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_MessageBoxType, CNA_StringView, CNA_StringView,
+) -> CNA_Result;
+pub type cna_system_tray_add_entry_fn = unsafe extern "C" fn(
+    CNA_SystemTrayHandle, CNA_StringView, CNA_Bool, CNA_Bool, CNA_Bool, CNA_TrayEntryClickCallback, *mut c_void, *mut u64,
+) -> CNA_Result;
+pub type cna_system_tray_click_entry_for_tests_ext_fn = unsafe extern "C" fn(
+    CNA_SystemTrayHandle, u64,
+) -> CNA_Result;
+pub type cna_system_tray_create_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_SystemTrayHandle,
+) -> CNA_Result;
+pub type cna_system_tray_create_with_test_backend_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_SystemTrayHandle,
+) -> CNA_Result;
+pub type cna_system_tray_destroy_fn = unsafe extern "C" fn(CNA_SystemTrayHandle) -> CNA_Result;
+pub type cna_system_tray_get_entry_checked_fn = unsafe extern "C" fn(
+    CNA_SystemTrayHandle, u64, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_system_tray_get_entry_enabled_fn = unsafe extern "C" fn(
+    CNA_SystemTrayHandle, u64, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_system_tray_get_is_supported_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_system_tray_set_entry_checked_fn = unsafe extern "C" fn(
+    CNA_SystemTrayHandle, u64, CNA_Bool,
+) -> CNA_Result;
+pub type cna_system_tray_set_entry_enabled_fn = unsafe extern "C" fn(
+    CNA_SystemTrayHandle, u64, CNA_Bool,
+) -> CNA_Result;
+pub type cna_system_tray_set_entry_label_fn = unsafe extern "C" fn(
+    CNA_SystemTrayHandle, u64, CNA_StringView,
+) -> CNA_Result;
+pub type cna_system_tray_set_tooltip_fn = unsafe extern "C" fn(
+    CNA_SystemTrayHandle, CNA_StringView,
+) -> CNA_Result;
+pub type cna_url_launcher_open_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_StringView, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_vibrate_controller_copy_device_name_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut c_char, u64, *mut u64,
+) -> CNA_Result;
+pub type cna_vibrate_controller_get_device_name_size_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut u64,
+) -> CNA_Result;
+pub type cna_vibrate_controller_get_is_supported_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_Bool,
+) -> CNA_Result;
+pub type cna_vibrate_controller_get_test_log_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, *mut CNA_VibrationTestLog,
+) -> CNA_Result;
+pub type cna_vibrate_controller_set_test_backend_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, CNA_Bool, CNA_Bool, CNA_StringView,
+) -> CNA_Result;
+pub type cna_vibrate_controller_start_fn = unsafe extern "C" fn(CNA_Handle, i64) -> CNA_Result;
+pub type cna_vibrate_controller_start_left_right_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, f32, f32, i64,
+) -> CNA_Result;
+pub type cna_vibrate_controller_start_with_intensity_ext_fn = unsafe extern "C" fn(
+    CNA_Handle, i64, f32,
+) -> CNA_Result;
+pub type cna_vibrate_controller_stop_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;

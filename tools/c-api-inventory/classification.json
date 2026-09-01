@@ -514,6 +514,28 @@
         "evidence": "crates/cna/src/graphics/effect.rs, whose apply_reflection_blueprint builds the whole graph through the add-create routes"
       },
       {
+        "id": "viewport-maths-in-rust",
+        "status": "DELIBERATE_NON_BINDING",
+        "names": [
+          "cna_viewport_get_aspect_ratio",
+          "cna_viewport_get_bounds",
+          "cna_viewport_set_bounds",
+          "cna_viewport_get_title_safe_area",
+          "cna_viewport_project",
+          "cna_viewport_unproject",
+          "cna_viewport_init_bounds",
+          "cna_viewport_init_from_rectangle"
+        ],
+        "reason": "a Viewport is six numbers and the operations over them are arithmetic: crates/cna/src/graphics/viewport.rs computes AspectRatio, Bounds, TitleSafeArea, Project and Unproject in Rust, including the perspective divide and its epsilon. The value never leaves Rust, so binding these would put a second implementation of the same arithmetic behind a native call that can fail -- the same reason the vectors and matrices are not bound.",
+        "rustEvidence": [
+          "pub fn Project",
+          "pub fn Unproject",
+          "pub fn AspectRatio",
+          "pub const fn TitleSafeArea"
+        ],
+        "evidence": "crates/cna/src/graphics/viewport.rs; the projection maths is measured against XNA's documented results in the behaviour corpus"
+      },
+      {
         "id": "reflective-reader-writes-at-caller-offsets",
         "status": "DELIBERATE_NON_BINDING",
         "names": [

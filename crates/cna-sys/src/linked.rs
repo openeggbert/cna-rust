@@ -12300,4 +12300,172 @@ extern "C" {
         argument1: CNA_StringView,
         argument2: *mut u64,
     ) -> CNA_Result;
+    pub fn cna_devices_clipboard_set_text_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_environment_get_device_type(argument0: *mut CNA_DeviceType) -> CNA_Result;
+    pub fn cna_file_dialog_get_is_supported_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_file_dialog_set_test_backend_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_Bool,
+        argument2: *const CNA_StringView,
+        argument3: u64,
+    ) -> CNA_Result;
+    pub fn cna_file_dialog_show_open_file_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_FileDialogResultCallback,
+        argument2: *mut c_void,
+        argument3: *const CNA_FileDialogFilter,
+        argument4: u64,
+        argument5: CNA_StringView,
+        argument6: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_file_dialog_show_open_folder_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_FileDialogResultCallback,
+        argument2: *mut c_void,
+        argument3: CNA_StringView,
+        argument4: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_file_dialog_show_save_file_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_FileDialogResultCallback,
+        argument2: *mut c_void,
+        argument3: *const CNA_FileDialogFilter,
+        argument4: u64,
+        argument5: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_message_box_get_is_supported_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_message_box_get_test_log_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_MessageBoxTestLog,
+    ) -> CNA_Result;
+    pub fn cna_message_box_set_test_backend_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_Bool,
+        argument2: i32,
+    ) -> CNA_Result;
+    pub fn cna_message_box_show_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_MessageBoxType,
+        argument2: CNA_StringView,
+        argument3: CNA_StringView,
+        argument4: *const CNA_StringView,
+        argument5: u64,
+        argument6: *mut i32,
+    ) -> CNA_Result;
+    pub fn cna_message_box_show_simple_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_MessageBoxType,
+        argument2: CNA_StringView,
+        argument3: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_system_tray_add_entry(
+        argument0: CNA_SystemTrayHandle,
+        argument1: CNA_StringView,
+        argument2: CNA_Bool,
+        argument3: CNA_Bool,
+        argument4: CNA_Bool,
+        argument5: CNA_TrayEntryClickCallback,
+        argument6: *mut c_void,
+        argument7: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_system_tray_click_entry_for_tests_ext(
+        argument0: CNA_SystemTrayHandle,
+        argument1: u64,
+    ) -> CNA_Result;
+    pub fn cna_system_tray_create(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_SystemTrayHandle,
+    ) -> CNA_Result;
+    pub fn cna_system_tray_create_with_test_backend_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_SystemTrayHandle,
+    ) -> CNA_Result;
+    pub fn cna_system_tray_destroy(argument0: CNA_SystemTrayHandle) -> CNA_Result;
+    pub fn cna_system_tray_get_entry_checked(
+        argument0: CNA_SystemTrayHandle,
+        argument1: u64,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_system_tray_get_entry_enabled(
+        argument0: CNA_SystemTrayHandle,
+        argument1: u64,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_system_tray_get_is_supported_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_system_tray_set_entry_checked(
+        argument0: CNA_SystemTrayHandle,
+        argument1: u64,
+        argument2: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_system_tray_set_entry_enabled(
+        argument0: CNA_SystemTrayHandle,
+        argument1: u64,
+        argument2: CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_system_tray_set_entry_label(
+        argument0: CNA_SystemTrayHandle,
+        argument1: u64,
+        argument2: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_system_tray_set_tooltip(
+        argument0: CNA_SystemTrayHandle,
+        argument1: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_url_launcher_open_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_StringView,
+        argument2: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_vibrate_controller_copy_device_name_ext(
+        argument0: CNA_Handle,
+        argument1: *mut c_char,
+        argument2: u64,
+        argument3: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_vibrate_controller_get_device_name_size_ext(
+        argument0: CNA_Handle,
+        argument1: *mut u64,
+    ) -> CNA_Result;
+    pub fn cna_vibrate_controller_get_is_supported_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_Bool,
+    ) -> CNA_Result;
+    pub fn cna_vibrate_controller_get_test_log_ext(
+        argument0: CNA_Handle,
+        argument1: *mut CNA_VibrationTestLog,
+    ) -> CNA_Result;
+    pub fn cna_vibrate_controller_set_test_backend_ext(
+        argument0: CNA_Handle,
+        argument1: CNA_Bool,
+        argument2: CNA_Bool,
+        argument3: CNA_StringView,
+    ) -> CNA_Result;
+    pub fn cna_vibrate_controller_start(argument0: CNA_Handle, argument1: i64) -> CNA_Result;
+    pub fn cna_vibrate_controller_start_left_right_ext(
+        argument0: CNA_Handle,
+        argument1: f32,
+        argument2: f32,
+        argument3: i64,
+    ) -> CNA_Result;
+    pub fn cna_vibrate_controller_start_with_intensity_ext(
+        argument0: CNA_Handle,
+        argument1: i64,
+        argument2: f32,
+    ) -> CNA_Result;
+    pub fn cna_vibrate_controller_stop(argument0: CNA_Handle) -> CNA_Result;
 }
