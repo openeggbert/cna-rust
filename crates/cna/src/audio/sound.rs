@@ -7,6 +7,7 @@ use cna_sys as sys;
 use crate::error::{CnaError, Result};
 use crate::game::{GameContext, TimeSpan};
 use crate::native::Native;
+use crate::extensions::audio_ext::{NativeDisposalState, SoundEffectExt};
 
 use super::runtime::{AudioResourceCleanup, AudioRuntime};
 use super::{sample_duration, sample_size, AudioChannels, AudioEmitter, AudioListener, SoundState};
@@ -225,32 +226,6 @@ impl SoundEffect {
         Ok(Self { state })
     }
 
-    pub fn FromAsset(game: &GameContext<'_>, assetName: &str) -> Result<Self> {
-        let runtime = Arc::clone(game.audio_runtime());
-        let active = runtime.active()?;
-        let handle = active
-            .native
-            .create_sound_effect_from_asset(active.handle, assetName)?;
-        let duration = match active.native.sound_effect_duration(handle) {
-            Ok(ticks) => TimeSpan::from_ticks(ticks),
-            Err(error) => {
-                let _ = active.native.destroy_sound_effect(handle);
-                return Err(error);
-            }
-        };
-        let state = Arc::new(SoundEffectState {
-            runtime: Arc::clone(&runtime),
-            native: active.native,
-            generation: active.generation,
-            handle: Mutex::new(handle),
-            duration,
-            name: Mutex::new(String::new()),
-            children: Mutex::new(Vec::new()),
-        });
-        runtime.register(&state);
-        Ok(Self { state })
-    }
-
     pub fn FromStream<R: Read>(game: &GameContext<'_>, stream: &mut R) -> Result<Self> {
         let mut bytes = Vec::new();
         stream.read_to_end(&mut bytes).map_err(|error| CnaError::Io(format!("failed to read audio stream: {error}")))?;
@@ -329,6 +304,10 @@ impl SoundEffect {
         self.state.native.play_sound_effect(self.state.require_handle()?, Some((volume, pitch, pan)))
     }
 
+    /// XNA's own static helpers: how long a buffer of a given size lasts, and
+    /// how many bytes a given duration needs. They are pure arithmetic over a
+    /// rate and a channel count, and they are called rather than restated so a
+    /// change to CNA's rounding changes here with it.
     pub fn GetSampleDuration(sizeInBytes: i32, sampleRate: i32, channels: AudioChannels) -> TimeSpan { sample_duration(sizeInBytes, sampleRate, channels) }
     pub fn GetSampleSizeInBytes(duration: TimeSpan, sampleRate: i32, channels: AudioChannels) -> i32 { sample_size(duration, sampleRate, channels) }
     pub fn Finalize(&self) {}
@@ -515,31 +494,49 @@ impl SoundEffectInstance {
 
 impl Drop for SoundEffectInstance { fn drop(&mut self) { let _ = self.state.dispose(); } }
 
-/// The `audio.h` routes with no XNA counterpart.
-///
-/// `SampleDuration` and `SampleSizeInBytes` are XNA's own static helpers --
-/// how long a buffer of a given size lasts, and how many bytes a given
-/// duration needs. They are pure arithmetic over a rate and a channel count,
-/// and they are called rather than restated so a change to CNA's rounding
-/// changes here with it.
-impl SoundEffect {
-    /// Whether CNA considers the sound effect disposed.
-    ///
-    /// A different question from [`IsDisposed`](Self::IsDisposed), which asks
-    /// whether Rust released the handle.
-    pub fn NativeIsDisposed(&self) -> Result<bool> {
+/// Whether CNA considers the sound effect disposed, which is a different
+/// question from `IsDisposed` asking whether Rust released the handle.
+impl NativeDisposalState for SoundEffect {
+    fn NativeIsDisposed(&self) -> Result<bool> {
         self.state
             .native
             .sound_effect_is_disposed(self.state.require_handle()?)
     }
-
 }
 
-impl SoundEffectInstance {
-    /// Whether CNA considers the instance disposed.
-    pub fn NativeIsDisposed(&self) -> Result<bool> {
+/// Whether CNA considers the instance disposed.
+impl NativeDisposalState for SoundEffectInstance {
+    fn NativeIsDisposed(&self) -> Result<bool> {
         self.state
             .native
             .sound_effect_instance_is_disposed(self.state.require_handle()?)
+    }
+}
+
+impl SoundEffectExt for SoundEffect {
+    fn FromAsset(game: &GameContext<'_>, assetName: &str) -> Result<Self> {
+        let runtime = Arc::clone(game.audio_runtime());
+        let active = runtime.active()?;
+        let handle = active
+            .native
+            .create_sound_effect_from_asset(active.handle, assetName)?;
+        let duration = match active.native.sound_effect_duration(handle) {
+            Ok(ticks) => TimeSpan::from_ticks(ticks),
+            Err(error) => {
+                let _ = active.native.destroy_sound_effect(handle);
+                return Err(error);
+            }
+        };
+        let state = Arc::new(SoundEffectState {
+            runtime: Arc::clone(&runtime),
+            native: active.native,
+            generation: active.generation,
+            handle: Mutex::new(handle),
+            duration,
+            name: Mutex::new(String::new()),
+            children: Mutex::new(Vec::new()),
+        });
+        runtime.register(&state);
+        Ok(Self { state })
     }
 }

@@ -11,7 +11,10 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use cna::extensions::audio_ext::capabilities;
+use cna::extensions::audio_ext::{
+    capabilities, DynamicSoundEffectInstanceExt, MicrophoneExt, NativeDisposalState,
+    SoundEffectExt,
+};
 use cna::Microsoft::Xna::Framework::Audio::{
     AudioChannels, DynamicSoundEffectInstance, Microphone, SoundEffect,
 };

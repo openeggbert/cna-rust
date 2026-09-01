@@ -7,6 +7,7 @@ use crate::extensions::events::{EventArgs, EventHandler};
 use crate::game::{GameContext, TimeSpan};
 use crate::graphics::resource::EventHandlers;
 use crate::native::Native;
+use crate::extensions::audio_ext::MicrophoneExt;
 
 use super::runtime::{
     audio_event_trampoline, AudioCallbackToken, AudioEventTarget, AudioResourceCleanup,
@@ -180,16 +181,8 @@ impl Microphone {
     }
 }
 
-/// The `audio.h` route that services every microphone at once.
-impl Microphone {
-    /// Checks every microphone's capture buffer and raises what is due.
-    ///
-    /// Process-wide rather than per-device, which is why it is an associated
-    /// function: XNA's `Microphone` raises `BufferReady` from the platform's
-    /// own servicing, and a caller driving capture on its own cadence -- a
-    /// test, or a game polling rather than waiting on events -- has no other
-    /// way to make that happen.
-    pub fn CheckAllBuffers(game: &GameContext<'_>) -> Result<()> {
+impl MicrophoneExt for Microphone {
+    fn CheckAllBuffers(game: &GameContext<'_>) -> Result<()> {
         let (native, handle) = game.native_game();
         native.check_all_microphone_buffers(handle)
     }

@@ -23,6 +23,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 
+use cna::extensions::audio_ext::NativeDisposalState;
 use cna::extensions::content::NativeContentManager;
 use cna::Microsoft::Xna::Framework::Audio::SoundEffect;
 use cna::Microsoft::Xna::Framework::Graphics::{
