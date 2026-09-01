@@ -454,11 +454,6 @@ extern "C" {
         argument2: u64,
         argument3: *mut u64,
     ) -> CNA_Result;
-    pub fn cna_graphics_device_supports_capability(
-        argument0: CNA_Handle,
-        argument1: CNA_GraphicsCapability,
-        argument2: *mut CNA_Bool,
-    ) -> CNA_Result;
     pub fn cna_graphics_device_get_renderer_info(
         argument0: CNA_Handle,
         argument1: *mut CNA_RendererInfo,
@@ -582,11 +577,6 @@ extern "C" {
         argument1: *mut CNA_RenderTargetInfo,
     ) -> CNA_Result;
     pub fn cna_render_target_destroy(argument0: CNA_Handle) -> CNA_Result;
-    pub fn cna_vertex_declaration_create(
-        argument0: *const CNA_VertexElement,
-        argument1: u64,
-        argument2: *mut CNA_VertexDeclarationHandle,
-    ) -> CNA_Result;
     pub fn cna_vertex_declaration_create_with_stride(
         argument0: i32,
         argument1: *const CNA_VertexElement,
@@ -1530,11 +1520,6 @@ extern "C" {
         argument0: CNA_Handle,
         argument1: CNA_PlayerIndex,
         argument2: *mut CNA_KeyboardState,
-    ) -> CNA_Result;
-    pub fn cna_keyboard_state_is_key_down(
-        argument0: *const CNA_KeyboardState,
-        argument1: CNA_Key,
-        argument2: *mut CNA_Bool,
     ) -> CNA_Result;
     pub fn cna_mouse_get_state(argument0: CNA_Handle, argument1: *mut CNA_MouseState) -> CNA_Result;
     pub fn cna_mouse_get_window_handle(argument0: CNA_Handle, argument1: *mut u64) -> CNA_Result;

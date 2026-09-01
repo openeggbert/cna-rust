@@ -119,6 +119,20 @@ one `outcome` from a closed set:
 A justification is checked, not trusted. The gate fails when one names a route
 that has since acquired a safe caller, stopped being bound, or left the
 headers, and when its `rustEvidence` names Rust that is no longer there.
+Measured, 2026-09-01, one mutation at a time against a passing gate:
+
+| Planted defect | Gate | What it reported |
+|---|---|---|
+| a justification deleted | fails | `boundWithoutSafeCallSiteUnjustified: [cna_packet_writer_write_matrix]` |
+| a justification's `rustEvidence` renamed | fails | `justificationsNamingAbsentRustCode: [cna_packet_writer_create: pub struct PacketScribbler]` |
+| a justification for a route that *is* reachable | fails | `staleUnreachableJustifications: [cna_audio_category_pause]` |
+| the only safe caller of a route deleted | fails | `boundWithoutSafeCallSiteUnjustified: [cna_net_get_last_join_error]` |
+
+The fourth is the one worth reading twice. Deleting `AudioCategory::Pause`
+alone does **not** fail the gate, and should not: `Resume`, `SetVolume` and
+`Stop` reach the same wrapper, and the wrapper still reads
+`category_pause`. The route is dead only when nothing reaches the field, which
+is what the walk measures and what a name-matching check could not.
 
 ## Measurement
 

@@ -3974,8 +3974,6 @@ pub type cna_graphics_device_get_render_target_count_fn =
     unsafe extern "C" fn(CNA_Handle, *mut u64) -> CNA_Result;
 pub type cna_graphics_device_copy_render_targets_fn =
     unsafe extern "C" fn(CNA_Handle, *mut CNA_RenderTargetBinding, u64, *mut u64) -> CNA_Result;
-pub type cna_graphics_device_supports_capability_fn =
-    unsafe extern "C" fn(CNA_Handle, CNA_GraphicsCapability, *mut CNA_Bool) -> CNA_Result;
 pub type cna_graphics_device_get_renderer_info_fn =
     unsafe extern "C" fn(CNA_Handle, *mut CNA_RendererInfo) -> CNA_Result;
 pub type cna_graphics_device_get_renderer_name_size_fn =
@@ -4072,11 +4070,6 @@ pub type cna_render_target_cube_create_fn = unsafe extern "C" fn(
 pub type cna_render_target_get_info_fn =
     unsafe extern "C" fn(CNA_Handle, *mut CNA_RenderTargetInfo) -> CNA_Result;
 pub type cna_render_target_destroy_fn = unsafe extern "C" fn(CNA_Handle) -> CNA_Result;
-pub type cna_vertex_declaration_create_fn = unsafe extern "C" fn(
-    *const CNA_VertexElement,
-    u64,
-    *mut CNA_VertexDeclarationHandle,
-) -> CNA_Result;
 pub type cna_vertex_declaration_create_with_stride_fn = unsafe extern "C" fn(
     i32,
     *const CNA_VertexElement,
@@ -4629,8 +4622,6 @@ pub type cna_keyboard_get_state_for_player_fn =
     unsafe extern "C" fn(CNA_Handle, CNA_PlayerIndex, *mut CNA_KeyboardState) -> CNA_Result;
 pub type cna_keyboard_get_state_fn =
     unsafe extern "C" fn(CNA_Handle, *mut CNA_KeyboardState) -> CNA_Result;
-pub type cna_keyboard_state_is_key_down_fn =
-    unsafe extern "C" fn(*const CNA_KeyboardState, CNA_Key, *mut CNA_Bool) -> CNA_Result;
 pub type cna_mouse_get_state_fn =
     unsafe extern "C" fn(CNA_Handle, *mut CNA_MouseState) -> CNA_Result;
 pub type cna_mouse_get_window_handle_fn = unsafe extern "C" fn(CNA_Handle, *mut u64) -> CNA_Result;

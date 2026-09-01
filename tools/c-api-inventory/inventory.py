@@ -87,9 +87,9 @@ UNREACHABLE_OUTCOMES = (
     # Safe Rust implements the behaviour itself, more faithfully than the C
     # route does.  Must name the Rust that does it in ``rustEvidence``.
     "IMPLEMENTED_IN_SAFE_RUST",
-    # The route mutates state XNA's object model freezes, so exposing it would
-    # contradict the semantics the projection exists to reproduce.
-    "MUTATOR_XNA_DOES_NOT_HAVE",
+    # The route backs something XNA's public API does not have: an explicit
+    # interface implementation, a mutator XNA throws from, or a CNA-only seam.
+    "OUTSIDE_XNA_SURFACE",
     # A CNA defect stops the safe layer from calling it.  Names a finding.
     "BLOCKED_UPSTREAM",
     # No renderer, platform, device or asset available here can drive it.
