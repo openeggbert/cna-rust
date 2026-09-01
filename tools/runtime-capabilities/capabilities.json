@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "scope": "Microsoft XNA 4.0 Windows Audio/XACT and Media/Video projection, plus every cna::extensions family",
-  "qualifiedArtifactSha256": "3a976d2494580ca9af45fbb2be30c13b01d05477f98ae80796ef26898c97d812",
+  "qualifiedArtifactSha256": "94078be94dc1f1e6c8787c1cd17b08c9430d1e4bb5699947cd2b7aafee40281d",
   "abiVersion": "0.21",
   "rows": [
     {
