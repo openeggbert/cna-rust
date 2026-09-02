@@ -281,10 +281,33 @@ a dummy backend look alive, and only the silent control rejects it.
 
 Microphone capture is *newly reachable* -- `Microphone::All` answers three real
 capture devices on `pulseaudio` where the dummy driver fabricates two -- but it
-is not qualified here. Asserting anything about captured samples means recording
-real audio on the host, which is the operator's decision to authorise, not a
-test's to take. The row stays `HARDWARE_PENDING` with its reason restated: no
-device or sample is fabricated.
+is still not qualified, and the reason has changed from "this host has no
+capture hardware" to something more specific.
+
+Qualifying capture needs a known signal. Recording the physical microphone
+records whatever is in the room, so the deterministic alternative is a loopback:
+point capture at the monitor of the sink CNA is playing into and capture exactly
+the tone CNA itself emitted. That was measured here, and it does not work:
+
+* SDL3's PulseAudio recording enumeration exposes only physical capture
+  devices. `Microphone::All` answers `Default Device`, `Ryzen HD Audio
+  Controller Stereo Microphone` and `Ryzen HD Audio Controller Digital
+  Microphone`. No `.monitor` source appears, so the loopback cannot be selected
+  through the XNA `Microphone` API at all.
+* `PULSE_SOURCE` does not redirect it either. With `PULSE_SOURCE` set to the
+  default sink's monitor (source 63), the stream still bound to source 65, the
+  physical microphone, because PipeWire's `module-stream-restore` resolves a
+  remembered device per application name
+  (`source-output-by-application-name:SDL Application`) and wins over the
+  environment variable.
+
+What remains would each modify the host's audio configuration rather than this
+process's: moving the stream after it starts, changing the default source, or
+unloading the restore module. None is this repository's to do. So the row stays
+`HARDWARE_PENDING`, and the honest statement of it is that capture hardware
+exists and the routes reach it, while a *deterministic* capture signal does not
+exist without either operator-authorised microphone recording or a host audio
+configuration change. No device or sample is fabricated.
 
 
 The later process-global Media registration architecture retains the exact

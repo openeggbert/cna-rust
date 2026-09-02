@@ -63,8 +63,12 @@ dead backend look alive, which only the silent control rejects.
 Nothing here is locally actionable. What remains is external:
 
 1. **Microphone capture** is newly *reachable* — three real capture devices
-   answer on `pulseaudio` — but qualifying it means recording real audio on the
-   host, which is the operator's call to authorise. `HARDWARE_PENDING`.
+   answer on `pulseaudio` — but a *deterministic* capture signal is not. The
+   loopback route was measured and does not exist here: SDL3's PulseAudio
+   recording enumeration exposes no monitor source, so CNA's own playback cannot
+   be captured through the XNA API, and `PULSE_SOURCE` is overridden by
+   PipeWire's `module-stream-restore`. What is left changes host audio
+   configuration, not this process's. `HARDWARE_PENDING`.
 2. **The other five standing blockers.** A wasm toolchain for
    `RUST-PLATFORM-003` — re-measured, and now not even `core` exists for any
    wasm target, with no `rustup` and no wasm sysroot anywhere on the filesystem;

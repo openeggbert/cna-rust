@@ -84,7 +84,7 @@
         "VERIFIED_MANAGED",
         "HARDWARE_PENDING"
       ],
-      "evidence": "Exact validation and native routes are implemented; real physical-device sample capture and event timing were not qualified. No synthetic device or samples are used."
+      "evidence": "Exact validation and native routes are implemented; real physical-device sample capture and event timing were not qualified. No synthetic device or samples are used. Re-measured for RUST-BEHAVIOR-008: this host now has capture hardware and Microphone::All reaches three real devices, so the limit is no longer the absence of a device. A deterministic capture signal is what is missing. SDL3's PulseAudio recording enumeration exposes no monitor source, so a loopback of CNA's own playback cannot be selected through the XNA API, and PULSE_SOURCE does not redirect it because PipeWire's module-stream-restore resolves a remembered device per application name and wins. The alternatives all change host audio configuration rather than this process's."
     },
     {
       "capability": "AudioEngine",
