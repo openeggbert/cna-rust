@@ -6,7 +6,10 @@ The surface milestone left the repository locally exhausted, with six external
 conditions standing between it and more work. One of them moved.
 
 ```text
-CNANEXT_HEAD=7712534d3d22c7e284714e0e87afebba3f3cb472   # unchanged
+CNANEXT_HEAD=5347b52eae1311fbea1f89955ae8a48c6843a88a
+  # one commit past the 7712534d qualification baseline, and it is a CNA-internal
+  # gtest only: no header, no c-api, no runtime source. Census 4055, ABI 0 findings
+  # and the qualified artifact 94078be9 are all unchanged against it.
 SHARP_RUNTIMENEXT_HEAD=9cc96cd57cde394940cc24d58743edf9bf63d3fb   # unchanged
 
 SDL_DRIVER            dummy  ->  pulseaudio
@@ -21,8 +24,13 @@ LOUD_BINS (within a tenth)            0       4       4
 PEAK_SAMPLE (0.8 authored @ vol 0.15) 0  0.119994  0.119994
 ```
 
-Ten upstream findings, two dependencies, and five other external blockers were
-checked and none of them moved; nothing was re-run against byte-identical code.
+Ten upstream findings and five other external blockers were checked and none of
+them moved; nothing was re-run against byte-identical code. cnanext gained one
+commit mid-session -- `5347b52ea`, replacing a fixed 50 ms sleep in its own
+AudioEngine gtest with a wait for real playback to finish, because "a fixed
+sleep can expire before the first callback even though playback is healthy".
+That is the same environment change measured here, arrived at independently
+from the other side.
 
 ### What the blocker actually was
 
